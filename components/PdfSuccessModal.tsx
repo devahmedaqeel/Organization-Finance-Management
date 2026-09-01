@@ -85,12 +85,13 @@ export function PdfSuccessModal({
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: "#0284C7", paddingVertical: 13 }]}
               onPress={async () => {
+                const targetUrl = "https://ofmapp-main.web.app/?tab=reports&export=dossier";
                 const { Linking } = require("react-native");
                 try {
                   const WebBrowser = require("expo-web-browser");
-                  await WebBrowser.openBrowserAsync("https://ofmapp-main.web.app");
+                  await WebBrowser.openBrowserAsync(targetUrl);
                 } catch {
-                  await Linking.openURL("https://ofmapp-main.web.app");
+                  await Linking.openURL(targetUrl);
                 }
               }}
               activeOpacity={0.85}

@@ -86,6 +86,16 @@ export function WebShell() {
   const [budgetModalVisible, setBudgetModalVisible] = useState(false);
 
   useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get("tab") as WebTabKey;
+      if (tabParam) {
+        setActiveTab(tabParam);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     injectWebMicroAnimations();
   }, []);
 

@@ -197,6 +197,17 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
     await openPdfReport(enterpriseData);
   };
 
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("export") === "dossier" || params.get("auto") === "pdf") {
+        setTimeout(() => {
+          handleExportPDF();
+        }, 700);
+      }
+    }
+  }, []);
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, isMobile && { padding: 14, gap: 14 }]} showsVerticalScrollIndicator={false}>
       {/* ─── Header ─── */}
