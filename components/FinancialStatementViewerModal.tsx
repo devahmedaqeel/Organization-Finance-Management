@@ -30,6 +30,9 @@ interface Props {
   onClose: () => void;
   reportOpts: ReportOptions | null;
   fileUri?: string;
+  title?: string;
+  onPrintDownload?: () => void;
+  htmlContent?: string;
 }
 
 function fmt(n: number): string {

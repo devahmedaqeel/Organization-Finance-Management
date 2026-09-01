@@ -26,26 +26,33 @@ interface Props {
   subtitle?: string;
 }
 
+import { openPdfFile, sharePdfFile } from "@/services/pdfDownloadService";
+
 export function PdfSuccessModal({
   visible,
   onClose,
   filename,
+  fileUri,
   title = "Saved into File Manager ✅",
   subtitle = "Official payslip PDF saved to your phone storage.",
 }: Props) {
   const colors = useColors();
 
-  // Auto-close popup after 2 seconds
-  useEffect(() => {
-    if (visible) {
-      const timer = setTimeout(() => {
-        onClose();
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [visible, onClose]);
-
   if (!visible) return null;
+
+  const handleOpen = async () => {
+    if (fileUri) {
+      await openPdfFile(fileUri, filename);
+    }
+    onClose();
+  };
+
+  const handleShare = async () => {
+    if (fileUri) {
+      await sharePdfFile(fileUri, filename);
+    }
+    onClose();
+  };
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -69,14 +76,38 @@ export function PdfSuccessModal({
             {filename ? `${filename}\n${subtitle}` : subtitle}
           </Text>
 
-          {/* Close Button */}
-          <TouchableOpacity
-            style={[styles.closeBtn, { backgroundColor: "#10B981" }]}
-            onPress={onClose}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.closeBtnText}>Close</Text>
-          </TouchableOpacity>
+          {/* Action Buttons Row */}
+          <View style={{ flexDirection: "row", gap: 10, width: "100%", marginTop: 4 }}>
+            {fileUri ? (
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: "#38BDF8", flex: 1 }]}
+                onPress={handleOpen}
+                activeOpacity={0.85}
+              >
+                <Feather name="file-text" size={15} color="#0F172A" />
+                <Text style={[styles.actionBtnText, { color: "#0F172A" }]}>Open PDF</Text>
+              </TouchableOpacity>
+            ) : null}
+
+            {fileUri ? (
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: "#10B981", flex: 1 }]}
+                onPress={handleShare}
+                activeOpacity={0.85}
+              >
+                <Feather name="share-2" size={15} color="#FFFFFF" />
+                <Text style={[styles.actionBtnText, { color: "#FFFFFF" }]}>Share</Text>
+              </TouchableOpacity>
+            ) : null}
+
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: colors.border, flex: fileUri ? 0.7 : 1 }]}
+              onPress={onClose}
+              activeOpacity={0.85}
+            >
+              <Text style={[styles.actionBtnText, { color: colors.foreground }]}>Close</Text>
+            </TouchableOpacity>
+          </View>
 
         </View>
       </TouchableOpacity>
@@ -142,6 +173,19 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     lineHeight: 18,
     paddingHorizontal: 4,
+  },
+  actionBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  actionBtnText: {
+    fontSize: 12.5,
+    fontFamily: "Inter_700Bold",
   },
   closeBtn: {
     width: "100%",

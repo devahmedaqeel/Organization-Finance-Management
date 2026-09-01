@@ -177,6 +177,33 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
     );
   }, [transactions, budgets, payroll, departments, effectivePeriod, scope, selectedDept, selectedType, settings, user]);
 
+  const reportOptsForViewer: ReportOptions = useMemo(() => {
+    return {
+      organizationName: settings.organizationName || user?.organization || "DevOrbit Tech Kotli",
+      organizationAddress: settings.organizationAddress || "Kotli, Azad Kashmir",
+      organizationEmail: (settings.organizationEmail && !settings.organizationEmail.includes("ofm-cloud.com")) ? settings.organizationEmail : (user?.email && !user.email.includes("ofm-cloud.com")) ? user.email : "",
+      organizationPhone: settings.organizationPhone || "+92-586-444111",
+      organizationLogo: settings.organizationLogo || "",
+      currency: settings.currency || "PKR",
+      fiscalYear: settings.fiscalYear || "2025-2026",
+      periodLabel: effectivePeriod?.label || "Selected Audit Scope",
+      startDate: effectivePeriod?.startDate,
+      endDate: effectivePeriod?.endDate,
+      generatedBy: user?.name || user?.email || "Chief Financial Officer",
+      generatedByEmail: user?.email || "",
+      userRole: user?.role || "Admin",
+      totalIncome: compiledEnterpriseData.executiveSummary.totalRevenue,
+      totalExpenses: compiledEnterpriseData.executiveSummary.totalExpenses,
+      netBalance: compiledEnterpriseData.executiveSummary.netOperatingBalance,
+      budgetUtilization: compiledEnterpriseData.executiveSummary.budgetUtilizationPct,
+      transactions: compiledEnterpriseData.generalLedger.transactions,
+      departments: departments,
+      payroll: payroll,
+      budgets: budgets,
+      reportMode: selectedType,
+    };
+  }, [settings, user, effectivePeriod, compiledEnterpriseData, departments, payroll, budgets, selectedType]);
+
   const handlePreview = () => {
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -490,7 +517,7 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
         <FinancialStatementViewerModal
           visible={previewModalVisible}
           onClose={() => setPreviewModalVisible(false)}
-          htmlContent={previewHtml}
+          reportOpts={reportOptsForViewer}
           title={compiledEnterpriseData.reportTitle}
           onPrintDownload={handleExport}
         />
