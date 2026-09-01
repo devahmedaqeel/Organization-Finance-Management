@@ -199,6 +199,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const [loaded, setLoaded] = useState(false);
 
   const prevTransactionsRef = useRef<Transaction[]>([]);
+  const deletedIdsRef = useRef<Set<string>>(new Set());
 
   const isDemoOrg = user?.organizationId === "demo-org";
   const activeOrgId = user?.organizationId || "default_org";
@@ -358,33 +359,18 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     const unsubBudgets = onSnapshot(
       qBudgets,
       (snapshot) => {
-        if (snapshot.empty) {
-          SEED_BUDGETS.forEach((sb) => {
-            const docId = `budget_${sb.id}_${canonicalOrgId.replace(/[^a-zA-Z0-9]/g, "_")}`;
-            setDoc(doc(db, "budgets", docId), {
-              ...sb,
-              id: docId,
-              organizationId: canonicalOrgId,
-              organization: canonicalOrgName,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            }, { merge: true }).catch(() => {});
-          });
-          setBudgets(SEED_BUDGETS);
-          return;
-        }
-
         const items: Budget[] = [];
         snapshot.forEach((d) => {
-          items.push({ id: d.id, ...d.data() } as Budget);
+          if (!deletedIdsRef.current.has(d.id)) {
+            items.push({ id: d.id, ...d.data() } as Budget);
+          }
         });
-        setBudgets(items.length > 0 ? items : SEED_BUDGETS);
+        setBudgets(items);
       },
       (err) => {
         if (err.code !== "permission-denied") {
           console.log("Budgets live sync notice:", err.message);
         }
-        setBudgets(SEED_BUDGETS);
       }
     );
 
@@ -404,39 +390,16 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       (snapshot) => {
         const items: PayrollEntry[] = [];
         snapshot.forEach((d) => {
-          items.push({ id: d.id, ...d.data() } as PayrollEntry);
-        });
-
-        if (items.length < SEED_PAYROLL.length) {
-          const existingEmployeeNames = new Set(items.map((it) => (it.employeeName || "").trim().toLowerCase()));
-          const missingSeed = SEED_PAYROLL.filter((sp) => !existingEmployeeNames.has(sp.employeeName.trim().toLowerCase()));
-
-          if (missingSeed.length > 0) {
-            missingSeed.forEach((sp) => {
-              const docId = `payroll_${sp.id}_${canonicalOrgId.replace(/[^a-zA-Z0-9]/g, "_")}`;
-              setDoc(doc(db, "payroll", docId), {
-                ...sp,
-                id: docId,
-                organizationId: canonicalOrgId,
-                organization: canonicalOrgName,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-              }, { merge: true }).catch(() => {});
-            });
-
-            // Instant combined state so badge shows 12 immediately
-            setPayroll([...items, ...missingSeed]);
-            return;
+          if (!deletedIdsRef.current.has(d.id)) {
+            items.push({ id: d.id, ...d.data() } as PayrollEntry);
           }
-        }
-
-        setPayroll(items.length > 0 ? items : SEED_PAYROLL);
+        });
+        setPayroll(items);
       },
       (err) => {
         if (err.code !== "permission-denied") {
           console.log("Payroll live sync notice:", err.message);
         }
-        setPayroll(SEED_PAYROLL);
       }
     );
 
@@ -454,33 +417,18 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     const unsubDepartments = onSnapshot(
       qDepartments,
       (snapshot) => {
-        if (snapshot.empty) {
-          SEED_DEPARTMENTS.forEach((sd) => {
-            const docId = `dept_${sd.id}_${canonicalOrgId.replace(/[^a-zA-Z0-9]/g, "_")}`;
-            setDoc(doc(db, "departments", docId), {
-              ...sd,
-              id: docId,
-              organizationId: canonicalOrgId,
-              organization: canonicalOrgName,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            }, { merge: true }).catch(() => {});
-          });
-          setDepartments(SEED_DEPARTMENTS);
-          return;
-        }
-
         const items: Department[] = [];
         snapshot.forEach((d) => {
-          items.push({ id: d.id, ...d.data() } as Department);
+          if (!deletedIdsRef.current.has(d.id)) {
+            items.push({ id: d.id, ...d.data() } as Department);
+          }
         });
-        setDepartments(items.length > 0 ? items : SEED_DEPARTMENTS);
+        setDepartments(items);
       },
       (err) => {
         if (err.code !== "permission-denied") {
           console.log("Departments live sync notice:", err.message);
         }
-        setDepartments(SEED_DEPARTMENTS);
       }
     );
 
@@ -631,9 +579,15 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteTransaction = async (id: string) => {
-    setTransactions((prev) => prev.filter((t) => t.id !== id));
+    deletedIdsRef.current.add(id);
+    const orgKey = (user?.organizationId || "demo-org").replace(/[^a-zA-Z0-9]/g, "_");
+    const aliasId = `tx_${id}_${orgKey}`;
+    deletedIdsRef.current.add(aliasId);
+
+    setTransactions((prev) => prev.filter((t) => t.id !== id && t.id !== aliasId));
     try {
-      await deleteDoc(doc(db, "transactions", id));
+      await deleteDoc(doc(db, "transactions", id)).catch(() => {});
+      await deleteDoc(doc(db, "transactions", aliasId)).catch(() => {});
       recordAuditLog({
         organizationId: activeOrgId,
         actorUid: user?.id || "anonymous",
@@ -704,9 +658,15 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteBudget = async (id: string) => {
-    setBudgets((prev) => prev.filter((b) => b.id !== id));
+    deletedIdsRef.current.add(id);
+    const orgKey = (user?.organizationId || "demo-org").replace(/[^a-zA-Z0-9]/g, "_");
+    const aliasId = `budget_${id}_${orgKey}`;
+    deletedIdsRef.current.add(aliasId);
+
+    setBudgets((prev) => prev.filter((b) => b.id !== id && b.id !== aliasId));
     try {
-      await deleteDoc(doc(db, "budgets", id));
+      await deleteDoc(doc(db, "budgets", id)).catch(() => {});
+      await deleteDoc(doc(db, "budgets", aliasId)).catch(() => {});
       recordAuditLog({
         organizationId: activeOrgId,
         actorUid: user?.id || "anonymous",
@@ -792,9 +752,15 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deletePayroll = async (id: string) => {
-    setPayroll((prev) => prev.filter((p) => p.id !== id));
+    deletedIdsRef.current.add(id);
+    const orgKey = (user?.organizationId || "demo-org").replace(/[^a-zA-Z0-9]/g, "_");
+    const aliasId = `payroll_${id}_${orgKey}`;
+    deletedIdsRef.current.add(aliasId);
+
+    setPayroll((prev) => prev.filter((p) => p.id !== id && p.id !== aliasId));
     try {
-      await deleteDoc(doc(db, "payroll", id));
+      await deleteDoc(doc(db, "payroll", id)).catch(() => {});
+      await deleteDoc(doc(db, "payroll", aliasId)).catch(() => {});
       recordAuditLog({
         organizationId: activeOrgId,
         actorUid: user?.id || "anonymous",
@@ -864,9 +830,15 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteDepartment = async (id: string) => {
-    setDepartments((prev) => prev.filter((d) => d.id !== id));
+    deletedIdsRef.current.add(id);
+    const orgKey = (user?.organizationId || "demo-org").replace(/[^a-zA-Z0-9]/g, "_");
+    const aliasId = `dept_${id}_${orgKey}`;
+    deletedIdsRef.current.add(aliasId);
+
+    setDepartments((prev) => prev.filter((d) => d.id !== id && d.id !== aliasId));
     try {
-      await deleteDoc(doc(db, "departments", id));
+      await deleteDoc(doc(db, "departments", id)).catch(() => {});
+      await deleteDoc(doc(db, "departments", aliasId)).catch(() => {});
       recordAuditLog({
         organizationId: activeOrgId,
         actorUid: user?.id || "anonymous",

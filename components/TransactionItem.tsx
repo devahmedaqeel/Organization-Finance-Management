@@ -1,7 +1,7 @@
 import { Feather } from "./UniversalIcon";
 import * as Haptics from "expo-haptics";
 import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View, Alert, Platform } from "react-native";
 import { Transaction } from "@/context/FinanceContext";
 import { useColors } from "@/hooks/useColors";
 import { useSettings } from "@/context/SettingsContext";
@@ -61,6 +61,26 @@ export function TransactionItem(props: TransactionItemProps) {
   const amountColor = isIncome ? colors.income : colors.expense;
   const icon = CATEGORY_ICONS[tx.category] ?? "file-text";
 
+  const handleDelete = () => {
+    if (!onDelete) return;
+    if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    Alert.alert(
+      `Delete ${isIncome ? "Income" : "Expense"}`,
+      `Are you sure you want to delete ${tx.category} transaction of ${settings.currency} ${formatAmountVal(tx.amount)}?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Yes, Delete It",
+          style: "destructive",
+          onPress: () => {
+            if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+            onDelete(tx.id);
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <View style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
       {/* Icon */}
@@ -105,10 +125,7 @@ export function TransactionItem(props: TransactionItemProps) {
             )}
             {onDelete && (
               <TouchableOpacity
-                onPress={() => {
-                  try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); } catch {}
-                  onDelete(tx.id);
-                }}
+                onPress={handleDelete}
                 hitSlop={12}
                 style={[styles.actionBtn, { backgroundColor: colors.expense + "18" }]}
               >

@@ -156,16 +156,24 @@ export default function DepartmentsScreen() {
     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
-  const confirmDelete = () => {
-    if (!deptToDelete) return;
-    if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    deleteDepartment(deptToDelete.id);
-    setDeptToDelete(null);
-  };
-
   const handleDelete = (dept: { id: string; name: string; headCount?: number; budgetAllocated?: number }) => {
-    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setDeptToDelete(dept);
+    if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    Alert.alert(
+      "Delete Department",
+      `Are you sure you want to delete ${dept.name} (${dept.headCount || 0} employees, ${settings.currency} ${fmt(dept.budgetAllocated || 0)} allocated)?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Yes, Delete It",
+          style: "destructive",
+          onPress: () => {
+            if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+            deleteDepartment(dept.id);
+            showFloatingToast("Department Deleted", `${dept.name} was permanently removed.`);
+          },
+        },
+      ]
+    );
   };
 
   return (

@@ -444,15 +444,16 @@ export default function PayrollScreen() {
                         onPress={() => {
                           Alert.alert(
                             "Delete Payroll Record",
-                            `Are you sure you want to delete payroll for ${item.employeeName}?`,
+                            `Are you sure you want to delete payroll record for ${item.employeeName} (${item.month})?`,
                             [
                               { text: "Cancel", style: "cancel" },
                               {
-                                text: "Delete",
+                                text: "Yes, Delete It",
                                 style: "destructive",
-                                onPress: () => {
-                                  if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                  deletePayroll(item.id);
+                                onPress: async () => {
+                                  if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+                                  await deletePayroll(item.id);
+                                  showFloatingToast("Payroll Deleted", `Payroll record for ${item.employeeName} was deleted.`);
                                 },
                               },
                             ]

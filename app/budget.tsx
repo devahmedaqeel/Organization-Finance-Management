@@ -163,6 +163,26 @@ export default function BudgetScreen() {
     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
+  const handleDeleteBudget = (item: any) => {
+    if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    Alert.alert(
+      "Delete Budget",
+      `Are you sure you want to delete ${item.department} (${item.category}) budget of ${settings.currency} ${fmtNum(item.allocated)}?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Yes, Delete It",
+          style: "destructive",
+          onPress: async () => {
+            if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+            await deleteBudget(item.id);
+            showFloatingToast("Budget Deleted", `${item.department} - ${item.category} budget was permanently deleted.`);
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <View style={[styles.flex, { backgroundColor: colors.background }]}>
       {/* Header */}
@@ -381,10 +401,7 @@ export default function BudgetScreen() {
                         <Feather name="edit-2" size={13} color={colors.primary} />
                       </TouchableOpacity>
                       <TouchableOpacity
-                        onPress={() => {
-                          if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                          deleteBudget(item.id);
-                        }}
+                        onPress={() => handleDeleteBudget(item)}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         style={[styles.trashBtn, { backgroundColor: colors.expense + "18", borderRadius: 8, padding: 6 }]}
                       >
