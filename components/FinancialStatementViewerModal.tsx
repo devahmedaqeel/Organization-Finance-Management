@@ -51,6 +51,8 @@ export function FinancialStatementViewerModal({
   onClose,
   reportOpts,
   fileUri,
+  title,
+  onPrintDownload,
 }: Props) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -158,6 +160,10 @@ export function FinancialStatementViewerModal({
 
   const handlePrintPdf = async () => {
     if (isExportingPdf) return;
+    if (onPrintDownload) {
+      onPrintDownload();
+      return;
+    }
     setIsExportingPdf(true);
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
