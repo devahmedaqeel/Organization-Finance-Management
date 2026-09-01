@@ -196,10 +196,17 @@ const toastStyles = StyleSheet.create({
   },
 });
 
-const SafeKeyboardProvider: React.ComponentType<{ children?: React.ReactNode }> =
-  Platform.OS === "web"
-    ? (({ children }) => <>{children}</>) as any
-    : require("react-native-keyboard-controller").KeyboardProvider;
+const SafeKeyboardProvider: React.ComponentType<{ children?: React.ReactNode }> = (() => {
+  if (Platform.OS === "web") {
+    return ({ children }: { children?: React.ReactNode }) => <>{children}</>;
+  }
+  try {
+    const { KeyboardProvider } = require("react-native-keyboard-controller");
+    return KeyboardProvider || (({ children }: { children?: React.ReactNode }) => <>{children}</>);
+  } catch {
+    return ({ children }: { children?: React.ReactNode }) => <>{children}</>;
+  }
+})();
 
 // ── Root Navigation ────────────────────────────────────────────────────────────
 function RootLayoutNav() {
