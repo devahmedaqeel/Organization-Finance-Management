@@ -1091,7 +1091,6 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
     </table>
   </div>
   ` : ""}
-  ` : ""}
 
   <!-- Audit Authorization & Verification Block -->
   <div class="footer-sign avoid-break">
