@@ -34,21 +34,17 @@ export function PdfSuccessModal({
   onClose,
   filename,
   fileUri,
-  title = "Saved into File Manager ✅",
-  subtitle = "Official PDF dossier saved to your phone storage.",
+  title = "Official PDF Dossier Ready ✅",
+  subtitle = Platform.OS === "ios" ? "Tap 'Share' to Save to Files or Send." : "Saved to device storage.",
 }: Props) {
   const colors = useColors();
 
-  // Auto-close popup after 2.5 seconds and trigger floating notification
+  // Trigger floating notification on display without premature auto-closing
   useEffect(() => {
     if (visible) {
-      showFloatingToast("Saved into File Manager ✅", filename || "PDF saved to phone storage.");
-      const timer = setTimeout(() => {
-        onClose();
-      }, 2500);
-      return () => clearTimeout(timer);
+      showFloatingToast("Official PDF Ready ✅", filename || "PDF generated successfully.");
     }
-  }, [visible, onClose, filename]);
+  }, [visible, filename]);
 
   if (!visible) return null;
 
