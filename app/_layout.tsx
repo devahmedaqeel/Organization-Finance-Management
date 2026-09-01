@@ -217,7 +217,7 @@ const SafeKeyboardProvider: React.ComponentType<{ children?: React.ReactNode }> 
 // ── Root Navigation ────────────────────────────────────────────────────────────
 function RootLayoutNav() {
   const { user, isLoading } = useAuth();
-  const [hasSeenOnboarding, setHasSeenOnboarding] = useState<boolean | null>(null);
+  const [hasSeenOnboarding, setHasSeenOnboarding] = useState<boolean>(true);
 
   const isAuthRoute =
     Platform.OS === "web" &&
@@ -226,10 +226,10 @@ function RootLayoutNav() {
 
   useEffect(() => {
     AsyncStorage.getItem("ofm_onboarding_seen").then((seen) => {
-      setHasSeenOnboarding(seen === "true");
-    }).catch(() => {
-      setHasSeenOnboarding(true);
-    });
+      if (seen === "false") {
+        setHasSeenOnboarding(false);
+      }
+    }).catch(() => {});
   }, []);
 
   // Route once both auth and onboarding checks are complete

@@ -317,7 +317,32 @@ export async function downloadFinancialReportPdf(
     }
   }
 
-  // 2. Call Secure Cloud Function (HTMLPDF.dev in Base64 mode)
+  // 2. Native HTML-to-PDF via expo-print (produces EXACT same output as in-app Preview)
+  try {
+    const Print = require("expo-print");
+    const pdfResult = await Print.printToFileAsync({
+      html,
+      base64: false,
+    });
+    if (pdfResult?.uri) {
+      // Move from temp to permanent location
+      const permanentUri = `${FileSystem.documentDirectory}${filename}`;
+      await FileSystem.moveAsync({ from: pdfResult.uri, to: permanentUri }).catch(() => {});
+      const finalUri = await FileSystem.getInfoAsync(permanentUri).then(
+        (info) => (info.exists ? permanentUri : pdfResult.uri)
+      ).catch(() => pdfResult.uri);
+      return {
+        success: true,
+        uri: finalUri,
+        filename,
+        message: `Official Financial Statement PDF saved successfully.`,
+      };
+    }
+  } catch (printErr: any) {
+    console.log("[PDF_SERVICE] expo-print unavailable, trying cloud endpoint:", printErr?.message);
+  }
+
+  // 3. Call Secure Cloud Function (HTMLPDF.dev in Base64 mode)
   try {
     const generatePdfCallable = httpsCallable<any, any>(functions, "generatePdfFromHtmlCallable");
     const res = await generatePdfCallable({
@@ -336,7 +361,7 @@ export async function downloadFinancialReportPdf(
     console.log("[PDF_SERVICE] Cloud HTMLPDF.dev endpoint unavailable, running verified local binary generator:", cloudErr?.message);
   }
 
-  // 3. Resilient High-Fidelity Local Vector Binary Fallback
+  // 4. Last Resort: Local Vector Binary Fallback
   const pdfBinary = buildFinancialPdfBinary(opts);
   const base64Data = safeBinaryToBase64(pdfBinary);
   return await saveBase64PdfToDevice(base64Data, filename, `Financial Statement (${opts.periodLabel})`);
