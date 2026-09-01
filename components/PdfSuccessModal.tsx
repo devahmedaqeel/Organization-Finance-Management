@@ -80,30 +80,25 @@ export function PdfSuccessModal({
             {filename ? `${filename}\n${subtitle}` : subtitle}
           </Text>
 
-          {/* Action Buttons: Open in Chrome Web, Open PDF, & Close */}
-          <View style={{ width: "100%", gap: 10, marginTop: 6 }}>
+          {/* Action Buttons: Single Direct Action & Close */}
+          <View style={{ width: "100%", gap: 10, marginTop: 8 }}>
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: "#0284C7", paddingVertical: 13 }]}
               onPress={async () => {
-                const { Linking } = require("react-native");
-                await Linking.openURL("https://ofmapp-main.web.app");
+                if (fileUri) {
+                  await openPdfFile(fileUri, filename);
+                } else {
+                  const { Linking } = require("react-native");
+                  await Linking.openURL("https://ofmapp-main.web.app");
+                }
               }}
               activeOpacity={0.85}
             >
-              <Feather name="globe" size={17} color="#FFFFFF" />
-              <Text style={[styles.actionBtnText, { color: "#FFFFFF", fontSize: 14.5 }]}>Open in Chrome Web</Text>
+              <Feather name="file-text" size={17} color="#FFFFFF" />
+              <Text style={[styles.actionBtnText, { color: "#FFFFFF", fontSize: 14.5 }]}>
+                Open Official PDF Dossier
+              </Text>
             </TouchableOpacity>
-
-            {fileUri ? (
-              <TouchableOpacity
-                style={[styles.actionBtn, { backgroundColor: "#38BDF8", paddingVertical: 13 }]}
-                onPress={handleOpen}
-                activeOpacity={0.85}
-              >
-                <Feather name="file-text" size={17} color="#0F172A" />
-                <Text style={[styles.actionBtnText, { color: "#0F172A", fontSize: 14.5 }]}>Open PDF File</Text>
-              </TouchableOpacity>
-            ) : null}
 
             <TouchableOpacity
               style={[styles.actionBtn, { backgroundColor: colors.border, paddingVertical: 12 }]}
