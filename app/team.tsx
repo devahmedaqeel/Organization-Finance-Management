@@ -419,54 +419,6 @@ ${orgName}`;
     }
   };
 
-  const handleUpdateRole = async (targetMember: User, newRole: UserRole) => {
-    try {
-      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      const { doc, setDoc } = require("firebase/firestore");
-      const userId = targetMember.id || `u_${targetMember.email.replace(/[^a-zA-Z0-9]/g, "_")}`;
-
-      // Update in Firestore users collection
-      await setDoc(doc(db, "users", userId), { role: newRole, updatedAt: new Date().toISOString() }, { merge: true });
-
-      // Optimistically update local state
-      setMembers((prev) => prev.map((m) => (m.id === targetMember.id || m.email === targetMember.email ? { ...m, role: newRole } : m)));
-      setSelectedMember((prev) => (prev ? { ...prev, role: newRole } : null));
-      showFloatingToast("Role Updated", `${targetMember.name} is now ${newRole.toUpperCase()}.`);
-    } catch (e: any) {
-      Alert.alert("Error", e?.message || "Failed to update role.");
-    }
-  };
-
-  const handleRemoveMember = async (targetMember: User) => {
-    Alert.alert(
-      "Remove Member",
-      `Are you sure you want to remove ${targetMember.name} from ${settings.organizationName}?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Remove",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-              const { doc, deleteDoc } = require("firebase/firestore");
-              const userId = targetMember.id || `u_${targetMember.email.replace(/[^a-zA-Z0-9]/g, "_")}`;
-
-              await deleteDoc(doc(db, "users", userId)).catch(() => {});
-              await deleteDoc(doc(db, "invitations", targetMember.email.toLowerCase())).catch(() => {});
-
-              setMembers((prev) => prev.filter((m) => m.id !== targetMember.id && m.email !== targetMember.email));
-              setMemberModalVisible(false);
-              showFloatingToast("Member Removed", `${targetMember.name} has been removed.`);
-            } catch (e: any) {
-              Alert.alert("Error", e?.message || "Failed to remove member.");
-            }
-          },
-        },
-      ]
-    );
-  };
-
   return (
     <KeyboardAvoidingView
       style={[styles.flex, { backgroundColor: colors.background }]}
