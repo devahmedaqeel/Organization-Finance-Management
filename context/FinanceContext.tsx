@@ -19,6 +19,16 @@ import {
   evaluateTransactionEvent,
 } from "@/services/notificationRules";
 import { recordAuditLog } from "@/services/auditService";
+import {
+  calculateTotalIncome,
+  calculateTotalExpenses,
+  calculateNetOperatingResult,
+  calculateActualCash,
+  calculateBudgetSpentForCategory,
+  calculateBudgetAllocation,
+  calculateBudgetUsed,
+  calculateBudgetRemaining,
+} from "@/services/FinancialCalculationEngine";
 
 export type TransactionType = "income" | "expense";
 
