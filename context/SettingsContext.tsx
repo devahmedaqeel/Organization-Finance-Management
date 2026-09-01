@@ -22,10 +22,10 @@ interface Settings {
 }
 
 const DEFAULT_SETTINGS: Settings = {
-  organizationName: "Organization Finance Management",
-  organizationAddress: "Enterprise Financial Center",
-  organizationEmail: "finance@ofm-cloud.com",
-  organizationPhone: "+1 (800) 555-0199",
+  organizationName: "DevOrbit Tech Kotli",
+  organizationAddress: "Kotli, Azad Kashmir",
+  organizationEmail: "",
+  organizationPhone: "+92-586-444111",
   currency: "PKR",
   fiscalYear: "2025-2026",
   organizationLogo: "",

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { StyleSheet, Text, TouchableOpacity, View, ScrollView, useWindowDimensions } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View, ScrollView, useWindowDimensions, Modal, TextInput, Platform } from "react-native";
 import { useFinance } from "@/context/FinanceContext";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
@@ -16,6 +16,7 @@ import { buildEnterpriseReportData } from "@/services/reportDataService";
 import {
   NormalizedPeriod,
   getPresetPeriod,
+  createCustomDatePeriod,
   filterTransactionsByPeriod,
   computePeriodMetrics,
   computeNetOperatingBalanceHealth,
@@ -42,6 +43,16 @@ interface WebReportsProps {
   onNavigate?: (route: string) => void;
 }
 
+const REPORT_PERIOD_PRESETS = [
+  { id: "last_7d", label: "1W" },
+  { id: "last_14d", label: "2W" },
+  { id: "this_month", label: "1M" },
+  { id: "last_3m", label: "3M" },
+  { id: "last_6m", label: "6M" },
+  { id: "this_year", label: "1Y" },
+  { id: "all_time", label: "ALL" },
+];
+
 export function WebReports({ onNavigate }: WebReportsProps = {}) {
   const colors = useColors();
   const { width } = useWindowDimensions();
@@ -53,6 +64,9 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
 
   const [activeTab, setActiveTab] = useState<"statement" | "analytics" | "departments" | "payroll">("statement");
   const [activePeriod, setActivePeriod] = useState<NormalizedPeriod>(() => getPresetPeriod("last_6m"));
+  const [customDateModalVisible, setCustomDateModalVisible] = useState(false);
+  const [customStart, setCustomStart] = useState(() => activePeriod.startDate || "2026-01-01");
+  const [customEnd, setCustomEnd] = useState(() => activePeriod.endDate || "2026-09-01");
   const [drillDownType, setDrillDownType] = useState<DrillDownType | null>(null);
 
   const fmt = (n: number) => {
@@ -195,20 +209,21 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
             <View style={{ flex: 1 }}>
               <Text style={[styles.pageTitle, { color: colors.foreground, fontSize: isMobile ? 19 : 22 }]}>Financial Auditing & Reports</Text>
               <Text style={[styles.pageSubtitle, { color: colors.mutedForeground, fontSize: isMobile ? 12 : 13 }]}>
-                {settings.organizationName || "Organization Finance Management"} · Period: {activePeriod.label}
+                {settings.organizationName || "Organization Finance Management"} · Institutional Statement & Compliance Engine
               </Text>
             </View>
           </View>
         </View>
 
-        <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap", width: isMobile ? "100%" : "auto" }}>
+        {/* Action Buttons */}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flexWrap: "wrap", width: isMobile ? "100%" : "auto" }}>
           <TouchableOpacity
             style={[styles.outlineBtn, { borderColor: colors.border, backgroundColor: colors.card }, isMobile && { flex: 1 }]}
             onPress={() => setExportModalVisible(true)}
             activeOpacity={0.8}
           >
-            <SvgLayers size={14} color={colors.foreground} />
-            <Text style={[styles.outlineBtnText, { color: colors.foreground }]}>Export Custom Report...</Text>
+            <SvgLayers size={15} color={colors.foreground} />
+            <Text style={[styles.outlineBtnText, { color: colors.foreground }]}>Export Custom Report</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -219,6 +234,76 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
             <SvgFileText size={15} color="#FFFFFF" />
             <Text style={styles.primaryBtnText}>Export Full Dossier (PDF)</Text>
           </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* ─── Dedicated Period & Audit Scope Toolbar ─── */}
+      <View style={[styles.scopeToolbar, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flexWrap: "wrap", flex: 1 }}>
+          <Text style={{ fontSize: 11, fontFamily: "Inter_800ExtraBold", color: colors.mutedForeground, letterSpacing: 0.5 }}>
+            AUDIT SCOPE:
+          </Text>
+
+          {/* Quick Period Selector Pills */}
+          <View style={[styles.periodPillsContainer, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            {REPORT_PERIOD_PRESETS.map((p) => {
+              const isSelected = activePeriod.presetId === p.id || (activePeriod.presetId !== "custom" && activePeriod.label.includes(p.label));
+              return (
+                <TouchableOpacity
+                  key={p.id}
+                  onPress={() => setActivePeriod(getPresetPeriod(p.id))}
+                  style={[
+                    styles.periodPill,
+                    isSelected && { backgroundColor: colors.primary },
+                  ]}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      styles.periodPillText,
+                      { color: isSelected ? "#FFFFFF" : colors.mutedForeground },
+                    ]}
+                  >
+                    {p.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+
+            {/* Custom Range Button */}
+            <TouchableOpacity
+              onPress={() => {
+                setCustomStart(activePeriod.startDate || "2026-01-01");
+                setCustomEnd(activePeriod.endDate || "2026-09-01");
+                setCustomDateModalVisible(true);
+              }}
+              style={[
+                styles.periodPill,
+                activePeriod.presetId === "custom" && { backgroundColor: colors.primary },
+              ]}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.periodPillText,
+                  { color: activePeriod.presetId === "custom" ? "#FFFFFF" : colors.mutedForeground },
+                ]}
+              >
+                📅 Custom Date Range
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Active Range Scope Tag */}
+        <View style={[styles.activeScopeTag, { backgroundColor: colors.background, borderColor: colors.border }]}>
+          <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: colors.primary }} />
+          <Text style={{ fontSize: 11.5, fontFamily: "Inter_700Bold", color: colors.foreground }}>
+            Scope: {activePeriod.label}
+          </Text>
+          <Text style={{ fontSize: 11, color: colors.mutedForeground }}>
+            ({periodTransactions.length} records)
+          </Text>
         </View>
       </View>
 
@@ -500,6 +585,139 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
         </View>
       )}
 
+      {/* ─── Custom Date Range Modal ─── */}
+      <Modal visible={customDateModalVisible} transparent animationType="fade" onRequestClose={() => setCustomDateModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.customDateSheet, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.customDateHeader}>
+              <View>
+                <Text style={[styles.customDateTitle, { color: colors.foreground }]}>Select Custom Date Period</Text>
+                <Text style={{ fontSize: 12, color: colors.mutedForeground, marginTop: 2 }}>
+                  Filter transactions, statement analytics & PDF reports by exact date range
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setCustomDateModalVisible(false)}>
+                <Text style={{ fontSize: 18, color: colors.mutedForeground, fontWeight: "700" }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ padding: 20, gap: 16 }}>
+              {/* Quick Presets Shortcut row */}
+              <Text style={{ fontSize: 11.5, fontWeight: "700", color: colors.foreground, textTransform: "uppercase" }}>Quick Shortcuts</Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                {[
+                  { label: "This Month (Sep)", start: "2026-09-01", end: "2026-09-30" },
+                  { label: "Last Month (Aug)", start: "2026-08-01", end: "2026-08-31" },
+                  { label: "Q3 2026", start: "2026-07-01", end: "2026-09-30" },
+                  { label: "Q2 2026", start: "2026-04-01", end: "2026-06-30" },
+                  { label: "Full Year 2026", start: "2026-01-01", end: "2026-12-31" },
+                  { label: "All Records", start: "2024-01-01", end: "2026-12-31" },
+                ].map((s) => (
+                  <TouchableOpacity
+                    key={s.label}
+                    onPress={() => {
+                      setCustomStart(s.start);
+                      setCustomEnd(s.end);
+                    }}
+                    style={{
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 8,
+                      backgroundColor: colors.background,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                    }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: "600", color: colors.foreground }}>{s.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Start Date & End Date Inputs */}
+              <View style={{ flexDirection: "row", gap: 14 }}>
+                <View style={{ flex: 1, gap: 6 }}>
+                  <Text style={{ fontSize: 12, fontWeight: "700", color: colors.foreground }}>Start Date (From)</Text>
+                  <TextInput
+                    value={customStart}
+                    onChangeText={setCustomStart}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor={colors.mutedForeground}
+                    style={{
+                      backgroundColor: colors.background,
+                      borderColor: colors.border,
+                      borderWidth: 1,
+                      borderRadius: 10,
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      color: colors.foreground,
+                      fontSize: 14,
+                      fontFamily: "Inter_600SemiBold",
+                    }}
+                  />
+                </View>
+
+                <View style={{ flex: 1, gap: 6 }}>
+                  <Text style={{ fontSize: 12, fontWeight: "700", color: colors.foreground }}>End Date (To)</Text>
+                  <TextInput
+                    value={customEnd}
+                    onChangeText={setCustomEnd}
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor={colors.mutedForeground}
+                    style={{
+                      backgroundColor: colors.background,
+                      borderColor: colors.border,
+                      borderWidth: 1,
+                      borderRadius: 10,
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      color: colors.foreground,
+                      fontSize: 14,
+                      fontFamily: "Inter_600SemiBold",
+                    }}
+                  />
+                </View>
+              </View>
+
+              {/* Actions */}
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 8 }}>
+                <TouchableOpacity
+                  onPress={() => setCustomDateModalVisible(false)}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 12,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: colors.border,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => {
+                    const customPeriod = createCustomDatePeriod(customStart, customEnd);
+                    setActivePeriod(customPeriod);
+                    setCustomDateModalVisible(false);
+                  }}
+                  style={{
+                    flex: 2,
+                    backgroundColor: colors.primary,
+                    paddingVertical: 12,
+                    borderRadius: 10,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Text style={{ fontSize: 13.5, fontWeight: "700", color: "#FFFFFF" }}>Apply Date Range</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* ─── Level 3 Comprehensive Financial Drill-Down Modal ─── */}
       {drillDownType !== null && (
         <FinancialDrillDownModal
@@ -526,6 +744,37 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
 }
 
 const styles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+  },
+  customDateSheet: {
+    width: "100%",
+    maxWidth: 520,
+    borderRadius: 18,
+    borderWidth: 1,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+  },
+  customDateHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(148,163,184,0.15)",
+  },
+  customDateTitle: {
+    fontSize: 16,
+    fontFamily: "Inter_800ExtraBold",
+  },
   container: {
     flex: 1,
   },
@@ -563,7 +812,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 7,
+    gap: 8,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 10,
@@ -575,6 +824,59 @@ const styles = StyleSheet.create({
   primaryBtnText: {
     color: "#FFFFFF",
     fontSize: 13,
+    fontFamily: "Inter_700Bold",
+  },
+  outlineBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  outlineBtnText: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+  },
+  scopeToolbar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 12,
+    flexWrap: "wrap",
+  },
+  activeScopeTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 9,
+    borderWidth: 1,
+  },
+  periodPillsContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 10,
+    padding: 3,
+    borderWidth: 1,
+    gap: 3,
+  },
+  periodPill: {
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 7,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  periodPillText: {
+    fontSize: 12,
     fontFamily: "Inter_700Bold",
   },
   metricsGrid: {

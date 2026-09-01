@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
   ActivityIndicator,
@@ -17,7 +18,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useFinance } from "@/context/FinanceContext";
 import { useSettings } from "@/context/SettingsContext";
 import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
-import { NormalizedPeriod } from "@/services/DatePeriodService";
+import { NormalizedPeriod, createCustomDatePeriod } from "@/services/DatePeriodService";
 import {
   generateFinancialHtmlReport,
   downloadCsvReport,
@@ -41,7 +42,7 @@ const REPORT_TYPE_OPTIONS: Array<{
   id: ReportType;
   title: string;
   subtitle: string;
-  icon: any;
+  icon: string;
   color: string;
 }> = [
   {
@@ -77,14 +78,14 @@ const REPORT_TYPE_OPTIONS: Array<{
     title: "Institutional Revenue Statement",
     subtitle: "Capital inflows, institutional grants, fee receipts & active funding streams",
     icon: "trending-up",
-    color: "#059669",
+    color: "#10B981",
   },
   {
     id: "department_analysis",
     title: "Departmental Cost Center Matrix",
-    subtitle: "Division allocations, actual vs budget utilization, headcount & net balance",
+    subtitle: "Allocated budget vs actual utilization, headcount costs & cost-center margins",
     icon: "layers",
-    color: "#3B82F6",
+    color: "#0EA5E9",
   },
   {
     id: "budget_performance",
@@ -98,7 +99,7 @@ const REPORT_TYPE_OPTIONS: Array<{
     title: "Audited General Ledger Trail",
     subtitle: "Chronological double-entry transaction trail with reference metadata",
     icon: "book-open",
-    color: "#0F172A",
+    color: "#475569",
   },
 ];
 
@@ -111,7 +112,9 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
 
   const [selectedType, setSelectedType] = useState<ReportType>("consolidated_statement");
   const [format, setFormat] = useState<"pdf" | "csv">("pdf");
-  const [scope, setScope] = useState<"period" | "all">("period");
+  const [scope, setScope] = useState<"period" | "all" | "custom">("period");
+  const [customStart, setCustomStart] = useState(() => activePeriod?.startDate || "2026-01-01");
+  const [customEnd, setCustomEnd] = useState(() => activePeriod?.endDate || "2026-09-01");
   const [selectedDept, setSelectedDept] = useState<string>("all");
   const [generating, setGenerating] = useState(false);
   const [loadingStep, setLoadingStep] = useState<string>("");
@@ -137,6 +140,13 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
     return ["all", ...unique];
   }, [departments, transactions, payroll]);
 
+  const effectivePeriod = useMemo(() => {
+    if (scope === "custom") {
+      return createCustomDatePeriod(customStart, customEnd);
+    }
+    return activePeriod;
+  }, [scope, customStart, customEnd, activePeriod]);
+
   const compiledEnterpriseData = useMemo(() => {
     return buildEnterpriseReportData(
       transactions,
@@ -144,33 +154,45 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
       payroll,
       departments,
       {
-        period: activePeriod,
-        scope,
+        period: effectivePeriod,
+        scope: scope === "custom" ? "period" : scope,
         departmentFilter: selectedDept,
         reportType: selectedType,
       },
       {
-        organizationName: settings.organizationName || user?.organization || "Organization Finance Management",
-        organizationAddress: settings.organizationAddress || "Enterprise Financial Center",
-        organizationEmail: settings.organizationEmail || user?.email || "finance@ofm-cloud.com",
-        organizationPhone: settings.organizationPhone || "+92-586-444111",
+        organizationName: settings.organizationName || user?.organization || "DevOrbit Tech Kotli",
+        organizationAddress: settings.organizationAddress || "Kotli, Azad Kashmir",
+        organizationEmail: (settings.organizationEmail && !settings.organizationEmail.includes("ofm-cloud.com")) ? settings.organizationEmail : (user?.email && !user.email.includes("ofm-cloud.com")) ? user.email : "",
+        organizationPhone: (settings.organizationPhone && !settings.organizationPhone.includes("555-0199")) ? settings.organizationPhone : "+92-586-444111",
         organizationLogo: settings.organizationLogo || "",
         currency: settings.currency || "PKR",
         fiscalYear: settings.fiscalYear || "2025-2026",
       },
       {
         name: user?.name || user?.email || "Chief Financial Officer",
-        email: user?.email || "cfo@ofm.org",
+        email: (user?.email && !user.email.includes("ofm.org")) ? user.email : "",
         role: user?.role || "Admin",
-        organization: settings.organizationName || user?.organization,
+        organization: settings.organizationName || user?.organization || "DevOrbit Tech Kotli",
       }
     );
-  }, [transactions, budgets, payroll, departments, activePeriod, scope, selectedDept, selectedType, settings, user]);
+  }, [transactions, budgets, payroll, departments, effectivePeriod, scope, selectedDept, selectedType, settings, user]);
 
   const handlePreview = () => {
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
     const html = generateFinancialHtmlReport(compiledEnterpriseData);
-    setPreviewHtml(html);
-    setPreviewModalVisible(true);
+    if (Platform.OS === "web") {
+      const printWindow = window.open("", "_blank");
+      if (printWindow) {
+        printWindow.document.open();
+        printWindow.document.write(html);
+        printWindow.document.close();
+      }
+    } else {
+      setPreviewHtml(html);
+      setPreviewModalVisible(true);
+    }
   };
 
   const handleExport = async () => {
@@ -296,7 +318,7 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
                   onPress={() => setScope("period")}
                 >
                   <Text style={[styles.toggleBtnText, { color: scope === "period" ? "#FFF" : colors.foreground }]}>
-                    Active Scope ({activePeriod?.label || "Current Period"})
+                    Active Scope
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -304,10 +326,63 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
                   onPress={() => setScope("all")}
                 >
                   <Text style={[styles.toggleBtnText, { color: scope === "all" ? "#FFF" : colors.foreground }]}>
-                    All-Time Archive
+                    All-Time
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.toggleBtn, scope === "custom" && { backgroundColor: colors.primary }]}
+                  onPress={() => setScope("custom")}
+                >
+                  <Text style={[styles.toggleBtnText, { color: scope === "custom" ? "#FFF" : colors.foreground }]}>
+                    Custom Range
                   </Text>
                 </TouchableOpacity>
               </View>
+
+              {scope === "custom" && (
+                <View style={{ flexDirection: "row", gap: 10, marginBottom: 12, marginTop: 4 }}>
+                  <View style={{ flex: 1, gap: 4 }}>
+                    <Text style={{ fontSize: 11, fontWeight: "700", color: colors.mutedForeground }}>From Date</Text>
+                    <TextInput
+                      value={customStart}
+                      onChangeText={setCustomStart}
+                      placeholder="YYYY-MM-DD"
+                      placeholderTextColor={colors.mutedForeground}
+                      style={{
+                        backgroundColor: colors.background,
+                        borderColor: colors.border,
+                        borderWidth: 1,
+                        borderRadius: 8,
+                        paddingHorizontal: 10,
+                        paddingVertical: 8,
+                        color: colors.foreground,
+                        fontSize: 13,
+                        fontWeight: "600",
+                      }}
+                    />
+                  </View>
+                  <View style={{ flex: 1, gap: 4 }}>
+                    <Text style={{ fontSize: 11, fontWeight: "700", color: colors.mutedForeground }}>To Date</Text>
+                    <TextInput
+                      value={customEnd}
+                      onChangeText={setCustomEnd}
+                      placeholder="YYYY-MM-DD"
+                      placeholderTextColor={colors.mutedForeground}
+                      style={{
+                        backgroundColor: colors.background,
+                        borderColor: colors.border,
+                        borderWidth: 1,
+                        borderRadius: 8,
+                        paddingHorizontal: 10,
+                        paddingVertical: 8,
+                        color: colors.foreground,
+                        fontSize: 13,
+                        fontWeight: "600",
+                      }}
+                    />
+                  </View>
+                </View>
+              )}
 
               {/* Department Cost Center Filter */}
               <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 14 }]}>3. Cost Center Filter</Text>
@@ -440,15 +515,25 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.65)",
-    justifyContent: "flex-end",
+    justifyContent: Platform.OS === "web" ? "center" : "flex-end",
+    alignItems: Platform.OS === "web" ? "center" : "stretch",
+    padding: Platform.OS === "web" ? 16 : 0,
   },
   sheet: {
+    width: "100%",
+    maxWidth: Platform.OS === "web" ? 640 : "100%",
+    borderRadius: Platform.OS === "web" ? 20 : 0,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     borderWidth: 1,
-    maxHeight: "92%",
+    maxHeight: Platform.OS === "web" ? "88%" : "92%",
     display: "flex",
     flexDirection: "column",
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
   },
   handle: {
     width: 38,
@@ -463,133 +548,139 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 18,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(148,163,184,0.15)",
   },
   headerLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 12,
     flex: 1,
   },
   headerIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  title: {
+    fontSize: 16.5,
+    fontWeight: "800",
+  },
+  subtitle: {
+    fontSize: 11.5,
+    marginTop: 2,
+  },
+  body: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    flexGrow: 1,
+  },
+  sectionTitle: {
+    fontSize: 11.5,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginBottom: 10,
+  },
+  reportTypeCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    gap: 12,
+  },
+  reportTypeIconBox: {
     width: 36,
     height: 36,
     borderRadius: 10,
     justifyContent: "center",
     alignItems: "center",
   },
-  title: {
-    fontSize: 16,
-    fontWeight: "800",
-  },
-  subtitle: {
-    fontSize: 11,
-    marginTop: 1,
-  },
-  body: {
-    padding: 16,
-    flexGrow: 1,
-  },
-  sectionTitle: {
-    fontSize: 12,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginBottom: 8,
-  },
-  reportTypeCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 10,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    gap: 10,
-  },
-  reportTypeIconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    justifyContent: "center",
-    alignItems: "center",
-  },
   reportTypeTitle: {
-    fontSize: 13,
+    fontSize: 13.5,
     fontWeight: "700",
   },
   reportTypeSub: {
-    fontSize: 10,
+    fontSize: 11,
     marginTop: 2,
-    lineHeight: 13,
+    lineHeight: 15,
   },
   radioCircle: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     borderWidth: 2,
     justifyContent: "center",
     alignItems: "center",
   },
   radioDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
   },
   toggleRow: {
     flexDirection: "row",
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
-    padding: 3,
+    padding: 4,
     marginBottom: 8,
   },
   toggleBtn: {
     flex: 1,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 9,
     alignItems: "center",
+    justifyContent: "center",
   },
   toggleBtnText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "700",
+    textAlign: "center",
   },
   deptChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
     borderWidth: 1,
   },
   deptChipText: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: "600",
   },
   formatGrid: {
     flexDirection: "row",
-    gap: 10,
+    gap: 12,
   },
   formatCard: {
     flex: 1,
-    padding: 12,
-    borderRadius: 10,
+    padding: 14,
+    borderRadius: 12,
     borderWidth: 1.5,
     alignItems: "center",
-    textAlign: "center",
-    gap: 4,
+    justifyContent: "center",
+    gap: 6,
   },
   formatTitle: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "700",
-    marginTop: 4,
+    marginTop: 2,
     textAlign: "center",
   },
   formatSub: {
-    fontSize: 9.5,
+    fontSize: 11,
     textAlign: "center",
-    lineHeight: 12,
+    lineHeight: 14,
   },
   footer: {
-    padding: 14,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
     borderTopWidth: 1,
   },
   loadingBox: {
@@ -608,13 +699,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    gap: 6,
+    gap: 8,
     paddingVertical: 12,
     borderRadius: 10,
     borderWidth: 1,
   },
   previewBtnText: {
-    fontSize: 13,
+    fontSize: 13.5,
     fontWeight: "700",
   },
   exportBtn: {
@@ -622,12 +713,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    gap: 6,
+    gap: 8,
     paddingVertical: 12,
     borderRadius: 10,
   },
   exportBtnText: {
-    fontSize: 13,
+    fontSize: 13.5,
     fontWeight: "800",
     color: "#FFFFFF",
   },

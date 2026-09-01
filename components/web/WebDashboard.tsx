@@ -525,9 +525,7 @@ export function WebDashboard({
             <Text style={{ color: currentHeroIsDeficit ? "#FB7185" : "#34D399", fontSize: 12, fontFamily: "Inter_700Bold" }}>
               {balanceViewMode === "expenses"
                 ? `${clampedSpendRatio}% Outflow Ratio`
-                : isDeficit
-                ? `-${Math.abs(netMargin).toFixed(1)}% MoM`
-                : `${incomeGrowth > 0 ? "+" : ""}${incomeGrowth.toFixed(1)}% MoM`}
+                : `${netMargin >= 0 ? "+" : ""}${netMargin.toFixed(1)}% Operating Margin`}
             </Text>
           </TouchableOpacity>
         </View>

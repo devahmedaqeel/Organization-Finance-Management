@@ -292,7 +292,32 @@ export async function downloadFinancialReportPdf(
   const filename = `OFM_${sanitizedOrg}_${cleanType}_${new Date().toISOString().substring(0, 10)}.pdf`;
   const html = generateFinancialHtmlReport(opts);
 
-  // 1. Call Secure Cloud Function (HTMLPDF.dev in Base64 mode)
+  // 1. Web Platform: Instant Full Multi-Page Printable PDF Dossier with all Charts, Departments & Payroll
+  if (Platform.OS === "web") {
+    try {
+      const printWindow = window.open("", "_blank");
+      if (printWindow) {
+        printWindow.document.open();
+        printWindow.document.write(html);
+        printWindow.document.close();
+        setTimeout(() => {
+          try {
+            printWindow.focus();
+            printWindow.print();
+          } catch (e) {}
+        }, 400);
+        return {
+          success: true,
+          filename,
+          message: "Official Multi-Page Financial Dossier generated with all graphs, departments, and payroll.",
+        };
+      }
+    } catch (e) {
+      console.log("Web window.open print fallback:", e);
+    }
+  }
+
+  // 2. Call Secure Cloud Function (HTMLPDF.dev in Base64 mode)
   try {
     const generatePdfCallable = httpsCallable<any, any>(functions, "generatePdfFromHtmlCallable");
     const res = await generatePdfCallable({
@@ -311,7 +336,7 @@ export async function downloadFinancialReportPdf(
     console.log("[PDF_SERVICE] Cloud HTMLPDF.dev endpoint unavailable, running verified local binary generator:", cloudErr?.message);
   }
 
-  // 2. Resilient High-Fidelity Local Vector Binary Fallback
+  // 3. Resilient High-Fidelity Local Vector Binary Fallback
   const pdfBinary = buildFinancialPdfBinary(opts);
   const base64Data = safeBinaryToBase64(pdfBinary);
   return await saveBase64PdfToDevice(base64Data, filename, `Financial Statement (${opts.periodLabel})`);

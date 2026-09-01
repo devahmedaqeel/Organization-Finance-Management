@@ -575,11 +575,9 @@ export default function DashboardScreen() {
                   <Text style={[styles.heroGrowthText, { color: currentHeroIsDeficit ? "#FB7185" : "#4ADE80" }]}>
                     {balanceViewMode === "budget" && totalBudgeted > 0
                       ? `${netBudgetUtilization.toFixed(0)}% Used`
-                      : isDeficit
-                      ? `-${Math.abs(netMargin).toFixed(1)}%`
-                      : `${incomeGrowth > 0 ? "+" : ""}${incomeGrowth.toFixed(1)}%`}
+                      : `${netMargin >= 0 ? "+" : ""}${netMargin.toFixed(1)}%`}
                   </Text>
-                  <Text style={styles.heroGrowthSub}>{balanceViewMode === "budget" && totalBudgeted > 0 ? "Cap" : isDeficit ? "Deficit" : "MoM"}</Text>
+                  <Text style={styles.heroGrowthSub}>{balanceViewMode === "budget" && totalBudgeted > 0 ? "Cap" : isDeficit ? "Deficit" : "Margin"}</Text>
                 </>
               )}
               {growthMode === 1 && (

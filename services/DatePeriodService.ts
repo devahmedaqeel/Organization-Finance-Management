@@ -148,13 +148,15 @@ export function getPresetPeriod(presetId: string): NormalizedPeriod {
   let endDate = todayStr;
   let label = "Today";
 
-  switch (presetId) {
+  const key = (presetId || "").toLowerCase().trim();
+  switch (key) {
     case "today": {
       startDate = todayStr;
       endDate = todayStr;
       label = `Today (${formatReadableDate(todayStr)})`;
       break;
     }
+    case "1w":
     case "this_week":
     case "last_7d": {
       const s = new Date(now);
@@ -164,6 +166,7 @@ export function getPresetPeriod(presetId: string): NormalizedPeriod {
       label = "Last 7 Days (1W)";
       break;
     }
+    case "2w":
     case "last_14d": {
       const s = new Date(now);
       s.setDate(now.getDate() - 13);
@@ -172,6 +175,7 @@ export function getPresetPeriod(presetId: string): NormalizedPeriod {
       label = "Last 14 Days (2W)";
       break;
     }
+    case "1m":
     case "this_month": {
       const s = new Date(now.getFullYear(), now.getMonth(), 1);
       const e = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -188,6 +192,7 @@ export function getPresetPeriod(presetId: string): NormalizedPeriod {
       label = "Last 30 Days";
       break;
     }
+    case "3m":
     case "last_3m": {
       const s = new Date(now.getFullYear(), now.getMonth() - 2, 1);
       const e = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -196,6 +201,7 @@ export function getPresetPeriod(presetId: string): NormalizedPeriod {
       label = "Last 3 Months";
       break;
     }
+    case "6m":
     case "last_6m": {
       const s = new Date(now.getFullYear(), now.getMonth() - 5, 1);
       const e = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -204,6 +210,7 @@ export function getPresetPeriod(presetId: string): NormalizedPeriod {
       label = "Last 6 Months";
       break;
     }
+    case "1y":
     case "this_year": {
       startDate = `${now.getFullYear()}-01-01`;
       endDate = `${now.getFullYear()}-12-31`;
@@ -217,6 +224,7 @@ export function getPresetPeriod(presetId: string): NormalizedPeriod {
       label = `Year ${py}`;
       break;
     }
+    case "all":
     case "all_time":
     default: {
       startDate = "2024-01-01";
@@ -235,6 +243,23 @@ export function getPresetPeriod(presetId: string): NormalizedPeriod {
     label,
     granularity,
     presetId,
+  };
+}
+
+export function createCustomDatePeriod(startDate: string, endDate: string, customLabel?: string): NormalizedPeriod {
+  const now = new Date();
+  const cleanStart = startDate ? startDate.trim() : `${now.getFullYear()}-01-01`;
+  const cleanEnd = endDate ? endDate.trim() : formatYMD(now);
+  const granularity = calculateIntelligentGranularity(cleanStart, cleanEnd);
+  const label = customLabel || `${formatReadableDate(cleanStart)} → ${formatReadableDate(cleanEnd)}`;
+
+  return {
+    mode: "days",
+    startDate: cleanStart,
+    endDate: cleanEnd,
+    label,
+    granularity,
+    presetId: "custom",
   };
 }
 

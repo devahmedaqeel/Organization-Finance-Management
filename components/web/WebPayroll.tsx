@@ -1,10 +1,10 @@
 import React, { useState, useMemo } from "react";
-import { StyleSheet, Text, TextInput, TouchableOpacity, View, ScrollView, useWindowDimensions } from "react-native";
+import { StyleSheet, Text, TextInput, TouchableOpacity, View, ScrollView, useWindowDimensions, Platform } from "react-native";
 import { useFinance, PayrollEntry } from "@/context/FinanceContext";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
 import { useColors } from "@/hooks/useColors";
-import { openPdfReport } from "@/services/ReportExportService";
+import { openPdfReport, buildPayslipHtml } from "@/services/ReportExportService";
 import { downloadPayslipPDF } from "@/services/payslipExportService";
 import {
   SvgUsers,
@@ -76,23 +76,51 @@ export function WebPayroll() {
   const totalNetDisbursed = totalBase + totalBonus - totalDeductions;
 
   const handleExportEmployeeSlip = async (emp: PayrollEntry) => {
+    const orgEmail = (settings.organizationEmail && !settings.organizationEmail.includes("ofm-cloud.com"))
+      ? settings.organizationEmail
+      : (user?.email && !user.email.includes("ofm-cloud.com"))
+        ? user.email
+        : "";
+    const orgPhone = (settings.organizationPhone && !settings.organizationPhone.includes("555-0199"))
+      ? settings.organizationPhone
+      : "+92-586-444111";
+
     const orgInfo = {
-      organizationName: settings.organizationName || user?.organization || "DevOrbit Tech Kotli",
-      organizationAddress: settings.organizationAddress || "Kotli, Azad Kashmir",
-      organizationEmail: settings.organizationEmail || user?.email || "finance@devorbit.tech",
-      organizationPhone: settings.organizationPhone || "+92-586-444111",
+      name: settings.organizationName || user?.organization || "DevOrbit Tech Kotli",
+      address: settings.organizationAddress || "Kotli, Azad Kashmir",
+      email: orgEmail,
+      phone: orgPhone,
       currency: settings.currency || "PKR",
       fiscalYear: settings.fiscalYear || "2025-2026",
     };
-    await downloadPayslipPDF(emp, orgInfo);
+    if (Platform.OS === "web") {
+      const html = buildPayslipHtml(emp, orgInfo);
+      const printWindow = window.open("", "_blank");
+      if (printWindow) {
+        printWindow.document.open();
+        printWindow.document.write(html);
+        printWindow.document.close();
+      }
+    } else {
+      await downloadPayslipPDF(emp, orgInfo);
+    }
   };
 
   const handleExportPDF = async () => {
+    const orgEmail = (settings.organizationEmail && !settings.organizationEmail.includes("ofm-cloud.com"))
+      ? settings.organizationEmail
+      : (user?.email && !user.email.includes("ofm-cloud.com"))
+        ? user.email
+        : "";
+    const orgPhone = (settings.organizationPhone && !settings.organizationPhone.includes("555-0199"))
+      ? settings.organizationPhone
+      : "+92-586-444111";
+
     await openPdfReport({
-      organizationName: settings.organizationName || "Organization Finance Management",
-      organizationAddress: settings.organizationAddress || "Enterprise Financial Center",
-      organizationEmail: settings.organizationEmail || "finance@ofm-cloud.com",
-      organizationPhone: settings.organizationPhone || "+1 (800) 555-0199",
+      organizationName: settings.organizationName || user?.organization || "DevOrbit Tech Kotli",
+      organizationAddress: settings.organizationAddress || "Kotli, Azad Kashmir",
+      organizationEmail: orgEmail,
+      organizationPhone: orgPhone,
       organizationLogo: settings.organizationLogo || "",
       currency: settings.currency || "PKR",
       fiscalYear: settings.fiscalYear || "2025-2026",
@@ -337,120 +365,116 @@ export function WebPayroll() {
         </View>
       ) : (
         <View style={[styles.tableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={true}>
-            <View style={{ minWidth: 920 }}>
-              <View style={[styles.tableHeader, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-                <View style={[styles.thCol, { width: 170 }]}>
-                  <Text style={[styles.thText, { color: colors.mutedForeground }]}>EMPLOYEE</Text>
-                </View>
-                <View style={[styles.thCol, { width: 140 }]}>
-                  <Text style={[styles.thText, { color: colors.mutedForeground }]}>DEPARTMENT</Text>
-                </View>
-                <View style={[styles.thCol, { width: 110, justifyContent: "flex-end" }]}>
-                  <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>BASE</Text>
-                </View>
-                <View style={[styles.thCol, { width: 100, justifyContent: "flex-end" }]}>
-                  <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>BONUS</Text>
-                </View>
-                <View style={[styles.thCol, { width: 100, justifyContent: "flex-end" }]}>
-                  <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>DEDUCTIONS</Text>
-                </View>
-                <View style={[styles.thCol, { width: 130, justifyContent: "flex-end" }]}>
-                  <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>NET SALARY</Text>
-                </View>
-                <View style={[styles.thCol, { width: 130, justifyContent: "center" }]}>
-                  <Text style={[styles.thText, { color: colors.mutedForeground }]}>ACTIONS</Text>
-                </View>
-              </View>
+          <View style={[styles.tableHeader, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+            <View style={[styles.thCol, { flex: 2.2 }]}>
+              <Text style={[styles.thText, { color: colors.mutedForeground }]}>EMPLOYEE</Text>
+            </View>
+            <View style={[styles.thCol, { flex: 1.8 }]}>
+              <Text style={[styles.thText, { color: colors.mutedForeground }]}>DEPARTMENT</Text>
+            </View>
+            <View style={[styles.thCol, { flex: 1.1, justifyContent: "flex-end" }]}>
+              <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>BASE</Text>
+            </View>
+            <View style={[styles.thCol, { flex: 1.0, justifyContent: "flex-end" }]}>
+              <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>BONUS</Text>
+            </View>
+            <View style={[styles.thCol, { flex: 1.0, justifyContent: "flex-end" }]}>
+              <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>DEDUCTIONS</Text>
+            </View>
+            <View style={[styles.thCol, { flex: 1.2, justifyContent: "flex-end" }]}>
+              <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>NET SALARY</Text>
+            </View>
+            <View style={[styles.thCol, { flex: 1.5, justifyContent: "center" }]}>
+              <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "center" }]}>ACTIONS</Text>
+            </View>
+          </View>
 
-              {filteredPayroll.length === 0 ? (
-                <View style={styles.emptyWrap}>
-                  <SvgFileText size={36} color={colors.mutedForeground} />
-                  <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No payroll entries recorded</Text>
-                  <Text style={[styles.emptySubtitle, { color: colors.mutedForeground }]}>
-                    Click "Add Entry" to generate a staff payroll slip.
-                  </Text>
-                </View>
-              ) : (
-                filteredPayroll.map((p) => {
-                  const net = (p.baseSalary || 0) + (p.bonus || 0) - (p.deductions || 0);
-                  return (
-                    <View key={p.id} style={[styles.tableRow, { borderBottomColor: colors.border }]}>
-                      <View style={[styles.tdCol, { width: 170 }]}>
-                        <Text style={[styles.empName, { color: colors.foreground }]} numberOfLines={1}>
-                          {p.employeeName}
-                        </Text>
-                        <Text style={[styles.empMeta, { color: colors.mutedForeground }]} numberOfLines={1}>
-                          {p.employeeId} · {p.designation || "Staff"}
-                        </Text>
-                      </View>
+          {filteredPayroll.length === 0 ? (
+            <View style={styles.emptyWrap}>
+              <SvgFileText size={36} color={colors.mutedForeground} />
+              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No payroll entries recorded</Text>
+              <Text style={[styles.emptySubtitle, { color: colors.mutedForeground }]}>
+                Click "Add Entry" to generate a staff payroll slip.
+              </Text>
+            </View>
+          ) : (
+            filteredPayroll.map((p) => {
+              const net = (p.baseSalary || 0) + (p.bonus || 0) - (p.deductions || 0);
+              return (
+                <View key={p.id} style={[styles.tableRow, { borderBottomColor: colors.border }]}>
+                  <View style={[styles.tdCol, { flex: 2.2 }]}>
+                    <Text style={[styles.empName, { color: colors.foreground }]}>
+                      {p.employeeName}
+                    </Text>
+                    <Text style={[styles.empMeta, { color: colors.mutedForeground }]}>
+                      {p.employeeId} · {p.designation || "Staff"}
+                    </Text>
+                  </View>
 
-                      <View style={[styles.tdCol, { width: 140 }]}>
-                        <Text style={[styles.deptText, { color: colors.foreground }]} numberOfLines={1}>
-                          {p.department}
-                        </Text>
-                      </View>
+                  <View style={[styles.tdCol, { flex: 1.8 }]}>
+                    <Text style={[styles.deptText, { color: colors.foreground }]}>
+                      {p.department}
+                    </Text>
+                  </View>
 
-                      <View style={[styles.tdCol, { width: 110, alignItems: "flex-end" }]}>
-                        <Text style={[styles.amountCell, { color: colors.foreground }]} numberOfLines={1}>
-                          {settings.currency} {p.baseSalary?.toLocaleString()}
-                        </Text>
-                      </View>
+                  <View style={[styles.tdCol, { flex: 1.1, alignItems: "flex-end" }]}>
+                    <Text style={[styles.amountCell, { color: colors.foreground }]}>
+                      {settings.currency} {p.baseSalary?.toLocaleString()}
+                    </Text>
+                  </View>
 
-                      <View style={[styles.tdCol, { width: 100, alignItems: "flex-end" }]}>
-                        <Text style={[styles.amountCell, { color: colors.income }]} numberOfLines={1}>
-                          +{settings.currency} {p.bonus?.toLocaleString() || "0"}
-                        </Text>
-                      </View>
+                  <View style={[styles.tdCol, { flex: 1.0, alignItems: "flex-end" }]}>
+                    <Text style={[styles.amountCell, { color: colors.income }]}>
+                      +{settings.currency} {p.bonus?.toLocaleString() || "0"}
+                    </Text>
+                  </View>
 
-                      <View style={[styles.tdCol, { width: 100, alignItems: "flex-end" }]}>
-                        <Text style={[styles.amountCell, { color: colors.expense }]} numberOfLines={1}>
-                          -{settings.currency} {p.deductions?.toLocaleString() || "0"}
-                        </Text>
-                      </View>
+                  <View style={[styles.tdCol, { flex: 1.0, alignItems: "flex-end" }]}>
+                    <Text style={[styles.amountCell, { color: colors.expense }]}>
+                      -{settings.currency} {p.deductions?.toLocaleString() || "0"}
+                    </Text>
+                  </View>
 
-                      <View style={[styles.tdCol, { width: 130, alignItems: "flex-end" }]}>
-                        <Text style={[styles.netAmountText, { color: "#8B5CF6" }]} numberOfLines={1}>
-                          {settings.currency} {net.toLocaleString()}
-                        </Text>
-                      </View>
+                  <View style={[styles.tdCol, { flex: 1.2, alignItems: "flex-end" }]}>
+                    <Text style={[styles.netAmountText, { color: "#8B5CF6" }]}>
+                      {settings.currency} {net.toLocaleString()}
+                    </Text>
+                  </View>
 
-                      <View style={[styles.tdCol, { width: 130, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 6 }]}>
+                  <View style={[styles.tdCol, { flex: 1.5, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 6 }]}>
+                    <TouchableOpacity
+                      style={[styles.actionIconBtn, { borderColor: "#8B5CF640", backgroundColor: "#8B5CF615", paddingHorizontal: 9, width: "auto" }]}
+                      onPress={() => handleExportEmployeeSlip(p)}
+                    >
+                      <SvgFileText size={12} color="#8B5CF6" />
+                      <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: "#8B5CF6", marginLeft: 4 }}>Slip</Text>
+                    </TouchableOpacity>
+
+                    {canEdit && (
+                      <>
                         <TouchableOpacity
-                          style={[styles.actionIconBtn, { borderColor: "#8B5CF640", backgroundColor: "#8B5CF615", paddingHorizontal: 7, width: "auto" }]}
-                          onPress={() => handleExportEmployeeSlip(p)}
+                          style={[styles.actionIconBtn, { borderColor: "#3B82F630", backgroundColor: "#3B82F612" }]}
+                          onPress={() => {
+                            setEditingEntry(p);
+                            setModalVisible(true);
+                          }}
                         >
-                          <SvgFileText size={12} color="#8B5CF6" />
-                          <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: "#8B5CF6", marginLeft: 4 }}>Slip</Text>
+                          <SvgEdit size={14} color="#3B82F6" />
                         </TouchableOpacity>
 
-                        {canEdit && (
-                          <>
-                            <TouchableOpacity
-                              style={[styles.actionIconBtn, { borderColor: "#3B82F630", backgroundColor: "#3B82F612" }]}
-                              onPress={() => {
-                                setEditingEntry(p);
-                                setModalVisible(true);
-                              }}
-                            >
-                              <SvgEdit size={14} color="#3B82F6" />
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                              style={[styles.actionIconBtn, { borderColor: "#F43F5E30", backgroundColor: "#F43F5E12" }]}
-                              onPress={() => setDeletingPayroll(p)}
-                            >
-                              <SvgTrash size={14} color="#F43F5E" />
-                            </TouchableOpacity>
-                          </>
-                        )}
-                      </View>
-                    </View>
-                  );
-                })
-              )}
-            </View>
-          </ScrollView>
+                        <TouchableOpacity
+                          style={[styles.actionIconBtn, { borderColor: "#F43F5E30", backgroundColor: "#F43F5E12" }]}
+                          onPress={() => setDeletingPayroll(p)}
+                        >
+                          <SvgTrash size={14} color="#F43F5E" />
+                        </TouchableOpacity>
+                      </>
+                    )}
+                  </View>
+                </View>
+              );
+            })
+          )}
         </View>
       )}
 
