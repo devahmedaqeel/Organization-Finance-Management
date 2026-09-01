@@ -216,35 +216,48 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
         </View>
 
         {/* Action Buttons */}
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flexWrap: "wrap", width: isMobile ? "100%" : "auto" }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10, width: isMobile ? "100%" : "auto", marginTop: isMobile ? 8 : 0 }}>
           <TouchableOpacity
-            style={[styles.outlineBtn, { borderColor: colors.border, backgroundColor: colors.card }, isMobile && { flex: 1 }]}
+            style={[styles.outlineBtn, { borderColor: colors.border, backgroundColor: colors.card, flex: isMobile ? 1 : undefined }]}
             onPress={() => setExportModalVisible(true)}
             activeOpacity={0.8}
           >
-            <SvgLayers size={15} color={colors.foreground} />
-            <Text style={[styles.outlineBtnText, { color: colors.foreground }]}>Export Custom Report</Text>
+            <SvgLayers size={14} color={colors.foreground} />
+            <Text style={[styles.outlineBtnText, { color: colors.foreground, fontSize: isMobile ? 11.5 : 13 }]} numberOfLines={1}>Export Custom</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.primaryBtn, { backgroundColor: colors.primary }, isMobile && { flex: 1 }]}
+            style={[styles.primaryBtn, { backgroundColor: colors.primary, flex: isMobile ? 1 : undefined }]}
             onPress={handleExportPDF}
             activeOpacity={0.8}
           >
-            <SvgFileText size={15} color="#FFFFFF" />
-            <Text style={styles.primaryBtnText}>Export Full Dossier (PDF)</Text>
+            <SvgFileText size={14} color="#FFFFFF" />
+            <Text style={[styles.primaryBtnText, { fontSize: isMobile ? 11.5 : 13 }]} numberOfLines={1}>Full Dossier (PDF)</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       {/* ─── Dedicated Period & Audit Scope Toolbar ─── */}
-      <View style={[styles.scopeToolbar, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flexWrap: "wrap", flex: 1 }}>
+      <View style={[styles.scopeToolbar, { backgroundColor: colors.card, borderColor: colors.border }, isMobile && { flexDirection: "column", alignItems: "stretch", gap: 10, padding: 12 }]}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
           <Text style={{ fontSize: 11, fontFamily: "Inter_800ExtraBold", color: colors.mutedForeground, letterSpacing: 0.5 }}>
             AUDIT SCOPE:
           </Text>
 
-          {/* Quick Period Selector Pills */}
+          {/* Active Range Scope Tag */}
+          <View style={[styles.activeScopeTag, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: colors.primary }} />
+            <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: colors.foreground }}>
+              Scope: {activePeriod.label}
+            </Text>
+            <Text style={{ fontSize: 10.5, color: colors.mutedForeground }}>
+              ({periodTransactions.length} records)
+            </Text>
+          </View>
+        </View>
+
+        {/* Quick Period Selector Pills with Horizontal ScrollView */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}>
           <View style={[styles.periodPillsContainer, { backgroundColor: colors.background, borderColor: colors.border }]}>
             {REPORT_PERIOD_PRESETS.map((p) => {
               const isSelected = activePeriod.presetId === p.id || (activePeriod.presetId !== "custom" && activePeriod.label.includes(p.label));
@@ -293,18 +306,7 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
               </Text>
             </TouchableOpacity>
           </View>
-        </View>
-
-        {/* Active Range Scope Tag */}
-        <View style={[styles.activeScopeTag, { backgroundColor: colors.background, borderColor: colors.border }]}>
-          <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: colors.primary }} />
-          <Text style={{ fontSize: 11.5, fontFamily: "Inter_700Bold", color: colors.foreground }}>
-            Scope: {activePeriod.label}
-          </Text>
-          <Text style={{ fontSize: 11, color: colors.mutedForeground }}>
-            ({periodTransactions.length} records)
-          </Text>
-        </View>
+        </ScrollView>
       </View>
 
       {/* ─── Executive Period KPIs ─── */}
