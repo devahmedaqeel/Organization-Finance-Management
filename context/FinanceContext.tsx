@@ -258,16 +258,15 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       AsyncStorage.getItem(`${cachePrefix}departments`),
     ]).then(([t, b, p, d]) => {
       setTransactions(t ? JSON.parse(t) : (isDemoOrg ? SEED_TRANSACTIONS : []));
-      setBudgets(b ? JSON.parse(b) : SEED_BUDGETS);
-      const parsedPayroll = p ? JSON.parse(p) : [];
-      setPayroll(parsedPayroll.length >= SEED_PAYROLL.length ? parsedPayroll : SEED_PAYROLL);
-      const parsedDepts = d ? JSON.parse(d) : [];
-      setDepartments(parsedDepts.length >= SEED_DEPARTMENTS.length ? parsedDepts : SEED_DEPARTMENTS);
+      setBudgets(b ? JSON.parse(b) : (isDemoOrg ? SEED_BUDGETS : []));
+      setPayroll(p ? JSON.parse(p) : (isDemoOrg ? SEED_PAYROLL : []));
+      setDepartments(d ? JSON.parse(d) : (isDemoOrg ? SEED_DEPARTMENTS : []));
       setLoaded(true);
     }).catch(() => {
-      setPayroll(SEED_PAYROLL);
-      setDepartments(SEED_DEPARTMENTS);
-      setBudgets(SEED_BUDGETS);
+      setTransactions(isDemoOrg ? SEED_TRANSACTIONS : []);
+      setPayroll(isDemoOrg ? SEED_PAYROLL : []);
+      setDepartments(isDemoOrg ? SEED_DEPARTMENTS : []);
+      setBudgets(isDemoOrg ? SEED_BUDGETS : []);
       setLoaded(true);
     });
   }, [activeOrgId, user?.id, isDemoOrg]);
@@ -700,8 +699,34 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     };
 
     setPayroll((prev) => [newPayroll, ...prev.filter((item) => item.id !== id)]);
+
+    // ─── Automatic Ledger Expense Transaction Sync ───
+    // Automatically record an expense in the General Ledger under category "Salaries"
+    // and matching department so it directly deducts from that Department's Salaries Budget!
+    const txId = `tx_pay_${id}`;
+    const salaryTx: Transaction = {
+      id: txId,
+      type: "expense",
+      amount: netSalary,
+      category: "Salaries",
+      department: p.department || "General",
+      date: p.month ? `${p.month}-01` : now.split("T")[0],
+      title: `Salary — ${p.employeeName} (${p.month || "Current"})`,
+      description: `Staff payroll disbursement for ${p.employeeName} (${p.employeeId || "Staff"}). Base: ${p.baseSalary}, Bonus: ${p.bonus || 0}, Deductions: ${p.deductions || 0}`,
+      addedBy: user?.name || user?.email || "Payroll System",
+      organizationId: orgId,
+      organization: orgName,
+      createdAt: now,
+      updatedAt: now,
+      paymentMethod: "Bank Transfer",
+      status: "completed",
+    };
+
+    setTransactions((prev) => [salaryTx, ...prev.filter((t) => t.id !== txId)]);
+
     try {
       await setDoc(doc(db, "payroll", id), newPayroll);
+      await setDoc(doc(db, "transactions", txId), salaryTx).catch(() => {});
       recordAuditLog({
         organizationId: orgId,
         actorUid: user?.id || "anonymous",
@@ -710,14 +735,14 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         action: "create",
         entity: "payroll",
         entityId: id,
-        metadata: { employeeName: p.employeeName, month: p.month, netSalary },
+        metadata: { employeeName: p.employeeName, month: p.month, netSalary, department: p.department },
       }).catch(() => {});
       
       dispatchNotification(
         {
           type: "PAYROLL_PROCESSED",
-          title: "Payroll Disbursal Recorded",
-          message: `Disbursed ${settings.currency || "PKR"} ${netSalary.toLocaleString()} for ${p.employeeName} (${p.month}).`,
+          title: "Payroll Disbursal Deducted",
+          message: `Deducted ${settings.currency || "PKR"} ${netSalary.toLocaleString()} from ${p.department} budget for ${p.employeeName} (${p.month}).`,
           severity: "INFO",
           actionRoute: "/payroll",
           entityId: id,
@@ -733,9 +758,54 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
   const updatePayroll = async (id: string, updates: Partial<Omit<PayrollEntry, "id">>) => {
     const enrichedUpdates = { ...updates, updatedAt: new Date().toISOString() };
-    setPayroll((prev) => prev.map((p) => (p.id === id ? { ...p, ...enrichedUpdates } : p)));
+    let updatedNetSalary: number | undefined;
+
+    setPayroll((prev) =>
+      prev.map((p) => {
+        if (p.id === id) {
+          const merged = { ...p, ...enrichedUpdates };
+          const base = merged.baseSalary || 0;
+          const bonus = merged.bonus || 0;
+          const deductions = merged.deductions || 0;
+          merged.netSalary = base + bonus - deductions;
+          updatedNetSalary = merged.netSalary;
+          return merged;
+        }
+        return p;
+      })
+    );
+
+    // Also update linked transaction in transactions list
+    const txId = `tx_pay_${id}`;
+    setTransactions((prev) =>
+      prev.map((t) => {
+        if (t.id === txId) {
+          return {
+            ...t,
+            amount: updatedNetSalary ?? t.amount,
+            department: updates.department ?? t.department,
+            title: updates.employeeName ? `Salary — ${updates.employeeName} (${updates.month || "Current"})` : t.title,
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return t;
+      })
+    );
+
     try {
       await setDoc(doc(db, "payroll", id), enrichedUpdates, { merge: true });
+      if (updatedNetSalary !== undefined || updates.department || updates.employeeName) {
+        await setDoc(
+          doc(db, "transactions", txId),
+          {
+            amount: updatedNetSalary,
+            department: updates.department,
+            title: updates.employeeName ? `Salary — ${updates.employeeName} (${updates.month || "Current"})` : undefined,
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true }
+        ).catch(() => {});
+      }
       recordAuditLog({
         organizationId: activeOrgId,
         actorUid: user?.id || "anonymous",
@@ -757,10 +827,16 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     const aliasId = `payroll_${id}_${orgKey}`;
     deletedIdsRef.current.add(aliasId);
 
+    const txId = `tx_pay_${id}`;
+    deletedIdsRef.current.add(txId);
+
     setPayroll((prev) => prev.filter((p) => p.id !== id && p.id !== aliasId));
+    setTransactions((prev) => prev.filter((t) => t.id !== txId));
+
     try {
       await deleteDoc(doc(db, "payroll", id)).catch(() => {});
       await deleteDoc(doc(db, "payroll", aliasId)).catch(() => {});
+      await deleteDoc(doc(db, "transactions", txId)).catch(() => {});
       recordAuditLog({
         organizationId: activeOrgId,
         actorUid: user?.id || "anonymous",

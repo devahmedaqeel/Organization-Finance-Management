@@ -39,7 +39,7 @@ export default function PayrollScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { payroll, addPayroll, updatePayroll, deletePayroll, departments } = useFinance();
+  const { payroll, addPayroll, updatePayroll, deletePayroll, departments, budgets } = useFinance();
   const { settings } = useSettings();
   const keyboardHeight = useKeyboardHeight();
 
@@ -685,13 +685,56 @@ export default function PayrollScreen() {
                   </TouchableOpacity>
                 ))}
               </View>
+
+              {/* ─── Real-Time Department Budget Deduction Indicator ─── */}
+              {(() => {
+                const s = parseFloat(salary) || 0;
+                const b = parseFloat(bonus) || 0;
+                const d = parseFloat(deductions) || 0;
+                const netAmt = Math.max(0, s + b - d);
+                const matchBudget = budgets.find(
+                  (bg) => bg.department?.trim().toLowerCase() === dept?.trim().toLowerCase() && bg.category?.toLowerCase() === "salaries"
+                ) || budgets.find((bg) => bg.department?.trim().toLowerCase() === dept?.trim().toLowerCase());
+
+                return (
+                  <View style={{ backgroundColor: "#8B5CF612", borderColor: "#8B5CF633", borderWidth: 1, borderRadius: 12, padding: 12, marginVertical: 8, gap: 4 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Feather name="shield" size={13} color="#8B5CF6" />
+                        <Text style={{ fontSize: 11.5, fontFamily: "Inter_700Bold", color: "#8B5CF6" }}>
+                          Budget Deduction Sync
+                        </Text>
+                      </View>
+                      <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>
+                        {dept}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 10.5, color: colors.mutedForeground, marginTop: 1 }}>
+                      {matchBudget
+                        ? `Allocated: ${settings.currency} ${matchBudget.allocated.toLocaleString()} · Spent: ${settings.currency} ${(matchBudget.spent || 0).toLocaleString()}`
+                        : `Deducting directly from ${dept} department expenditure.`}
+                    </Text>
+                    {netAmt > 0 && (
+                      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4, paddingTop: 6, borderTopWidth: 1, borderTopColor: "#8B5CF622" }}>
+                        <Text style={{ fontSize: 11.5, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>
+                          Deduction from Outflows:
+                        </Text>
+                        <Text style={{ fontSize: 12.5, fontFamily: "Inter_700Bold", color: colors.expense }}>
+                          -{settings.currency} {netAmt.toLocaleString()}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              })()}
+
               {error ? <Text style={[styles.error, { color: colors.expense }]}>{error}</Text> : null}
               <View style={styles.modalBtns}>
                 <TouchableOpacity style={[styles.cancelBtn, { borderColor: colors.border }]} onPress={() => setModalVisible(false)}>
                   <Text style={[styles.cancelText, { color: colors.mutedForeground }]}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.addBtn, { backgroundColor: "#8B5CF6" }]} onPress={handleSave}>
-                  <Text style={styles.addBtnText}>{editingEntry ? "Save Changes" : "Add Employee"}</Text>
+                  <Text style={styles.addBtnText}>{editingEntry ? "Save Changes" : "Disburse Salary"}</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
