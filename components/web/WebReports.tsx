@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { StyleSheet, Text, TouchableOpacity, View, ScrollView, useWindowDimensions, Modal, TextInput, Platform } from "react-native";
 import { useFinance } from "@/context/FinanceContext";
 import { useAuth } from "@/context/AuthContext";
