@@ -35,15 +35,15 @@ export function PdfSuccessModal({
   onClose,
   filename,
   fileUri,
-  title = "PDF Ready ✓",
-  subtitle = "Your official financial PDF dossier has been saved successfully.",
+  title = "Saved into File Manager ✅",
+  subtitle = "Official PDF dossier saved to your phone storage.",
 }: Props) {
   const colors = useColors();
 
   // Trigger floating notification on display without auto-closing
   useEffect(() => {
     if (visible) {
-      showFloatingToast("PDF Ready ✓", filename || "PDF generated successfully.");
+      showFloatingToast("Saved into File Manager ✅", filename || "PDF saved to device storage.");
     }
   }, [visible, filename]);
 
@@ -52,18 +52,6 @@ export function PdfSuccessModal({
   const handleOpen = async () => {
     if (fileUri) {
       await openPdfFile(fileUri, filename);
-    }
-  };
-
-  const handleShare = async () => {
-    if (fileUri) {
-      await sharePdfFile(fileUri, filename);
-    }
-  };
-
-  const handleSaveToManager = async () => {
-    if (fileUri) {
-      await sharePdfFile(fileUri, filename);
     }
   };
 
@@ -92,48 +80,26 @@ export function PdfSuccessModal({
             {filename ? `${filename}\n${subtitle}` : subtitle}
           </Text>
 
-          {/* Action Buttons Column */}
-          <View style={{ width: "100%", gap: 8, marginTop: 4 }}>
+          {/* Action Buttons: Open PDF & Close */}
+          <View style={{ width: "100%", gap: 10, marginTop: 6 }}>
             {fileUri ? (
               <TouchableOpacity
-                style={[styles.actionBtn, { backgroundColor: "#38BDF8" }]}
+                style={[styles.actionBtn, { backgroundColor: "#38BDF8", paddingVertical: 13 }]}
                 onPress={handleOpen}
                 activeOpacity={0.85}
               >
-                <Feather name="file-text" size={15} color="#0F172A" />
-                <Text style={[styles.actionBtnText, { color: "#0F172A" }]}>Open PDF</Text>
-              </TouchableOpacity>
-            ) : null}
-
-            {fileUri ? (
-              <TouchableOpacity
-                style={[styles.actionBtn, { backgroundColor: "#10B981" }]}
-                onPress={handleShare}
-                activeOpacity={0.85}
-              >
-                <Feather name="share-2" size={15} color="#FFFFFF" />
-                <Text style={[styles.actionBtnText, { color: "#FFFFFF" }]}>Share</Text>
-              </TouchableOpacity>
-            ) : null}
-
-            {fileUri ? (
-              <TouchableOpacity
-                style={[styles.actionBtn, { backgroundColor: "#6366F1" }]}
-                onPress={handleSaveToManager}
-                activeOpacity={0.85}
-              >
-                <Feather name="folder" size={15} color="#FFFFFF" />
-                <Text style={[styles.actionBtnText, { color: "#FFFFFF" }]}>Save to File Manager</Text>
+                <Feather name="file-text" size={17} color="#0F172A" />
+                <Text style={[styles.actionBtnText, { color: "#0F172A", fontSize: 14.5 }]}>Open PDF</Text>
               </TouchableOpacity>
             ) : null}
 
             <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: colors.border, marginTop: 2 }]}
+              style={[styles.actionBtn, { backgroundColor: colors.border, paddingVertical: 12 }]}
               onPress={onClose}
               activeOpacity={0.85}
             >
-              <Feather name="x" size={14} color={colors.foreground} />
-              <Text style={[styles.actionBtnText, { color: colors.foreground }]}>Close</Text>
+              <Feather name="x" size={16} color={colors.foreground} />
+              <Text style={[styles.actionBtnText, { color: colors.foreground, fontSize: 13.5 }]}>Close</Text>
             </TouchableOpacity>
           </View>
 
