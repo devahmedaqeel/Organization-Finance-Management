@@ -7,6 +7,9 @@ export default function RootHtml({ children }: PropsWithChildren) {
       <head>
         <meta charSet="utf-8" />
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+        <meta httpEquiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+        <meta httpEquiv="Pragma" content="no-cache" />
+        <meta httpEquiv="Expires" content="0" />
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
         <title>OFM — Organization Finance Management</title>
         <meta
@@ -15,10 +18,10 @@ export default function RootHtml({ children }: PropsWithChildren) {
         />
         <meta name="theme-color" content="#060D1F" />
         <link rel="manifest" href="/manifest.json" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png?v=3" />
-        <link rel="icon" type="image/png" sizes="192x192" href="/icon.png?v=3" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/icon.png?v=3" />
-        <link rel="shortcut icon" href="/favicon.ico?v=3" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png?v=4" />
+        <link rel="icon" type="image/png" sizes="192x192" href="/icon.png?v=4" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/icon.png?v=4" />
+        <link rel="shortcut icon" href="/favicon.ico?v=4" />
         
         {/* Preconnect and Load Google Inter Font */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
