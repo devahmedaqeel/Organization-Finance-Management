@@ -21,7 +21,6 @@ import {
   orderBy,
   limit,
 } from "firebase/firestore";
-import * as Notifications from "expo-notifications";
 import { db } from "@/config/firebase";
 import { EvaluatedNotificationEvent, NotificationType } from "./notificationRules";
 
@@ -53,6 +52,7 @@ const processedKeysSet = new Set<string>();
  */
 if (Platform.OS !== "web" && !isExpoGo) {
   try {
+    const Notifications = require("expo-notifications");
     Notifications.setNotificationHandler({
       handleNotification: async () => ({
         shouldShowAlert: true,
@@ -74,6 +74,7 @@ export async function registerForPushNotificationsAsync(userId?: string, orgId?:
   if (Platform.OS === "web" || isExpoGo) return null;
 
   try {
+    const Notifications = require("expo-notifications");
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
 

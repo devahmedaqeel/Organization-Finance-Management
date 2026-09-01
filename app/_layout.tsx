@@ -12,7 +12,7 @@ import { Stack, router } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useState } from "react";
-import { StyleSheet, View, Text, Platform, useColorScheme, Animated, TouchableOpacity } from "react-native";
+import { StyleSheet, View, Text, Platform, useColorScheme, Animated, TouchableOpacity, LogBox } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 // KeyboardProvider is only safe on native — loaded dynamically to avoid web crash
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -26,6 +26,12 @@ import { FinanceProvider } from "@/context/FinanceContext";
 import { SettingsProvider, useSettings } from "@/context/SettingsContext";
 import { WebShell } from "@/components/web/WebShell";
 import { requestNotificationPermissions } from "@/hooks/NotificationHelper";
+
+LogBox.ignoreLogs([
+  /expo-notifications: Android Push notifications/,
+  /removed from Expo Go with the release of SDK 53/,
+  /warnOfExpoGoPushUsage/,
+]);
 
 SplashScreen.preventAutoHideAsync();
 
