@@ -179,7 +179,7 @@ export default function DashboardScreen() {
   const selectedCurrency = useMemo(() => WORLD_CURRENCIES.find(c => c.code === settings.currency), [settings.currency]);
   const webTop = Platform.OS === "web" ? 67 : 0;
   const roleColor = ROLE_COLORS[user?.role ?? "admin"];
-  const [balanceViewMode, setBalanceViewMode] = useState<"cashflow" | "expenses">("cashflow");
+  const [balanceViewMode, setBalanceViewMode] = useState<"cashflow" | "expenses" | "budget">("cashflow");
   const isDeficit = netBalance < 0;
   const netMargin = totalIncome > 0 ? (netBalance / totalIncome) * 100 : (totalExpenses > 0 ? -100 : 0);
   const rawSpendRatio = totalIncome > 0 ? (totalExpenses / totalIncome) * 100 : (totalExpenses > 0 ? 100 : 0);
@@ -192,8 +192,13 @@ export default function DashboardScreen() {
   const netBudgetRemaining = calculateBudgetRemaining(totalBudgeted, totalExpenses);
   const netBudgetUtilization = totalBudgeted > 0 ? (totalExpenses / totalBudgeted) * 100 : 0;
   
-  // Real-time authoritative display balance (Net Surplus vs Total Outflows)
-  const currentHeroBalance = balanceViewMode === "cashflow" ? netBalance : -totalExpenses;
+  // Real-time authoritative display balance (Net Surplus vs Total Outflows vs Allocated Budget)
+  const currentHeroBalance =
+    balanceViewMode === "cashflow"
+      ? netBalance
+      : balanceViewMode === "budget"
+      ? totalBudgeted
+      : -totalExpenses;
   const currentHeroIsDeficit = currentHeroBalance < 0;
 
   // Filtered transactions for the modal viewer
@@ -802,7 +807,7 @@ export default function DashboardScreen() {
                       ? colors.expense
                       : budgetUtilization > 80
                       ? colors.warning
-                      : colors.income
+                      : "#3B82F6"
                   }
                 />
               </View>
@@ -815,7 +820,7 @@ export default function DashboardScreen() {
                         ? colors.expense
                         : budgetUtilization > 80
                         ? colors.warning
-                        : colors.income) + "18",
+                        : "#3B82F6") + "18",
                   },
                 ]}
               >
@@ -828,7 +833,7 @@ export default function DashboardScreen() {
                           ? colors.expense
                           : budgetUtilization > 80
                           ? colors.warning
-                          : colors.income,
+                          : "#3B82F6",
                     },
                   ]}
                 >
@@ -840,21 +845,16 @@ export default function DashboardScreen() {
               style={[
                 styles.kpiValueText,
                 {
-                  color:
-                    budgetUtilization > 100
-                      ? colors.expense
-                      : budgetUtilization > 80
-                      ? colors.warning
-                      : colors.foreground,
+                  color: colors.foreground,
                 },
               ]}
               numberOfLines={1}
               adjustsFontSizeToFit
             >
-              {settings.currency} {fmt(totalExpenses)}
+              {settings.currency} {fmt(totalBudgeted)}
             </Text>
             <Text style={[styles.kpiLabelText, { color: colors.mutedForeground }]} numberOfLines={1}>
-              Budget ({settings.currency} {fmt(totalBudgeted)})
+              Total Budget
             </Text>
             <Text
               style={{
@@ -867,7 +867,7 @@ export default function DashboardScreen() {
             >
               {totalExpenses > totalBudgeted
                 ? `${settings.currency} ${fmt(totalExpenses - totalBudgeted)} Over Limit`
-                : `${settings.currency} ${fmt(Math.max(totalBudgeted - totalExpenses, 0))} Left`}
+                : `${settings.currency} ${fmt(Math.max(totalBudgeted - totalExpenses, 0))} Left (${settings.currency} ${fmt(totalExpenses)} Spent)`}
             </Text>
             <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 4, overflow: "hidden" }}>
               <View
@@ -879,7 +879,7 @@ export default function DashboardScreen() {
                       ? colors.expense
                       : budgetUtilization > 80
                       ? colors.warning
-                      : colors.income,
+                      : "#3B82F6",
                   borderRadius: 2,
                 }}
               />

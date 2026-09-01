@@ -9,6 +9,7 @@ import {
   Platform,
   useWindowDimensions,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import * as Haptics from "expo-haptics";
 import {
@@ -54,6 +55,7 @@ export function FinancialDrillDownModal({
   onNavigate,
 }: Props) {
   const colors = useColors();
+  const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const isMobile = width < 768;
 
@@ -451,8 +453,21 @@ export function FinancialDrillDownModal({
             )}
           </ScrollView>
 
-          {/* ─── Footer Action ─── */}
-          <View style={[styles.footerRow, { borderTopColor: colors.border }]}>
+          {/* ─── Footer Action with safe area padding ─── */}
+          <View
+            style={[
+              styles.footerRow,
+              {
+                borderTopColor: colors.border,
+                paddingBottom:
+                  Platform.OS === "android"
+                    ? Math.max(insets.bottom, 24) + 12
+                    : Platform.OS === "ios"
+                    ? Math.max(insets.bottom, 16) + 4
+                    : 14,
+              },
+            ]}
+          >
             <TouchableOpacity
               style={[styles.footerBtn, { backgroundColor: colors.primary }]}
               onPress={() => {

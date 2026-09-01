@@ -99,6 +99,30 @@ export function WebMemberRoleModal({ visible, onClose, member, onUpdateSuccess }
     }
   };
 
+  const handleDeleteMember = async () => {
+    if (!member || submitting) return;
+    if (typeof window !== "undefined" && !window.confirm(`Are you sure you want to remove ${member.name} (${member.email}) from the team?`)) {
+      return;
+    }
+
+    setSubmitting(true);
+    setError("");
+    try {
+      const { deleteDoc, doc } = require("firebase/firestore");
+      if (member.id) {
+        await deleteDoc(doc(db, "users", member.id)).catch(() => {});
+      }
+      if (member.email) {
+        await deleteDoc(doc(db, "invitations", member.email.toLowerCase())).catch(() => {});
+      }
+      onClose();
+    } catch (e: any) {
+      setError(e?.message || "Failed to remove member.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={[styles.backdrop, isMobile && { padding: 10 }]}>
@@ -168,27 +192,37 @@ export function WebMemberRoleModal({ visible, onClose, member, onUpdateSuccess }
           </ScrollView>
 
           {/* Footer */}
-          <View style={[styles.footer, { borderTopColor: colors.border }]}>
-            <TouchableOpacity style={[styles.cancelBtn, { borderColor: colors.border }]} onPress={onClose} disabled={submitting}>
-              <Text style={[styles.cancelBtnText, { color: colors.foreground }]}>Cancel</Text>
-            </TouchableOpacity>
-
+          <View style={[styles.footer, { borderTopColor: colors.border, justifyContent: "space-between" }]}>
             <TouchableOpacity
-              style={[
-                styles.submitBtn,
-                {
-                  backgroundColor: "#6366F1",
-                  opacity: submitting ? 0.7 : 1,
-                },
-              ]}
-              onPress={handleUpdate}
+              style={[styles.cancelBtn, { borderColor: "#EF444440", backgroundColor: "#EF444415" }]}
+              onPress={handleDeleteMember}
               disabled={submitting}
             >
-              <SvgCheck size={15} color="#FFFFFF" />
-              <Text style={styles.submitBtnText}>
-                {submitting ? "Updating..." : "Save Role Permissions"}
-              </Text>
+              <Text style={[styles.cancelBtnText, { color: "#EF4444" }]}>Remove Member</Text>
             </TouchableOpacity>
+
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <TouchableOpacity style={[styles.cancelBtn, { borderColor: colors.border }]} onPress={onClose} disabled={submitting}>
+                <Text style={[styles.cancelBtnText, { color: colors.foreground }]}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.submitBtn,
+                  {
+                    backgroundColor: "#6366F1",
+                    opacity: submitting ? 0.7 : 1,
+                  },
+                ]}
+                onPress={handleUpdate}
+                disabled={submitting}
+              >
+                <SvgCheck size={15} color="#FFFFFF" />
+                <Text style={styles.submitBtnText}>
+                  {submitting ? "Updating..." : "Save Changes"}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </View>

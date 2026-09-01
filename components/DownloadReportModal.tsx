@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { Feather } from "./UniversalIcon";
 import * as Haptics from "expo-haptics";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/context/AuthContext";
 import { useFinance } from "@/context/FinanceContext";
@@ -105,6 +106,7 @@ const REPORT_TYPE_OPTIONS: Array<{
 
 export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
   const colors = useColors();
+  const insets = useSafeAreaInsets();
   const keyboardHeight = useKeyboardHeight();
   const { user } = useAuth();
   const { settings } = useSettings();
@@ -507,8 +509,21 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
               </View>
             </ScrollView>
 
-            {/* Actions */}
-            <View style={[styles.footer, { borderTopColor: colors.border }]}>
+            {/* Actions with full bottom safe area padding for Android 3-button navigation bar */}
+            <View
+              style={[
+                styles.footer,
+                {
+                  borderTopColor: colors.border,
+                  paddingBottom:
+                    Platform.OS === "android"
+                      ? Math.max(insets.bottom, 24) + 16
+                      : Platform.OS === "ios"
+                      ? Math.max(insets.bottom, 16) + 8
+                      : 16,
+                },
+              ]}
+            >
               {generating ? (
                 <View style={styles.loadingBox}>
                   <ActivityIndicator size="small" color={colors.primary} />

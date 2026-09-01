@@ -105,7 +105,7 @@ export function WebDashboard({
     );
   }, [transactions, budgets, departments, activePeriod, settings.currency]);
 
-  const [balanceViewMode, setBalanceViewMode] = useState<"cashflow" | "expenses">("cashflow");
+  const [balanceViewMode, setBalanceViewMode] = useState<"cashflow" | "expenses" | "budget">("cashflow");
   const isDeficit = netBalance < 0;
   const netMargin = totalIncome > 0 ? ((netBalance / totalIncome) * 100) : (totalExpenses > 0 ? -100 : 0);
   const rawSpendRatio = totalIncome > 0 ? (totalExpenses / totalIncome) * 100 : (totalExpenses > 0 ? 100 : 0);
@@ -118,8 +118,13 @@ export function WebDashboard({
   const netBudgetRemaining = calculateBudgetRemaining(totalBudgeted, totalExpenses);
   const netBudgetUtilization = totalBudgeted > 0 ? (totalExpenses / totalBudgeted) * 100 : 0;
   
-  // Real-time authoritative display balance (Net Surplus vs Total Outflows)
-  const currentHeroBalance = balanceViewMode === "cashflow" ? netBalance : -totalExpenses;
+  // Real-time authoritative display balance (Net Surplus vs Total Outflows vs Allocated Budget)
+  const currentHeroBalance =
+    balanceViewMode === "cashflow"
+      ? netBalance
+      : balanceViewMode === "budget"
+      ? totalBudgeted
+      : -totalExpenses;
   const currentHeroIsDeficit = currentHeroBalance < 0;
 
   const now = new Date();
@@ -387,7 +392,11 @@ export function WebDashboard({
               <SvgShield size={13} color="#38BDF8" />
             </View>
             <Text style={{ color: "#FFFFFF", fontSize: 13, fontFamily: "Inter_800ExtraBold", letterSpacing: 1.2 }}>
-              {balanceViewMode === "cashflow" ? "OPERATING RESULT" : "TOTAL DISBURSEMENTS"}
+              {balanceViewMode === "cashflow"
+                ? "OPERATING RESULT"
+                : balanceViewMode === "budget"
+                ? "ALLOCATED BUDGET CAP"
+                : "TOTAL DISBURSEMENTS"}
             </Text>
             <TouchableOpacity
               onPress={() => setHideBalance(!hideBalance)}
@@ -601,7 +610,7 @@ export function WebDashboard({
           <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>Operational Expenses</Text>
         </TouchableOpacity>
 
-        {/* Card 3: Budget Utilization */}
+        {/* Card 3: Total Budget Allocated */}
         <TouchableOpacity
           style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}
           onPress={() => onNavigate("budgets")}
@@ -616,12 +625,12 @@ export function WebDashboard({
             </View>
           </View>
           <WebCountUp
-            value={budgetUtilization}
-            suffix="%"
-            decimals={0}
+            value={totalBudgeted}
+            prefix={`${settings.currency} `}
+            formatter={fmt}
             style={[styles.kpiBigNumber, { color: colors.foreground }]}
           />
-          <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>Annual Budget Utilization</Text>
+          <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>Total Budget Allocated</Text>
         </TouchableOpacity>
 
         {/* Card 4: Monitored Units */}
