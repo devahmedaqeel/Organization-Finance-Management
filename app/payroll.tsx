@@ -30,6 +30,8 @@ import {
   sharePayslipImage,
 } from "@/services/payslipExportService";
 import { PdfSuccessModal } from "@/components/PdfSuccessModal";
+import { ConfirmDeleteModal } from "@/components/ConfirmDeleteModal";
+import { showFloatingToast } from "@/utils/toast";
 
 const DEPARTMENTS = ["Software Engineering", "Administration", "Research & Development", "Finance"];
 
@@ -47,6 +49,7 @@ export default function PayrollScreen() {
   const [search, setSearch] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
   const [editingEntry, setEditingEntry] = useState<PayrollEntry | null>(null);
+  const [deletingEntry, setDeletingEntry] = useState<PayrollEntry | null>(null);
   const [slipModalEntry, setSlipModalEntry] = useState<PayrollEntry | null>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
@@ -442,22 +445,8 @@ export default function PayrollScreen() {
                     {canEdit && (
                       <TouchableOpacity
                         onPress={() => {
-                          Alert.alert(
-                            "Delete Payroll Record",
-                            `Are you sure you want to delete payroll record for ${item.employeeName} (${item.month})?`,
-                            [
-                              { text: "Cancel", style: "cancel" },
-                              {
-                                text: "Yes, Delete It",
-                                style: "destructive",
-                                onPress: async () => {
-                                  if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-                                  await deletePayroll(item.id);
-                                  showFloatingToast("Payroll Deleted", `Payroll record for ${item.employeeName} was deleted.`);
-                                },
-                              },
-                            ]
-                          );
+                          if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                          setDeletingEntry(item);
                         }}
                         style={{
                           padding: 5,
@@ -719,6 +708,26 @@ export default function PayrollScreen() {
         fileSize={successModalData.fileSize}
         title={successModalData.title}
         subtitle={successModalData.subtitle}
+      />
+
+      {/* ─── Ultra-Premium Custom Delete Confirmation Modal ─── */}
+      <ConfirmDeleteModal
+        visible={Boolean(deletingEntry)}
+        title="Delete Payroll Record"
+        subtitle="Are you sure you want to permanently delete this employee salary record?"
+        itemName={deletingEntry ? `${deletingEntry.employeeName} (${deletingEntry.employeeId})` : undefined}
+        itemDetails={deletingEntry ? `${deletingEntry.department} · Month: ${deletingEntry.month}` : undefined}
+        itemAmount={deletingEntry ? `${settings.currency} ${(deletingEntry.netSalary || deletingEntry.baseSalary).toLocaleString()}` : undefined}
+        confirmText="Yes, Delete It"
+        onCancel={() => setDeletingEntry(null)}
+        onConfirm={async () => {
+          if (deletingEntry) {
+            const p = deletingEntry;
+            setDeletingEntry(null);
+            await deletePayroll(p.id);
+            showFloatingToast("Payroll Deleted", `Salary record for ${p.employeeName} was deleted.`);
+          }
+        }}
       />
     </View>
   );

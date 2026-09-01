@@ -872,7 +872,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     return departments.reduce((s, d) => s + Number(d.budgetAllocated || 0), 0);
   }, [departments]);
 
-  const totalBudgeted = totalLineBudgeted > 0 ? totalLineBudgeted : totalDeptBudgeted;
+  const totalBudgeted = totalLineBudgeted;
   
   // Real-time Net Balance includes Total Income + Total Allocated Budget - Total Expenses
   // Whenever Income OR Budget is added/allocated, this Top Balance increases immediately!

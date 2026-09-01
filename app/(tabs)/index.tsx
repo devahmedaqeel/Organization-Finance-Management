@@ -188,7 +188,7 @@ export default function DashboardScreen() {
 
   const totalLineBudgeted = calculateBudgetAllocation(budgets);
   const totalDeptBudgeted = calculateBudgetAllocation([], departments);
-  const totalBudgeted = totalLineBudgeted > 0 ? totalLineBudgeted : totalDeptBudgeted;
+  const totalBudgeted = totalLineBudgeted;
   const netBudgetRemaining = calculateBudgetRemaining(totalBudgeted, totalExpenses);
   const netBudgetUtilization = totalBudgeted > 0 ? (totalExpenses / totalBudgeted) * 100 : 0;
   
@@ -703,7 +703,7 @@ export default function DashboardScreen() {
               <View
                 style={{
                   height: "100%",
-                  width: `${Math.min(Math.max(!isDeficit && totalIncome > 0 ? retainedSurplusPct : 10, 6), 100)}%`,
+                  width: `${totalIncome === 0 ? 0 : Math.min(Math.max(!isDeficit ? retainedSurplusPct : 10, 6), 100)}%`,
                   backgroundColor: isDeficit ? colors.expense : colors.income,
                   borderRadius: 2,
                 }}
@@ -734,11 +734,11 @@ export default function DashboardScreen() {
               <View
                 style={[
                   styles.kpiTag,
-                  { backgroundColor: (isDeficit ? colors.expense : colors.warning) + "18" },
+                  { backgroundColor: (totalExpenses === 0 ? colors.income : isDeficit ? colors.expense : colors.warning) + "18" },
                 ]}
               >
-                <Text style={[styles.kpiTagText, { color: isDeficit ? colors.expense : colors.warning }]}>
-                  {isDeficit ? "Over Inflows" : "Outflows"}
+                <Text style={[styles.kpiTagText, { color: totalExpenses === 0 ? colors.income : isDeficit ? colors.expense : colors.warning }]}>
+                  {totalExpenses === 0 ? "No Outflows" : isDeficit ? "Over Inflows" : "Outflows"}
                 </Text>
               </View>
             </View>
@@ -749,20 +749,24 @@ export default function DashboardScreen() {
             <Text
               style={{
                 fontSize: 9.5,
-                color: isDeficit ? colors.expense : colors.foreground,
+                color: totalExpenses === 0 ? colors.income : isDeficit ? colors.expense : colors.foreground,
                 fontFamily: "Inter_600SemiBold",
                 marginTop: -2,
               }}
               numberOfLines={1}
             >
-              {totalIncome > 0 ? `${Math.round(rawSpendRatio)}% of Inflows` : "100% Outflow"}
+              {totalExpenses === 0
+                ? "No Outflows (0%)"
+                : totalIncome > 0
+                ? `${Math.round(rawSpendRatio)}% of Inflows`
+                : "100% Outflow"}
             </Text>
             <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 4, overflow: "hidden" }}>
               <View
                 style={{
                   height: "100%",
-                  width: `${Math.min(Math.max(totalIncome > 0 ? rawSpendRatio : 100, 6), 100)}%`,
-                  backgroundColor: isDeficit ? colors.expense : rawSpendRatio > 80 ? colors.warning : colors.income,
+                  width: `${totalExpenses === 0 ? 0 : Math.min(Math.max(totalIncome > 0 ? rawSpendRatio : 100, 6), 100)}%`,
+                  backgroundColor: totalExpenses === 0 ? colors.income : isDeficit ? colors.expense : rawSpendRatio > 80 ? colors.warning : colors.income,
                   borderRadius: 2,
                 }}
               />
@@ -859,21 +863,23 @@ export default function DashboardScreen() {
             <Text
               style={{
                 fontSize: 9.5,
-                color: totalExpenses > totalBudgeted ? colors.expense : colors.income,
+                color: totalBudgeted === 0 ? colors.mutedForeground : totalExpenses > totalBudgeted ? colors.expense : colors.income,
                 fontFamily: "Inter_600SemiBold",
                 marginTop: -2,
               }}
               numberOfLines={1}
             >
-              {totalExpenses > totalBudgeted
+              {totalBudgeted === 0
+                ? "No Budget Set"
+                : totalExpenses > totalBudgeted
                 ? `${settings.currency} ${fmt(totalExpenses - totalBudgeted)} Over Limit`
-                : `${settings.currency} ${fmt(Math.max(totalBudgeted - totalExpenses, 0))} Left (${settings.currency} ${fmt(totalExpenses)} Spent)`}
+                : `${settings.currency} ${fmt(Math.max(totalBudgeted - totalExpenses, 0))} Left`}
             </Text>
             <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 4, overflow: "hidden" }}>
               <View
                 style={{
                   height: "100%",
-                  width: `${Math.min(Math.max(budgetUtilization, 4), 100)}%`,
+                  width: `${totalBudgeted === 0 ? 0 : Math.min(Math.max(budgetUtilization, 4), 100)}%`,
                   backgroundColor:
                     budgetUtilization > 100
                       ? colors.expense
@@ -906,32 +912,40 @@ export default function DashboardScreen() {
               <View style={[styles.kpiIconWrap, { backgroundColor: colors.primary + "20" }]}>
                 <Feather name="list" size={17} color={colors.primary} />
               </View>
-              <View style={[styles.kpiTag, { backgroundColor: colors.primary + "18" }]}>
-                <Text style={[styles.kpiTagText, { color: colors.primary }]}>Active</Text>
+              <View style={[styles.kpiTag, { backgroundColor: (transactions.length > 0 ? colors.primary : colors.muted) + "18" }]}>
+                <Text style={[styles.kpiTagText, { color: transactions.length > 0 ? colors.primary : colors.mutedForeground }]}>
+                  {transactions.length > 0 ? "Active" : "Empty"}
+                </Text>
               </View>
             </View>
             <Text style={[styles.kpiValueText, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit>
               {transactions.length}
             </Text>
             <Text style={[styles.kpiLabelText, { color: colors.mutedForeground }]} numberOfLines={1}>Transactions</Text>
-            <Text style={{ fontSize: 9.5, color: colors.primary, fontFamily: "Inter_600SemiBold", marginTop: -2 }} numberOfLines={1}>
-              {transactions.filter(t => t.type === 'income').length} In · {transactions.filter(t => t.type === 'expense').length} Out
+            <Text style={{ fontSize: 9.5, color: transactions.length > 0 ? colors.primary : colors.mutedForeground, fontFamily: "Inter_600SemiBold", marginTop: -2 }} numberOfLines={1}>
+              {transactions.length > 0
+                ? `${transactions.filter(t => t.type === 'income').length} In · ${transactions.filter(t => t.type === 'expense').length} Out`
+                : "No Transactions"}
             </Text>
             <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 4, overflow: "hidden", flexDirection: "row" }}>
-              <View
-                style={{
-                  height: "100%",
-                  width: `${transactions.length > 0 ? Math.max((transactions.filter(t => t.type === 'income').length / transactions.length) * 100, 10) : 50}%`,
-                  backgroundColor: colors.income,
-                }}
-              />
-              <View
-                style={{
-                  height: "100%",
-                  width: `${transactions.length > 0 ? (transactions.filter(t => t.type === 'expense').length / transactions.length) * 100 : 50}%`,
-                  backgroundColor: colors.expense,
-                }}
-              />
+              {transactions.length > 0 ? (
+                <>
+                  <View
+                    style={{
+                      height: "100%",
+                      width: `${(transactions.filter(t => t.type === 'income').length / transactions.length) * 100}%`,
+                      backgroundColor: colors.income,
+                    }}
+                  />
+                  <View
+                    style={{
+                      height: "100%",
+                      width: `${(transactions.filter(t => t.type === 'expense').length / transactions.length) * 100}%`,
+                      backgroundColor: colors.expense,
+                    }}
+                  />
+                </>
+              ) : null}
             </View>
           </TouchableOpacity>
 
@@ -955,22 +969,28 @@ export default function DashboardScreen() {
               <View style={[styles.kpiIconWrap, { backgroundColor: "#8B5CF625" }]}>
                 <Feather name="users" size={17} color="#8B5CF6" />
               </View>
-              <View style={[styles.kpiTag, { backgroundColor: "#8B5CF618" }]}>
-                <Text style={[styles.kpiTagText, { color: "#8B5CF6" }]}>{payroll.length} Staff</Text>
+              <View style={[styles.kpiTag, { backgroundColor: (payroll.length > 0 ? "#8B5CF6" : colors.muted) + "18" }]}>
+                <Text style={[styles.kpiTagText, { color: payroll.length > 0 ? "#8B5CF6" : colors.mutedForeground }]}>
+                  {payroll.length} Staff
+                </Text>
               </View>
             </View>
             <Text style={[styles.kpiValueText, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit>
               {settings.currency} {fmt(payroll.reduce((s, p) => s + (p.baseSalary || 0) + (p.bonus || 0) - (p.deductions || 0), 0))}
             </Text>
             <Text style={[styles.kpiLabelText, { color: colors.mutedForeground }]} numberOfLines={1}>Staff Payroll</Text>
-            <Text style={{ fontSize: 9.5, color: "#8B5CF6", fontFamily: "Inter_600SemiBold", marginTop: -2 }} numberOfLines={1}>
-              {totalExpenses > 0 ? `${Math.round((payroll.reduce((s, p) => s + (p.baseSalary || 0) + (p.bonus || 0) - (p.deductions || 0), 0) / totalExpenses) * 100)}% of Outflows` : "Monthly Pay"}
+            <Text style={{ fontSize: 9.5, color: payroll.length > 0 ? "#8B5CF6" : colors.mutedForeground, fontFamily: "Inter_600SemiBold", marginTop: -2 }} numberOfLines={1}>
+              {payroll.length === 0
+                ? "No Staff Added"
+                : totalExpenses > 0
+                ? `${Math.round((payroll.reduce((s, p) => s + (p.baseSalary || 0) + (p.bonus || 0) - (p.deductions || 0), 0) / totalExpenses) * 100)}% of Outflows`
+                : "Monthly Pay"}
             </Text>
             <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 4, overflow: "hidden" }}>
               <View
                 style={{
                   height: "100%",
-                  width: `${Math.min(Math.max(totalExpenses > 0 ? (payroll.reduce((s, p) => s + (p.baseSalary || 0) + (p.bonus || 0) - (p.deductions || 0), 0) / totalExpenses) * 100 : 25, 6), 100)}%`,
+                  width: `${payroll.length === 0 ? 0 : Math.min(Math.max(totalExpenses > 0 ? (payroll.reduce((s, p) => s + (p.baseSalary || 0) + (p.bonus || 0) - (p.deductions || 0), 0) / totalExpenses) * 100 : 50, 6), 100)}%`,
                   backgroundColor: "#8B5CF6",
                   borderRadius: 2,
                 }}

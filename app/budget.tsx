@@ -16,11 +16,13 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DonutChart } from "@/components/DonutChart";
+import { ConfirmDeleteModal } from "@/components/ConfirmDeleteModal";
 import { useAuth } from "@/context/AuthContext";
 import { useFinance } from "@/context/FinanceContext";
 import { useColors } from "@/hooks/useColors";
 import { useSettings } from "@/context/SettingsContext";
 import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
+import { showFloatingToast } from "@/utils/toast";
 
 const DEPARTMENTS = [
   "Software Engineering",
@@ -29,8 +31,22 @@ const DEPARTMENTS = [
   "Finance",
   "Marketing",
   "Operations",
+  "Human Resources",
+  "Logistics",
 ];
-const CATS = ["Salaries", "Utilities", "Equipment", "Research", "Maintenance", "Travel", "Other"];
+const CATS = [
+  "Salaries",
+  "Equipment",
+  "Utilities",
+  "Research",
+  "Maintenance",
+  "Travel",
+  "Marketing",
+  "Software",
+  "Supplies",
+  "Consulting",
+  "Other",
+];
 const DEPT_COLORS = ["#3B82F6", "#10B981", "#F59E0B", "#8B5CF6", "#EC4899", "#06B6D4"];
 
 function fmtNum(n: number) {
@@ -58,6 +74,7 @@ export default function BudgetScreen() {
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
+  const [deletingBudget, setDeletingBudget] = useState<Budget | null>(null);
   const [dept, setDept] = useState(DEPARTMENTS[0]);
   const [cat, setCat] = useState(CATS[0]);
   const [allocated, setAllocated] = useState("");
@@ -165,23 +182,8 @@ export default function BudgetScreen() {
   };
 
   const handleDeleteBudget = (item: any) => {
-    if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    Alert.alert(
-      "Delete Budget",
-      `Are you sure you want to delete ${item.department} (${item.category}) budget of ${settings.currency} ${fmtNum(item.allocated)}?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Yes, Delete It",
-          style: "destructive",
-          onPress: async () => {
-            if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-            await deleteBudget(item.id);
-            showFloatingToast("Budget Deleted", `${item.department} - ${item.category} budget was permanently deleted.`);
-          },
-        },
-      ]
-    );
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setDeletingBudget(item);
   };
 
   return (
@@ -543,6 +545,26 @@ export default function BudgetScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Ultra-Premium Custom Delete Confirmation Modal */}
+      <ConfirmDeleteModal
+        visible={Boolean(deletingBudget)}
+        title="Delete Budget Allocation"
+        subtitle="Are you sure you want to permanently remove this budget line item?"
+        itemName={deletingBudget ? `${deletingBudget.department} — ${deletingBudget.category}` : undefined}
+        itemDetails={deletingBudget ? `Period: ${deletingBudget.period || defaultPeriod}` : undefined}
+        itemAmount={deletingBudget ? `${settings.currency} ${fmtNum(deletingBudget.allocated)}` : undefined}
+        confirmText="Yes, Delete It"
+        onCancel={() => setDeletingBudget(null)}
+        onConfirm={async () => {
+          if (deletingBudget) {
+            const b = deletingBudget;
+            setDeletingBudget(null);
+            await deleteBudget(b.id);
+            showFloatingToast("Budget Deleted", `${b.department} - ${b.category} was permanently removed.`);
+          }
+        }}
+      />
     </View>
   );
 }

@@ -17,11 +17,13 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ProgressBar } from "@/components/ProgressBar";
+import { ConfirmDeleteModal } from "@/components/ConfirmDeleteModal";
 import { useAuth } from "@/context/AuthContext";
 import { useFinance } from "@/context/FinanceContext";
 import { useColors } from "@/hooks/useColors";
 import { useSettings } from "@/context/SettingsContext";
 import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
+import { showFloatingToast } from "@/utils/toast";
 
 const DEPT_COLORS = ["#3B82F6", "#10B981", "#8B5CF6", "#F59E0B", "#F43F5E", "#0EA5E9", "#EC4899"];
 
@@ -157,23 +159,8 @@ export default function DepartmentsScreen() {
   };
 
   const handleDelete = (dept: { id: string; name: string; headCount?: number; budgetAllocated?: number }) => {
-    if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    Alert.alert(
-      "Delete Department",
-      `Are you sure you want to delete ${dept.name} (${dept.headCount || 0} employees, ${settings.currency} ${fmt(dept.budgetAllocated || 0)} allocated)?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Yes, Delete It",
-          style: "destructive",
-          onPress: () => {
-            if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-            deleteDepartment(dept.id);
-            showFloatingToast("Department Deleted", `${dept.name} was permanently removed.`);
-          },
-        },
-      ]
-    );
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setDeptToDelete(dept);
   };
 
   return (
@@ -560,6 +547,26 @@ export default function DepartmentsScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Ultra-Premium Custom Delete Confirmation Modal */}
+      <ConfirmDeleteModal
+        visible={Boolean(deptToDelete)}
+        title="Delete Department"
+        subtitle="Are you sure you want to permanently remove this monitored unit from tracking?"
+        itemName={deptToDelete ? deptToDelete.name : undefined}
+        itemDetails={deptToDelete ? `${deptToDelete.headCount || 0} Staff Headcount` : undefined}
+        itemAmount={deptToDelete ? `${settings.currency} ${fmt(deptToDelete.budgetAllocated || 0)}` : undefined}
+        confirmText="Yes, Delete It"
+        onCancel={() => setDeptToDelete(null)}
+        onConfirm={async () => {
+          if (deptToDelete) {
+            const d = deptToDelete;
+            setDeptToDelete(null);
+            await deleteDepartment(d.id);
+            showFloatingToast("Department Deleted", `${d.name} was permanently removed.`);
+          }
+        }}
+      />
     </View>
   );
 }

@@ -1,10 +1,11 @@
 import { Feather } from "./UniversalIcon";
 import * as Haptics from "expo-haptics";
-import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View, Alert, Platform } from "react-native";
+import React, { useState } from "react";
+import { StyleSheet, Text, TouchableOpacity, View, Platform } from "react-native";
 import { Transaction } from "@/context/FinanceContext";
 import { useColors } from "@/hooks/useColors";
 import { useSettings } from "@/context/SettingsContext";
+import { ConfirmDeleteModal } from "@/components/ConfirmDeleteModal";
 
 function formatDate(d: string) {
   const date = new Date(d);
@@ -41,6 +42,7 @@ export function TransactionItem(props: TransactionItemProps) {
   const { item, transaction, onDelete, onEdit, canDelete } = props;
   const colors = useColors();
   const { settings } = useSettings();
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   // Support item prop, transaction prop, or directly spread props
   const tx: Transaction | undefined =
@@ -63,22 +65,8 @@ export function TransactionItem(props: TransactionItemProps) {
 
   const handleDelete = () => {
     if (!onDelete) return;
-    if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    Alert.alert(
-      `Delete ${isIncome ? "Income" : "Expense"}`,
-      `Are you sure you want to delete ${tx.category} transaction of ${settings.currency} ${formatAmountVal(tx.amount)}?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Yes, Delete It",
-          style: "destructive",
-          onPress: () => {
-            if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-            onDelete(tx.id);
-          },
-        },
-      ]
-    );
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setShowDeleteModal(true);
   };
 
   return (
@@ -135,6 +123,22 @@ export function TransactionItem(props: TransactionItemProps) {
           </View>
         )}
       </View>
+
+      {/* Ultra-Premium Custom Delete Confirmation Modal */}
+      <ConfirmDeleteModal
+        visible={showDeleteModal}
+        title={`Delete ${isIncome ? "Income" : "Expense"}`}
+        subtitle={`Are you sure you want to permanently delete this ${isIncome ? "income credit" : "expense debit"} transaction?`}
+        itemName={tx.title || tx.category}
+        itemDetails={`${tx.department || "General"} · ${formatDate(tx.date)}`}
+        itemAmount={`${isIncome ? "+" : "-"}${settings.currency} ${formatAmountVal(tx.amount)}`}
+        confirmText="Yes, Delete It"
+        onCancel={() => setShowDeleteModal(false)}
+        onConfirm={() => {
+          setShowDeleteModal(false);
+          if (onDelete) onDelete(tx.id);
+        }}
+      />
     </View>
   );
 }

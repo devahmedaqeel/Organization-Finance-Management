@@ -114,7 +114,7 @@ export function WebDashboard({
 
   const totalLineBudgeted = calculateBudgetAllocation(budgets);
   const totalDeptBudgeted = calculateBudgetAllocation([], departments);
-  const totalBudgeted = totalLineBudgeted > 0 ? totalLineBudgeted : totalDeptBudgeted;
+  const totalBudgeted = totalLineBudgeted;
   const netBudgetRemaining = calculateBudgetRemaining(totalBudgeted, totalExpenses);
   const netBudgetUtilization = totalBudgeted > 0 ? (totalExpenses / totalBudgeted) * 100 : 0;
   
