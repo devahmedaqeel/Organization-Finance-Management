@@ -257,8 +257,8 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
               visible: true,
               filename: res.filename || `OFM_${selectedType}.pdf`,
               fileUri: res.uri,
-              title: "Official PDF Dossier Saved ✅",
-              subtitle: "Saved to your device storage",
+              title: "Saved into File Manager ✅",
+              subtitle: "Official PDF saved into device storage",
             });
           } else {
             Alert.alert("Export Notice", res.message || res.error || "Failed to generate PDF file.");

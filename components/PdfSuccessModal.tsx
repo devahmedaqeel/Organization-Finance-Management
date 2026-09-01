@@ -27,6 +27,7 @@ interface Props {
 }
 
 import { openPdfFile, sharePdfFile } from "@/services/pdfDownloadService";
+import { showFloatingToast } from "./CustomToast";
 
 export function PdfSuccessModal({
   visible,
@@ -34,9 +35,20 @@ export function PdfSuccessModal({
   filename,
   fileUri,
   title = "Saved into File Manager ✅",
-  subtitle = "Official payslip PDF saved to your phone storage.",
+  subtitle = "Official PDF dossier saved to your phone storage.",
 }: Props) {
   const colors = useColors();
+
+  // Auto-close popup after 2.5 seconds and trigger floating notification
+  useEffect(() => {
+    if (visible) {
+      showFloatingToast("Saved into File Manager ✅", filename || "PDF saved to phone storage.");
+      const timer = setTimeout(() => {
+        onClose();
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [visible, onClose, filename]);
 
   if (!visible) return null;
 

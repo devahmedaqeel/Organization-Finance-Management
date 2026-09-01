@@ -169,13 +169,13 @@ export function FinancialStatementViewerModal({
     try {
       const res = await downloadPdfReport(reportOpts);
       if (res.success) {
-        showFloatingToast("PDF Ready", "Official Financial Statement PDF saved successfully.");
+        showFloatingToast("Saved into File Manager ✅", "Official Financial Statement PDF saved successfully.");
         setSuccessModalData({
           visible: true,
           filename: res.filename || "Financial_Statement.pdf",
           fileUri: res.uri,
-          title: "Financial Statement Ready",
-          subtitle: `Consolidated Financial Statement (${periodLabel}) has been saved to your device.`,
+          title: "Saved into File Manager ✅",
+          subtitle: `Official PDF dossier saved to your phone storage.`,
         });
       } else {
         Alert.alert("PDF Error", res.message || "Failed to download PDF report.");
