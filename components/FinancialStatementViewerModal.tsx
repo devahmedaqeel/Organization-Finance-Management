@@ -198,10 +198,41 @@ export function FinancialStatementViewerModal({
         <View style={styles.topHeader}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1 }}>
             <View style={styles.docIconBox}>
-              <Feather name="file-text" size={17} color="#38BDF8" />
+              <Feather
+                name={
+                  reportOpts.reportMode === "payroll_audit"
+                    ? "users"
+                    : reportOpts.reportMode === "expense_analysis"
+                    ? "trending-down"
+                    : reportOpts.reportMode === "revenue_analysis"
+                    ? "trending-up"
+                    : reportOpts.reportMode === "department_analysis"
+                    ? "layers"
+                    : reportOpts.reportMode === "budget_performance"
+                    ? "pie-chart"
+                    : "file-text"
+                }
+                size={17}
+                color="#38BDF8"
+              />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.topHeaderTitle} numberOfLines={1}>Official Financial Statement</Text>
+              <Text style={styles.topHeaderTitle} numberOfLines={1}>
+                {title ||
+                  (reportOpts.reportMode === "payroll_audit"
+                    ? "Staff Payroll & Remuneration Audit"
+                    : reportOpts.reportMode === "expense_analysis"
+                    ? "Operational Expenditure Analysis"
+                    : reportOpts.reportMode === "revenue_analysis"
+                    ? "Institutional Revenue Statement"
+                    : reportOpts.reportMode === "department_analysis"
+                    ? "Departmental Cost Center Matrix"
+                    : reportOpts.reportMode === "budget_performance"
+                    ? "Fiscal Budget Performance Report"
+                    : reportOpts.reportMode === "general_ledger"
+                    ? "Audited General Ledger Trail"
+                    : "Official Consolidated Financial Statement")}
+              </Text>
               <Text style={styles.topHeaderSub} numberOfLines={1}>{organizationName} · {periodLabel}</Text>
             </View>
           </View>
