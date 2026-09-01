@@ -8,6 +8,7 @@
 import React, { useEffect } from "react";
 import {
   Modal,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -34,15 +35,15 @@ export function PdfSuccessModal({
   onClose,
   filename,
   fileUri,
-  title = "Official PDF Dossier Ready ✅",
-  subtitle = Platform.OS === "ios" ? "Tap 'Share' to Save to Files or Send." : "Saved to device storage.",
+  title = "PDF Ready ✓",
+  subtitle = "Your official financial PDF dossier has been saved successfully.",
 }: Props) {
   const colors = useColors();
 
-  // Trigger floating notification on display without premature auto-closing
+  // Trigger floating notification on display without auto-closing
   useEffect(() => {
     if (visible) {
-      showFloatingToast("Official PDF Ready ✅", filename || "PDF generated successfully.");
+      showFloatingToast("PDF Ready ✓", filename || "PDF generated successfully.");
     }
   }, [visible, filename]);
 
@@ -52,14 +53,18 @@ export function PdfSuccessModal({
     if (fileUri) {
       await openPdfFile(fileUri, filename);
     }
-    onClose();
   };
 
   const handleShare = async () => {
     if (fileUri) {
       await sharePdfFile(fileUri, filename);
     }
-    onClose();
+  };
+
+  const handleSaveToManager = async () => {
+    if (fileUri) {
+      await sharePdfFile(fileUri, filename);
+    }
   };
 
   return (
@@ -69,8 +74,11 @@ export function PdfSuccessModal({
         activeOpacity={1}
         onPress={onClose}
       >
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          
+        <TouchableOpacity
+          style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
+          activeOpacity={1}
+          onPress={(e) => e.stopPropagation()}
+        >
           {/* Glowing Checkmark Badge */}
           <View style={styles.glowOuter}>
             <View style={styles.glowInner}>
@@ -84,11 +92,11 @@ export function PdfSuccessModal({
             {filename ? `${filename}\n${subtitle}` : subtitle}
           </Text>
 
-          {/* Action Buttons Row */}
-          <View style={{ flexDirection: "row", gap: 10, width: "100%", marginTop: 4 }}>
+          {/* Action Buttons Column */}
+          <View style={{ width: "100%", gap: 8, marginTop: 4 }}>
             {fileUri ? (
               <TouchableOpacity
-                style={[styles.actionBtn, { backgroundColor: "#38BDF8", flex: 1 }]}
+                style={[styles.actionBtn, { backgroundColor: "#38BDF8" }]}
                 onPress={handleOpen}
                 activeOpacity={0.85}
               >
@@ -99,7 +107,7 @@ export function PdfSuccessModal({
 
             {fileUri ? (
               <TouchableOpacity
-                style={[styles.actionBtn, { backgroundColor: "#10B981", flex: 1 }]}
+                style={[styles.actionBtn, { backgroundColor: "#10B981" }]}
                 onPress={handleShare}
                 activeOpacity={0.85}
               >
@@ -108,16 +116,28 @@ export function PdfSuccessModal({
               </TouchableOpacity>
             ) : null}
 
+            {fileUri ? (
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: "#6366F1" }]}
+                onPress={handleSaveToManager}
+                activeOpacity={0.85}
+              >
+                <Feather name="folder" size={15} color="#FFFFFF" />
+                <Text style={[styles.actionBtnText, { color: "#FFFFFF" }]}>Save to File Manager</Text>
+              </TouchableOpacity>
+            ) : null}
+
             <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: colors.border, flex: fileUri ? 0.7 : 1 }]}
+              style={[styles.actionBtn, { backgroundColor: colors.border, marginTop: 2 }]}
               onPress={onClose}
               activeOpacity={0.85}
             >
+              <Feather name="x" size={14} color={colors.foreground} />
               <Text style={[styles.actionBtnText, { color: colors.foreground }]}>Close</Text>
             </TouchableOpacity>
           </View>
 
-        </View>
+        </TouchableOpacity>
       </TouchableOpacity>
     </Modal>
   );
@@ -129,11 +149,11 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0, 0, 0, 0.65)",
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 28,
+    paddingHorizontal: 24,
   },
   card: {
     width: "100%",
-    maxWidth: 320,
+    maxWidth: 340,
     borderRadius: 22,
     borderWidth: 1,
     paddingVertical: 22,
