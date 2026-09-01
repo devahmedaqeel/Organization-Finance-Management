@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Modal, StyleSheet, Text, TouchableOpacity, View, ScrollView, useWindowDimensions } from "react-native";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "@/config/firebase";
@@ -53,7 +53,7 @@ export function WebMemberRoleModal({ visible, onClose, member, onUpdateSuccess }
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (member) setSelectedRole(member.role);
     setError("");
   }, [member, visible]);
