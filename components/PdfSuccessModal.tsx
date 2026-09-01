@@ -27,7 +27,7 @@ interface Props {
 }
 
 import { openPdfFile, sharePdfFile } from "@/services/pdfDownloadService";
-import { showFloatingToast } from "./CustomToast";
+import { showFloatingToast } from "@/utils/toast";
 
 export function PdfSuccessModal({
   visible,
