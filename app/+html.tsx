@@ -18,10 +18,28 @@ export default function RootHtml({ children }: PropsWithChildren) {
         />
         <meta name="theme-color" content="#060D1F" />
         <link rel="manifest" href="/manifest.json" />
-        <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png?v=4" />
-        <link rel="icon" type="image/png" sizes="192x192" href="/icon.png?v=4" />
-        <link rel="apple-touch-icon" sizes="180x180" href="/icon.png?v=4" />
-        <link rel="shortcut icon" href="/favicon.ico?v=4" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png?v=5" />
+        <link rel="icon" type="image/png" sizes="192x192" href="/icon.png?v=5" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/icon.png?v=5" />
+        <link rel="shortcut icon" href="/favicon.ico?v=5" />
+        
+        {/* Force Clear Stale ServiceWorker and Browser Disk Cache */}
+        <script dangerouslySetInnerHTML={{ __html: `
+          try {
+            if (typeof window !== 'undefined') {
+              if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(function(regs) {
+                  for (var r of regs) r.unregister();
+                });
+              }
+              if ('caches' in window) {
+                caches.keys().then(function(keys) {
+                  for (var k of keys) caches.delete(k);
+                });
+              }
+            }
+          } catch (e) {}
+        `}} />
         
         {/* Preconnect and Load Google Inter Font */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />

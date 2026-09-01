@@ -251,7 +251,7 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
         } else {
           // On mobile: automatically open the live web app in Chrome with auto-dossier export trigger
           if (Platform.OS !== "web") {
-            const targetUrl = "https://ofmapp-main.web.app/?tab=reports&export=dossier";
+            const targetUrl = `https://ofmapp-main.web.app/?tab=reports&export=dossier&v=${Date.now()}`;
             const { Linking } = require("react-native");
             try {
               const WebBrowser = require("expo-web-browser");
