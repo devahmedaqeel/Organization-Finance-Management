@@ -8,6 +8,7 @@
 
 import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 import {
   collection,
   doc,
@@ -23,6 +24,8 @@ import {
 import * as Notifications from "expo-notifications";
 import { db } from "@/config/firebase";
 import { EvaluatedNotificationEvent, NotificationType } from "./notificationRules";
+
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
 export interface AppNotification {
   id: string;
@@ -48,23 +51,27 @@ const processedKeysSet = new Set<string>();
 /**
  * Configure default notification handler for foreground notifications.
  */
-if (Platform.OS !== "web") {
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: true,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    }),
-  });
+if (Platform.OS !== "web" && !isExpoGo) {
+  try {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      }),
+    });
+  } catch {
+    // Ignored in unsupported environments
+  }
 }
 
 /**
  * Registers device for Expo Push Notifications and returns the token.
  */
 export async function registerForPushNotificationsAsync(userId?: string, orgId?: string): Promise<string | null> {
-  if (Platform.OS === "web") return null;
+  if (Platform.OS === "web" || isExpoGo) return null;
 
   try {
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
