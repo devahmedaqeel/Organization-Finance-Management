@@ -239,6 +239,32 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
 
         setLoadingStep("Compiling official PDF dossier...");
 
+        if (format === "pdf" && Platform.OS !== "web") {
+          setGenerating(false);
+          onClose();
+          const query = new URLSearchParams({
+            tab: "reports",
+            export: "dossier",
+            reportType: selectedType,
+            scope: scope,
+            dept: selectedDept,
+            v: String(Date.now()),
+          });
+          if (scope === "custom" && customStart && customEnd) {
+            query.set("startDate", customStart);
+            query.set("endDate", customEnd);
+          }
+          const webUrl = `https://ofmapp-main.web.app/?${query.toString()}`;
+          const { Linking } = require("react-native");
+          try {
+            const WebBrowser = require("expo-web-browser");
+            await WebBrowser.openBrowserAsync(webUrl);
+          } catch {
+            await Linking.openURL(webUrl);
+          }
+          return;
+        }
+
         if (format === "csv") {
           const res = await downloadCsvReport(compiledEnterpriseData);
           setGenerating(false);
@@ -253,12 +279,6 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
           setGenerating(false);
           if (res.success) {
             onClose();
-            if (res.uri && Platform.OS !== "web") {
-              try {
-                const { openPdfFile } = require("@/services/pdfDownloadService");
-                await openPdfFile(res.uri, res.filename);
-              } catch (e) {}
-            }
             setSuccessModalData({
               visible: true,
               filename: res.filename || `OFM_${selectedType}.pdf`,

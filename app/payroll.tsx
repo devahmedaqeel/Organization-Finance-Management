@@ -201,15 +201,32 @@ export default function PayrollScreen() {
 
   const handleExportEmployeeSlip = async (emp: PayrollEntry) => {
     try {
+      if (Platform.OS !== "web") {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        const query = new URLSearchParams({
+          tab: "payroll",
+          export: "payslip",
+          empId: emp.employeeId || emp.id,
+          v: String(Date.now()),
+        });
+        const webUrl = `https://ofmapp-main.web.app/?${query.toString()}`;
+        const { Linking } = require("react-native");
+        try {
+          const WebBrowser = require("expo-web-browser");
+          await WebBrowser.openBrowserAsync(webUrl);
+        } catch {
+          await Linking.openURL(webUrl);
+        }
+        return;
+      }
+
       setIsGeneratingPdf(true);
       setPdfSuccessMessage(null);
       setPdfErrorMessage(null);
-      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
       setIsSavingPdf(true);
       const result = await downloadPayslipPDF(emp, getOrgInfo());
       
-      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setPdfSuccessMessage(`Saved: ${result.filename}`);
       
       setSuccessModalData({
@@ -217,8 +234,8 @@ export default function PayrollScreen() {
         filename: result.filename,
         fileUri: result.uri,
         fileSize: result.fileSize,
-        title: "Saved into your File Manager ✅",
-        subtitle: `Saved to device storage`,
+        title: "PDF Ready ✓",
+        subtitle: `Your PDF has been downloaded successfully.`,
       });
 
       setTimeout(() => {

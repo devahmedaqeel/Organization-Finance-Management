@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { StyleSheet, Text, TextInput, TouchableOpacity, View, ScrollView, useWindowDimensions, Platform } from "react-native";
 import { useFinance, PayrollEntry } from "@/context/FinanceContext";
 import { useAuth } from "@/context/AuthContext";
@@ -144,6 +144,30 @@ export function WebPayroll() {
       includeReconciliation: true,
     });
   };
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const exportType = params.get("export");
+      if (exportType === "payslip" || exportType === "slip") {
+        const empId = params.get("empId") || params.get("employeeId");
+        if (empId && payroll.length > 0) {
+          const matchedEmp = payroll.find(
+            (p) => p.id === empId || p.employeeId === empId || p.employeeName.toLowerCase().includes(empId.toLowerCase())
+          );
+          if (matchedEmp) {
+            setTimeout(() => {
+              handleExportEmployeeSlip(matchedEmp);
+            }, 600);
+          }
+        }
+      } else if (exportType === "payroll" || exportType === "all") {
+        setTimeout(() => {
+          handleExportPDF();
+        }, 600);
+      }
+    }
+  }, [payroll]);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, isMobile && { padding: 14, gap: 14 }]} showsVerticalScrollIndicator={false}>

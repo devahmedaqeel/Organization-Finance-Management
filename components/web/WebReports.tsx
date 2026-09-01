@@ -201,12 +201,47 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       if (params.get("export") === "dossier" || params.get("auto") === "pdf") {
+        const reportType = (params.get("reportType") || "consolidated_statement") as any;
+        const scope = (params.get("scope") || "period") as any;
+        const dept = params.get("dept") || "all";
+        const startDate = params.get("startDate") || undefined;
+        const endDate = params.get("endDate") || undefined;
+
         setTimeout(() => {
-          handleExportPDF();
+          const enterpriseData = buildEnterpriseReportData(
+            transactions,
+            budgets,
+            payroll,
+            departments,
+            {
+              period: activePeriod,
+              scope,
+              reportType,
+              department: dept,
+              startDate,
+              endDate,
+            },
+            {
+              organizationName: settings.organizationName || user?.organization || "Organization Finance Management",
+              organizationAddress: settings.organizationAddress || "Enterprise Financial Center",
+              organizationEmail: settings.organizationEmail || user?.email || "finance@ofm-cloud.com",
+              organizationPhone: settings.organizationPhone || "+92-586-444111",
+              organizationLogo: settings.organizationLogo || "",
+              currency: settings.currency || "PKR",
+              fiscalYear: settings.fiscalYear || "2025-2026",
+            },
+            {
+              name: user?.name || user?.email || "Chief Financial Officer",
+              email: user?.email || "cfo@ofm.org",
+              role: user?.role || "Admin",
+              organization: settings.organizationName || user?.organization,
+            }
+          );
+          openPdfReport(enterpriseData);
         }, 700);
       }
     }
-  }, []);
+  }, [transactions, budgets, payroll, departments, activePeriod, settings, user]);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, isMobile && { padding: 14, gap: 14 }]} showsVerticalScrollIndicator={false}>
