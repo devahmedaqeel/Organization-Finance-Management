@@ -489,22 +489,49 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
                   <Text style={[styles.loadingText, { color: colors.primary }]}>{loadingStep}</Text>
                 </View>
               ) : (
-                <View style={{ flexDirection: "row", gap: 10, width: "100%" }}>
-                  <TouchableOpacity
-                    style={[styles.previewBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
-                    onPress={handlePreview}
-                  >
-                    <Feather name="eye" size={15} color={colors.foreground} />
-                    <Text style={[styles.previewBtnText, { color: colors.foreground }]}>Preview</Text>
-                  </TouchableOpacity>
+                <View style={{ flexDirection: "column", gap: 10, width: "100%" }}>
+                  <View style={{ flexDirection: "row", gap: 10, width: "100%" }}>
+                    <TouchableOpacity
+                      style={[styles.previewBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
+                      onPress={handlePreview}
+                    >
+                      <Feather name="eye" size={15} color={colors.foreground} />
+                      <Text style={[styles.previewBtnText, { color: colors.foreground }]}>Preview</Text>
+                    </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={[styles.exportBtn, { backgroundColor: colors.primary }]}
-                    onPress={handleExport}
-                  >
-                    <Feather name="download" size={16} color="#FFF" />
-                    <Text style={styles.exportBtnText}>Generate & Download {format.toUpperCase()}</Text>
-                  </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.exportBtn, { backgroundColor: colors.primary }]}
+                      onPress={handleExport}
+                    >
+                      <Feather name="download" size={16} color="#FFF" />
+                      <Text style={styles.exportBtnText}>Generate & Download {format.toUpperCase()}</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {Platform.OS !== "web" && (
+                    <TouchableOpacity
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 8,
+                        paddingVertical: 10,
+                        borderRadius: 10,
+                        backgroundColor: "#0284C718",
+                        borderWidth: 1,
+                        borderColor: "#0284C740",
+                      }}
+                      onPress={async () => {
+                        const { Linking } = require("react-native");
+                        await Linking.openURL("https://ofmapp-main.web.app");
+                      }}
+                    >
+                      <Feather name="globe" size={15} color="#0284C7" />
+                      <Text style={{ color: "#0284C7", fontSize: 13, fontWeight: "700" }}>
+                        Open in Chrome Web (Direct Download)
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               )}
             </View>
