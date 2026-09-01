@@ -57,6 +57,7 @@
     "expo-crypto": "~15.0.9",
     "expo-notifications": "~0.32.17",
     "expo-print": "~15.0.8",
+    "expo-sharing": "~14.0.8",
     "expo-speech": "~14.0.8",
     "firebase": "^12.13.0",
     "react": "19.1.0",
