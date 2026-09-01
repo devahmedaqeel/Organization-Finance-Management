@@ -1126,7 +1126,7 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
  */
 export function buildFinancialPdfBinary(input: ReportOptions | EnterpriseReportData): string {
   const data = normalizeToEnterpriseData(input);
-  const { metadata, executiveSummary, generalLedger, departmentFinancials } = data;
+  const { metadata, executiveSummary, generalLedger, departmentFinancials, payrollSection } = data;
   const currency = metadata.currency;
   const totalIncome = executiveSummary.totalRevenue;
   const totalExpenses = executiveSummary.totalExpenses;
@@ -1396,7 +1396,7 @@ export function buildFinancialPdfBinary(input: ReportOptions | EnterpriseReportD
     "ET",
 
     // Payroll Rows (Up to 5 Employees)
-    ...((payrollSection.employees && payrollSection.employees.length > 0)
+    ...((payrollSection?.employees && payrollSection.employees.length > 0)
       ? payrollSection.employees.slice(0, 5)
       : [
           { employeeName: "Ahmed Aqeel", employeeId: "EMP2855", department: "Software Engineering", baseSalary: 120000, netSalary: 125000 },
