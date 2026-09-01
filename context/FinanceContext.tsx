@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, { createContext, useContext, useEffect, useState, useRef } from "react";
+import React, { createContext, useContext, useEffect, useState, useRef, useMemo } from "react";
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "../config/firebase";
 import { useAuth } from "./AuthContext";
@@ -884,17 +884,28 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   // Authoritative Aggregate Computations via Single Source of Truth
   const totalIncome = calculateTotalIncome(transactions);
   const totalExpenses = calculateTotalExpenses(transactions);
-  const netBalance = calculateNetOperatingResult(transactions);
-  const actualCash = calculateActualCash(transactions);
 
-  const budgetsWithSpent = budgets.map((b) => {
-    const spent = calculateBudgetSpentForCategory(b, transactions);
-    return { ...b, spent };
-  });
+  const budgetsWithSpent = useMemo(() => {
+    return budgets.map((b) => {
+      const spent = calculateBudgetSpentForCategory(b, transactions);
+      return { ...b, spent };
+    });
+  }, [budgets, transactions]);
 
-  const totalLineBudgeted = calculateBudgetAllocation(budgets);
-  const totalDeptBudgeted = calculateBudgetAllocation([], departments);
+  const totalLineBudgeted = useMemo(() => {
+    return budgets.reduce((s, b) => s + Number(b.allocated || 0), 0);
+  }, [budgets]);
+
+  const totalDeptBudgeted = useMemo(() => {
+    return departments.reduce((s, d) => s + Number(d.budgetAllocated || 0), 0);
+  }, [departments]);
+
   const totalBudgeted = totalLineBudgeted > 0 ? totalLineBudgeted : totalDeptBudgeted;
+  
+  // Real-time Net Balance includes Total Income + Total Allocated Budget - Total Expenses
+  // Whenever Income OR Budget is added/allocated, this Top Balance increases immediately!
+  const netBalance = (totalIncome + totalBudgeted) - totalExpenses;
+  const actualCash = calculateActualCash(transactions);
   const totalBudgetSpent = calculateBudgetUsed(transactions, budgets);
   const totalBudgetRemaining = calculateBudgetRemaining(totalBudgeted, totalBudgetSpent);
   const budgetUtilization = totalBudgeted > 0 ? (totalBudgetSpent / totalBudgeted) * 100 : 0;
