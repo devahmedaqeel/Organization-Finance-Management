@@ -1,0 +1,803 @@
+import React, { useState, useEffect } from "react";
+import { StyleSheet, Text, TouchableOpacity, View, ScrollView, useWindowDimensions, Modal, Image } from "react-native";
+import { useAuth } from "@/context/AuthContext";
+import { useFinance } from "@/context/FinanceContext";
+import { useSettings } from "@/context/SettingsContext";
+import { useColors } from "@/hooks/useColors";
+import {
+  SvgGrid,
+  SvgArrowUpRight,
+  SvgArrowDownLeft,
+  SvgList,
+  SvgPieChart,
+  SvgLayers,
+  SvgUsers,
+  SvgShield,
+  SvgFileText,
+  SvgCpu,
+  SvgSettings,
+  SvgMenu,
+  SvgX,
+  SvgLogOut,
+  SvgChevronLeft,
+  SvgChevronRight,
+  SvgSun,
+  SvgMoon,
+} from "./SvgIcons";
+
+import { WebDashboard } from "./WebDashboard";
+import { WebIncome } from "./WebIncome";
+import { WebExpenses } from "./WebExpenses";
+import { WebTransactions } from "./WebTransactions";
+import { WebBudgets } from "./WebBudgets";
+import { WebDepartments } from "./WebDepartments";
+import { WebPayroll } from "./WebPayroll";
+import { WebTeam } from "./WebTeam";
+import { WebReports } from "./WebReports";
+import { WebAIInsights } from "./WebAIInsights";
+import { WebSettings } from "./WebSettings";
+import { WebAuth } from "./WebAuth";
+import { OpenInAppBanner } from "./OpenInAppBanner";
+
+import { WebTransactionModal } from "./modals/WebTransactionModal";
+import { WebBudgetModal } from "./modals/WebBudgetModal";
+import { WebPageTransition } from "./animations/WebPageTransition";
+import { injectWebMicroAnimations } from "./animations/webStyles";
+
+export type WebTabKey =
+  | "dashboard"
+  | "income"
+  | "expenses"
+  | "transactions"
+  | "budgets"
+  | "departments"
+  | "payroll"
+  | "team"
+  | "reports"
+  | "ai-insights"
+  | "settings";
+
+interface NavItem {
+  id: WebTabKey;
+  label: string;
+  icon: string;
+  badge?: number | string;
+  badgeColor?: string;
+  roleRestriction?: ("admin" | "accountant" | "manager" | "employee")[];
+}
+
+export function WebShell() {
+  const colors = useColors();
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+  const isTablet = width >= 768 && width < 1080;
+
+  const { user, logout } = useAuth();
+  const { settings, updateSettings } = useSettings();
+  const { transactions, budgets, departments, payroll } = useFinance();
+
+  const [activeTab, setActiveTab] = useState<WebTabKey>("dashboard");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(isTablet);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+
+  // Global Quick Modals
+  const [txModalVisible, setTxModalVisible] = useState(false);
+  const [txModalType, setTxModalType] = useState<"income" | "expense">("income");
+  const [budgetModalVisible, setBudgetModalVisible] = useState(false);
+
+  useEffect(() => {
+    injectWebMicroAnimations();
+  }, []);
+
+  useEffect(() => {
+    if (isTablet) {
+      setSidebarCollapsed(true);
+    } else if (!isMobile) {
+      setSidebarCollapsed(false);
+    }
+  }, [isTablet, isMobile]);
+
+  // If unauthenticated or after logout on Web, present the Web Sign In & Create Account screen
+  if (!user) {
+    return <WebAuth />;
+  }
+
+  const canEdit = user?.role === "admin" || user?.role === "accountant";
+  const hasCustomLogo = Boolean(settings?.organizationLogo && settings.organizationLogo.trim());
+
+  const incomeCount = transactions.filter((t) => t.type === "income").length;
+  const expenseCount = transactions.filter((t) => t.type === "expense").length;
+
+  const NAV_ITEMS: NavItem[] = [
+    { id: "dashboard", label: user?.role === "employee" ? "Employee Portal" : "Dashboard", icon: "grid" },
+    { id: "income", label: "Income & Grants", icon: "arrow-up-right", badge: incomeCount, badgeColor: colors.income, roleRestriction: ["admin", "accountant"] },
+    { id: "expenses", label: "Expenses", icon: "arrow-down-left", badge: expenseCount, badgeColor: colors.expense, roleRestriction: ["admin", "accountant", "manager"] },
+    { id: "transactions", label: "Transactions", icon: "list", roleRestriction: ["admin", "accountant", "manager"] },
+    { id: "budgets", label: "Budget Allocations", icon: "pie-chart", badge: budgets.length, roleRestriction: ["admin", "accountant", "manager"] },
+    { id: "departments", label: "Departments", icon: "layers", badge: departments.length, roleRestriction: ["admin", "accountant", "manager"] },
+    { id: "payroll", label: user?.role === "employee" ? "My Salary Slip" : "Staff Payroll", icon: "users", badge: user?.role === "employee" ? undefined : payroll.length, roleRestriction: ["admin", "accountant", "manager", "employee"] },
+    { id: "team", label: "Team & Permissions", icon: "shield", roleRestriction: ["admin"] },
+    { id: "reports", label: "Financial Reports", icon: "file-text", roleRestriction: ["admin", "accountant", "manager"] },
+    { id: "ai-insights", label: "AI Insights", icon: "cpu", roleRestriction: ["admin", "manager"] },
+    { id: "settings", label: "Settings", icon: "settings", roleRestriction: ["admin"] },
+  ];
+
+  const handleOpenTx = (type: "income" | "expense") => {
+    setTxModalType(type);
+    setTxModalVisible(true);
+  };
+
+  const toggleTheme = () => {
+    const nextTheme = settings.theme === "dark" ? "light" : "dark";
+    updateSettings({ theme: nextTheme });
+  };
+
+  const renderNavIcon = (icon: string, size = 16, color = "#94A3B8") => {
+    switch (icon) {
+      case "grid": return <SvgGrid size={size} color={color} />;
+      case "arrow-up-right": return <SvgArrowUpRight size={size} color={color} />;
+      case "arrow-down-left": return <SvgArrowDownLeft size={size} color={color} />;
+      case "list": return <SvgList size={size} color={color} />;
+      case "pie-chart": return <SvgPieChart size={size} color={color} />;
+      case "layers": return <SvgLayers size={size} color={color} />;
+      case "users": return <SvgUsers size={size} color={color} />;
+      case "shield": return <SvgShield size={size} color={color} />;
+      case "file-text": return <SvgFileText size={size} color={color} />;
+      case "cpu": return <SvgCpu size={size} color={color} />;
+      case "settings": return <SvgSettings size={size} color={color} />;
+      default: return <SvgGrid size={size} color={color} />;
+    }
+  };
+
+  const renderNavLinks = (isDrawer = false) => (
+    <ScrollView style={styles.navScroll} contentContainerStyle={styles.navContent} showsVerticalScrollIndicator={false}>
+      <View style={{ gap: 4 }}>
+        {NAV_ITEMS.map((item) => {
+          const isActive = activeTab === item.id;
+          const isAllowed = !item.roleRestriction || (user && item.roleRestriction.includes(user.role));
+          if (!isAllowed) return null;
+
+          return (
+            <TouchableOpacity
+              key={item.id}
+              style={[
+                styles.navItem,
+                (!isDrawer && sidebarCollapsed) && {
+                  justifyContent: "center",
+                  paddingHorizontal: 0,
+                  alignItems: "center",
+                  borderLeftWidth: 0,
+                  borderRadius: 10,
+                  height: 42,
+                },
+                isActive && {
+                  backgroundColor: colors.primary + "16",
+                  borderLeftColor: (!isDrawer && sidebarCollapsed) ? "transparent" : colors.primary,
+                },
+              ]}
+              onPress={() => {
+                setActiveTab(item.id);
+                if (isDrawer) setMobileDrawerOpen(false);
+              }}
+              title={(!isDrawer && sidebarCollapsed) ? item.label : undefined}
+              activeOpacity={0.7}
+            >
+              {renderNavIcon(item.icon, 16, isActive ? colors.primary : colors.mutedForeground)}
+              {(isDrawer || !sidebarCollapsed) && (
+                <Text
+                  style={[
+                    styles.navLabel,
+                    {
+                      color: isActive ? colors.primary : colors.foreground,
+                      fontFamily: isActive ? "Inter_700Bold" : "Inter_500Medium",
+                    },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {item.label}
+                </Text>
+              )}
+
+              {(isDrawer || !sidebarCollapsed) && item.badge !== undefined && (
+                <View
+                  style={[
+                    styles.navBadge,
+                    {
+                      backgroundColor: item.badgeColor ? item.badgeColor + "20" : colors.muted,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.navBadgeText,
+                      { color: item.badgeColor || colors.mutedForeground },
+                    ]}
+                  >
+                    {item.badge}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </ScrollView>
+  );
+
+  return (
+    <View style={[styles.root, { backgroundColor: colors.background }]}>
+      {/* ─── DESKTOP / TABLET SIDEBAR ─── */}
+      {!isMobile && (
+        <View
+          style={[
+            styles.sidebar,
+            {
+              width: sidebarCollapsed ? 76 : 260,
+              backgroundColor: colors.card,
+              borderRightColor: colors.border,
+            },
+          ]}
+        >
+          {/* Brand Header */}
+          <View
+            style={[
+              styles.brandHeader,
+              { borderBottomColor: colors.border },
+              sidebarCollapsed && { paddingHorizontal: 8, paddingVertical: 14, flexDirection: "column", gap: 10, alignItems: "center" },
+            ]}
+          >
+            <TouchableOpacity
+              style={{ flexDirection: sidebarCollapsed ? "column" : "row", alignItems: "center", gap: sidebarCollapsed ? 0 : 12, flex: 1, minWidth: 0 }}
+              onPress={() => setActiveTab("dashboard")}
+              activeOpacity={0.8}
+            >
+              <View
+                style={[
+                  styles.brandLogoWrap,
+                  {
+                    backgroundColor: hasCustomLogo ? "#FFFFFF" : colors.primary,
+                    borderWidth: hasCustomLogo ? 1 : 0,
+                    borderColor: colors.border,
+                    padding: hasCustomLogo ? 2 : 0,
+                  },
+                ]}
+              >
+                {hasCustomLogo ? (
+                  <Image
+                    key={settings.organizationLogo}
+                    source={{ uri: settings.organizationLogo }}
+                    style={styles.brandLogoImg}
+                    resizeMode="contain"
+                  />
+                ) : (
+                  <Image
+                    source={require("@/assets/images/icon.png")}
+                    style={styles.brandLogoImg}
+                    resizeMode="cover"
+                  />
+                )}
+              </View>
+
+              {!sidebarCollapsed && (
+                <View style={{ flex: 1, minWidth: 0, paddingRight: 6 }}>
+                  <Text style={[styles.brandTitle, { color: colors.foreground }]} numberOfLines={1}>
+                    OFM Cloud
+                  </Text>
+                  <Text style={[styles.brandSubtitle, { color: colors.mutedForeground }]} numberOfLines={1}>
+                    {settings.organizationName || "Financial Management"}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {!isTablet && (
+              <TouchableOpacity
+                style={[styles.collapseBtn, { borderColor: colors.border }]}
+                onPress={() => setSidebarCollapsed(!sidebarCollapsed)}
+                title={sidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+                activeOpacity={0.7}
+              >
+                {sidebarCollapsed ? (
+                  <SvgChevronRight size={14} color={colors.mutedForeground} />
+                ) : (
+                  <SvgChevronLeft size={14} color={colors.mutedForeground} />
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Navigation Links */}
+          {renderNavLinks(false)}
+
+          {/* User Profile Footer */}
+          <View
+            style={[
+              styles.userFooter,
+              { borderTopColor: colors.border },
+              sidebarCollapsed && { paddingVertical: 14, paddingHorizontal: 4, flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12 },
+            ]}
+          >
+            {sidebarCollapsed ? (
+              <>
+                <View
+                  style={[styles.userAvatar, { backgroundColor: colors.primary + "20" }]}
+                  title={`Logged in as ${user?.name || "User"} (${(user?.role || "admin").toUpperCase()})`}
+                >
+                  <Text style={[styles.userAvatarText, { color: colors.primary }]}>
+                    {(user?.name || "User").charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.logoutBtn, { borderColor: colors.border, padding: 8, borderRadius: 8 }]}
+                  onPress={logout}
+                  title="Log Out"
+                  activeOpacity={0.75}
+                >
+                  <SvgLogOut size={14} color={colors.expense} />
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
+                  <View style={[styles.userAvatar, { backgroundColor: colors.primary + "20" }]}>
+                    <Text style={[styles.userAvatarText, { color: colors.primary }]}>
+                      {(user?.name || "User").charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={[styles.userName, { color: colors.foreground }]} numberOfLines={1}>
+                      {user?.name || "Admin"}
+                    </Text>
+                    <Text style={[styles.userRole, { color: colors.mutedForeground }]}>
+                      {(user?.role || "admin").toUpperCase()}
+                    </Text>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.logoutBtn, { borderColor: colors.border }]}
+                  onPress={logout}
+                  title="Log Out"
+                  activeOpacity={0.75}
+                >
+                  <SvgLogOut size={15} color={colors.expense} />
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      )}
+
+      {/* ─── MOBILE DRAWER MODAL (<768px) ─── */}
+      {isMobile && (
+        <Modal visible={mobileDrawerOpen} transparent animationType="fade" onRequestClose={() => setMobileDrawerOpen(false)}>
+          <View style={styles.drawerBackdrop}>
+            <View style={[styles.drawerContent, { backgroundColor: colors.card, borderRightColor: colors.border }]}>
+              {/* Drawer Brand Header */}
+              <View style={[styles.brandHeader, { borderBottomColor: colors.border }]}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1 }}>
+                  <View
+                    style={[
+                      styles.brandLogoWrap,
+                      {
+                        backgroundColor: hasCustomLogo ? "#FFFFFF" : colors.primary,
+                        borderWidth: hasCustomLogo ? 1 : 0,
+                        borderColor: colors.border,
+                        padding: hasCustomLogo ? 2 : 0,
+                      },
+                    ]}
+                  >
+                    {hasCustomLogo ? (
+                      <Image
+                        key={settings.organizationLogo}
+                        source={{ uri: settings.organizationLogo }}
+                        style={styles.brandLogoImg}
+                        resizeMode="contain"
+                      />
+                    ) : (
+                      <Text style={styles.brandLogoInitials}>
+                        {(settings.organizationName || "OFM")
+                          .split(" ")
+                          .filter(Boolean)
+                          .slice(0, 2)
+                          .map((w) => w[0] || "")
+                          .join("")
+                          .toUpperCase() || "OFM"}
+                      </Text>
+                    )}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.brandTitle, { color: colors.foreground }]} numberOfLines={1}>
+                      Organization Finance Management
+                    </Text>
+                    <Text style={[styles.brandSubtitle, { color: colors.mutedForeground }]} numberOfLines={1}>
+                      {settings.organizationName || "Enterprise Financial System"}
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity style={[styles.collapseBtn, { borderColor: colors.border }]} onPress={() => setMobileDrawerOpen(false)}>
+                  <SvgX size={16} color={colors.foreground} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Drawer Links */}
+              {renderNavLinks(true)}
+
+              {/* Drawer Footer */}
+              <View style={[styles.userFooter, { borderTopColor: colors.border }]}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1 }}>
+                  <View style={[styles.userAvatar, { backgroundColor: colors.primary + "20" }]}>
+                    <Text style={[styles.userAvatarText, { color: colors.primary }]}>
+                      {(user?.name || "User").charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.userName, { color: colors.foreground }]} numberOfLines={1}>
+                      {user?.name || "Admin"}
+                    </Text>
+                    <Text style={[styles.userRole, { color: colors.mutedForeground }]}>
+                      {(user?.role || "admin").toUpperCase()}
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity style={[styles.logoutBtn, { borderColor: colors.border }]} onPress={logout}>
+                  <SvgLogOut size={15} color={colors.expense} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* ─── MAIN APP WORKSPACE ─── */}
+      <View style={styles.workspace}>
+        {/* Open In Native App Banner for Mobile Browsers */}
+        <OpenInAppBanner />
+
+        {/* Top Header Bar */}
+        <View style={[styles.topBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1 }}>
+            {/* Mobile Hamburger Button */}
+            {isMobile && (
+              <TouchableOpacity
+                style={[styles.collapseBtn, { borderColor: colors.border, marginRight: 4 }]}
+                onPress={() => setMobileDrawerOpen(true)}
+              >
+                <SvgMenu size={18} color={colors.foreground} />
+              </TouchableOpacity>
+            )}
+
+            {/* Breadcrumb Info */}
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
+              <Text
+                style={[
+                  styles.breadcrumbRoot,
+                  { color: colors.mutedForeground },
+                  isMobile && { maxWidth: 90 },
+                ]}
+                numberOfLines={1}
+              >
+                {isMobile ? "OFM" : (settings.organizationName || "OFM")}
+              </Text>
+              <Text style={[styles.breadcrumbSep, { color: colors.mutedForeground }]}>/</Text>
+              <Text style={[styles.breadcrumbCurrent, { color: colors.foreground, flexShrink: 1 }]} numberOfLines={1}>
+                {NAV_ITEMS.find((n) => n.id === activeTab)?.label || "Overview"}
+              </Text>
+            </View>
+          </View>
+
+          {/* Quick Header Right Actions */}
+          <View style={styles.topRightActions}>
+            {/* Live 2-Way Cloud Sync Indicator */}
+            {!isMobile && (
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 5,
+                  backgroundColor: "rgba(16, 185, 129, 0.1)",
+                  borderColor: "rgba(16, 185, 129, 0.3)",
+                  borderWidth: 1,
+                  paddingHorizontal: 8,
+                  paddingVertical: 3.5,
+                  borderRadius: 16,
+                  marginRight: 6,
+                  flexShrink: 0,
+                }}
+              >
+                <View
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: 3,
+                    backgroundColor: "#10B981",
+                  }}
+                />
+                <Text
+                  style={{
+                    fontSize: 10.5,
+                    fontFamily: "Inter_600SemiBold",
+                    color: "#10B981",
+                    letterSpacing: 0.2,
+                  }}
+                >
+                  Live Cloud
+                </Text>
+              </View>
+            )}
+
+            {canEdit && !isMobile && (
+              <>
+                <TouchableOpacity
+                  style={[styles.quickAddBtn, { backgroundColor: colors.income }]}
+                  onPress={() => handleOpenTx("income")}
+                >
+                  <SvgArrowUpRight size={14} color="#FFFFFF" />
+                  <Text style={styles.quickAddText}>+ Inflow</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.quickAddBtn, { backgroundColor: colors.expense }]}
+                  onPress={() => handleOpenTx("expense")}
+                >
+                  <SvgArrowDownLeft size={14} color="#FFFFFF" />
+                  <Text style={styles.quickAddText}>+ Outflow</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {/* Theme Toggle */}
+            <TouchableOpacity
+              style={[styles.topIconBtn, { borderColor: colors.border }]}
+              onPress={toggleTheme}
+              title="Toggle Theme"
+            >
+              {settings.theme === "dark" ? (
+                <SvgSun size={16} color={colors.foreground} />
+              ) : (
+                <SvgMoon size={16} color={colors.foreground} />
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Dynamic Main Content Tab */}
+        <View style={styles.tabContentArea}>
+          <WebPageTransition pageKey={activeTab}>
+            {activeTab === "dashboard" && (
+              <WebDashboard
+                onNavigate={(route) => setActiveTab(route as WebTabKey)}
+                onOpenTransactionModal={handleOpenTx}
+                onOpenBudgetModal={() => setBudgetModalVisible(true)}
+              />
+            )}
+            {activeTab === "income" && <WebIncome onOpenReport={() => setActiveTab("reports")} />}
+            {activeTab === "expenses" && <WebExpenses onOpenReport={() => setActiveTab("reports")} />}
+            {activeTab === "transactions" && <WebTransactions />}
+            {activeTab === "budgets" && <WebBudgets />}
+            {activeTab === "departments" && <WebDepartments />}
+            {activeTab === "payroll" && <WebPayroll />}
+            {activeTab === "team" && <WebTeam />}
+            {activeTab === "reports" && <WebReports onNavigate={(route) => setActiveTab(route as WebTabKey)} />}
+            {activeTab === "ai-insights" && <WebAIInsights />}
+            {activeTab === "settings" && <WebSettings />}
+          </WebPageTransition>
+        </View>
+      </View>
+
+      {/* Global Quick Transaction Modal */}
+      <WebTransactionModal
+        visible={txModalVisible}
+        onClose={() => setTxModalVisible(false)}
+        initialType={txModalType}
+      />
+
+      {/* Global Budget Modal */}
+      <WebBudgetModal
+        visible={budgetModalVisible}
+        onClose={() => setBudgetModalVisible(false)}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    flexDirection: "row",
+    height: "100%",
+    width: "100%",
+    overflow: "hidden",
+  },
+  sidebar: {
+    height: "100%",
+    borderRightWidth: 1,
+    display: "flex",
+    flexDirection: "column",
+  },
+  drawerBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    flexDirection: "row",
+  },
+  drawerContent: {
+    width: 280,
+    height: "100%",
+    borderRightWidth: 1,
+    display: "flex",
+    flexDirection: "column",
+  },
+  brandHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 18,
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  brandLogoWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    flexShrink: 0,
+  },
+  brandLogoImg: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 8,
+  },
+  brandLogoInitials: {
+    color: "#FFFFFF",
+    fontSize: 13.5,
+    fontFamily: "Inter_800ExtraBold",
+    letterSpacing: 0.5,
+  },
+  brandTitle: {
+    fontSize: 14.5,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: -0.2,
+  },
+  brandSubtitle: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    letterSpacing: 0.1,
+    marginTop: 1,
+  },
+  collapseBtn: {
+    padding: 6.5,
+    borderRadius: 8,
+    borderWidth: 1,
+    flexShrink: 0,
+  },
+  navScroll: {
+    flex: 1,
+  },
+  navContent: {
+    paddingTop: 10,
+    paddingBottom: 28,
+    paddingHorizontal: 8,
+  },
+  navItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: "transparent",
+  },
+  navLabel: {
+    flex: 1,
+    fontSize: 13.5,
+    letterSpacing: -0.15,
+  },
+  navBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  navBadgeText: {
+    fontSize: 10,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.2,
+  },
+  userFooter: {
+    padding: 12,
+    borderTopWidth: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  userAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  userAvatarText: {
+    fontSize: 14,
+    fontFamily: "Inter_800ExtraBold",
+  },
+  userName: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: -0.2,
+  },
+  userRole: {
+    fontSize: 9.5,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 0.6,
+    marginTop: 1,
+  },
+  logoutBtn: {
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  workspace: {
+    flex: 1,
+    display: "flex",
+    flexDirection: "column",
+    minHeight: 0,
+    width: "100%",
+  },
+  topBar: {
+    height: 60,
+    borderBottomWidth: 1,
+    paddingHorizontal: 18,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    flexShrink: 0,
+  },
+  breadcrumbRoot: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    letterSpacing: -0.1,
+  },
+  breadcrumbSep: {
+    fontSize: 13,
+    opacity: 0.6,
+  },
+  breadcrumbCurrent: {
+    fontSize: 13.5,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: -0.2,
+  },
+  topRightActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  quickAddBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  quickAddText: {
+    color: "#FFFFFF",
+    fontSize: 12.5,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.1,
+  },
+  topIconBtn: {
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  tabContentArea: {
+    flex: 1,
+    minHeight: 0,
+    width: "100%",
+  },
+});

@@ -1,0 +1,809 @@
+import React, { useState, useMemo } from "react";
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  Platform,
+  useWindowDimensions,
+} from "react-native";
+import { useColors } from "@/hooks/useColors";
+import * as Haptics from "expo-haptics";
+import { RingProgress } from "@/components/RingProgress";
+import { DonutChart } from "@/components/DonutChart";
+import {
+  SvgTarget,
+  SvgTrendingUp,
+  SvgPieChart,
+  SvgArrowUpRight,
+  SvgArrowDownRight,
+  SvgChevronDown,
+} from "@/components/web/SvgIcons";
+import {
+  ValidatedBudgetAnalytics,
+  ValidatedOperatingMarginAnalytics,
+  ValidatedExpenseDistributionAnalytics,
+  formatCurrencySafe,
+  formatCompactCurrency,
+} from "@/services/FinancialCalculationEngine";
+
+interface Props {
+  budget: ValidatedBudgetAnalytics;
+  margin: ValidatedOperatingMarginAnalytics;
+  distribution: ValidatedExpenseDistributionAnalytics;
+  currency?: string;
+  onOpenDrillDown: (type: "budget" | "nob" | "expense") => void;
+  isCompact?: boolean;
+}
+
+export function FinancialAnalyticsSuite({
+  budget,
+  margin,
+  distribution,
+  currency = "PKR",
+  onOpenDrillDown,
+  isCompact = false,
+}: Props) {
+  const colors = useColors();
+  const { width } = useWindowDimensions();
+  const isMobile = width < 768;
+
+  // Active interaction mode states
+  const [budgetMode, setBudgetMode] = useState<"used" | "spent" | "remaining">("used");
+  const [marginMode, setMarginMode] = useState<"margin" | "outflow" | "net">("margin");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [showTooltip, setShowTooltip] = useState<"budget" | "margin" | "distribution" | null>(null);
+  const [showAllCategories, setShowAllCategories] = useState(false);
+
+  // Selected category data for interactive donut
+  const activeCategoryData = useMemo(() => {
+    if (!selectedCategory || !distribution.categories.length) return null;
+    return distribution.categories.find((c) => c.category === selectedCategory) || null;
+  }, [selectedCategory, distribution.categories]);
+
+  // Donut chart segments formatted
+  const donutSegments = useMemo(() => {
+    return distribution.chartSegments.map((seg) => ({
+      label: seg.category,
+      value: seg.amount,
+      color: seg.color,
+      pct: seg.pct,
+    }));
+  }, [distribution.chartSegments]);
+
+  return (
+    <View style={styles.container}>
+      {/* ─── 3 Column Responsive Section ─── */}
+      <View style={styles.grid}>
+        {/* ========================================================================= */}
+        {/* CARD 1: BUDGET UTILIZATION CARD                                          */}
+        {/* ========================================================================= */}
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 300 }]}>
+          {/* Header */}
+          <View style={styles.cardHeader}>
+            <View style={styles.headerTitleRow}>
+              <View style={[styles.iconBadge, { backgroundColor: colors.primary + "16" }]}>
+                <SvgTarget size={18} color={colors.primary} />
+              </View>
+              <View>
+                <View style={styles.titleWithHelpRow}>
+                  <Text style={[styles.cardTitle, { color: colors.foreground }]}>Budget Utilization</Text>
+                  <TouchableOpacity
+                    onPress={() => setShowTooltip(showTooltip === "budget" ? null : "budget")}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Text style={[styles.helpIcon, { color: colors.mutedForeground }]}>ⓘ</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
+                  {budget.isValid
+                    ? `Cap: ${formatCompactCurrency(budget.totalAllocated, currency)}`
+                    : "No Budget Cap Configured"}
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => {
+                if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                onOpenDrillDown("budget");
+              }}
+            >
+              <Text style={[styles.linkText, { color: colors.primary }]}>View Details →</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Formula Tooltip Banner */}
+          {showTooltip === "budget" && (
+            <View style={[styles.tooltipBanner, { backgroundColor: colors.primary + "12", borderColor: colors.primary + "30" }]}>
+              <Text style={[styles.tooltipText, { color: colors.foreground }]}>
+                📐 <Text style={{ fontFamily: "Inter_700Bold" }}>Formula:</Text> (Actual Spend ÷ Budget Cap) × 100
+              </Text>
+              <Text style={[styles.tooltipSub, { color: colors.mutedForeground }]}>{budget.explanation}</Text>
+            </View>
+          )}
+
+          {/* Contextual Status Strip */}
+          <View style={[styles.statusStrip, { backgroundColor: budget.statusColor + "14", borderColor: budget.statusColor + "30" }]}>
+            <View style={[styles.statusDot, { backgroundColor: budget.statusColor }]} />
+            <Text style={[styles.statusStripText, { color: budget.statusColor }]} numberOfLines={1}>
+              {budget.statusLabel} · {budget.remainingText}
+            </Text>
+          </View>
+
+          {/* Visual Ring / Gauge */}
+          <View style={styles.ringCenterWrap}>
+            <RingProgress
+              percentage={
+                !budget.isValid
+                  ? 0
+                  : budgetMode === "remaining"
+                  ? Math.min(100, Math.max(0, Math.round(((budget.remainingAmount) / budget.totalAllocated) * 100)))
+                  : budget.clampedRingPct
+              }
+              size={135}
+              strokeWidth={13}
+              color={budgetMode === "remaining" ? colors.income : budget.statusColor}
+              centerLabel={
+                !budget.isValid
+                  ? "N/A"
+                  : budgetMode === "spent"
+                  ? formatCompactCurrency(budget.actualSpending, currency)
+                  : budgetMode === "remaining"
+                  ? formatCompactCurrency(budget.remainingAmount, currency)
+                  : budget.displayPct
+              }
+              label={
+                budgetMode === "spent"
+                  ? "Total Disbursed"
+                  : budgetMode === "remaining"
+                  ? "Available Buffer"
+                  : "Budget Used"
+              }
+              sublabel={
+                !budget.isValid
+                  ? "NO CAP"
+                  : budgetMode === "spent"
+                  ? `${budget.rawUtilizationPct.toFixed(0)}% OF CAP`
+                  : budgetMode === "remaining"
+                  ? `${budget.totalAllocated > 0 ? ((budget.remainingAmount / budget.totalAllocated) * 100).toFixed(0) : 0}% LEFT`
+                  : budget.isOverBudget
+                  ? `${formatCompactCurrency(budget.excessAmount, currency)} OVER`
+                  : `${formatCompactCurrency(budget.actualSpending, currency)} SPENT`
+              }
+            />
+          </View>
+
+          {/* Segmented Option Controls */}
+          <View style={styles.chipsRow}>
+            {[
+              { id: "used", label: "% Used" },
+              { id: "spent", label: "Spent Amount" },
+              { id: "remaining", label: "Remaining" },
+            ].map((opt) => {
+              const isSelected = budgetMode === opt.id;
+              return (
+                <TouchableOpacity
+                  key={opt.id}
+                  style={[
+                    styles.chip,
+                    {
+                      backgroundColor: isSelected ? colors.primary : (colors.cardAlt ?? colors.muted) + "30",
+                      borderColor: isSelected ? colors.primary : colors.border,
+                    },
+                  ]}
+                  onPress={() => {
+                    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setBudgetMode(opt.id as any);
+                  }}
+                  activeOpacity={0.75}
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      { color: isSelected ? "#FFFFFF" : colors.mutedForeground },
+                      isSelected && { fontFamily: "Inter_700Bold" },
+                    ]}
+                  >
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* 3-Metric Structured Bento Box */}
+          <View style={[styles.bentoRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <View style={styles.bentoCol}>
+              <Text style={[styles.bentoLabel, { color: colors.mutedForeground }]}>DISBURSED</Text>
+              <Text style={[styles.bentoVal, { color: colors.expense }]} numberOfLines={1}>
+                {formatCompactCurrency(budget.actualSpending, currency)}
+              </Text>
+            </View>
+            <View style={[styles.bentoDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.bentoCol}>
+              <Text style={[styles.bentoLabel, { color: colors.mutedForeground }]}>ALLOCATED</Text>
+              <Text style={[styles.bentoVal, { color: budget.isValid ? colors.foreground : colors.mutedForeground }]} numberOfLines={1}>
+                {budget.isValid ? formatCompactCurrency(budget.totalAllocated, currency) : "Not Set"}
+              </Text>
+            </View>
+            <View style={[styles.bentoDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.bentoCol}>
+              <Text style={[styles.bentoLabel, { color: colors.mutedForeground }]}>
+                {budget.isOverBudget ? "OVER BUDGET" : "REMAINING"}
+              </Text>
+              <Text
+                style={[
+                  styles.bentoVal,
+                  {
+                    color: budget.isOverBudget
+                      ? colors.expense
+                      : budget.remainingAmount > 0
+                      ? colors.income
+                      : colors.mutedForeground,
+                  },
+                ]}
+                numberOfLines={1}
+              >
+                {budget.isValid
+                  ? budget.isOverBudget
+                    ? `-${formatCompactCurrency(budget.excessAmount, currency)}`
+                    : formatCompactCurrency(budget.remainingAmount, currency)
+                  : "—"}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* ========================================================================= */}
+        {/* CARD 2: NET OPERATING MARGIN (NOM) CARD                                  */}
+        {/* ========================================================================= */}
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 300 }]}>
+          {/* Header */}
+          <View style={styles.cardHeader}>
+            <View style={styles.headerTitleRow}>
+              <View style={[styles.iconBadge, { backgroundColor: margin.statusColor + "16" }]}>
+                <SvgTrendingUp size={18} color={margin.statusColor} />
+              </View>
+              <View>
+                <View style={styles.titleWithHelpRow}>
+                  <Text style={[styles.cardTitle, { color: colors.foreground }]}>Net Operating Margin</Text>
+                  <TouchableOpacity
+                    onPress={() => setShowTooltip(showTooltip === "margin" ? null : "margin")}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Text style={[styles.helpIcon, { color: colors.mutedForeground }]}>ⓘ</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
+                  {margin.statusLabel}
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => {
+                if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                onOpenDrillDown("nob");
+              }}
+            >
+              <Text style={[styles.linkText, { color: colors.primary }]}>View Details →</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Formula Tooltip Banner */}
+          {showTooltip === "margin" && (
+            <View style={[styles.tooltipBanner, { backgroundColor: colors.primary + "12", borderColor: colors.primary + "30" }]}>
+              <Text style={[styles.tooltipText, { color: colors.foreground }]}>
+                📐 <Text style={{ fontFamily: "Inter_700Bold" }}>Formula:</Text> (Operating Income ÷ Operating Revenue) × 100
+              </Text>
+              <Text style={[styles.tooltipSub, { color: colors.mutedForeground }]}>
+                Measures the percentage of operating revenue retained after operating disbursements.
+              </Text>
+            </View>
+          )}
+
+          {/* Contextual Status Strip with Trend */}
+          <View style={[styles.statusStrip, { backgroundColor: margin.statusColor + "14", borderColor: margin.statusColor + "30" }]}>
+            <View style={[styles.statusDot, { backgroundColor: margin.statusColor }]} />
+            <Text style={[styles.statusStripText, { color: margin.statusColor, flex: 1 }]} numberOfLines={1}>
+              {margin.explanationText}
+            </Text>
+            {margin.marginChangeVsPrevious !== null && margin.marginChangeVsPrevious !== undefined && (
+              <View style={styles.trendBadge}>
+                {margin.trendDirection === "up" ? (
+                  <SvgArrowUpRight size={12} color={colors.income} />
+                ) : (
+                  <SvgArrowDownRight size={12} color={colors.expense} />
+                )}
+                <Text
+                  style={[
+                    styles.trendText,
+                    { color: margin.trendDirection === "up" ? colors.income : colors.expense },
+                  ]}
+                >
+                  {Math.abs(margin.marginChangeVsPrevious).toFixed(1)}% vs prev
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Visual Ring / Gauge */}
+          <View style={styles.ringCenterWrap}>
+            <RingProgress
+              percentage={
+                !margin.hasRevenue
+                  ? 0
+                  : marginMode === "outflow"
+                  ? Math.max(0, Math.min(100, Math.round(margin.expenseRatioPct)))
+                  : Math.max(0, Math.min(100, Math.round(margin.rawMarginPct)))
+              }
+              size={135}
+              strokeWidth={13}
+              color={marginMode === "outflow" ? colors.expense : margin.statusColor}
+              centerLabel={
+                !margin.hasRevenue
+                  ? "N/A"
+                  : marginMode === "outflow"
+                  ? margin.displayExpenseRatio
+                  : marginMode === "net"
+                  ? `${margin.isLoss ? "-" : "+"}${formatCompactCurrency(Math.abs(margin.operatingIncome), currency)}`
+                  : margin.displayMargin
+              }
+              label={
+                marginMode === "outflow"
+                  ? "Outflow Ratio"
+                  : marginMode === "net"
+                  ? margin.isLoss
+                    ? "Operating Deficit"
+                    : "Net Cash Surplus"
+                  : margin.isLoss
+                  ? "Operating Loss"
+                  : "Operating Margin"
+              }
+              sublabel={
+                !margin.hasRevenue
+                  ? "NO REVENUE"
+                  : marginMode === "outflow"
+                  ? `-${formatCompactCurrency(margin.operatingExpenses, currency)}`
+                  : marginMode === "net"
+                  ? `${margin.displayMargin} RETAINED`
+                  : margin.isLoss
+                  ? `-${formatCompactCurrency(Math.abs(margin.operatingIncome), currency)}`
+                  : `+${formatCompactCurrency(margin.operatingIncome, currency)}`
+              }
+            />
+          </View>
+
+          {/* Segmented Option Controls */}
+          <View style={styles.chipsRow}>
+            {[
+              { id: "margin", label: "Margin %" },
+              { id: "outflow", label: "Outflow %" },
+              { id: "net", label: "Net Balance" },
+            ].map((opt) => {
+              const isSelected = marginMode === opt.id;
+              return (
+                <TouchableOpacity
+                  key={opt.id}
+                  style={[
+                    styles.chip,
+                    {
+                      backgroundColor: isSelected
+                        ? opt.id === "outflow"
+                          ? colors.expense
+                          : margin.statusColor
+                        : (colors.cardAlt ?? colors.muted) + "30",
+                      borderColor: isSelected
+                        ? opt.id === "outflow"
+                          ? colors.expense
+                          : margin.statusColor
+                        : colors.border,
+                    },
+                  ]}
+                  onPress={() => {
+                    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setMarginMode(opt.id as any);
+                  }}
+                  activeOpacity={0.75}
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      { color: isSelected ? "#FFFFFF" : colors.mutedForeground },
+                      isSelected && { fontFamily: "Inter_700Bold" },
+                    ]}
+                  >
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* 3-Metric Structured Bento Box */}
+          <View style={[styles.bentoRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <View style={styles.bentoCol}>
+              <Text style={[styles.bentoLabel, { color: colors.mutedForeground }]}>REVENUE</Text>
+              <Text style={[styles.bentoVal, { color: colors.income }]} numberOfLines={1}>
+                +{formatCompactCurrency(margin.operatingRevenue, currency)}
+              </Text>
+            </View>
+            <View style={[styles.bentoDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.bentoCol}>
+              <Text style={[styles.bentoLabel, { color: colors.mutedForeground }]}>EXPENSES</Text>
+              <Text style={[styles.bentoVal, { color: colors.expense }]} numberOfLines={1}>
+                -{formatCompactCurrency(margin.operatingExpenses, currency)}
+              </Text>
+            </View>
+            <View style={[styles.bentoDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.bentoCol}>
+              <Text style={[styles.bentoLabel, { color: colors.mutedForeground }]}>
+                {margin.isLoss ? "DEFICIT" : "NET SURPLUS"}
+              </Text>
+              <Text
+                style={[
+                  styles.bentoVal,
+                  { color: margin.isLoss ? colors.expense : colors.income },
+                ]}
+                numberOfLines={1}
+              >
+                {margin.isLoss ? "-" : "+"}
+                {formatCompactCurrency(Math.abs(margin.operatingIncome), currency)}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* ========================================================================= */}
+        {/* CARD 3: EXPENSE DISTRIBUTION DONUT & RANKED LIST CARD                     */}
+        {/* ========================================================================= */}
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, flex: 1.1, minWidth: isMobile ? "100%" : 320 }]}>
+          {/* Header */}
+          <View style={styles.cardHeader}>
+            <View style={styles.headerTitleRow}>
+              <View style={[styles.iconBadge, { backgroundColor: "#8B5CF616" }]}>
+                <SvgPieChart size={18} color="#8B5CF6" />
+              </View>
+              <View>
+                <View style={styles.titleWithHelpRow}>
+                  <Text style={[styles.cardTitle, { color: colors.foreground }]}>Expense Distribution</Text>
+                  <TouchableOpacity
+                    onPress={() => setShowTooltip(showTooltip === "distribution" ? null : "distribution")}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Text style={[styles.helpIcon, { color: colors.mutedForeground }]}>ⓘ</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
+                  {distribution.categories.length} Cost Drivers Categorized
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => {
+                if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                onOpenDrillDown("expense");
+              }}
+            >
+              <Text style={[styles.linkText, { color: colors.primary }]}>View Outflows →</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Formula Tooltip Banner */}
+          {showTooltip === "distribution" && (
+            <View style={[styles.tooltipBanner, { backgroundColor: colors.primary + "12", borderColor: colors.primary + "30" }]}>
+              <Text style={[styles.tooltipText, { color: colors.foreground }]}>
+                📐 <Text style={{ fontFamily: "Inter_700Bold" }}>Formula:</Text> Category Expense ÷ Total Expenses × 100
+              </Text>
+              <Text style={[styles.tooltipSub, { color: colors.mutedForeground }]}>
+                All displayed percentages derive from authoritative raw sums and total ~100%.
+              </Text>
+            </View>
+          )}
+
+          {/* Contextual Status Strip */}
+          <View style={[styles.statusStrip, { backgroundColor: "#8B5CF614", borderColor: "#8B5CF630" }]}>
+            <View style={[styles.statusDot, { backgroundColor: "#8B5CF6" }]} />
+            <Text style={[styles.statusStripText, { color: "#8B5CF6" }]} numberOfLines={2}>
+              {distribution.explanation}
+            </Text>
+          </View>
+
+          {/* Interactive Donut Chart */}
+          {distribution.hasExpenses ? (
+            <View style={styles.donutWrap}>
+              <DonutChart
+                segments={donutSegments}
+                size={135}
+                strokeWidth={14}
+                centerLabel={
+                  activeCategoryData
+                    ? formatCompactCurrency(activeCategoryData.amount, currency)
+                    : formatCompactCurrency(distribution.totalExpenses, currency)
+                }
+                centerSub={activeCategoryData ? activeCategoryData.category.toUpperCase() : "TOTAL SPENT"}
+                currency={currency}
+                showChips={false}
+              />
+            </View>
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+                No expense disbursements recorded in this period.
+              </Text>
+            </View>
+          )}
+
+          {/* Ranked Category List with Mini Progress Bars */}
+          <View style={styles.categoryRankedList}>
+            {(showAllCategories ? distribution.categories : distribution.categories.slice(0, 3)).map((cat) => {
+              const isSelected = selectedCategory === cat.category;
+              return (
+                <TouchableOpacity
+                  key={cat.category}
+                  style={[
+                    styles.rankedRow,
+                    {
+                      backgroundColor: isSelected ? colors.primary + "10" : "transparent",
+                      borderColor: isSelected ? colors.primary + "30" : colors.border + "40",
+                    },
+                  ]}
+                  onPress={() => {
+                    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setSelectedCategory(isSelected ? null : cat.category);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.rankedLeft}>
+                    <View style={[styles.catColorDot, { backgroundColor: cat.color }]} />
+                    <Text style={[styles.rankedCatName, { color: colors.foreground }]} numberOfLines={1}>
+                      {cat.category}
+                    </Text>
+                  </View>
+
+                  <View style={styles.rankedRight}>
+                    <Text style={[styles.rankedAmount, { color: colors.foreground }]}>
+                      {formatCompactCurrency(cat.amount, currency)}
+                    </Text>
+                    <Text style={[styles.rankedPct, { color: colors.mutedForeground }]}>
+                      {cat.displayPct}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+
+            {distribution.categories.length > 3 && (
+              <TouchableOpacity
+                style={styles.expandRow}
+                onPress={() => setShowAllCategories(!showAllCategories)}
+              >
+                <Text style={[styles.expandText, { color: colors.primary }]}>
+                  {showAllCategories ? "Show Top 3 Only ▲" : `+${distribution.categories.length - 3} More Categories ▼`}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    width: "100%",
+  },
+  grid: {
+    flexDirection: "row",
+    gap: 16,
+    flexWrap: "wrap",
+  },
+  card: {
+    flex: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 18,
+    gap: 12,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  headerTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  titleWithHelpRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  helpIcon: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+  },
+  iconBadge: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cardTitle: {
+    fontSize: 15,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: -0.3,
+  },
+  cardSub: {
+    fontSize: 11.5,
+    fontFamily: "Inter_400Regular",
+    letterSpacing: -0.1,
+    marginTop: 1,
+  },
+  linkText: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 0.1,
+  },
+  tooltipBanner: {
+    padding: 9,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 2,
+  },
+  tooltipText: {
+    fontSize: 11.5,
+    fontFamily: "Inter_600SemiBold",
+  },
+  tooltipSub: {
+    fontSize: 10.5,
+    fontFamily: "Inter_400Regular",
+  },
+  statusStrip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusStripText: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: -0.1,
+  },
+  trendBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+  },
+  trendText: {
+    fontSize: 10,
+    fontFamily: "Inter_700Bold",
+  },
+  ringCenterWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginVertical: 4,
+  },
+  chipsRow: {
+    flexDirection: "row",
+    gap: 6,
+    justifyContent: "center",
+    marginVertical: 2,
+  },
+  chip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  chipText: {
+    fontSize: 10.5,
+    fontFamily: "Inter_600SemiBold",
+  },
+  bentoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingVertical: 9,
+    paddingHorizontal: 6,
+  },
+  bentoCol: {
+    flex: 1,
+    alignItems: "center",
+    gap: 2,
+  },
+  bentoDivider: {
+    width: 1,
+    height: "80%",
+  },
+  bentoLabel: {
+    fontSize: 8.5,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.4,
+  },
+  bentoVal: {
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
+  },
+  donutWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginVertical: 4,
+  },
+  categoryRankedList: {
+    gap: 5,
+    marginTop: 4,
+  },
+  rankedRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  rankedLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flex: 1,
+  },
+  catColorDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  rankedCatName: {
+    fontSize: 11.5,
+    fontFamily: "Inter_600SemiBold",
+  },
+  rankedRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  rankedAmount: {
+    fontSize: 11.5,
+    fontFamily: "Inter_700Bold",
+  },
+  rankedPct: {
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
+    minWidth: 38,
+    textAlign: "right",
+  },
+  expandRow: {
+    alignItems: "center",
+    paddingVertical: 4,
+  },
+  expandText: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+  },
+  emptyContainer: {
+    paddingVertical: 24,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  emptyText: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+  },
+});

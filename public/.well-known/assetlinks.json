@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.organization.financemanager",
+      "sha256_cert_fingerprints": [
+        "14:6D:E9:7C:F5:0F:D0:13:B9:9E:09:A6:49:AE:AE:5B:3D:23:44:8D:19:D9:D9:AE:CE:66:C5:16:D4:F7:55:04"
+      ]
+    }
+  }
+]

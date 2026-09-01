@@ -1,0 +1,50 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Allow full real-time reading and writing for organization financial records and users across Web and Mobile
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+
+    match /organizations/{orgId} {
+      allow read, write: if true;
+      match /members/{memberId} {
+        allow read, write: if true;
+      }
+    }
+
+    match /transactions/{transactionId} {
+      allow read, write: if true;
+    }
+
+    match /budgets/{budgetId} {
+      allow read, write: if true;
+    }
+
+    match /payroll/{payrollId} {
+      allow read, write: if true;
+    }
+
+    match /departments/{departmentId} {
+      allow read, write: if true;
+    }
+
+    match /invitations/{invitationId} {
+      allow read, write: if true;
+    }
+
+    match /settings/{settingsId} {
+      allow read, write: if true;
+    }
+
+    match /auditLogs/{logId} {
+      allow read, write: if true;
+    }
+
+    // Default fallback
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

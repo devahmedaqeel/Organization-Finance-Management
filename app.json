@@ -1,0 +1,106 @@
+{
+  "expo": {
+    "name": "OFM — Organization Finance Management",
+    "description": "OFM — Organization Finance Management is an enterprise financial management platform for institutional budgets, ledger transactions, department cost centers, and real-time collaboration.",
+    "slug": "ofm-main-updated",
+    "owner": "engraqeels-team",
+    "version": "1.0.1",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "ofm-app",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/images/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.organization.financemanager",
+      "associatedDomains": [
+        "applinks:ofmapp-main.web.app",
+        "applinks:ofmapp-main.firebaseapp.com"
+      ],
+      "infoPlist": {
+        "NSSpeechRecognitionUsageDescription": "OFM uses speech for voice-guided onboarding.",
+        "NSMicrophoneUsageDescription": "OFM uses the microphone for voice assistance features.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.organization.financemanager",
+      "versionCode": 5,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "ofmapp-main.web.app",
+              "pathPrefix": "/"
+            },
+            {
+              "scheme": "https",
+              "host": "ofmapp-main.firebaseapp.com",
+              "pathPrefix": "/"
+            },
+            {
+              "scheme": "ofm-app"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ],
+      "permissions": [
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "RECORD_AUDIO",
+        "MODIFY_AUDIO_SETTINGS",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/images/icon.png"
+    },
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "origin": "https://ofmapp-main.web.app/"
+        }
+      ],
+      "expo-font",
+      "expo-web-browser",
+      "expo-splash-screen",
+      "expo-system-ui",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#3B82F6",
+          "defaultChannel": "default"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": "https://ofmapp-main.web.app/"
+      },
+      "eas": {
+        "projectId": "012306b6-9150-4ab0-a477-0505dea5fa7b"
+      }
+    }
+  }
+}
