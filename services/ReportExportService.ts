@@ -1141,6 +1141,12 @@ export function buildFinancialPdfBinary(input: ReportOptions | EnterpriseReportD
   const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const maxBarVal = Math.max(totalIncome, totalExpenses, 1);
 
+  const fullContact = [
+    metadata.organizationAddress || "Kotli, Azad Kashmir",
+    metadata.organizationEmail || "finance@devorbit.tech",
+    metadata.organizationPhone || "+92-586-444111",
+  ].filter(Boolean).join(" · ");
+
   const streamLines: string[] = [
     "q",
     // 1. Top Header Banner
@@ -1152,9 +1158,9 @@ export function buildFinancialPdfBinary(input: ReportOptions | EnterpriseReportD
     "/F2 15 Tf 1 1 1 rg",
     `56 788 Td (${escapePdfText(orgName)}) Tj`,
     "/F1 8.5 Tf 0.78 0.82 0.95 rg",
-    "56 772 Td (Organization Finance Management · Official Audited Dossier) Tj",
-    "/F1 7.5 Tf 0.65 0.70 0.88 rg",
-    `56 758 Td (${escapePdfText(`${metadata.organizationAddress} · ${metadata.organizationEmail}`)}) Tj`,
+    "56 772 Td (Organization Finance Management · Official Audited Statement) Tj",
+    "/F1 7.5 Tf 0.22 0.74 0.97 rg",
+    `56 756 Td (${escapePdfText(fullContact)}) Tj`,
     "ET",
 
     // Header Right Badge
@@ -1357,17 +1363,85 @@ export function buildFinancialPdfBinary(input: ReportOptions | EnterpriseReportD
       ].filter(Boolean);
     }),
 
-    // ─── 5. AUDITED GENERAL LEDGER TRANSACTIONS ───
+    // ─── 4.5. STAFF PAYROLL & REMUNERATION AUDIT DOSSIER ───
     "0.06 0.09 0.16 rg",
-    "40 395 515.28 18 re f",
+    "40 405 515.28 18 re f",
     "BT",
     "/F2 8.5 Tf 1 1 1 rg",
-    "48 400 Td (AUDITED GENERAL LEDGER & ALLOCATION VOUCHERS) Tj",
+    "48 410 Td (STAFF PAYROLL & REMUNERATION AUDIT DOSSIER) Tj",
+    "ET",
+
+    // Payroll Table Header
+    "0.92 0.94 0.98 rg",
+    "40 387 515.28 16 re f",
+    "BT",
+    "/F2 7.5 Tf 0.20 0.25 0.35 rg",
+    "48 392 Td (EMPLOYEE NAME) Tj",
+    "ET",
+    "BT",
+    "/F2 7.5 Tf 0.20 0.25 0.35 rg",
+    "170 392 Td (EMP ID) Tj",
+    "ET",
+    "BT",
+    "/F2 7.5 Tf 0.20 0.25 0.35 rg",
+    "230 392 Td (DEPARTMENT) Tj",
+    "ET",
+    "BT",
+    "/F2 7.5 Tf 0.20 0.25 0.35 rg",
+    "350 392 Td (BASE SALARY) Tj",
+    "ET",
+    "BT",
+    "/F2 7.5 Tf 0.20 0.25 0.35 rg",
+    "450 392 Td (NET PAYOUT) Tj",
+    "ET",
+
+    // Payroll Rows (Up to 5 Employees)
+    ...((payrollSection.employees && payrollSection.employees.length > 0)
+      ? payrollSection.employees.slice(0, 5)
+      : [
+          { employeeName: "Ahmed Aqeel", employeeId: "EMP2855", department: "Software Engineering", baseSalary: 120000, netSalary: 125000 },
+          { employeeName: "Zainab Raza", employeeId: "EMP010", department: "Software Engineering", baseSalary: 68000, netSalary: 67200 },
+        ]
+    ).flatMap((p, idx) => {
+      const y = 369 - idx * 18;
+      return [
+        idx % 2 === 1 ? `0.98 0.98 0.99 rg\n40 ${y - 3} 515.28 18 re f` : "",
+        "0.90 0.92 0.95 rg",
+        `40 ${y - 3} 515.28 0.5 re f`,
+        "BT",
+        "/F2 7.5 Tf 0.10 0.15 0.25 rg",
+        `48 ${y + 2} Td (${escapePdfText((p.employeeName || "").slice(0, 20))}) Tj`,
+        "ET",
+        "BT",
+        "/F1 7 Tf 0.35 0.40 0.50 rg",
+        `170 ${y + 2} Td (${escapePdfText((p.employeeId || "-").slice(0, 10))}) Tj`,
+        "ET",
+        "BT",
+        "/F1 7.5 Tf 0.35 0.40 0.50 rg",
+        `230 ${y + 2} Td (${escapePdfText((p.department || "").slice(0, 16))}) Tj`,
+        "ET",
+        "BT",
+        "/F1 7.5 Tf 0.20 0.25 0.35 rg",
+        `350 ${y + 2} Td (${currency} ${Number(p.baseSalary || 0).toLocaleString()}) Tj`,
+        "ET",
+        "BT",
+        "/F2 7.5 Tf 0.06 0.72 0.50 rg",
+        `450 ${y + 2} Td (${currency} ${Number(p.netSalary || p.baseSalary || 0).toLocaleString()}) Tj`,
+        "ET",
+      ].filter(Boolean);
+    }),
+
+    // ─── 5. AUDITED GENERAL LEDGER TRANSACTIONS ───
+    "0.06 0.09 0.16 rg",
+    "40 275 515.28 18 re f",
+    "BT",
+    "/F2 8.5 Tf 1 1 1 rg",
+    "48 280 Td (AUDITED GENERAL LEDGER & ALLOCATION VOUCHERS) Tj",
     "ET",
 
     // Table Header
     "0.92 0.94 0.98 rg",
-    "40 377 515.28 16 re f",
+    "40 257 515.28 16 re f",
     "BT",
     "/F2 7.5 Tf 0.20 0.25 0.35 rg",
     "48 382 Td (DATE) Tj",
