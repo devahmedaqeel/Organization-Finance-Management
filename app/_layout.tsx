@@ -309,19 +309,21 @@ export default function RootLayout() {
       `;
     }
 
-    if (fontsLoaded || fontError) {
+    // Safety timeout: Always hide splash screen within 400ms to guarantee instant app load
+    const timer = setTimeout(() => {
       SplashScreen.hideAsync().catch(() => {});
-      // Request notification permission on Android 13+
+    }, 400);
+
+    if (fontsLoaded || fontError) {
+      clearTimeout(timer);
+      SplashScreen.hideAsync().catch(() => {});
       if (Platform.OS !== "web") {
         requestNotificationPermissions();
       }
     }
+
+    return () => clearTimeout(timer);
   }, [fontsLoaded, fontError]);
-
-
-  if (!fontsLoaded && !fontError) {
-    return <View style={{ flex: 1, backgroundColor: '#0f172a' }} />;
-  }
 
   return (
     <SafeAreaProvider>
