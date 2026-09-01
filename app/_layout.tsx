@@ -325,6 +325,10 @@ export default function RootLayout() {
     return () => clearTimeout(timer);
   }, [fontsLoaded, fontError]);
 
+  if (!fontsLoaded && !fontError) {
+    return <View style={{ flex: 1, backgroundColor: '#0f172a' }} />;
+  }
+
   return (
     <SafeAreaProvider>
       <ErrorBoundary>

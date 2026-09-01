@@ -317,54 +317,37 @@ export async function downloadFinancialReportPdf(
     }
   }
 
-  // 2. Native HTML-to-PDF via expo-print (produces EXACT same output as in-app Preview)
+  // 2. Native: Save HTML report and open in phone's browser (Chrome/Safari)
+  // User sees EXACT same page as web → can print/save as PDF from browser
+  try {
+    const htmlFilePath = `${FileSystem.documentDirectory}${filename.replace('.pdf', '.html')}`;
+    await FileSystem.writeAsStringAsync(htmlFilePath, html, { encoding: FileSystem.EncodingType.UTF8 });
+
+    // Open in phone's browser — exact same rendering as web
+    const contentUri = await FileSystem.getContentUriAsync(htmlFilePath).catch(() => htmlFilePath);
+    const { Linking } = require("react-native");
+    await Linking.openURL(contentUri);
+
+    return {
+      success: true,
+      filename,
+      message: "Report opened in browser — use Print/Save as PDF.",
+    };
+  } catch (browserErr: any) {
+    console.log("[PDF_SERVICE] Browser open failed, trying print dialog:", browserErr?.message);
+  }
+
+  // 3. Fallback: System Print Dialog
   try {
     const Print = require("expo-print");
-
-    // Inject print-optimized CSS to prevent overlapping and ensure proper page breaks
-    const printCss = `
-      <style>
-        @media print {
-          body { font-size: 9px !important; line-height: 1.35 !important; }
-          .avoid-break { page-break-inside: avoid !important; break-inside: avoid !important; }
-          .section-title { page-break-after: avoid !important; }
-          tr { page-break-inside: avoid !important; }
-          table { page-break-inside: auto !important; }
-          .kpi-grid { page-break-inside: avoid !important; }
-          .header-card { page-break-inside: avoid !important; }
-          svg { max-width: 100% !important; height: auto !important; }
-        }
-        /* Mobile PDF print override: remove screen-only styles */
-        body { max-width: none !important; margin: 0 !important; padding: 8px !important; background: #FFF !important; }
-        .sheet-wrap { box-shadow: none !important; padding: 0 !important; }
-        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-      </style>
-    `;
-    const printHtml = html.replace("</head>", `${printCss}</head>`);
-
-    const pdfResult = await Print.printToFileAsync({
-      html: printHtml,
-      base64: false,
-      width: 595,   // A4 width in points (210mm)
-      height: 842,  // A4 height in points (297mm)
-      margins: { top: 20, bottom: 20, left: 16, right: 16 },
-    });
-    if (pdfResult?.uri) {
-      // Move from temp to permanent location
-      const permanentUri = `${FileSystem.documentDirectory}${filename}`;
-      await FileSystem.moveAsync({ from: pdfResult.uri, to: permanentUri }).catch(() => {});
-      const finalUri = await FileSystem.getInfoAsync(permanentUri).then(
-        (info) => (info.exists ? permanentUri : pdfResult.uri)
-      ).catch(() => pdfResult.uri);
-      return {
-        success: true,
-        uri: finalUri,
-        filename,
-        message: `Official Financial Statement PDF saved successfully.`,
-      };
-    }
+    await Print.printAsync({ html });
+    return {
+      success: true,
+      filename,
+      message: "PDF generated via system print dialog.",
+    };
   } catch (printErr: any) {
-    console.log("[PDF_SERVICE] expo-print unavailable, trying cloud endpoint:", printErr?.message);
+    console.log("[PDF_SERVICE] expo-print system dialog failed:", printErr?.message);
   }
 
   // 3. Call Secure Cloud Function (HTMLPDF.dev in Base64 mode)
