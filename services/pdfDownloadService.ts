@@ -471,3 +471,36 @@ export async function sharePdfFile(uri: string, filename?: string): Promise<void
       : { url: contentUri, title: cleanName }
   );
 }
+
+/**
+ * Saves a local PDF file to the phone's native file storage / Downloads using StorageAccessFramework on Android or Sharing.
+ */
+export async function saveToPhoneFileManager(uri: string, filename?: string): Promise<boolean> {
+  const cleanName = sanitizeFilename(filename || "Document.pdf");
+
+  if (Platform.OS === "android" && FileSystem.StorageAccessFramework) {
+    try {
+      const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+      if (permissions.granted) {
+        const destUri = await FileSystem.StorageAccessFramework.createFileAsync(
+          permissions.directoryUri,
+          cleanName.replace(/\.pdf$/i, ""),
+          "application/pdf"
+        );
+        const base64Data = await FileSystem.readAsStringAsync(uri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        await FileSystem.writeAsStringAsync(destUri, base64Data, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        return true;
+      }
+    } catch (e) {
+      console.log("[PDF_SERVICE] SAF save failed, using native file viewer fallback:", e);
+    }
+  }
+
+  // Fallback to native sharing / file export
+  await openPdfFile(uri, cleanName);
+  return true;
+}

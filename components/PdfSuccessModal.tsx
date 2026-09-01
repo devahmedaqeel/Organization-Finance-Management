@@ -27,7 +27,7 @@ interface Props {
   subtitle?: string;
 }
 
-import { openPdfFile, sharePdfFile } from "@/services/pdfDownloadService";
+import { openPdfFile, sharePdfFile, saveToPhoneFileManager } from "@/services/pdfDownloadService";
 import { showFloatingToast } from "@/utils/toast";
 
 export function PdfSuccessModal({
@@ -35,15 +35,15 @@ export function PdfSuccessModal({
   onClose,
   filename,
   fileUri,
-  title = "Saved into File Manager ✅",
-  subtitle = "Official PDF dossier saved to your phone storage.",
+  title = "PDF Ready ✓",
+  subtitle = "Your PDF has been downloaded successfully.",
 }: Props) {
   const colors = useColors();
 
   // Trigger floating notification on display without auto-closing
   useEffect(() => {
     if (visible) {
-      showFloatingToast("Saved into File Manager ✅", filename || "PDF saved to device storage.");
+      showFloatingToast("PDF Ready ✓", filename || "Your PDF has been downloaded successfully.");
     }
   }, [visible, filename]);
 
@@ -52,6 +52,21 @@ export function PdfSuccessModal({
   const handleOpen = async () => {
     if (fileUri) {
       await openPdfFile(fileUri, filename);
+    }
+  };
+
+  const handleShare = async () => {
+    if (fileUri) {
+      await sharePdfFile(fileUri, filename);
+    }
+  };
+
+  const handleSaveToFileManager = async () => {
+    if (fileUri) {
+      const saved = await saveToPhoneFileManager(fileUri, filename);
+      if (saved) {
+        showFloatingToast("Saved to Storage ✓", "PDF file saved to device storage.");
+      }
     }
   };
 
@@ -80,34 +95,53 @@ export function PdfSuccessModal({
             {filename ? `${filename}\n${subtitle}` : subtitle}
           </Text>
 
-          {/* Action Buttons: Single Direct Action & Close */}
-          <View style={{ width: "100%", gap: 10, marginTop: 8 }}>
-            <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: "#0284C7", paddingVertical: 13 }]}
-              onPress={async () => {
-                const targetUrl = `https://ofmapp-main.web.app/?tab=reports&export=dossier&v=${Date.now()}`;
-                const { Linking } = require("react-native");
-                try {
-                  const WebBrowser = require("expo-web-browser");
-                  await WebBrowser.openBrowserAsync(targetUrl);
-                } catch {
-                  await Linking.openURL(targetUrl);
-                }
-              }}
-              activeOpacity={0.85}
-            >
-              <Feather name="file-text" size={17} color="#FFFFFF" />
-              <Text style={[styles.actionBtnText, { color: "#FFFFFF", fontSize: 14.5 }]}>
-                Open Official PDF Dossier
-              </Text>
-            </TouchableOpacity>
+          {/* Action Buttons: Open PDF, Share, Save to File Manager, & Close */}
+          <View style={{ width: "100%", gap: 9, marginTop: 8 }}>
+            {fileUri ? (
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: "#0284C7", paddingVertical: 12 }]}
+                onPress={handleOpen}
+                activeOpacity={0.85}
+              >
+                <Feather name="file-text" size={16} color="#FFFFFF" />
+                <Text style={[styles.actionBtnText, { color: "#FFFFFF", fontSize: 14 }]}>
+                  Open PDF
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+
+            {fileUri ? (
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: "#6366F1", paddingVertical: 12 }]}
+                onPress={handleShare}
+                activeOpacity={0.85}
+              >
+                <Feather name="share-2" size={16} color="#FFFFFF" />
+                <Text style={[styles.actionBtnText, { color: "#FFFFFF", fontSize: 14 }]}>
+                  Share
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+
+            {fileUri ? (
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: "#0D9488", paddingVertical: 12 }]}
+                onPress={handleSaveToFileManager}
+                activeOpacity={0.85}
+              >
+                <Feather name="folder" size={16} color="#FFFFFF" />
+                <Text style={[styles.actionBtnText, { color: "#FFFFFF", fontSize: 14 }]}>
+                  Save to File Manager
+                </Text>
+              </TouchableOpacity>
+            ) : null}
 
             <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: colors.border, paddingVertical: 12 }]}
+              style={[styles.actionBtn, { backgroundColor: colors.border, paddingVertical: 11, marginTop: 2 }]}
               onPress={onClose}
               activeOpacity={0.85}
             >
-              <Feather name="x" size={16} color={colors.foreground} />
+              <Feather name="x" size={15} color={colors.foreground} />
               <Text style={[styles.actionBtnText, { color: colors.foreground, fontSize: 13.5 }]}>Close</Text>
             </TouchableOpacity>
           </View>

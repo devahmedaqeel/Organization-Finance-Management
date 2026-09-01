@@ -249,28 +249,22 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
             Alert.alert("Export Error", res.message || "Failed to generate CSV file.");
           }
         } else {
-          // On mobile: automatically open the live web app in Chrome with auto-dossier export trigger
-          if (Platform.OS !== "web") {
-            const targetUrl = `https://ofmapp-main.web.app/?tab=reports&export=dossier&v=${Date.now()}`;
-            const { Linking } = require("react-native");
-            try {
-              const WebBrowser = require("expo-web-browser");
-              WebBrowser.openBrowserAsync(targetUrl).catch(() => Linking.openURL(targetUrl));
-            } catch {
-              Linking.openURL(targetUrl).catch(() => {});
-            }
-          }
-
           const res = await downloadPdfReport(compiledEnterpriseData as any);
           setGenerating(false);
           if (res.success) {
             onClose();
+            if (res.uri && Platform.OS !== "web") {
+              try {
+                const { openPdfFile } = require("@/services/pdfDownloadService");
+                await openPdfFile(res.uri, res.filename);
+              } catch (e) {}
+            }
             setSuccessModalData({
               visible: true,
               filename: res.filename || `OFM_${selectedType}.pdf`,
               fileUri: res.uri,
-              title: "Saved into File Manager ✅",
-              subtitle: "Official PDF saved into device storage",
+              title: "PDF Ready ✓",
+              subtitle: "Your PDF has been downloaded successfully.",
             });
           } else {
             onClose();
