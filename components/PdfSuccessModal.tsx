@@ -80,8 +80,20 @@ export function PdfSuccessModal({
             {filename ? `${filename}\n${subtitle}` : subtitle}
           </Text>
 
-          {/* Action Buttons: Open PDF & Close */}
+          {/* Action Buttons: Open in Chrome Web, Open PDF, & Close */}
           <View style={{ width: "100%", gap: 10, marginTop: 6 }}>
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: "#0284C7", paddingVertical: 13 }]}
+              onPress={async () => {
+                const { Linking } = require("react-native");
+                await Linking.openURL("https://ofmapp-main.web.app");
+              }}
+              activeOpacity={0.85}
+            >
+              <Feather name="globe" size={17} color="#FFFFFF" />
+              <Text style={[styles.actionBtnText, { color: "#FFFFFF", fontSize: 14.5 }]}>Open in Chrome Web</Text>
+            </TouchableOpacity>
+
             {fileUri ? (
               <TouchableOpacity
                 style={[styles.actionBtn, { backgroundColor: "#38BDF8", paddingVertical: 13 }]}
@@ -89,7 +101,7 @@ export function PdfSuccessModal({
                 activeOpacity={0.85}
               >
                 <Feather name="file-text" size={17} color="#0F172A" />
-                <Text style={[styles.actionBtnText, { color: "#0F172A", fontSize: 14.5 }]}>Open PDF</Text>
+                <Text style={[styles.actionBtnText, { color: "#0F172A", fontSize: 14.5 }]}>Open PDF File</Text>
               </TouchableOpacity>
             ) : null}
 
