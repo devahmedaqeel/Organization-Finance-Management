@@ -359,23 +359,23 @@ export function WebDashboard({
         </ScrollView>
       </View>
 
-      {/* ─── Net Operating Balance Hero Card (Exact Mobile Parity) ─── */}
+      {/* ─── Net Operating Balance Hero Card (Exact Mobile App Parity - Matching Pic 1) ─── */}
       <LinearGradient
-        colors={["#0B1936", "#102554", "#0A1B3F"]}
+        colors={["#060D1F", "#0B1B3D", "#112D66", "#1D4ED8"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[
           styles.heroBalanceCard,
           {
-            borderRadius: 24,
+            borderRadius: 22,
             padding: isMobile ? 16 : 22,
-            borderWidth: 1.5,
-            borderColor: "rgba(59, 130, 246, 0.35)",
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 12 },
-            shadowOpacity: 0.4,
-            shadowRadius: 24,
-            elevation: 12,
+            borderWidth: 1.2,
+            borderColor: "rgba(255, 255, 255, 0.18)",
+            shadowColor: "#1d4ed8",
+            shadowOffset: { width: 0, height: 10 },
+            shadowOpacity: 0.35,
+            shadowRadius: 18,
+            elevation: 10,
             overflow: "hidden",
             position: "relative",
           },
@@ -386,12 +386,12 @@ export function WebDashboard({
         <View style={styles.ambientGlowBottomLeft} pointerEvents="none" />
 
         {/* Top Row: Title + Privacy Eye + Fiscal Dossier Button */}
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <View style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: "rgba(56, 189, 248, 0.18)", alignItems: "center", justifyContent: "center" }}>
-              <SvgShield size={13} color="#38BDF8" />
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
+            <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: "rgba(56, 189, 248, 0.18)", alignItems: "center", justifyContent: "center" }}>
+              <SvgShield size={12} color="#38BDF8" />
             </View>
-            <Text style={{ color: "#FFFFFF", fontSize: 13, fontFamily: "Inter_800ExtraBold", letterSpacing: 1.2 }}>
+            <Text style={{ color: "#FFFFFF", fontSize: isMobile ? 12 : 13, fontFamily: "Inter_800ExtraBold", letterSpacing: 1.0 }}>
               {balanceViewMode === "cashflow"
                 ? "OPERATING RESULT"
                 : balanceViewMode === "budget"
@@ -400,14 +400,14 @@ export function WebDashboard({
             </Text>
             <TouchableOpacity
               onPress={() => setHideBalance(!hideBalance)}
-              style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: "rgba(255, 255, 255, 0.12)", alignItems: "center", justifyContent: "center" }}
+              style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: "rgba(255, 255, 255, 0.12)", alignItems: "center", justifyContent: "center" }}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               activeOpacity={0.7}
             >
               {hideBalance ? (
-                <SvgEyeOff size={13} color="#FFFFFF" />
+                <SvgEyeOff size={12} color="#FFFFFF" />
               ) : (
-                <SvgEye size={13} color="#FFFFFF" />
+                <SvgEye size={12} color="#FFFFFF" />
               )}
             </TouchableOpacity>
           </View>
@@ -417,77 +417,82 @@ export function WebDashboard({
             style={{
               flexDirection: "row",
               alignItems: "center",
-              gap: 6,
+              gap: 5,
               backgroundColor: "rgba(255, 255, 255, 0.10)",
-              paddingHorizontal: 14,
-              paddingVertical: 7,
+              paddingHorizontal: isMobile ? 10 : 14,
+              paddingVertical: isMobile ? 5 : 7,
               borderRadius: 20,
               borderWidth: 1,
               borderColor: "rgba(255, 255, 255, 0.22)",
+              cursor: "pointer" as any,
             }}
             onPress={() => setNetModalVisible(true)}
             activeOpacity={0.8}
           >
-            <SvgChart size={13} color="#38BDF8" />
-            <Text style={{ color: "#FFFFFF", fontSize: 12, fontFamily: "Inter_700Bold", letterSpacing: 0.3 }}>
+            <SvgChart size={12} color="#38BDF8" />
+            <Text style={{ color: "#FFFFFF", fontSize: isMobile ? 11 : 12, fontFamily: "Inter_700Bold", letterSpacing: 0.3 }}>
               Fiscal Dossier →
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* View Mode Switcher Pills (Net Operating Result vs Total Outflows) */}
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 16 }}>
+        {/* View Mode Switcher Pills (Net Operating Result vs Total Outflows) - Side-by-side on Mobile */}
+        <View style={{ flexDirection: "row", gap: isMobile ? 6 : 10, marginTop: -2, marginBottom: 14, flexWrap: isMobile ? "nowrap" : "wrap" }}>
           <TouchableOpacity
             style={{
+              flex: isMobile ? 1 : undefined,
               flexDirection: "row",
               alignItems: "center",
-              gap: 7,
-              paddingHorizontal: 14,
-              paddingVertical: 7,
-              borderRadius: 14,
-              backgroundColor: balanceViewMode === "cashflow" ? "rgba(59, 130, 246, 0.25)" : "rgba(255, 255, 255, 0.08)",
-              borderWidth: 1.5,
-              borderColor: balanceViewMode === "cashflow" ? "#3B82F6" : "rgba(255, 255, 255, 0.14)",
+              justifyContent: "center",
+              gap: isMobile ? 5 : 7,
+              paddingHorizontal: isMobile ? 8 : 14,
+              paddingVertical: isMobile ? 5 : 7,
+              borderRadius: isMobile ? 10 : 14,
+              backgroundColor: balanceViewMode === "cashflow" ? "rgba(59, 130, 246, 0.30)" : "rgba(255, 255, 255, 0.08)",
+              borderWidth: 1.2,
+              borderColor: balanceViewMode === "cashflow" ? "#60A5FA" : "rgba(255, 255, 255, 0.15)",
               cursor: "pointer" as any,
             }}
             onPress={() => setBalanceViewMode("cashflow")}
             activeOpacity={0.8}
           >
-            <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: "#10B981" }} />
-            <Text style={{ color: balanceViewMode === "cashflow" ? "#FFFFFF" : "rgba(255, 255, 255, 0.75)", fontSize: 12, fontFamily: "Inter_700Bold" }}>
+            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#10B981" }} />
+            <Text style={{ color: balanceViewMode === "cashflow" ? "#FFFFFF" : "rgba(255, 255, 255, 0.75)", fontSize: isMobile ? 10.5 : 12, fontFamily: "Inter_700Bold" }} numberOfLines={1}>
               Net Surplus ({netBalance >= 0 ? "+" : "-"}{settings.currency} {fmt(Math.abs(netBalance))})
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={{
+              flex: isMobile ? 1 : undefined,
               flexDirection: "row",
               alignItems: "center",
-              gap: 7,
-              paddingHorizontal: 14,
-              paddingVertical: 7,
-              borderRadius: 14,
-              backgroundColor: balanceViewMode === "expenses" ? "rgba(244, 63, 94, 0.25)" : "rgba(255, 255, 255, 0.08)",
-              borderWidth: 1.5,
-              borderColor: balanceViewMode === "expenses" ? "#F43F5E" : "rgba(255, 255, 255, 0.14)",
+              justifyContent: "center",
+              gap: isMobile ? 5 : 7,
+              paddingHorizontal: isMobile ? 8 : 14,
+              paddingVertical: isMobile ? 5 : 7,
+              borderRadius: isMobile ? 10 : 14,
+              backgroundColor: balanceViewMode === "expenses" ? "rgba(244, 63, 94, 0.30)" : "rgba(255, 255, 255, 0.08)",
+              borderWidth: 1.2,
+              borderColor: balanceViewMode === "expenses" ? "#F43F5E" : "rgba(255, 255, 255, 0.15)",
               cursor: "pointer" as any,
             }}
             onPress={() => setBalanceViewMode("expenses")}
             activeOpacity={0.8}
           >
-            <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: "#F43F5E" }} />
-            <Text style={{ color: balanceViewMode === "expenses" ? "#FFFFFF" : "rgba(255, 255, 255, 0.75)", fontSize: 12, fontFamily: "Inter_700Bold" }}>
+            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#F43F5E" }} />
+            <Text style={{ color: balanceViewMode === "expenses" ? "#FFFFFF" : "rgba(255, 255, 255, 0.75)", fontSize: isMobile ? 10.5 : 12, fontFamily: "Inter_700Bold" }} numberOfLines={1}>
               Total Outflows (-{settings.currency} {fmt(totalExpenses)})
             </Text>
           </TouchableOpacity>
         </View>
 
         {/* Balance Hero Amount Display + Growth Metric Pill */}
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
           <TouchableOpacity
             onPress={() => setNetModalVisible(true)}
             activeOpacity={0.85}
-            style={{ flex: 1 }}
+            style={{ flex: 1, marginRight: 8 }}
           >
             {hideBalance ? (
               <Text style={styles.heroAmountText} numberOfLines={1}>
@@ -501,40 +506,42 @@ export function WebDashboard({
                 style={[
                   styles.heroAmountText,
                   {
-                    fontSize: isMobile ? 26 : 34,
+                    fontSize: isMobile ? 28 : 34,
                     color: balanceViewMode === "expenses" ? "#FB7185" : "#FFFFFF",
                     fontFamily: "Inter_800ExtraBold",
+                    letterSpacing: -0.8,
                   },
                 ]}
               />
             )}
           </TouchableOpacity>
 
-          {/* Growth Pill Badge (Matching Screenshot) */}
+          {/* Growth Pill Badge (Matching Pic 1) */}
           <TouchableOpacity
             style={{
               flexDirection: "row",
               alignItems: "center",
-              gap: 6,
-              paddingHorizontal: 12,
-              paddingVertical: 7,
-              borderRadius: 20,
+              gap: 5,
+              paddingHorizontal: isMobile ? 10 : 12,
+              paddingVertical: isMobile ? 5 : 7,
+              borderRadius: isMobile ? 14 : 20,
               backgroundColor: currentHeroIsDeficit ? "rgba(244, 63, 94, 0.20)" : "rgba(16, 185, 129, 0.20)",
               borderWidth: 1.5,
               borderColor: currentHeroIsDeficit ? "rgba(244, 63, 94, 0.50)" : "rgba(16, 185, 129, 0.50)",
+              cursor: "pointer" as any,
             }}
             onPress={() => setGrowthMode((m) => (m + 1) % 4)}
             activeOpacity={0.8}
           >
             {currentHeroIsDeficit ? (
-              <SvgTrendingDown size={13} color="#FB7185" />
+              <SvgTrendingDown size={12} color="#FB7185" />
             ) : (
-              <SvgTrendingUp size={13} color="#34D399" />
+              <SvgTrendingUp size={12} color="#34D399" />
             )}
-            <Text style={{ color: currentHeroIsDeficit ? "#FB7185" : "#34D399", fontSize: 12, fontFamily: "Inter_700Bold" }}>
+            <Text style={{ color: currentHeroIsDeficit ? "#FB7185" : "#34D399", fontSize: isMobile ? 11.5 : 12, fontFamily: "Inter_700Bold" }}>
               {balanceViewMode === "expenses"
-                ? `${clampedSpendRatio}% Outflow Ratio`
-                : `${netMargin >= 0 ? "+" : ""}${netMargin.toFixed(1)}% Operating Margin`}
+                ? `${clampedSpendRatio}% Outflow`
+                : `${netMargin >= 0 ? "+" : ""}${netMargin.toFixed(1)}% Margin`}
             </Text>
           </TouchableOpacity>
         </View>
@@ -542,18 +549,18 @@ export function WebDashboard({
         {/* Dynamic Cash Flow / Budget Retention Progress Bar & Labels */}
         <View style={{ gap: 6 }}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-            <Text style={{ color: "#E2E8F0", fontSize: 11.5, fontFamily: "Inter_500Medium" }}>
+            <Text style={{ color: "#E2E8F0", fontSize: isMobile ? 11 : 11.5, fontFamily: "Inter_500Medium" }}>
               {clampedSpendRatio}% Spent of Inflows
             </Text>
-            <Text style={{ color: currentHeroIsDeficit ? "#FB7185" : "#34D399", fontSize: 11.5, fontFamily: "Inter_700Bold" }}>
+            <Text style={{ color: currentHeroIsDeficit ? "#FB7185" : "#34D399", fontSize: isMobile ? 11 : 11.5, fontFamily: "Inter_700Bold" }}>
               {retainedSurplusPct}% Retained Surplus
             </Text>
           </View>
-          <View style={{ height: 6, borderRadius: 3, backgroundColor: "rgba(255, 255, 255, 0.15)", overflow: "hidden" }}>
+          <View style={{ height: 5, borderRadius: 2.5, backgroundColor: "rgba(255, 255, 255, 0.15)", overflow: "hidden" }}>
             <View
               style={{
                 height: "100%",
-                borderRadius: 3,
+                borderRadius: 2.5,
                 width: `${isDeficit ? 100 : clampedSpendRatio}%`,
                 backgroundColor: currentHeroIsDeficit ? "#FB7185" : "#38BDF8",
               }}

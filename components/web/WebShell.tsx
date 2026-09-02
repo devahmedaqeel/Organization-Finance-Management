@@ -23,6 +23,7 @@ import {
   SvgChevronRight,
   SvgSun,
   SvgMoon,
+  SvgPlus,
 } from "./SvgIcons";
 
 import { WebDashboard } from "./WebDashboard";
@@ -466,63 +467,89 @@ export function WebShell() {
 
         {/* Top Header Bar */}
         <View style={[styles.topBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1 }}>
-            {/* Mobile Hamburger Button */}
-            {isMobile && (
-              <TouchableOpacity
-                style={[styles.collapseBtn, { borderColor: colors.border, marginRight: 4 }]}
-                onPress={() => setMobileDrawerOpen(true)}
-              >
-                <SvgMenu size={18} color={colors.foreground} />
-              </TouchableOpacity>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
+            {/* Mobile Brand / Current Tab Title */}
+            {isMobile ? (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
+                <View
+                  style={[
+                    styles.brandLogoWrap,
+                    {
+                      width: 28,
+                      height: 28,
+                      borderRadius: 8,
+                      backgroundColor: hasCustomLogo ? "#FFFFFF" : colors.primary,
+                      borderWidth: hasCustomLogo ? 1 : 0,
+                      borderColor: colors.border,
+                      padding: hasCustomLogo ? 2 : 0,
+                    },
+                  ]}
+                >
+                  {hasCustomLogo ? (
+                    <Image
+                      key={settings.organizationLogo}
+                      source={{ uri: settings.organizationLogo }}
+                      style={styles.brandLogoImg}
+                      resizeMode="contain"
+                    />
+                  ) : (
+                    <Image
+                      source={require("@/assets/images/icon.png")}
+                      style={styles.brandLogoImg}
+                      resizeMode="cover"
+                    />
+                  )}
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={[styles.breadcrumbCurrent, { color: colors.foreground, fontSize: 14 }]} numberOfLines={1}>
+                    {NAV_ITEMS.find((n) => n.id === activeTab)?.label || "Overview"}
+                  </Text>
+                  <Text style={{ color: colors.mutedForeground, fontSize: 9.5, fontFamily: "Inter_500Medium" }} numberOfLines={1}>
+                    {settings.organizationName || "OFM Cloud"}
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              /* Desktop Breadcrumb Info */
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
+                <Text style={[styles.breadcrumbRoot, { color: colors.mutedForeground }]} numberOfLines={1}>
+                  {settings.organizationName || "OFM"}
+                </Text>
+                <Text style={[styles.breadcrumbSep, { color: colors.mutedForeground }]}>/</Text>
+                <Text style={[styles.breadcrumbCurrent, { color: colors.foreground, flexShrink: 1 }]} numberOfLines={1}>
+                  {NAV_ITEMS.find((n) => n.id === activeTab)?.label || "Overview"}
+                </Text>
+              </View>
             )}
-
-            {/* Breadcrumb Info */}
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
-              <Text
-                style={[
-                  styles.breadcrumbRoot,
-                  { color: colors.mutedForeground },
-                  isMobile && { maxWidth: 90 },
-                ]}
-                numberOfLines={1}
-              >
-                {isMobile ? "OFM" : (settings.organizationName || "OFM")}
-              </Text>
-              <Text style={[styles.breadcrumbSep, { color: colors.mutedForeground }]}>/</Text>
-              <Text style={[styles.breadcrumbCurrent, { color: colors.foreground, flexShrink: 1 }]} numberOfLines={1}>
-                {NAV_ITEMS.find((n) => n.id === activeTab)?.label || "Overview"}
-              </Text>
-            </View>
           </View>
 
           {/* Quick Header Right Actions */}
           <View style={styles.topRightActions}>
             {/* Live 2-Way Cloud Sync Indicator */}
-            {!isMobile && (
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 5,
+                backgroundColor: "rgba(16, 185, 129, 0.1)",
+                borderColor: "rgba(16, 185, 129, 0.3)",
+                borderWidth: 1,
+                paddingHorizontal: isMobile ? 6 : 8,
+                paddingVertical: 3.5,
+                borderRadius: 16,
+                marginRight: isMobile ? 2 : 6,
+                flexShrink: 0,
+              }}
+            >
               <View
                 style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 5,
-                  backgroundColor: "rgba(16, 185, 129, 0.1)",
-                  borderColor: "rgba(16, 185, 129, 0.3)",
-                  borderWidth: 1,
-                  paddingHorizontal: 8,
-                  paddingVertical: 3.5,
-                  borderRadius: 16,
-                  marginRight: 6,
-                  flexShrink: 0,
+                  width: 6,
+                  height: 6,
+                  borderRadius: 3,
+                  backgroundColor: "#10B981",
                 }}
-              >
-                <View
-                  style={{
-                    width: 6,
-                    height: 6,
-                    borderRadius: 3,
-                    backgroundColor: "#10B981",
-                  }}
-                />
+              />
+              {!isMobile && (
                 <Text
                   style={{
                     fontSize: 10.5,
@@ -533,7 +560,28 @@ export function WebShell() {
                 >
                   Live Cloud
                 </Text>
-              </View>
+              )}
+            </View>
+
+            {/* Quick Action on Mobile */}
+            {canEdit && isMobile && (
+              <TouchableOpacity
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 4,
+                  backgroundColor: colors.primary,
+                  paddingHorizontal: 9,
+                  paddingVertical: 5.5,
+                  borderRadius: 8,
+                  cursor: "pointer" as any,
+                }}
+                onPress={() => handleOpenTx("income")}
+                activeOpacity={0.8}
+              >
+                <SvgPlus size={13} color="#FFFFFF" />
+                <Text style={{ color: "#FFFFFF", fontSize: 11, fontFamily: "Inter_700Bold" }}>Record</Text>
+              </TouchableOpacity>
             )}
 
             {canEdit && !isMobile && (
@@ -572,7 +620,7 @@ export function WebShell() {
         </View>
 
         {/* Dynamic Main Content Tab */}
-        <View style={styles.tabContentArea}>
+        <View style={[styles.tabContentArea, isMobile && { paddingBottom: 84 }]}>
           <WebPageTransition pageKey={activeTab}>
             {activeTab === "dashboard" && (
               <WebDashboard
@@ -593,6 +641,129 @@ export function WebShell() {
             {activeTab === "settings" && <WebSettings />}
           </WebPageTransition>
         </View>
+
+        {/* ─── NATIVE-APP-STYLE MOBILE BOTTOM NAVIGATION (<768px) ─── */}
+        {isMobile && (
+          <View
+            style={[
+              styles.mobileBottomNav,
+              {
+                backgroundColor: colors.card,
+                borderTopColor: colors.border,
+              },
+            ]}
+          >
+            {/* 1. Home / Dashboard */}
+            <TouchableOpacity
+              style={styles.mobileBottomNavItem}
+              onPress={() => setActiveTab("dashboard")}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.bottomNavIconWrap, activeTab === "dashboard" && { backgroundColor: colors.primary + "18" }]}>
+                <SvgGrid size={19} color={activeTab === "dashboard" ? colors.primary : colors.mutedForeground} />
+              </View>
+              <Text
+                style={[
+                  styles.mobileBottomNavLabel,
+                  {
+                    color: activeTab === "dashboard" ? colors.primary : colors.mutedForeground,
+                    fontFamily: activeTab === "dashboard" ? "Inter_700Bold" : "Inter_500Medium",
+                  },
+                ]}
+              >
+                Home
+              </Text>
+            </TouchableOpacity>
+
+            {/* 2. Ledger / Transactions */}
+            <TouchableOpacity
+              style={styles.mobileBottomNavItem}
+              onPress={() => setActiveTab("transactions")}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.bottomNavIconWrap, (activeTab === "transactions" || activeTab === "income" || activeTab === "expenses") && { backgroundColor: colors.primary + "18" }]}>
+                <SvgList size={19} color={(activeTab === "transactions" || activeTab === "income" || activeTab === "expenses") ? colors.primary : colors.mutedForeground} />
+              </View>
+              <Text
+                style={[
+                  styles.mobileBottomNavLabel,
+                  {
+                    color: (activeTab === "transactions" || activeTab === "income" || activeTab === "expenses") ? colors.primary : colors.mutedForeground,
+                    fontFamily: (activeTab === "transactions" || activeTab === "income" || activeTab === "expenses") ? "Inter_700Bold" : "Inter_500Medium",
+                  },
+                ]}
+              >
+                Ledger
+              </Text>
+            </TouchableOpacity>
+
+            {/* 3. Reports */}
+            <TouchableOpacity
+              style={styles.mobileBottomNavItem}
+              onPress={() => setActiveTab("reports")}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.bottomNavIconWrap, activeTab === "reports" && { backgroundColor: colors.primary + "18" }]}>
+                <SvgFileText size={19} color={activeTab === "reports" ? colors.primary : colors.mutedForeground} />
+              </View>
+              <Text
+                style={[
+                  styles.mobileBottomNavLabel,
+                  {
+                    color: activeTab === "reports" ? colors.primary : colors.mutedForeground,
+                    fontFamily: activeTab === "reports" ? "Inter_700Bold" : "Inter_500Medium",
+                  },
+                ]}
+              >
+                Reports
+              </Text>
+            </TouchableOpacity>
+
+            {/* 4. Payroll */}
+            <TouchableOpacity
+              style={styles.mobileBottomNavItem}
+              onPress={() => setActiveTab("payroll")}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.bottomNavIconWrap, activeTab === "payroll" && { backgroundColor: colors.primary + "18" }]}>
+                <SvgUsers size={19} color={activeTab === "payroll" ? colors.primary : colors.mutedForeground} />
+              </View>
+              <Text
+                style={[
+                  styles.mobileBottomNavLabel,
+                  {
+                    color: activeTab === "payroll" ? colors.primary : colors.mutedForeground,
+                    fontFamily: activeTab === "payroll" ? "Inter_700Bold" : "Inter_500Medium",
+                  },
+                ]}
+              >
+                {user?.role === "employee" ? "Salary" : "Payroll"}
+              </Text>
+            </TouchableOpacity>
+
+            {/* 5. More (Opens Mobile Drawer with Budgets, Departments, Team, AI Insights, Settings) */}
+            <TouchableOpacity
+              style={styles.mobileBottomNavItem}
+              onPress={() => setMobileDrawerOpen(true)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.bottomNavIconWrap, (activeTab !== "dashboard" && activeTab !== "transactions" && activeTab !== "income" && activeTab !== "expenses" && activeTab !== "reports" && activeTab !== "payroll") && { backgroundColor: colors.primary + "18" }]}>
+                <SvgLayers size={19} color={(activeTab !== "dashboard" && activeTab !== "transactions" && activeTab !== "income" && activeTab !== "expenses" && activeTab !== "reports" && activeTab !== "payroll") ? colors.primary : colors.mutedForeground} />
+              </View>
+              <Text
+                style={[
+                  styles.mobileBottomNavLabel,
+                  {
+                    color: (activeTab !== "dashboard" && activeTab !== "transactions" && activeTab !== "income" && activeTab !== "expenses" && activeTab !== "reports" && activeTab !== "payroll") ? colors.primary : colors.mutedForeground,
+                    fontFamily: (activeTab !== "dashboard" && activeTab !== "transactions" && activeTab !== "income" && activeTab !== "expenses" && activeTab !== "reports" && activeTab !== "payroll") ? "Inter_700Bold" : "Inter_500Medium",
+                  },
+                ]}
+              >
+                More
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       {/* Global Quick Transaction Modal */}
@@ -809,5 +980,40 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 0,
     width: "100%",
+  },
+  mobileBottomNav: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 60,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
+    borderTopWidth: 1,
+    paddingHorizontal: 4,
+    paddingBottom: 2,
+    zIndex: 999,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 16,
+  },
+  mobileBottomNavItem: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 4,
+    gap: 2,
+  },
+  bottomNavIconWrap: {
+    paddingHorizontal: 12,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  mobileBottomNavLabel: {
+    fontSize: 10,
+    letterSpacing: 0.1,
   },
 });

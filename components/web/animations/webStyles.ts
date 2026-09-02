@@ -113,6 +113,32 @@ export function injectWebMicroAnimations() {
       background: rgba(148, 163, 184, 0.55);
     }
 
+    /* Universal Modern Sans-Serif Typography Enforcement (Prevents Times New Roman on Mobile Web) */
+    *, html, body, div, span, p, h1, h2, h3, h4, h5, h6, [class*="css-text"], [dir="auto"] {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+    }
+
+    [style*="Inter_400Regular"], [style*="Inter_400"] {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+      font-weight: 400 !important;
+    }
+    [style*="Inter_500Medium"], [style*="Inter_500"] {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+      font-weight: 500 !important;
+    }
+    [style*="Inter_600SemiBold"], [style*="Inter_600"] {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+      font-weight: 600 !important;
+    }
+    [style*="Inter_700Bold"], [style*="Inter_700"] {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+      font-weight: 700 !important;
+    }
+    [style*="Inter_800ExtraBold"], [style*="Inter_800"] {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+      font-weight: 800 !important;
+    }
+
     /* Respect Reduced Motion */
     @media (prefers-reduced-motion: reduce) {
       *, ::before, ::after {

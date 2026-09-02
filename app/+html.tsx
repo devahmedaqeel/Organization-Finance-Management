@@ -62,10 +62,32 @@ export default function RootHtml({ children }: PropsWithChildren) {
           }
 
           /* Force modern sans-serif across all native & web text elements */
-          * {
+          *, html, body, div, span, p, h1, h2, h3, h4, h5, h6, [class*="css-text"], [dir="auto"] {
             box-sizing: border-box;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
             -webkit-tap-highlight-color: transparent;
+          }
+
+          /* React Native Web Font Style Overrides (Guarantees no serif/Times New Roman fallback) */
+          [style*="Inter_400Regular"], [style*="Inter_400"] {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+            font-weight: 400 !important;
+          }
+          [style*="Inter_500Medium"], [style*="Inter_500"] {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+            font-weight: 500 !important;
+          }
+          [style*="Inter_600SemiBold"], [style*="Inter_600"] {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+            font-weight: 600 !important;
+          }
+          [style*="Inter_700Bold"], [style*="Inter_700"] {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+            font-weight: 700 !important;
+          }
+          [style*="Inter_800ExtraBold"], [style*="Inter_800"] {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+            font-weight: 800 !important;
           }
 
           /* Smooth Momentum Touch Scrolling for All Scrollable Panes */
@@ -96,38 +118,6 @@ export default function RootHtml({ children }: PropsWithChildren) {
           }
           ::-webkit-scrollbar-thumb:hover {
             background: rgba(99, 102, 241, 0.6);
-          }
-
-          /* Explicit Expo Font Family Aliases with Robust Native Fallbacks */
-          @font-face {
-            font-family: 'Inter_400Regular';
-            src: local('Inter Regular'), local('Inter-Regular'), local('Inter'), local('-apple-system'), local('BlinkMacSystemFont'), local('Segoe UI'), local('Roboto'), local('Helvetica Neue'), local('Arial');
-            font-weight: 400;
-            font-display: swap;
-          }
-          @font-face {
-            font-family: 'Inter_500Medium';
-            src: local('Inter Medium'), local('Inter-Medium'), local('Inter'), local('-apple-system'), local('BlinkMacSystemFont'), local('Segoe UI'), local('Roboto'), local('Helvetica Neue'), local('Arial');
-            font-weight: 500;
-            font-display: swap;
-          }
-          @font-face {
-            font-family: 'Inter_600SemiBold';
-            src: local('Inter SemiBold'), local('Inter-SemiBold'), local('Inter'), local('-apple-system'), local('BlinkMacSystemFont'), local('Segoe UI'), local('Roboto'), local('Helvetica Neue'), local('Arial');
-            font-weight: 600;
-            font-display: swap;
-          }
-          @font-face {
-            font-family: 'Inter_700Bold';
-            src: local('Inter Bold'), local('Inter-Bold'), local('Inter'), local('-apple-system'), local('BlinkMacSystemFont'), local('Segoe UI'), local('Roboto'), local('Helvetica Neue'), local('Arial');
-            font-weight: 700;
-            font-display: swap;
-          }
-          @font-face {
-            font-family: 'Inter_800ExtraBold';
-            src: local('Inter ExtraBold'), local('Inter-ExtraBold'), local('Inter'), local('-apple-system'), local('BlinkMacSystemFont'), local('Segoe UI'), local('Roboto'), local('Helvetica Neue'), local('Arial');
-            font-weight: 800;
-            font-display: swap;
           }
 
           /* Icon Fonts */
