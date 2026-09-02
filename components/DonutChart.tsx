@@ -26,6 +26,7 @@ interface Props {
   centerSub?: string;
   currency?: string;
   showChips?: boolean;
+  showLegend?: boolean;
 }
 
 function fmtVal(n: number) {
@@ -58,30 +59,18 @@ function describeArcSector(
   const angleDiff = endAngle - startAngle;
   if (angleDiff <= 0) return "";
 
-  if (angleDiff >= 359.9) {
-    return [
-      `M ${x} ${y - outerRadius}`,
-      `A ${outerRadius} ${outerRadius} 0 1 0 ${x} ${y + outerRadius}`,
-      `A ${outerRadius} ${outerRadius} 0 1 0 ${x} ${y - outerRadius}`,
-      `M ${x} ${y - innerRadius}`,
-      `A ${innerRadius} ${innerRadius} 0 1 1 ${x} ${y + innerRadius}`,
-      `A ${innerRadius} ${innerRadius} 0 1 1 ${x} ${y - innerRadius}`,
-      `Z`,
-    ].join(" ");
-  }
-
   const startOuter = polarToCartesian(x, y, outerRadius, startAngle);
   const endOuter = polarToCartesian(x, y, outerRadius, endAngle);
-  const startInner = polarToCartesian(x, y, innerRadius, startAngle);
-  const endInner = polarToCartesian(x, y, innerRadius, endAngle);
+  const startInner = polarToCartesian(x, y, innerRadius, endAngle);
+  const endInner = polarToCartesian(x, y, innerRadius, startAngle);
 
-  const largeArcFlag = angleDiff > 180 ? 1 : 0;
+  const largeArcFlag = angleDiff <= 180 ? "0" : "1";
 
   return [
     `M ${startOuter.x} ${startOuter.y}`,
     `A ${outerRadius} ${outerRadius} 0 ${largeArcFlag} 1 ${endOuter.x} ${endOuter.y}`,
-    `L ${endInner.x} ${endInner.y}`,
-    `A ${innerRadius} ${innerRadius} 0 ${largeArcFlag} 0 ${startInner.x} ${startInner.y}`,
+    `L ${startInner.x} ${startInner.y}`,
+    `A ${innerRadius} ${innerRadius} 0 ${largeArcFlag} 0 ${endInner.x} ${endInner.y}`,
     `Z`,
   ].join(" ");
 }
@@ -94,6 +83,7 @@ export function DonutChart({
   centerSub = "total",
   currency = "PKR",
   showChips = true,
+  showLegend = true,
 }: Props) {
   const colors = useColors();
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
@@ -332,56 +322,58 @@ export function DonutChart({
         </View>
 
         {/* Legend List (Clean width so it never stretches across entire screen) */}
-        <View style={styles.legend}>
-          {segments.map((seg, i) => {
-            const isSelected = selectedIndex === i;
-            const pct = ((seg.value / total) * 100).toFixed(0);
-            return (
-              <TouchableOpacity
-                key={seg.label}
-                style={[
-                  styles.legendItem,
-                  {
-                    backgroundColor: isSelected ? seg.color + "18" : (colors.cardAlt ?? colors.muted) + "30",
-                    borderColor: isSelected ? seg.color : colors.border + "40",
-                  },
-                ]}
-                onPress={() => {
-                  setSelectedIndex(selectedIndex === i ? null : i);
-                  if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
-                }}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.dot, { backgroundColor: seg.color }]} />
-                <View style={styles.legendText}>
-                  <Text
-                    style={[
-                      styles.legendLabel,
-                      {
-                        color: isSelected ? colors.foreground : colors.mutedForeground,
-                        fontFamily: isSelected ? "Inter_700Bold" : "Inter_500Medium",
-                      },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {seg.label}
-                  </Text>
-                  <Text
-                    style={[
-                      styles.legendValue,
-                      {
-                        color: isSelected ? seg.color : colors.foreground,
-                        fontFamily: isSelected ? "Inter_700Bold" : "Inter_600SemiBold",
-                      },
-                    ]}
-                  >
-                    {pct}%
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+        {showLegend && (
+          <View style={styles.legend}>
+            {segments.map((seg, i) => {
+              const isSelected = selectedIndex === i;
+              const pct = ((seg.value / total) * 100).toFixed(0);
+              return (
+                <TouchableOpacity
+                  key={seg.label}
+                  style={[
+                    styles.legendItem,
+                    {
+                      backgroundColor: isSelected ? seg.color + "18" : (colors.cardAlt ?? colors.muted) + "30",
+                      borderColor: isSelected ? seg.color : colors.border + "40",
+                    },
+                  ]}
+                  onPress={() => {
+                    setSelectedIndex(selectedIndex === i ? null : i);
+                    if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.dot, { backgroundColor: seg.color }]} />
+                  <View style={styles.legendText}>
+                    <Text
+                      style={[
+                        styles.legendLabel,
+                        {
+                          color: isSelected ? colors.foreground : colors.mutedForeground,
+                          fontFamily: isSelected ? "Inter_700Bold" : "Inter_500Medium",
+                        },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {seg.label}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.legendValue,
+                        {
+                          color: isSelected ? seg.color : colors.foreground,
+                          fontFamily: isSelected ? "Inter_700Bold" : "Inter_600SemiBold",
+                        },
+                      ]}
+                    >
+                      {pct}%
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
       </View>
 
       {/* Quick Category Selector Pills */}

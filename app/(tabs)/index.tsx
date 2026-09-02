@@ -1077,7 +1077,7 @@ export default function DashboardScreen() {
               const deptColors = ["#EC4899", "#3B82F6", "#8B5CF6", "#F59E0B"];
               const itemColor = deptColors[idx % deptColors.length];
               const pct = totalExpenses > 0 ? Math.round((dept.total / totalExpenses) * 100) : 0;
-              const cleanName = (dept.department || "Dept").split(" ")[0];
+              const cleanName = dept.department || "General";
 
               return (
                 <View key={dept.department} style={{ gap: 5 }}>
@@ -1401,6 +1401,7 @@ export default function DashboardScreen() {
         period={activePeriod}
         transactions={transactions}
         budgets={budgets}
+        departments={departments}
         nobHealth={nobHealth}
         onNavigate={(route) => router.push(route as any)}
       />

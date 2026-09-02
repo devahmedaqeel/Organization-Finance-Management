@@ -400,6 +400,7 @@ export default function ReportsScreen() {
         period={activePeriod}
         transactions={transactions}
         budgets={budgets}
+        departments={departments}
         nobHealth={nobHealth}
         onNavigate={(route) => router.push(route as any)}
       />

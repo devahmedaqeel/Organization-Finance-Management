@@ -19,7 +19,7 @@ import {
   getNobInsight,
   getExpenseDistributionInsight,
 } from "@/services/DatePeriodService";
-import { Transaction } from "@/types";
+import { Transaction, Department } from "@/context/FinanceContext";
 import { Budget } from "@/services/BudgetService";
 import { SvgX, SvgFileText, SvgChevronDown, SvgTrendingUp, SvgArrowDownRight, SvgArrowUpRight } from "@/components/web/SvgIcons";
 
@@ -35,6 +35,7 @@ interface Props {
   budgets: Budget[];
   nobHealth: NetOperatingBalanceHealth;
   onNavigate?: (tab: string) => void;
+  departments?: Department[];
 }
 
 function fmt(n: number) {
@@ -53,6 +54,7 @@ export function FinancialDrillDownModal({
   budgets,
   nobHealth,
   onNavigate,
+  departments,
 }: Props) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -63,7 +65,11 @@ export function FinancialDrillDownModal({
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   // Budget metrics
-  const totalAllocated = useMemo(() => (budgets || []).reduce((s, b) => s + (b.allocated || 0), 0), [budgets]);
+  const totalAllocated = useMemo(() => {
+    const line = (budgets || []).reduce((s, b) => s + (b.allocated || 0), 0);
+    if (line > 0) return line;
+    return (departments || []).reduce((s, d) => s + (d.budgetAllocated || 0), 0);
+  }, [budgets, departments]);
   const totalSpent = nobHealth?.operatingExpenses ?? 0;
   const budgetRatio = totalAllocated > 0 ? (totalSpent / totalAllocated) * 100 : 0;
   const remainingBudget = totalAllocated - totalSpent;

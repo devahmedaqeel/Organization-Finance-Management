@@ -133,45 +133,65 @@ export function FinancialAnalyticsSuite({
 
           {/* Visual Ring / Gauge */}
           <View style={styles.ringCenterWrap}>
-            <RingProgress
-              percentage={
+            {(() => {
+              const remRatio =
+                budget.isValid && budget.totalAllocated > 0
+                  ? Math.min(100, Math.max(0, (budget.remainingAmount / budget.totalAllocated) * 100))
+                  : 0;
+
+              const spentRatio =
+                budget.isValid && budget.totalAllocated > 0
+                  ? Math.min(100, Math.max(0, (budget.actualSpending / budget.totalAllocated) * 100))
+                  : 0;
+
+              const activePct =
                 !budget.isValid
                   ? 0
                   : budgetMode === "remaining"
-                  ? Math.min(100, Math.max(0, Math.round(((budget.remainingAmount) / budget.totalAllocated) * 100)))
-                  : budget.clampedRingPct
-              }
-              size={135}
-              strokeWidth={13}
-              color={budgetMode === "remaining" ? colors.income : budget.statusColor}
-              centerLabel={
+                  ? remRatio
+                  : budgetMode === "spent"
+                  ? spentRatio
+                  : Math.min(100, Math.max(0, budget.rawUtilizationPct));
+
+              const centerLabel =
                 !budget.isValid
-                  ? "N/A"
+                  ? "0%"
                   : budgetMode === "spent"
                   ? formatCompactCurrency(budget.actualSpending, currency)
                   : budgetMode === "remaining"
                   ? formatCompactCurrency(budget.remainingAmount, currency)
-                  : budget.displayPct
-              }
-              label={
+                  : budget.displayPct;
+
+              const label =
                 budgetMode === "spent"
                   ? "Total Disbursed"
                   : budgetMode === "remaining"
                   ? "Available Buffer"
-                  : "Budget Used"
-              }
-              sublabel={
+                  : "Budget Used";
+
+              const sublabel =
                 !budget.isValid
                   ? "NO CAP"
                   : budgetMode === "spent"
-                  ? `${budget.rawUtilizationPct.toFixed(0)}% OF CAP`
+                  ? `${budget.rawUtilizationPct < 1 && budget.rawUtilizationPct > 0 ? budget.rawUtilizationPct.toFixed(1) : budget.rawUtilizationPct.toFixed(0)}% OF CAP`
                   : budgetMode === "remaining"
-                  ? `${budget.totalAllocated > 0 ? ((budget.remainingAmount / budget.totalAllocated) * 100).toFixed(0) : 0}% LEFT`
+                  ? `${remRatio < 100 && remRatio > 99 ? remRatio.toFixed(1) : remRatio.toFixed(0)}% LEFT`
                   : budget.isOverBudget
                   ? `${formatCompactCurrency(budget.excessAmount, currency)} OVER`
-                  : `${formatCompactCurrency(budget.actualSpending, currency)} SPENT`
-              }
-            />
+                  : `${formatCompactCurrency(budget.actualSpending, currency)} SPENT`;
+
+              return (
+                <RingProgress
+                  percentage={activePct}
+                  size={135}
+                  strokeWidth={13}
+                  color={budgetMode === "remaining" ? colors.income : budget.statusColor}
+                  centerLabel={centerLabel}
+                  label={label}
+                  sublabel={sublabel}
+                />
+              );
+            })()}
           </View>
 
           {/* Segmented Option Controls */}
@@ -330,27 +350,43 @@ export function FinancialAnalyticsSuite({
 
           {/* Visual Ring / Gauge */}
           <View style={styles.ringCenterWrap}>
-            <RingProgress
-              percentage={
+            {(() => {
+              const activePct =
                 !margin.hasRevenue
-                  ? 0
+                  ? margin.operatingExpenses > 0
+                    ? 100
+                    : 0
                   : marginMode === "outflow"
-                  ? Math.max(0, Math.min(100, Math.round(margin.expenseRatioPct)))
-                  : Math.max(0, Math.min(100, Math.round(margin.rawMarginPct)))
-              }
-              size={135}
-              strokeWidth={13}
-              color={marginMode === "outflow" ? colors.expense : margin.statusColor}
-              centerLabel={
+                  ? Math.min(100, Math.max(0, margin.expenseRatioPct))
+                  : marginMode === "net"
+                  ? margin.isLoss
+                    ? Math.min(100, Math.max(0, margin.expenseRatioPct))
+                    : Math.min(100, Math.max(0, margin.rawMarginPct))
+                  : margin.isLoss
+                  ? Math.min(100, Math.max(0, Math.abs(margin.rawMarginPct)))
+                  : Math.min(100, Math.max(0, margin.rawMarginPct));
+
+              const ringColor =
+                marginMode === "outflow"
+                  ? colors.expense
+                  : marginMode === "net"
+                  ? margin.isLoss
+                    ? colors.expense
+                    : colors.income
+                  : margin.statusColor;
+
+              const centerLabel =
                 !margin.hasRevenue
-                  ? "N/A"
+                  ? margin.operatingExpenses > 0
+                    ? "-100.0%"
+                    : "0%"
                   : marginMode === "outflow"
                   ? margin.displayExpenseRatio
                   : marginMode === "net"
                   ? `${margin.isLoss ? "-" : "+"}${formatCompactCurrency(Math.abs(margin.operatingIncome), currency)}`
-                  : margin.displayMargin
-              }
-              label={
+                  : margin.displayMargin;
+
+              const label =
                 marginMode === "outflow"
                   ? "Outflow Ratio"
                   : marginMode === "net"
@@ -359,20 +395,33 @@ export function FinancialAnalyticsSuite({
                     : "Net Cash Surplus"
                   : margin.isLoss
                   ? "Operating Loss"
-                  : "Operating Margin"
-              }
-              sublabel={
+                  : "Operating Margin";
+
+              const sublabel =
                 !margin.hasRevenue
-                  ? "NO REVENUE"
+                  ? margin.operatingExpenses > 0
+                    ? `-${formatCompactCurrency(margin.operatingExpenses, currency)}`
+                    : "PKR 0"
                   : marginMode === "outflow"
                   ? `-${formatCompactCurrency(margin.operatingExpenses, currency)}`
                   : marginMode === "net"
                   ? `${margin.displayMargin} RETAINED`
                   : margin.isLoss
                   ? `-${formatCompactCurrency(Math.abs(margin.operatingIncome), currency)}`
-                  : `+${formatCompactCurrency(margin.operatingIncome, currency)}`
-              }
-            />
+                  : `+${formatCompactCurrency(margin.operatingIncome, currency)}`;
+
+              return (
+                <RingProgress
+                  percentage={activePct}
+                  size={135}
+                  strokeWidth={13}
+                  color={ringColor}
+                  centerLabel={centerLabel}
+                  label={label}
+                  sublabel={sublabel}
+                />
+              );
+            })()}
           </View>
 
           {/* Segmented Option Controls */}
@@ -526,6 +575,7 @@ export function FinancialAnalyticsSuite({
                 centerSub={activeCategoryData ? activeCategoryData.category.toUpperCase() : "TOTAL SPENT"}
                 currency={currency}
                 showChips={false}
+                showLegend={false}
               />
             </View>
           ) : (

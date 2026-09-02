@@ -74,7 +74,9 @@ export function RingProgress({
     };
   }, [clampedPct, showAnimation]);
 
-  const offset = circumference - (circumference * Math.min(Math.max(displayPct, 0), 100)) / 100;
+  // Ensure tiny percentages (e.g. 0.1%) have a clean visible arc, while 0% is completely empty
+  const visualPct = displayPct > 0 && displayPct < 1.2 ? 1.2 : displayPct;
+  const offset = circumference - (circumference * Math.min(Math.max(visualPct, 0), 100)) / 100;
 
   const ringColor =
     color ??
@@ -129,7 +131,8 @@ export function RingProgress({
             strokeWidth={strokeWidth}
             strokeDasharray={`${circumference} ${circumference}`}
             strokeDashoffset={offset}
-            strokeLinecap="round"
+            strokeLinecap={displayPct > 0.4 ? "round" : "butt"}
+            opacity={displayPct > 0 ? 1 : 0}
           />
         </G>
       </Svg>

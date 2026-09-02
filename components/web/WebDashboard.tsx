@@ -842,6 +842,7 @@ export function WebDashboard({
         period={activePeriod}
         transactions={transactions}
         budgets={budgets}
+        departments={departments}
         nobHealth={nobHealth}
         onNavigate={onNavigate}
       />

@@ -375,16 +375,16 @@ export function calculateBudgetUtilization(
     return {
       totalAllocated: 0,
       actualSpending,
-      utilizationPct: null,
+      utilizationPct: 0,
       rawUtilizationPct: 0,
-      displayPct: "N/A",
+      displayPct: "0%",
       clampedRingPct: 0,
       remainingAmount: 0,
       excessAmount: actualSpending,
       status: "no_budget",
-      statusLabel: "No Budget Configured",
+      statusLabel: "No Budget Set",
       statusColor: "#94A3B8",
-      remainingText: "No Budget Configured",
+      remainingText: "No Budget Set",
       isOverBudget: false,
       isValid: false,
       explanation: "No budget cap configured for the selected scope.",
@@ -395,7 +395,13 @@ export function calculateBudgetUtilization(
   const isOverBudget = actualSpending > budgetLimit;
   const remainingAmount = Math.max(0, budgetLimit - actualSpending);
   const excessAmount = Math.max(0, actualSpending - budgetLimit);
-  const clampedRingPct = Math.min(100, Math.max(0, Math.round(rawUtilization)));
+  const clampedRingPct = Math.min(100, Math.max(0, rawUtilization));
+  const displayPct =
+    rawUtilization === 0
+      ? "0%"
+      : rawUtilization < 0.1 && rawUtilization > 0
+      ? "<0.1%"
+      : `${rawUtilization.toFixed(1)}%`;
 
   let status: BudgetStatus = "on_track";
   let statusLabel: "On Track" | "Watch" | "Near Limit" | "Over Budget" = "On Track";
@@ -466,14 +472,14 @@ export function calculateNetOperatingMargin(
       operatingRevenue: 0,
       operatingExpenses,
       operatingIncome,
-      operatingMarginPct: null,
+      operatingMarginPct: operatingExpenses > 0 ? -100 : 0,
       rawMarginPct: operatingExpenses > 0 ? -100 : 0,
-      displayMargin: operatingExpenses > 0 ? "-100.0%" : "N/A",
+      displayMargin: operatingExpenses > 0 ? "-100.0%" : "0%",
       expenseRatioPct: operatingExpenses > 0 ? 100 : 0,
-      displayExpenseRatio: operatingExpenses > 0 ? "100.0%" : "N/A",
+      displayExpenseRatio: operatingExpenses > 0 ? "100.0%" : "0%",
       status: "no_revenue",
-      statusLabel: "No Operating Revenue",
-      statusColor: "#94A3B8",
+      statusLabel: operatingExpenses > 0 ? "Operating Deficit" : "No Transactions",
+      statusColor: operatingExpenses > 0 ? "#F43F5E" : "#94A3B8",
       isLoss: operatingExpenses > 0,
       hasRevenue: false,
       explanationText: operatingExpenses > 0

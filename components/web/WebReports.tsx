@@ -776,6 +776,7 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
           period={activePeriod}
           transactions={transactions}
           budgets={budgets}
+          departments={departments}
           nobHealth={nobHealth}
           onNavigate={onNavigate}
         />
