@@ -33,7 +33,9 @@ LogBox.ignoreLogs([
   /warnOfExpoGoPushUsage/,
 ]);
 
-SplashScreen.preventAutoHideAsync();
+if (Platform.OS !== "web") {
+  SplashScreen.preventAutoHideAsync().catch(() => {});
+}
 
 const queryClient = new QueryClient();
 
@@ -325,7 +327,8 @@ export default function RootLayout() {
     return () => clearTimeout(timer);
   }, [fontsLoaded, fontError]);
 
-  if (!fontsLoaded && !fontError) {
+  // Only block on native mobile — on Web, CSS fonts & system-ui render immediately with zero delay
+  if (Platform.OS !== "web" && !fontsLoaded && !fontError) {
     return <View style={{ flex: 1, backgroundColor: '#0f172a' }} />;
   }
 

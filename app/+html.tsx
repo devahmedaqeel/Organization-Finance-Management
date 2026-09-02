@@ -23,28 +23,16 @@ export default function RootHtml({ children }: PropsWithChildren) {
         <link rel="apple-touch-icon" sizes="180x180" href="/icon.png?v=5" />
         <link rel="shortcut icon" href="/favicon.ico?v=5" />
         
-        {/* Force Clear Stale ServiceWorker and Browser Disk Cache */}
-        <script dangerouslySetInnerHTML={{ __html: `
-          try {
-            if (typeof window !== 'undefined') {
-              if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.getRegistrations().then(function(regs) {
-                  for (var r of regs) r.unregister();
-                });
-              }
-              if ('caches' in window) {
-                caches.keys().then(function(keys) {
-                  for (var k of keys) caches.delete(k);
-                });
-              }
-            }
-          } catch (e) {}
-        `}} />
-        
-        {/* Preconnect and Load Google Inter Font */}
+        {/* Preconnect and Asynchronously Load Google Inter Font (Non-blocking) */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
+          rel="stylesheet"
+          media="print"
+          // @ts-ignore
+          onLoad="this.media='all'"
+        />
 
         <ScrollViewStyleReset />
         <style dangerouslySetInnerHTML={{ __html: `
@@ -126,9 +114,78 @@ export default function RootHtml({ children }: PropsWithChildren) {
             src: url('https://cdn.jsdelivr.net/npm/@expo/vector-icons@14.0.0/build/vendor/react-native-vector-icons/Fonts/Feather.ttf') format('truetype');
             font-display: swap;
           }
+
+          /* Keyframe animation for initial high-speed loader bar */
+          @keyframes ofmProgress {
+            0% { transform: translateX(-100%); }
+            50% { transform: translateX(30%); }
+            100% { transform: translateX(200%); }
+          }
         ` }} />
       </head>
-      <body>{children}</body>
+      <body>
+        <div id="root">
+          {/* Instant Native Splash (Replaced instantly upon React hydration) */}
+          <div
+            id="ofm-initial-splash"
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: "#060D1F",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 999999,
+              fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+            }}
+          >
+            <div
+              style={{
+                width: 68,
+                height: 68,
+                borderRadius: 20,
+                backgroundColor: "#1D4ED8",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                boxShadow: "0 12px 28px rgba(29, 78, 216, 0.45)",
+                marginBottom: 16,
+              }}
+            >
+              <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <line x1="3" y1="9" x2="21" y2="9" />
+                <line x1="9" y1="21" x2="9" y2="9" />
+              </svg>
+            </div>
+            <div style={{ color: "#FFFFFF", fontSize: 18, fontWeight: 800, letterSpacing: "-0.3px", marginBottom: 4 }}>
+              OFM Cloud
+            </div>
+            <div style={{ color: "#94A3B8", fontSize: 11.5, fontWeight: 500, letterSpacing: "0.2px", marginBottom: 26 }}>
+              Enterprise Financial Ledger
+            </div>
+            <div style={{ width: 130, height: 4, borderRadius: 2, backgroundColor: "rgba(255, 255, 255, 0.12)", overflow: "hidden", position: "relative" }}>
+              <div
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  bottom: 0,
+                  width: "50%",
+                  backgroundColor: "#38BDF8",
+                  borderRadius: 2,
+                  animation: "ofmProgress 1.4s infinite ease-in-out",
+                }}
+              />
+            </div>
+          </div>
+          {children}
+        </div>
+      </body>
     </html>
   );
 }

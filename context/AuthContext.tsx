@@ -198,8 +198,31 @@ const AuthContext = createContext<AuthContextValue>({
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // Synchronous optimistic state initialization for Web to eliminate blank screen loading delays
+  const [user, setUser] = useState<User | null>(() => {
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      try {
+        const local = localStorage.getItem("ofm_user");
+        if (local) {
+          const parsed = JSON.parse(local);
+          if (parsed && parsed.email) return parsed;
+        }
+      } catch (e) {}
+    }
+    return null;
+  });
+  const [isLoading, setIsLoading] = useState(() => {
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      try {
+        const local = localStorage.getItem("ofm_user");
+        if (local) {
+          const parsed = JSON.parse(local);
+          if (parsed && parsed.email) return false;
+        }
+      } catch (e) {}
+    }
+    return true;
+  });
 
   // Handle Google redirect result on web (after signInWithRedirect completes)
   useEffect(() => {
