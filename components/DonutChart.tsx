@@ -35,7 +35,10 @@ interface Props {
 
 function fmtVal(n: number) {
   if (Math.abs(n) >= 1000000) return `${(n / 1000000).toFixed(2)}M`;
-  if (Math.abs(n) >= 1000) return `${(n / 1000).toFixed(0)}K`;
+  if (Math.abs(n) >= 1000) {
+    const val = n / 1000;
+    return val % 1 === 0 ? `${val.toFixed(0)}K` : `${val.toFixed(1)}K`;
+  }
   return n.toLocaleString();
 }
 
@@ -121,9 +124,14 @@ export function DonutChart({
   };
 
   const center = size / 2;
-  const outerRadius = size / 2 - 2;
+  const outerRadius = size / 2 - 3;
   const innerRadius = outerRadius - strokeWidth;
   const total = segments.reduce((s, seg) => s + seg.value, 0) || 1;
+
+  // Typography mathematically proportional to donut diameter
+  const amountFontSize = Math.max(13, Math.min(16, Math.round(size * 0.105)));
+  const catFontSize = Math.max(9.5, Math.min(11.5, Math.round(size * 0.075)));
+  const pctFontSize = Math.max(8.5, Math.min(10, Math.round(size * 0.065)));
 
   // Compute exact arc sectors with clean gaps
   const computedSlices = useRef<
@@ -137,12 +145,11 @@ export function DonutChart({
       endAngle: number;
       midAngle: number;
       path: string;
-      popPath: string;
     }[]
   >([]);
 
   let currentAngle = 0;
-  const gap = segments.length > 1 ? 2.0 : 0; // 2 degree clean gap
+  const gap = segments.length > 1 ? 2.5 : 0; // 2.5 degree clean gap
   const sliceList: typeof computedSlices.current = [];
 
   segments.forEach((seg, i) => {
@@ -163,15 +170,6 @@ export function DonutChart({
       endA
     );
 
-    const popPath = describeArcSector(
-      center,
-      center,
-      Math.max(1, innerRadius - 2),
-      outerRadius + 3.5,
-      startA,
-      endA
-    );
-
     sliceList.push({
       index: i,
       label: seg.label,
@@ -182,7 +180,6 @@ export function DonutChart({
       endAngle: currentAngle + span,
       midAngle: midA,
       path,
-      popPath,
     });
 
     currentAngle += span;
@@ -197,7 +194,7 @@ export function DonutChart({
     const dist = Math.sqrt(dx * dx + dy * dy);
 
     // Check if touching inside the ring area
-    if (dist < innerRadius - 8 || dist > outerRadius + 12) {
+    if (dist < innerRadius - 8 || dist > outerRadius + 8) {
       return;
     }
 
@@ -261,9 +258,9 @@ export function DonutChart({
                 return (
                   <Path
                     key={`slice-${slice.index}`}
-                    d={isSelected ? slice.popPath : slice.path}
+                    d={slice.path}
                     fill={slice.color}
-                    opacity={isAnySelected ? (isSelected ? 1.0 : 0.22) : 1.0}
+                    opacity={isAnySelected ? (isSelected ? 1.0 : 0.18) : 1.0}
                     stroke={isSelected ? "#FFFFFF" : "transparent"}
                     strokeWidth={isSelected ? 1.5 : 0}
                     onPress={() => {
@@ -284,11 +281,11 @@ export function DonutChart({
             style={[
               styles.centerTextContainer,
               {
-                width: innerDiameter - 8,
-                height: innerDiameter - 8,
-                top: innerOffset + 4,
-                left: innerOffset + 4,
-                borderRadius: (innerDiameter - 8) / 2,
+                width: innerDiameter - 6,
+                height: innerDiameter - 6,
+                top: innerOffset + 3,
+                left: innerOffset + 3,
+                borderRadius: (innerDiameter - 6) / 2,
                 paddingHorizontal: 4,
               },
             ]}
@@ -303,7 +300,7 @@ export function DonutChart({
                 <Text
                   style={[
                     styles.centerAmount,
-                    { color: activeSegment.color, fontSize: size >= 160 ? 15 : 13 },
+                    { color: activeSegment.color, fontSize: amountFontSize },
                   ]}
                   numberOfLines={1}
                   adjustsFontSizeToFit
@@ -313,7 +310,7 @@ export function DonutChart({
                 <Text
                   style={[
                     styles.centerCategoryTitle,
-                    { color: colors.foreground, fontSize: size >= 160 ? 11 : 9.5 },
+                    { color: colors.foreground, fontSize: catFontSize },
                   ]}
                   numberOfLines={1}
                 >
@@ -324,18 +321,21 @@ export function DonutChart({
                     styles.pctBadge,
                     {
                       backgroundColor: activeSegment.color + "18",
-                      borderColor: activeSegment.color + "35",
+                      borderColor: activeSegment.color + "40",
+                      paddingHorizontal: 7,
+                      paddingVertical: 2,
+                      borderRadius: 12,
                     },
                   ]}
                 >
                   <Text
                     style={[
                       styles.centerPctText,
-                      { color: activeSegment.color, fontSize: size >= 160 ? 9.5 : 8.5 },
+                      { color: activeSegment.color, fontSize: pctFontSize },
                     ]}
                     numberOfLines={1}
                   >
-                    {((activeSegment.value / total) * 100).toFixed(0)}% of total
+                    {((activeSegment.value / total) * 100).toFixed(1)}% of total
                   </Text>
                 </View>
               </View>
@@ -344,7 +344,7 @@ export function DonutChart({
                 <Text
                   style={[
                     styles.centerAmount,
-                    { color: colors.foreground, fontSize: size >= 160 ? 15 : 13 },
+                    { color: colors.foreground, fontSize: amountFontSize },
                   ]}
                   numberOfLines={1}
                   adjustsFontSizeToFit
@@ -354,7 +354,7 @@ export function DonutChart({
                 <Text
                   style={[
                     styles.centerSubText,
-                    { color: colors.mutedForeground, fontSize: size >= 160 ? 10 : 8.5 },
+                    { color: colors.mutedForeground, fontSize: catFontSize - 1 },
                   ]}
                   numberOfLines={1}
                 >

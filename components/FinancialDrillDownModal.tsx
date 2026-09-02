@@ -141,42 +141,49 @@ export function FinancialDrillDownModal({
             </TouchableOpacity>
           </View>
 
-          {/* ─── Tab Navigation Bar ─── */}
-          <View style={[styles.tabBar, { borderBottomColor: colors.border }]}>
-            {[
-              { id: "overview", label: "Executive KPI" },
-              { id: "breakdown", label: type === "budget" ? "Department Ceilings" : "Category Ledger" },
-              { id: "trend", label: "Monthly Timeline" },
-              { id: "ledger", label: "Transaction Audit" },
-            ].map((tab) => {
-              const isSelected = activeTab === tab.id;
-              return (
-                <TouchableOpacity
-                  key={tab.id}
-                  style={[
-                    styles.tabItem,
-                    isSelected && [styles.tabItemActive, { borderBottomColor: colors.primary }],
-                  ]}
-                  onPress={() => {
-                    setActiveTab(tab.id as any);
-                    if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Text
+          {/* ─── Tab Navigation Bar (Horizontal Slider) ─── */}
+          <View style={[styles.tabBarWrap, { borderBottomColor: colors.border }]}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.tabBarScroll}
+            >
+              {[
+                { id: "overview", label: "Executive KPI" },
+                { id: "breakdown", label: type === "budget" ? "Department Ceilings" : "Category Ledger" },
+                { id: "trend", label: "Monthly Timeline" },
+                { id: "ledger", label: "Transaction Audit" },
+              ].map((tab) => {
+                const isSelected = activeTab === tab.id;
+                return (
+                  <TouchableOpacity
+                    key={tab.id}
                     style={[
-                      styles.tabItemText,
-                      {
-                        color: isSelected ? colors.primary : colors.mutedForeground,
-                        fontFamily: isSelected ? "Inter_700Bold" : "Inter_500Medium",
-                      },
+                      styles.tabItem,
+                      isSelected && [styles.tabItemActive, { borderBottomColor: colors.primary }],
                     ]}
+                    onPress={() => {
+                      setActiveTab(tab.id as any);
+                      if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
+                    }}
+                    activeOpacity={0.7}
                   >
-                    {tab.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+                    <Text
+                      style={[
+                        styles.tabItemText,
+                        {
+                          color: isSelected ? colors.primary : colors.mutedForeground,
+                          fontFamily: isSelected ? "Inter_700Bold" : "Inter_600SemiBold",
+                        },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {tab.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
           </View>
 
           {/* ─── Body Content ─── */}
@@ -536,16 +543,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  tabBar: {
-    flexDirection: "row",
+  tabBarWrap: {
     borderBottomWidth: 1,
-    paddingHorizontal: 16,
+  },
+  tabBarScroll: {
+    flexDirection: "row",
+    paddingHorizontal: 14,
+    alignItems: "center",
   },
   tabItem: {
-    paddingVertical: 11,
-    paddingHorizontal: 12,
-    borderBottomWidth: 2,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderBottomWidth: 2.5,
     borderBottomColor: "transparent",
+    marginRight: 6,
   },
   tabItemActive: {},
   tabItemText: {

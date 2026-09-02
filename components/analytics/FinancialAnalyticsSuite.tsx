@@ -565,7 +565,7 @@ export function FinancialAnalyticsSuite({
             <View style={styles.donutWrap}>
               <DonutChart
                 segments={donutSegments}
-                size={135}
+                size={144}
                 strokeWidth={14}
                 centerLabel={
                   activeCategoryData
