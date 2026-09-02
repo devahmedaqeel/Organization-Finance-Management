@@ -265,6 +265,7 @@ function RootLayoutNav() {
         fullScreenGestureEnabled: false, // Edge-only gesture activation
       }}
     >
+      <Stack.Screen name="index" options={{ animation: "fade", gestureEnabled: false }} />
       <Stack.Screen name="onboarding" options={{ animation: "fade", gestureEnabled: false }} />
       <Stack.Screen name="login" options={{ animation: "fade", gestureEnabled: false }} />
       <Stack.Screen name="auth/google" options={{ animation: "fade", gestureEnabled: false }} />
