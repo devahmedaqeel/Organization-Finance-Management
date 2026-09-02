@@ -1,4 +1,4 @@
-type ToastListener = (title: string, message: string) => void;
+type ToastListener = (title: string, message?: string) => void;
 
 let activeToastListener: ToastListener | null = null;
 
@@ -11,8 +11,8 @@ export function registerToastListener(listener: ToastListener) {
   };
 }
 
-export function showFloatingToast(title: string, message: string) {
+export function showFloatingToast(title: string, message?: string) {
   if (activeToastListener) {
-    activeToastListener(title, message);
+    activeToastListener(title, message || "");
   }
 }

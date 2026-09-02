@@ -531,10 +531,10 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (ratio >= 100) {
-          showFloatingToast(`⚠️ Budget Exceeded for ${matchBudget.department} (${matchBudget.category})`);
+          showFloatingToast("Budget Exceeded", `⚠️ ${matchBudget.department} (${matchBudget.category}) has exceeded its allocated limit.`);
           triggerLocalNotification("Budget Limit Exceeded", `${matchBudget.department} has reached ${ratio.toFixed(0)}% of its ${matchBudget.category} budget limit.`);
         } else if (ratio >= 80) {
-          showFloatingToast(`⚡ Budget Alert: ${matchBudget.department} (${matchBudget.category}) is at ${ratio.toFixed(0)}% capacity`);
+          showFloatingToast("Budget Alert", `⚡ ${matchBudget.department} (${matchBudget.category}) is at ${ratio.toFixed(0)}% capacity.`);
         }
       }
 
@@ -543,15 +543,16 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         (d) => d.name?.trim().toLowerCase() === newTx.department?.trim().toLowerCase()
       );
       if (matchDept && (matchDept.budgetAllocated || 0) > 0) {
+        const allocated = matchDept.budgetAllocated || 0;
         const currentDeptSpent = transactions
           .filter((t) => t.type === "expense" && t.department?.trim().toLowerCase() === matchDept.name?.trim().toLowerCase())
           .reduce((s, t) => s + t.amount, 0) + newTx.amount;
-        const deptRatio = (currentDeptSpent / matchDept.budgetAllocated) * 100;
+        const deptRatio = (currentDeptSpent / allocated) * 100;
         if (deptRatio >= 100) {
-          showFloatingToast(`⚠️ ${matchDept.name} Department Budget Cap Exceeded (${deptRatio.toFixed(0)}%)`);
-          triggerLocalNotification("Department Budget Exceeded", `${matchDept.name} has exceeded its allocated ceiling of ${settings.currency} ${matchDept.budgetAllocated.toLocaleString()}.`);
+          showFloatingToast("Department Cap Exceeded", `⚠️ ${matchDept.name} Department Budget Cap Exceeded (${deptRatio.toFixed(0)}%).`);
+          triggerLocalNotification("Department Budget Exceeded", `${matchDept.name} has exceeded its allocated ceiling of ${settings.currency} ${allocated.toLocaleString()}.`);
         } else if (deptRatio >= 80) {
-          showFloatingToast(`⚡ Department Alert: ${matchDept.name} has utilized ${deptRatio.toFixed(0)}% of its budget ceiling.`);
+          showFloatingToast("Department Alert", `⚡ ${matchDept.name} has utilized ${deptRatio.toFixed(0)}% of its budget ceiling.`);
         }
       }
     }
