@@ -381,9 +381,7 @@ export function WebDashboard({
           },
         ]}
       >
-        {/* Ambient Decorative Background Glows */}
-        <View style={styles.ambientGlowTopRight} pointerEvents="none" />
-        <View style={styles.ambientGlowBottomLeft} pointerEvents="none" />
+
 
         {/* Top Row: Title + Privacy Eye + Fiscal Dossier Button */}
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
@@ -547,22 +545,30 @@ export function WebDashboard({
         </View>
 
         {/* Dynamic Cash Flow / Budget Retention Progress Bar & Labels */}
-        <View style={{ gap: 6 }}>
+        <View style={{ gap: 7, marginTop: 2 }}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-            <Text style={{ color: "#E2E8F0", fontSize: isMobile ? 11 : 11.5, fontFamily: "Inter_500Medium" }}>
+            <Text style={{ color: "#CBD5E1", fontSize: isMobile ? 11 : 11.5, fontFamily: "Inter_500Medium" }}>
               {clampedSpendRatio}% Spent of Inflows
             </Text>
             <Text style={{ color: currentHeroIsDeficit ? "#FB7185" : "#34D399", fontSize: isMobile ? 11 : 11.5, fontFamily: "Inter_700Bold" }}>
               {retainedSurplusPct}% Retained Surplus
             </Text>
           </View>
-          <View style={{ height: 5, borderRadius: 2.5, backgroundColor: "rgba(255, 255, 255, 0.15)", overflow: "hidden" }}>
+          <View style={{ height: 6, borderRadius: 3, backgroundColor: "rgba(255, 255, 255, 0.12)", overflow: "hidden" }}>
             <View
               style={{
                 height: "100%",
-                borderRadius: 2.5,
-                width: `${isDeficit ? 100 : clampedSpendRatio}%`,
+                borderRadius: 3,
+                width: `${isDeficit ? 100 : Math.max(clampedSpendRatio, 2.5)}%`,
                 backgroundColor: currentHeroIsDeficit ? "#FB7185" : "#38BDF8",
+                shadowColor: currentHeroIsDeficit ? "#FB7185" : "#38BDF8",
+                shadowOffset: { width: 0, height: 0 },
+                shadowOpacity: 0.9,
+                shadowRadius: 8,
+                // @ts-ignore
+                boxShadow: currentHeroIsDeficit
+                  ? "0 0 10px rgba(251, 113, 133, 0.75)"
+                  : "0 0 10px rgba(56, 189, 248, 0.75)",
               }}
             />
           </View>
@@ -937,21 +943,23 @@ const styles = StyleSheet.create({
   },
   ambientGlowTopRight: {
     position: "absolute",
-    top: -40,
-    right: -40,
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: "rgba(255, 255, 255, 0.12)",
+    top: -50,
+    right: -50,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: "rgba(56, 189, 248, 0.22)",
+    pointerEvents: "none",
   },
   ambientGlowBottomLeft: {
     position: "absolute",
-    bottom: -50,
-    left: -30,
-    width: 130,
-    height: 130,
-    borderRadius: 65,
-    backgroundColor: "rgba(37, 99, 235, 0.3)",
+    bottom: -60,
+    left: -40,
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: "rgba(37, 99, 235, 0.32)",
+    pointerEvents: "none",
   },
   heroTopRow: {
     flexDirection: "row",

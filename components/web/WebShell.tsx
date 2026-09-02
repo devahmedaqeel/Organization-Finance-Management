@@ -531,13 +531,13 @@ export function WebShell() {
                 flexDirection: "row",
                 alignItems: "center",
                 gap: 5,
-                backgroundColor: "rgba(16, 185, 129, 0.1)",
-                borderColor: "rgba(16, 185, 129, 0.3)",
+                backgroundColor: "rgba(16, 185, 129, 0.12)",
+                borderColor: "rgba(16, 185, 129, 0.35)",
                 borderWidth: 1,
-                paddingHorizontal: isMobile ? 6 : 8,
-                paddingVertical: 3.5,
-                borderRadius: 16,
-                marginRight: isMobile ? 2 : 6,
+                paddingHorizontal: isMobile ? 7 : 8,
+                paddingVertical: 4,
+                borderRadius: 14,
+                marginRight: isMobile ? 4 : 6,
                 flexShrink: 0,
               }}
             >
@@ -549,60 +549,19 @@ export function WebShell() {
                   backgroundColor: "#10B981",
                 }}
               />
-              {!isMobile && (
-                <Text
-                  style={{
-                    fontSize: 10.5,
-                    fontFamily: "Inter_600SemiBold",
-                    color: "#10B981",
-                    letterSpacing: 0.2,
-                  }}
-                >
-                  Live Cloud
-                </Text>
-              )}
+              <Text
+                style={{
+                  fontSize: 10.5,
+                  fontFamily: "Inter_600SemiBold",
+                  color: "#10B981",
+                  letterSpacing: 0.2,
+                }}
+              >
+                {isMobile ? "Live" : "Live Cloud"}
+              </Text>
             </View>
 
-            {/* Quick Action on Mobile */}
-            {canEdit && isMobile && (
-              <TouchableOpacity
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 4,
-                  backgroundColor: colors.primary,
-                  paddingHorizontal: 9,
-                  paddingVertical: 5.5,
-                  borderRadius: 8,
-                  cursor: "pointer" as any,
-                }}
-                onPress={() => handleOpenTx("income")}
-                activeOpacity={0.8}
-              >
-                <SvgPlus size={13} color="#FFFFFF" />
-                <Text style={{ color: "#FFFFFF", fontSize: 11, fontFamily: "Inter_700Bold" }}>Record</Text>
-              </TouchableOpacity>
-            )}
 
-            {canEdit && !isMobile && (
-              <>
-                <TouchableOpacity
-                  style={[styles.quickAddBtn, { backgroundColor: colors.income }]}
-                  onPress={() => handleOpenTx("income")}
-                >
-                  <SvgArrowUpRight size={14} color="#FFFFFF" />
-                  <Text style={styles.quickAddText}>+ Inflow</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.quickAddBtn, { backgroundColor: colors.expense }]}
-                  onPress={() => handleOpenTx("expense")}
-                >
-                  <SvgArrowDownLeft size={14} color="#FFFFFF" />
-                  <Text style={styles.quickAddText}>+ Outflow</Text>
-                </TouchableOpacity>
-              </>
-            )}
 
             {/* Theme Toggle */}
             <TouchableOpacity

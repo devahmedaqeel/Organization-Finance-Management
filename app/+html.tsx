@@ -115,6 +115,32 @@ export default function RootHtml({ children }: PropsWithChildren) {
             font-display: swap;
           }
 
+          /* Smooth Luxury Ambient Blue Glows for Corporate Cards (Prevents harsh circular discs) */
+          .ofm-ambient-glow-tr {
+            position: absolute !important;
+            top: -70px !important;
+            right: -70px !important;
+            width: 240px !important;
+            height: 240px !important;
+            border-radius: 50% !important;
+            background: radial-gradient(circle, rgba(56, 189, 248, 0.28) 0%, rgba(29, 78, 216, 0.12) 45%, transparent 75%) !important;
+            filter: blur(40px) !important;
+            -webkit-filter: blur(40px) !important;
+            pointer-events: none !important;
+          }
+          .ofm-ambient-glow-bl {
+            position: absolute !important;
+            bottom: -70px !important;
+            left: -60px !important;
+            width: 240px !important;
+            height: 240px !important;
+            border-radius: 50% !important;
+            background: radial-gradient(circle, rgba(37, 99, 235, 0.38) 0%, rgba(29, 78, 216, 0.15) 45%, transparent 75%) !important;
+            filter: blur(45px) !important;
+            -webkit-filter: blur(45px) !important;
+            pointer-events: none !important;
+          }
+
           /* Keyframe animation for initial high-speed loader bar */
           @keyframes ofmProgress {
             0% { transform: translateX(-100%); }
