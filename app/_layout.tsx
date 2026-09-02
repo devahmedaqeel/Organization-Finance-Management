@@ -11,7 +11,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack, router } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { StyleSheet, View, Text, Platform, useColorScheme, Animated, TouchableOpacity, LogBox } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 // KeyboardProvider is only safe on native — loaded dynamically to avoid web crash
@@ -234,21 +234,17 @@ function RootLayoutNav() {
     }).catch(() => {});
   }, []);
 
-  // Route once both auth and onboarding checks are complete
+  // Handle session termination on native mobile
+  const prevUserRef = useRef<boolean>(false);
   useEffect(() => {
-    if (isLoading || hasSeenOnboarding === null) return;
-    if (isAuthRoute) return;
-
+    if (isLoading) return;
     if (Platform.OS !== "web") {
-      if (user) {
-        router.replace("/(tabs)");
-      } else if (hasSeenOnboarding) {
+      if (prevUserRef.current && !user) {
         router.replace("/login");
-      } else {
-        router.replace("/onboarding");
       }
+      prevUserRef.current = Boolean(user);
     }
-  }, [user?.id, isLoading, hasSeenOnboarding, isAuthRoute]);
+  }, [user, isLoading]);
 
   // On Web platform: always render the complete enterprise WebShell
   if (Platform.OS === "web" && !isAuthRoute) {

@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from "react";
 import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../config/firebase";
 import { useAuth } from "./AuthContext";
@@ -91,7 +91,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     return () => unsub();
   }, [user]);
 
-  const updateSettings = async (patch: Partial<Settings>) => {
+  const updateSettings = useCallback(async (patch: Partial<Settings>) => {
     let nextSettings: Settings = DEFAULT_SETTINGS;
     setSettings((prev) => {
       nextSettings = { ...prev, ...patch };
@@ -105,10 +105,15 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       console.log("Settings cloud write notice (saved offline):", err);
     }
-  };
+  }, [user?.organizationId, user?.organization]);
+
+  const value = useMemo(
+    () => ({ settings, updateSettings, isLoading }),
+    [settings, updateSettings, isLoading]
+  );
 
   return (
-    <SettingsContext.Provider value={{ settings, updateSettings, isLoading }}>
+    <SettingsContext.Provider value={value}>
       {children}
     </SettingsContext.Provider>
   );

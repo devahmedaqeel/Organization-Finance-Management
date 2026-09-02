@@ -292,7 +292,8 @@ export function subscribeToNotifications(
   try {
     const q = query(
       collection(db, "notifications"),
-      where("organizationId", "==", orgId)
+      where("organizationId", "==", orgId),
+      limit(25)
     );
 
     const unsubscribe = onSnapshot(

@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { StyleSheet, Text, TouchableOpacity, View, ScrollView, useWindowDimensions, Modal, Image } from "react-native";
+import React, { useState, useEffect, useCallback, Suspense, lazy } from "react";
+import { StyleSheet, Text, TouchableOpacity, View, ScrollView, useWindowDimensions, Modal, Image, ActivityIndicator } from "react-native";
 import { useAuth } from "@/context/AuthContext";
 import { useFinance } from "@/context/FinanceContext";
 import { useSettings } from "@/context/SettingsContext";
@@ -27,18 +27,31 @@ import {
 } from "./SvgIcons";
 
 import { WebDashboard } from "./WebDashboard";
-import { WebIncome } from "./WebIncome";
-import { WebExpenses } from "./WebExpenses";
-import { WebTransactions } from "./WebTransactions";
-import { WebBudgets } from "./WebBudgets";
-import { WebDepartments } from "./WebDepartments";
-import { WebPayroll } from "./WebPayroll";
-import { WebTeam } from "./WebTeam";
-import { WebReports } from "./WebReports";
-import { WebAIInsights } from "./WebAIInsights";
-import { WebSettings } from "./WebSettings";
 import { WebAuth } from "./WebAuth";
 import { OpenInAppBanner } from "./OpenInAppBanner";
+
+// Code-split secondary tabs so startup only parses the Dashboard shell
+const WebIncome = lazy(() => import("./WebIncome").then((m) => ({ default: m.WebIncome })));
+const WebExpenses = lazy(() => import("./WebExpenses").then((m) => ({ default: m.WebExpenses })));
+const WebTransactions = lazy(() => import("./WebTransactions").then((m) => ({ default: m.WebTransactions })));
+const WebBudgets = lazy(() => import("./WebBudgets").then((m) => ({ default: m.WebBudgets })));
+const WebDepartments = lazy(() => import("./WebDepartments").then((m) => ({ default: m.WebDepartments })));
+const WebPayroll = lazy(() => import("./WebPayroll").then((m) => ({ default: m.WebPayroll })));
+const WebTeam = lazy(() => import("./WebTeam").then((m) => ({ default: m.WebTeam })));
+const WebReports = lazy(() => import("./WebReports").then((m) => ({ default: m.WebReports })));
+const WebAIInsights = lazy(() => import("./WebAIInsights").then((m) => ({ default: m.WebAIInsights })));
+const WebSettings = lazy(() => import("./WebSettings").then((m) => ({ default: m.WebSettings })));
+
+function TabLoadingSkeleton() {
+  return (
+    <View style={{ flex: 1, minHeight: 380, justifyContent: "center", alignItems: "center", padding: 24 }}>
+      <ActivityIndicator size="large" color="#3B82F6" />
+      <Text style={{ marginTop: 12, color: "#94A3B8", fontSize: 13, fontFamily: "Inter_500Medium" }}>
+        Loading module...
+      </Text>
+    </View>
+  );
+}
 
 import { WebTransactionModal } from "./modals/WebTransactionModal";
 import { WebBudgetModal } from "./modals/WebBudgetModal";
@@ -708,16 +721,56 @@ export function WebShell() {
                 onOpenBudgetModal={() => setBudgetModalVisible(true)}
               />
             )}
-            {activeTab === "income" && <WebIncome onOpenReport={() => navigateToTab("reports")} />}
-            {activeTab === "expenses" && <WebExpenses onOpenReport={() => navigateToTab("reports")} />}
-            {activeTab === "transactions" && <WebTransactions />}
-            {activeTab === "budgets" && <WebBudgets />}
-            {activeTab === "departments" && <WebDepartments />}
-            {activeTab === "payroll" && <WebPayroll />}
-            {activeTab === "team" && <WebTeam />}
-            {activeTab === "reports" && <WebReports onNavigate={(route) => navigateToTab(route as WebTabKey)} />}
-            {activeTab === "ai-insights" && <WebAIInsights />}
-            {activeTab === "settings" && <WebSettings />}
+            {activeTab === "income" && (
+              <Suspense fallback={<TabLoadingSkeleton />}>
+                <WebIncome onOpenReport={() => navigateToTab("reports")} />
+              </Suspense>
+            )}
+            {activeTab === "expenses" && (
+              <Suspense fallback={<TabLoadingSkeleton />}>
+                <WebExpenses onOpenReport={() => navigateToTab("reports")} />
+              </Suspense>
+            )}
+            {activeTab === "transactions" && (
+              <Suspense fallback={<TabLoadingSkeleton />}>
+                <WebTransactions />
+              </Suspense>
+            )}
+            {activeTab === "budgets" && (
+              <Suspense fallback={<TabLoadingSkeleton />}>
+                <WebBudgets />
+              </Suspense>
+            )}
+            {activeTab === "departments" && (
+              <Suspense fallback={<TabLoadingSkeleton />}>
+                <WebDepartments />
+              </Suspense>
+            )}
+            {activeTab === "payroll" && (
+              <Suspense fallback={<TabLoadingSkeleton />}>
+                <WebPayroll />
+              </Suspense>
+            )}
+            {activeTab === "team" && (
+              <Suspense fallback={<TabLoadingSkeleton />}>
+                <WebTeam />
+              </Suspense>
+            )}
+            {activeTab === "reports" && (
+              <Suspense fallback={<TabLoadingSkeleton />}>
+                <WebReports onNavigate={(route) => navigateToTab(route as WebTabKey)} />
+              </Suspense>
+            )}
+            {activeTab === "ai-insights" && (
+              <Suspense fallback={<TabLoadingSkeleton />}>
+                <WebAIInsights />
+              </Suspense>
+            )}
+            {activeTab === "settings" && (
+              <Suspense fallback={<TabLoadingSkeleton />}>
+                <WebSettings />
+              </Suspense>
+            )}
             {!VALID_TABS.includes(activeTab) && (
               <WebDashboard
                 onNavigate={(route) => navigateToTab(route as WebTabKey)}

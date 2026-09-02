@@ -931,8 +931,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Authoritative Aggregate Computations via Single Source of Truth
-  const totalIncome = calculateTotalIncome(transactions);
-  const totalExpenses = calculateTotalExpenses(transactions);
+  const totalIncome = useMemo(() => calculateTotalIncome(transactions), [transactions]);
+  const totalExpenses = useMemo(() => calculateTotalExpenses(transactions), [transactions]);
 
   const budgetsWithSpent = useMemo(() => {
     return budgets.map((b) => {
@@ -953,46 +953,75 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   
   // Real-time Net Balance includes Total Income + Total Allocated Budget - Total Expenses
   // Whenever Income OR Budget is added/allocated, this Top Balance increases immediately!
-  const netBalance = (totalIncome + totalBudgeted) - totalExpenses;
-  const actualCash = calculateActualCash(transactions);
-  const totalBudgetSpent = calculateBudgetUsed(transactions, budgets);
-  const totalBudgetRemaining = calculateBudgetRemaining(totalBudgeted, totalBudgetSpent);
-  const budgetUtilization = totalBudgeted > 0 ? (totalBudgetSpent / totalBudgeted) * 100 : 0;
-  const unreadNotificationCount = notifications.filter((n) => !n.read).length;
+  const netBalance = useMemo(() => (totalIncome + totalBudgeted) - totalExpenses, [totalIncome, totalBudgeted, totalExpenses]);
+  const actualCash = useMemo(() => calculateActualCash(transactions), [transactions]);
+  const totalBudgetSpent = useMemo(() => calculateBudgetUsed(transactions, budgets), [transactions, budgets]);
+  const totalBudgetRemaining = useMemo(() => calculateBudgetRemaining(totalBudgeted, totalBudgetSpent), [totalBudgeted, totalBudgetSpent]);
+  const budgetUtilization = useMemo(() => totalBudgeted > 0 ? (totalBudgetSpent / totalBudgeted) * 100 : 0, [totalBudgeted, totalBudgetSpent]);
+  const unreadNotificationCount = useMemo(() => notifications.filter((n) => !n.read).length, [notifications]);
+
+  const financeValue = useMemo(() => ({
+    transactions,
+    budgets: budgetsWithSpent,
+    payroll,
+    departments,
+    notifications,
+    unreadNotificationCount,
+    syncStatus,
+    addTransaction,
+    updateTransaction,
+    deleteTransaction,
+    addBudget,
+    updateBudget,
+    deleteBudget,
+    addPayroll,
+    updatePayroll,
+    deletePayroll,
+    addDepartment,
+    updateDepartment,
+    deleteDepartment,
+    totalIncome,
+    totalExpenses,
+    netBalance,
+    budgetUtilization,
+    totalBudgeted,
+    totalLineBudgeted,
+    totalDeptBudgeted,
+    totalBudgetSpent,
+    totalBudgetRemaining,
+  }), [
+    transactions,
+    budgetsWithSpent,
+    payroll,
+    departments,
+    notifications,
+    unreadNotificationCount,
+    syncStatus,
+    addTransaction,
+    updateTransaction,
+    deleteTransaction,
+    addBudget,
+    updateBudget,
+    deleteBudget,
+    addPayroll,
+    updatePayroll,
+    deletePayroll,
+    addDepartment,
+    updateDepartment,
+    deleteDepartment,
+    totalIncome,
+    totalExpenses,
+    netBalance,
+    budgetUtilization,
+    totalBudgeted,
+    totalLineBudgeted,
+    totalDeptBudgeted,
+    totalBudgetSpent,
+    totalBudgetRemaining,
+  ]);
 
   return (
-    <FinanceContext.Provider
-      value={{
-        transactions,
-        budgets: budgetsWithSpent,
-        payroll,
-        departments,
-        notifications,
-        unreadNotificationCount,
-        syncStatus,
-        addTransaction,
-        updateTransaction,
-        deleteTransaction,
-        addBudget,
-        updateBudget,
-        deleteBudget,
-        addPayroll,
-        updatePayroll,
-        deletePayroll,
-        addDepartment,
-        updateDepartment,
-        deleteDepartment,
-        totalIncome,
-        totalExpenses,
-        netBalance,
-        budgetUtilization,
-        totalBudgeted,
-        totalLineBudgeted,
-        totalDeptBudgeted,
-        totalBudgetSpent,
-        totalBudgetRemaining,
-      }}
-    >
+    <FinanceContext.Provider value={financeValue}>
       {children}
     </FinanceContext.Provider>
   );
