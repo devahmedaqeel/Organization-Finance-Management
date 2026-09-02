@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import {
   StyleSheet,
   Text,
@@ -27,6 +27,10 @@ interface Props {
   currency?: string;
   showChips?: boolean;
   showLegend?: boolean;
+  selectedLabel?: string | null;
+  onSelectLabel?: (label: string | null) => void;
+  selectedIndex?: number | null;
+  onSelectIndex?: (index: number | null) => void;
 }
 
 function fmtVal(n: number) {
@@ -84,9 +88,37 @@ export function DonutChart({
   currency = "PKR",
   showChips = true,
   showLegend = true,
+  selectedLabel,
+  onSelectLabel,
+  selectedIndex,
+  onSelectIndex,
 }: Props) {
   const colors = useColors();
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [internalIndex, setInternalIndex] = useState<number | null>(null);
+
+  // Controlled or uncontrolled selection
+  const effectiveIndex = useMemo(() => {
+    if (selectedIndex !== undefined && selectedIndex !== null) return selectedIndex;
+    if (selectedLabel !== undefined) {
+      if (!selectedLabel) return null;
+      const idx = segments.findIndex(
+        (s) => s.label.trim().toLowerCase() === selectedLabel.trim().toLowerCase()
+      );
+      return idx >= 0 ? idx : null;
+    }
+    return internalIndex;
+  }, [selectedIndex, selectedLabel, segments, internalIndex]);
+
+  const setEffectiveIndex = (idx: number | null) => {
+    setInternalIndex(idx);
+    if (onSelectIndex) {
+      onSelectIndex(idx);
+    }
+    if (onSelectLabel) {
+      const label = idx !== null && idx < segments.length ? segments[idx].label : null;
+      onSelectLabel(label);
+    }
+  };
 
   const center = size / 2;
   const outerRadius = size / 2 - 2;
@@ -131,6 +163,15 @@ export function DonutChart({
       endA
     );
 
+    const popPath = describeArcSector(
+      center,
+      center,
+      Math.max(1, innerRadius - 2),
+      outerRadius + 3.5,
+      startA,
+      endA
+    );
+
     sliceList.push({
       index: i,
       label: seg.label,
@@ -141,6 +182,7 @@ export function DonutChart({
       endAngle: currentAngle + span,
       midAngle: midA,
       path,
+      popPath,
     });
 
     currentAngle += span;
@@ -167,8 +209,8 @@ export function DonutChart({
       (s) => deg >= s.startAngle && deg < s.endAngle
     );
 
-    if (found && found.index !== selectedIndex) {
-      setSelectedIndex(found.index);
+    if (found && found.index !== effectiveIndex) {
+      setEffectiveIndex(found.index);
       if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
     }
   };
@@ -189,8 +231,8 @@ export function DonutChart({
   const innerOffset = (size - innerDiameter) / 2;
 
   const activeSegment =
-    selectedIndex !== null && selectedIndex < segments.length
-      ? segments[selectedIndex]
+    effectiveIndex !== null && effectiveIndex < segments.length
+      ? segments[effectiveIndex]
       : null;
 
   return (
@@ -213,18 +255,20 @@ export function DonutChart({
             {/* Clean Concentric SVG Arc Sectors */}
             <G>
               {sliceList.map((slice) => {
-                const isSelected = selectedIndex === slice.index;
-                const isAnySelected = selectedIndex !== null;
+                const isSelected = effectiveIndex === slice.index;
+                const isAnySelected = effectiveIndex !== null;
 
                 return (
                   <Path
                     key={`slice-${slice.index}`}
-                    d={slice.path}
+                    d={isSelected ? slice.popPath : slice.path}
                     fill={slice.color}
-                    opacity={isAnySelected ? (isSelected ? 1 : 0.28) : 1}
+                    opacity={isAnySelected ? (isSelected ? 1.0 : 0.22) : 1.0}
+                    stroke={isSelected ? "#FFFFFF" : "transparent"}
+                    strokeWidth={isSelected ? 1.5 : 0}
                     onPress={() => {
-                      setSelectedIndex(
-                        selectedIndex === slice.index ? null : slice.index
+                      setEffectiveIndex(
+                        effectiveIndex === slice.index ? null : slice.index
                       );
                       if (Platform.OS !== "web")
                         Haptics.selectionAsync().catch(() => {});
@@ -249,7 +293,7 @@ export function DonutChart({
               },
             ]}
             onPress={() => {
-              setSelectedIndex(null);
+              setEffectiveIndex(null);
               if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
             }}
             activeOpacity={0.8}

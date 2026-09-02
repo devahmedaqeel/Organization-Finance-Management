@@ -576,6 +576,8 @@ export function FinancialAnalyticsSuite({
                 currency={currency}
                 showChips={false}
                 showLegend={false}
+                selectedLabel={selectedCategory}
+                onSelectLabel={(cat) => setSelectedCategory(cat)}
               />
             </View>
           ) : (
@@ -589,15 +591,19 @@ export function FinancialAnalyticsSuite({
           {/* Ranked Category List with Mini Progress Bars */}
           <View style={styles.categoryRankedList}>
             {(showAllCategories ? distribution.categories : distribution.categories.slice(0, 3)).map((cat) => {
-              const isSelected = selectedCategory === cat.category;
+              const isSelected = selectedCategory?.trim().toLowerCase() === cat.category.trim().toLowerCase();
+              const isAnySelected = selectedCategory !== null;
+
               return (
                 <TouchableOpacity
                   key={cat.category}
                   style={[
                     styles.rankedRow,
                     {
-                      backgroundColor: isSelected ? colors.primary + "10" : "transparent",
-                      borderColor: isSelected ? colors.primary + "30" : colors.border + "40",
+                      backgroundColor: isSelected ? cat.color + "16" : "transparent",
+                      borderColor: isSelected ? cat.color : colors.border + "40",
+                      borderWidth: isSelected ? 1.5 : 1,
+                      opacity: isAnySelected ? (isSelected ? 1.0 : 0.55) : 1.0,
                     },
                   ]}
                   onPress={() => {
@@ -607,17 +613,50 @@ export function FinancialAnalyticsSuite({
                   activeOpacity={0.7}
                 >
                   <View style={styles.rankedLeft}>
-                    <View style={[styles.catColorDot, { backgroundColor: cat.color }]} />
-                    <Text style={[styles.rankedCatName, { color: colors.foreground }]} numberOfLines={1}>
+                    <View
+                      style={[
+                        styles.catColorDot,
+                        {
+                          backgroundColor: cat.color,
+                          transform: [{ scale: isSelected ? 1.35 : 1.0 }],
+                        },
+                      ]}
+                    />
+                    <Text
+                      style={[
+                        styles.rankedCatName,
+                        {
+                          color: isSelected ? cat.color : colors.foreground,
+                          fontFamily: isSelected ? "Inter_700Bold" : "Inter_600SemiBold",
+                        },
+                      ]}
+                      numberOfLines={1}
+                    >
                       {cat.category}
                     </Text>
                   </View>
 
                   <View style={styles.rankedRight}>
-                    <Text style={[styles.rankedAmount, { color: colors.foreground }]}>
+                    <Text
+                      style={[
+                        styles.rankedAmount,
+                        {
+                          color: colors.foreground,
+                          fontFamily: isSelected ? "Inter_700Bold" : "Inter_600SemiBold",
+                        },
+                      ]}
+                    >
                       {formatCompactCurrency(cat.amount, currency)}
                     </Text>
-                    <Text style={[styles.rankedPct, { color: colors.mutedForeground }]}>
+                    <Text
+                      style={[
+                        styles.rankedPct,
+                        {
+                          color: isSelected ? cat.color : colors.mutedForeground,
+                          fontFamily: isSelected ? "Inter_700Bold" : "Inter_500Medium",
+                        },
+                      ]}
+                    >
                       {cat.displayPct}
                     </Text>
                   </View>
