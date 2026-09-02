@@ -257,17 +257,24 @@ function RootLayoutNav() {
 
   // Mobile App Native Stack / Web Unauthenticated / Web Auth Route
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="onboarding" options={{ animation: "fade" }} />
-      <Stack.Screen name="login" options={{ animation: "fade" }} />
-      <Stack.Screen name="auth/google" options={{ animation: "fade" }} />
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="budget" options={{ presentation: "card", animation: "slide_from_right" }} />
-      <Stack.Screen name="payroll" options={{ presentation: "card", animation: "slide_from_right" }} />
-      <Stack.Screen name="departments" options={{ presentation: "card", animation: "slide_from_right" }} />
-      <Stack.Screen name="ai-insights" options={{ presentation: "card", animation: "slide_from_right" }} />
-      <Stack.Screen name="settings" options={{ presentation: "card", animation: "slide_from_right" }} />
-      <Stack.Screen name="team" options={{ presentation: "card", animation: "slide_from_right" }} />
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        gestureEnabled: true,
+        animation: "slide_from_right",
+        fullScreenGestureEnabled: false, // Edge-only gesture activation
+      }}
+    >
+      <Stack.Screen name="onboarding" options={{ animation: "fade", gestureEnabled: false }} />
+      <Stack.Screen name="login" options={{ animation: "fade", gestureEnabled: false }} />
+      <Stack.Screen name="auth/google" options={{ animation: "fade", gestureEnabled: false }} />
+      <Stack.Screen name="(tabs)" options={{ gestureEnabled: false }} />
+      <Stack.Screen name="budget" options={{ presentation: "card", animation: "slide_from_right", gestureEnabled: true }} />
+      <Stack.Screen name="payroll" options={{ presentation: "card", animation: "slide_from_right", gestureEnabled: true }} />
+      <Stack.Screen name="departments" options={{ presentation: "card", animation: "slide_from_right", gestureEnabled: true }} />
+      <Stack.Screen name="ai-insights" options={{ presentation: "card", animation: "slide_from_right", gestureEnabled: true }} />
+      <Stack.Screen name="settings" options={{ presentation: "card", animation: "slide_from_right", gestureEnabled: true }} />
+      <Stack.Screen name="team" options={{ presentation: "card", animation: "slide_from_right", gestureEnabled: true }} />
     </Stack>
   );
 }

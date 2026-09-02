@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { StyleSheet, Text, TouchableOpacity, View, ScrollView, useWindowDimensions, Modal, Image } from "react-native";
 import { useAuth } from "@/context/AuthContext";
 import { useFinance } from "@/context/FinanceContext";
@@ -44,6 +44,8 @@ import { WebTransactionModal } from "./modals/WebTransactionModal";
 import { WebBudgetModal } from "./modals/WebBudgetModal";
 import { WebPageTransition } from "./animations/WebPageTransition";
 import { injectWebMicroAnimations } from "./animations/webStyles";
+import { useEdgeSwipeBack } from "./navigation/useEdgeSwipeBack";
+import { EdgeSwipeVisualIndicator } from "./navigation/EdgeSwipeVisualIndicator";
 
 export type WebTabKey =
   | "dashboard"
@@ -86,13 +88,87 @@ export function WebShell() {
   const [txModalType, setTxModalType] = useState<"income" | "expense">("income");
   const [budgetModalVisible, setBudgetModalVisible] = useState(false);
 
+  const [tabHistory, setTabHistory] = useState<WebTabKey[]>(["dashboard"]);
+
+  const navigateToTab = useCallback((tab: WebTabKey) => {
+    setActiveTab((prev) => {
+      if (prev === tab) return prev;
+      setTabHistory((h) => [...h, tab]);
+      if (typeof window !== "undefined" && window.history) {
+        window.history.pushState({ tab }, "", "?tab=" + tab);
+      }
+      return tab;
+    });
+  }, []);
+
+  const handleGoBack = useCallback(() => {
+    // 1. Intelligent Modal Priority: Close drawer or modals first
+    if (mobileDrawerOpen) {
+      setMobileDrawerOpen(false);
+      return true;
+    }
+    if (txModalVisible) {
+      setTxModalVisible(false);
+      return true;
+    }
+    if (budgetModalVisible) {
+      setBudgetModalVisible(false);
+      return true;
+    }
+
+    // 2. Navigation Stack Awareness: Pop previous tab if available
+    let handled = false;
+    setTabHistory((prevHistory) => {
+      if (prevHistory.length > 1) {
+        const nextHistory = [...prevHistory];
+        nextHistory.pop();
+        const targetTab = nextHistory[nextHistory.length - 1];
+        setActiveTab(targetTab);
+        if (typeof window !== "undefined" && window.history) {
+          window.history.replaceState({ tab: targetTab }, "", "?tab=" + targetTab);
+        }
+        handled = true;
+        return nextHistory;
+      }
+      return prevHistory;
+    });
+
+    return handled;
+  }, [mobileDrawerOpen, txModalVisible, budgetModalVisible]);
+
+  const canGoBack = mobileDrawerOpen || txModalVisible || budgetModalVisible || tabHistory.length > 1;
+
+  const { isSwiping, swipeProgress } = useEdgeSwipeBack({
+    enabled: isMobile,
+    edgeZone: 30,
+    thresholdDistance: 65,
+    thresholdVelocity: 0.3,
+    onBack: handleGoBack,
+    canGoBack,
+  });
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get("tab") as WebTabKey;
       if (tabParam) {
         setActiveTab(tabParam);
+        setTabHistory(["dashboard", tabParam]);
       }
+
+      const handlePopState = (e: PopStateEvent) => {
+        if (e.state && e.state.tab) {
+          setActiveTab(e.state.tab);
+          setTabHistory((prev) => {
+            if (prev.length > 1 && prev[prev.length - 2] === e.state.tab) {
+              return prev.slice(0, -1);
+            }
+            return [...prev, e.state.tab];
+          });
+        }
+      };
+      window.addEventListener("popstate", handlePopState);
+      return () => window.removeEventListener("popstate", handlePopState);
     }
   }, []);
 
@@ -187,7 +263,7 @@ export function WebShell() {
                 },
               ]}
               onPress={() => {
-                setActiveTab(item.id);
+                navigateToTab(item.id);
                 if (isDrawer) setMobileDrawerOpen(false);
               }}
               title={(!isDrawer && sidebarCollapsed) ? item.label : undefined}
@@ -209,25 +285,11 @@ export function WebShell() {
                 </Text>
               )}
 
-              {(isDrawer || !sidebarCollapsed) && item.badge !== undefined && (
-                <View
-                  style={[
-                    styles.navBadge,
-                    {
-                      backgroundColor: item.badgeColor ? item.badgeColor + "20" : colors.muted,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.navBadgeText,
-                      { color: item.badgeColor || colors.mutedForeground },
-                    ]}
-                  >
-                    {item.badge}
-                  </Text>
+              {Boolean(item.badge) && (!isDrawer && sidebarCollapsed ? null : (
+                <View style={[styles.navBadge, { backgroundColor: item.badgeColor || colors.muted }]}>
+                  <Text style={styles.navBadgeText}>{item.badge}</Text>
                 </View>
-              )}
+              ))}
             </TouchableOpacity>
           );
         })}
@@ -237,6 +299,9 @@ export function WebShell() {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
+      {/* Mobile Edge Swipe Back Visual Indicator */}
+      <EdgeSwipeVisualIndicator isSwiping={isSwiping} progress={swipeProgress} />
+
       {/* ─── DESKTOP / TABLET SIDEBAR ─── */}
       {!isMobile && (
         <View
@@ -259,7 +324,7 @@ export function WebShell() {
           >
             <TouchableOpacity
               style={{ flexDirection: sidebarCollapsed ? "column" : "row", alignItems: "center", gap: sidebarCollapsed ? 0 : 12, flex: 1, minWidth: 0 }}
-              onPress={() => setActiveTab("dashboard")}
+              onPress={() => navigateToTab("dashboard")}
               activeOpacity={0.8}
             >
               <View
@@ -471,6 +536,24 @@ export function WebShell() {
             {/* Mobile Brand / Current Tab Title */}
             {isMobile ? (
               <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
+                {tabHistory.length > 1 && (
+                  <TouchableOpacity
+                    onPress={handleGoBack}
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: 8,
+                      backgroundColor: colors.primary + "18",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      marginRight: 2,
+                    }}
+                    activeOpacity={0.7}
+                    accessibilityLabel="Back"
+                  >
+                    <SvgChevronLeft size={16} color={colors.primary} />
+                  </TouchableOpacity>
+                )}
                 <View
                   style={[
                     styles.brandLogoWrap,
@@ -583,19 +666,19 @@ export function WebShell() {
           <WebPageTransition pageKey={activeTab}>
             {activeTab === "dashboard" && (
               <WebDashboard
-                onNavigate={(route) => setActiveTab(route as WebTabKey)}
+                onNavigate={(route) => navigateToTab(route as WebTabKey)}
                 onOpenTransactionModal={handleOpenTx}
                 onOpenBudgetModal={() => setBudgetModalVisible(true)}
               />
             )}
-            {activeTab === "income" && <WebIncome onOpenReport={() => setActiveTab("reports")} />}
-            {activeTab === "expenses" && <WebExpenses onOpenReport={() => setActiveTab("reports")} />}
+            {activeTab === "income" && <WebIncome onOpenReport={() => navigateToTab("reports")} />}
+            {activeTab === "expenses" && <WebExpenses onOpenReport={() => navigateToTab("reports")} />}
             {activeTab === "transactions" && <WebTransactions />}
             {activeTab === "budgets" && <WebBudgets />}
             {activeTab === "departments" && <WebDepartments />}
             {activeTab === "payroll" && <WebPayroll />}
             {activeTab === "team" && <WebTeam />}
-            {activeTab === "reports" && <WebReports onNavigate={(route) => setActiveTab(route as WebTabKey)} />}
+            {activeTab === "reports" && <WebReports onNavigate={(route) => navigateToTab(route as WebTabKey)} />}
             {activeTab === "ai-insights" && <WebAIInsights />}
             {activeTab === "settings" && <WebSettings />}
           </WebPageTransition>
@@ -615,7 +698,7 @@ export function WebShell() {
             {/* 1. Home / Dashboard */}
             <TouchableOpacity
               style={styles.mobileBottomNavItem}
-              onPress={() => setActiveTab("dashboard")}
+              onPress={() => navigateToTab("dashboard")}
               activeOpacity={0.7}
             >
               <View style={[styles.bottomNavIconWrap, activeTab === "dashboard" && { backgroundColor: colors.primary + "18" }]}>
@@ -637,7 +720,7 @@ export function WebShell() {
             {/* 2. Ledger / Transactions */}
             <TouchableOpacity
               style={styles.mobileBottomNavItem}
-              onPress={() => setActiveTab("transactions")}
+              onPress={() => navigateToTab("transactions")}
               activeOpacity={0.7}
             >
               <View style={[styles.bottomNavIconWrap, (activeTab === "transactions" || activeTab === "income" || activeTab === "expenses") && { backgroundColor: colors.primary + "18" }]}>
@@ -659,7 +742,7 @@ export function WebShell() {
             {/* 3. Reports */}
             <TouchableOpacity
               style={styles.mobileBottomNavItem}
-              onPress={() => setActiveTab("reports")}
+              onPress={() => navigateToTab("reports")}
               activeOpacity={0.7}
             >
               <View style={[styles.bottomNavIconWrap, activeTab === "reports" && { backgroundColor: colors.primary + "18" }]}>
@@ -681,7 +764,7 @@ export function WebShell() {
             {/* 4. Payroll */}
             <TouchableOpacity
               style={styles.mobileBottomNavItem}
-              onPress={() => setActiveTab("payroll")}
+              onPress={() => navigateToTab("payroll")}
               activeOpacity={0.7}
             >
               <View style={[styles.bottomNavIconWrap, activeTab === "payroll" && { backgroundColor: colors.primary + "18" }]}>
