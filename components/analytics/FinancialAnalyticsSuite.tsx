@@ -351,64 +351,65 @@ export function FinancialAnalyticsSuite({
           {/* Visual Ring / Gauge */}
           <View style={styles.ringCenterWrap}>
             {(() => {
-              const activePct =
-                !margin.hasRevenue
-                  ? margin.operatingExpenses > 0
-                    ? 100
-                    : 0
-                  : marginMode === "outflow"
-                  ? Math.min(100, Math.max(0, margin.expenseRatioPct))
-                  : marginMode === "net"
-                  ? margin.isLoss
-                    ? Math.min(100, Math.max(0, margin.expenseRatioPct))
-                    : Math.min(100, Math.max(0, margin.rawMarginPct))
-                  : margin.isLoss
-                  ? Math.min(100, Math.max(0, Math.abs(margin.rawMarginPct)))
+              const revenue = margin.operatingRevenue;
+              const expenses = margin.operatingExpenses;
+              const income = margin.operatingIncome;
+              const isLoss = margin.isLoss;
+              const totalFlow = revenue + expenses;
+
+              // Outflow share of total cash movement
+              const outflowSharePct = totalFlow > 0 ? (expenses / totalFlow) * 100 : 0;
+              // Deficit share of expenditures
+              const deficitSharePct = expenses > 0 ? (Math.abs(income) / expenses) * 100 : 0;
+
+              let activePct = 0;
+              let ringColor = margin.statusColor;
+              let centerLabel = margin.displayMargin;
+              let label = margin.statusLabel;
+              let sublabel = `${isLoss ? "-" : "+"}${formatCompactCurrency(Math.abs(income), currency)}`;
+
+              if (marginMode === "outflow") {
+                activePct = Math.min(100, Math.max(0, outflowSharePct));
+                ringColor = colors.expense;
+                centerLabel = `${outflowSharePct.toFixed(1)}%`;
+                label = "Expenses Share";
+                sublabel = `-${formatCompactCurrency(expenses, currency)} Expenses`;
+              } else if (marginMode === "net") {
+                activePct = isLoss
+                  ? Math.min(98.5, Math.max(5, deficitSharePct))
                   : Math.min(100, Math.max(0, margin.rawMarginPct));
-
-              const ringColor =
-                marginMode === "outflow"
-                  ? colors.expense
-                  : marginMode === "net"
-                  ? margin.isLoss
-                    ? colors.expense
-                    : colors.income
-                  : margin.statusColor;
-
-              const centerLabel =
-                !margin.hasRevenue
-                  ? margin.operatingExpenses > 0
-                    ? "-100.0%"
-                    : "0%"
-                  : marginMode === "outflow"
-                  ? margin.displayExpenseRatio
-                  : marginMode === "net"
-                  ? `${margin.isLoss ? "-" : "+"}${formatCompactCurrency(Math.abs(margin.operatingIncome), currency)}`
-                  : margin.displayMargin;
-
-              const label =
-                marginMode === "outflow"
-                  ? "Outflow Ratio"
-                  : marginMode === "net"
-                  ? margin.isLoss
-                    ? "Operating Deficit"
-                    : "Net Cash Surplus"
-                  : margin.isLoss
-                  ? "Operating Loss"
-                  : "Operating Margin";
-
-              const sublabel =
-                !margin.hasRevenue
-                  ? margin.operatingExpenses > 0
-                    ? `-${formatCompactCurrency(margin.operatingExpenses, currency)}`
-                    : "PKR 0"
-                  : marginMode === "outflow"
-                  ? `-${formatCompactCurrency(margin.operatingExpenses, currency)}`
-                  : marginMode === "net"
-                  ? `${margin.displayMargin} RETAINED`
-                  : margin.isLoss
-                  ? `-${formatCompactCurrency(Math.abs(margin.operatingIncome), currency)}`
-                  : `+${formatCompactCurrency(margin.operatingIncome, currency)}`;
+                ringColor = isLoss ? colors.expense : colors.income;
+                centerLabel = `${isLoss ? "-" : "+"}${formatCompactCurrency(Math.abs(income), currency)}`;
+                label = isLoss ? "Net Deficit" : "Net Surplus";
+                sublabel = `${isLoss ? "Loss" : "Profit"}: ${margin.displayMargin}`;
+              } else {
+                // marginMode === "margin" (Profit / Loss %)
+                if (!margin.hasRevenue) {
+                  activePct = expenses > 0 ? 100 : 0;
+                  ringColor = expenses > 0 ? colors.expense : colors.mutedForeground;
+                  centerLabel = expenses > 0 ? "-100%" : "0%";
+                  label = expenses > 0 ? "Zero Income" : "No Activity";
+                  sublabel = expenses > 0 ? `-${formatCompactCurrency(expenses, currency)} Deficit` : "PKR 0";
+                } else if (isLoss) {
+                  // If moderate loss (within -100%), show proportional arc
+                  // If extreme deficit (e.g. -4920%), show 98% deficit arc so it is NOT a fake solid 100% circle
+                  activePct =
+                    Math.abs(margin.rawMarginPct) <= 100
+                      ? Math.min(100, Math.max(0, Math.abs(margin.rawMarginPct)))
+                      : Math.min(98.5, Math.max(5, deficitSharePct));
+                  ringColor = colors.expense;
+                  centerLabel = margin.displayMargin;
+                  label = "Operating Loss";
+                  sublabel = `Loss: -${formatCompactCurrency(Math.abs(income), currency)}`;
+                } else {
+                  // Healthy Surplus
+                  activePct = Math.min(100, Math.max(0, margin.rawMarginPct));
+                  ringColor = colors.income;
+                  centerLabel = margin.displayMargin;
+                  label = "Operating Profit";
+                  sublabel = `Profit: +${formatCompactCurrency(income, currency)}`;
+                }
+              }
 
               return (
                 <RingProgress
@@ -424,30 +425,85 @@ export function FinancialAnalyticsSuite({
             })()}
           </View>
 
-          {/* Segmented Option Controls */}
+          {/* Dual-Tone Cash Income vs Expenses Comparison Bar */}
+          {(() => {
+            const rev = margin.operatingRevenue;
+            const exp = margin.operatingExpenses;
+            const total = rev + exp;
+            if (total <= 0) return null;
+
+            const inflowPct = (rev / total) * 100;
+            const outflowPct = (exp / total) * 100;
+
+            return (
+              <View style={styles.flowBarSection}>
+                <View style={[styles.flowBarTrack, { backgroundColor: (colors.cardAlt ?? colors.muted) + "50" }]}>
+                  {inflowPct > 0 && (
+                    <View
+                      style={[
+                        styles.flowBarFill,
+                        {
+                          width: `${Math.max(3, Math.min(97, inflowPct))}%`,
+                          backgroundColor: colors.income,
+                        },
+                      ]}
+                    />
+                  )}
+                  {outflowPct > 0 && (
+                    <View
+                      style={[
+                        styles.flowBarFill,
+                        {
+                          width: `${Math.max(3, Math.min(97, outflowPct))}%`,
+                          backgroundColor: colors.expense,
+                        },
+                      ]}
+                    />
+                  )}
+                </View>
+                <View style={styles.flowBarLegend}>
+                  <View style={styles.flowLegendItem}>
+                    <View style={[styles.flowDot, { backgroundColor: colors.income }]} />
+                    <Text style={[styles.flowLegendText, { color: colors.mutedForeground }]}>
+                      Income: <Text style={{ color: colors.income, fontFamily: "Inter_600SemiBold" }}>+{formatCompactCurrency(rev, currency)} ({inflowPct.toFixed(0)}%)</Text>
+                    </Text>
+                  </View>
+                  <View style={styles.flowLegendItem}>
+                    <View style={[styles.flowDot, { backgroundColor: colors.expense }]} />
+                    <Text style={[styles.flowLegendText, { color: colors.mutedForeground }]}>
+                      Expenses: <Text style={{ color: colors.expense, fontFamily: "Inter_600SemiBold" }}>-{formatCompactCurrency(exp, currency)} ({outflowPct.toFixed(0)}%)</Text>
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            );
+          })()}
+
+          {/* Segmented Option Controls with Easy Matching Words */}
           <View style={styles.chipsRow}>
             {[
-              { id: "margin", label: "Margin %" },
-              { id: "outflow", label: "Outflow %" },
-              { id: "net", label: "Net Balance" },
+              { id: "margin", label: "Profit / Loss" },
+              { id: "outflow", label: "Expenses %" },
+              { id: "net", label: "Net Surplus" },
             ].map((opt) => {
               const isSelected = marginMode === opt.id;
+              const chipColor =
+                opt.id === "outflow"
+                  ? colors.expense
+                  : opt.id === "net"
+                  ? margin.isLoss
+                    ? colors.expense
+                    : colors.income
+                  : margin.statusColor;
+
               return (
                 <TouchableOpacity
                   key={opt.id}
                   style={[
                     styles.chip,
                     {
-                      backgroundColor: isSelected
-                        ? opt.id === "outflow"
-                          ? colors.expense
-                          : margin.statusColor
-                        : (colors.cardAlt ?? colors.muted) + "30",
-                      borderColor: isSelected
-                        ? opt.id === "outflow"
-                          ? colors.expense
-                          : margin.statusColor
-                        : colors.border,
+                      backgroundColor: isSelected ? chipColor : (colors.cardAlt ?? colors.muted) + "30",
+                      borderColor: isSelected ? chipColor : colors.border,
                     },
                   ]}
                   onPress={() => {
@@ -470,10 +526,10 @@ export function FinancialAnalyticsSuite({
             })}
           </View>
 
-          {/* 3-Metric Structured Bento Box */}
+          {/* 3-Metric Structured Bento Box with Easy Top-Card Matching Titles */}
           <View style={[styles.bentoRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
             <View style={styles.bentoCol}>
-              <Text style={[styles.bentoLabel, { color: colors.mutedForeground }]}>REVENUE</Text>
+              <Text style={[styles.bentoLabel, { color: colors.mutedForeground }]}>INCOME</Text>
               <Text style={[styles.bentoVal, { color: colors.income }]} numberOfLines={1}>
                 +{formatCompactCurrency(margin.operatingRevenue, currency)}
               </Text>
@@ -488,7 +544,7 @@ export function FinancialAnalyticsSuite({
             <View style={[styles.bentoDivider, { backgroundColor: colors.border }]} />
             <View style={styles.bentoCol}>
               <Text style={[styles.bentoLabel, { color: colors.mutedForeground }]}>
-                {margin.isLoss ? "DEFICIT" : "NET SURPLUS"}
+                {margin.isLoss ? "NET DEFICIT" : "NET SURPLUS"}
               </Text>
               <Text
                 style={[
@@ -787,6 +843,42 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginVertical: 4,
+  },
+  flowBarSection: {
+    gap: 5,
+    marginVertical: 4,
+    paddingHorizontal: 4,
+  },
+  flowBarTrack: {
+    height: 6,
+    borderRadius: 3,
+    flexDirection: "row",
+    overflow: "hidden",
+    gap: 2,
+  },
+  flowBarFill: {
+    height: "100%",
+    borderRadius: 3,
+  },
+  flowBarLegend: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 2,
+  },
+  flowLegendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  flowDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  flowLegendText: {
+    fontSize: 9.5,
+    fontFamily: "Inter_500Medium",
   },
   chipsRow: {
     flexDirection: "row",

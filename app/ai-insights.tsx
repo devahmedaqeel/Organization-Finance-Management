@@ -1,7 +1,8 @@
 import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
-import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { BackHandler, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AreaLineChart } from "@/components/AreaLineChart";
 import { DonutChart } from "@/components/DonutChart";
@@ -281,6 +282,28 @@ export default function AIInsightsScreen() {
   const positiveCount = insights.filter(i => i.type === "positive").length;
   const warningCount = insights.filter(i => i.type === "warning" || i.type === "alert").length;
 
+  useEffect(() => {
+    const onBackPress = () => {
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace("/(tabs)");
+      }
+      return true;
+    };
+    const sub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+    return () => sub.remove();
+  }, []);
+
+  const handleGoBack = () => {
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(tabs)");
+    }
+  };
+
   return (
     <View style={[styles.flex, { backgroundColor: colors.background }]}>
       {/* Fixed Header */}
@@ -296,10 +319,7 @@ export default function AIInsightsScreen() {
       >
         <View style={styles.headerRow}>
           <TouchableOpacity
-            onPress={() => {
-              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.back();
-            }}
+            onPress={handleGoBack}
             style={[styles.backBtn, { borderColor: colors.border }]}
           >
             <Feather name="arrow-left" size={18} color={colors.foreground} />

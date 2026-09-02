@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import { router } from "expo-router";
 import {
   StyleSheet,
   Text,
@@ -18,6 +19,7 @@ import {
   getBudgetInsight,
   getNobInsight,
   getExpenseDistributionInsight,
+  computeNetOperatingBalanceHealth,
 } from "@/services/DatePeriodService";
 import { Transaction, Department } from "@/context/FinanceContext";
 import { Budget } from "@/services/BudgetService";
@@ -33,7 +35,7 @@ interface Props {
   period: NormalizedPeriod;
   transactions: Transaction[];
   budgets: Budget[];
-  nobHealth: NetOperatingBalanceHealth;
+  nobHealth?: NetOperatingBalanceHealth;
   onNavigate?: (tab: string) => void;
   departments?: Department[];
 }
@@ -64,21 +66,58 @@ export function FinancialDrillDownModal({
   const [activeTab, setActiveTab] = useState<"overview" | "breakdown" | "trend" | "ledger">("overview");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
+  // Authoritative Fallback Safe Health Pipeline
+  const effectiveNobHealth: NetOperatingBalanceHealth = useMemo(() => {
+    try {
+      if (nobHealth && typeof nobHealth === "object" && nobHealth.statusColor && Array.isArray(nobHealth.expenseBreakdown)) {
+        return nobHealth;
+      }
+      if (transactions && period) {
+        const computed = computeNetOperatingBalanceHealth(transactions, period);
+        if (computed && computed.statusColor) return computed;
+      }
+    } catch (e) {
+      console.warn("computeNetOperatingBalanceHealth error:", e);
+    }
+    return {
+      operatingExpenses: 0,
+      totalIncome: 0,
+      netOperatingBalance: 0,
+      operatingMargin: 0,
+      isDeficit: false,
+      statusLabel: "Balanced",
+      statusColor: "#10B981",
+      expenseBreakdown: [],
+      expenseCount: 0,
+      monthlyTrend: [],
+    } as NetOperatingBalanceHealth;
+  }, [nobHealth, transactions, period]);
+
+  // Guaranteed safe extracted fields
+  const nobStatusColor = effectiveNobHealth?.statusColor || (effectiveNobHealth?.isDeficit ? colors.expense : colors.income);
+  const totalSpent = effectiveNobHealth?.operatingExpenses ?? 0;
+  const totalIncome = effectiveNobHealth?.totalIncome ?? 0;
+  const netOperatingBalance = effectiveNobHealth?.netOperatingBalance ?? 0;
+  const operatingMargin = effectiveNobHealth?.operatingMargin ?? 0;
+  const isDeficit = effectiveNobHealth?.isDeficit ?? false;
+  const expenseBreakdown = effectiveNobHealth?.expenseBreakdown ?? [];
+  const monthlyTrend = effectiveNobHealth?.monthlyTrend ?? [];
+  const expenseCount = effectiveNobHealth?.expenseCount ?? 0;
+
   // Budget metrics
   const totalAllocated = useMemo(() => {
     const line = (budgets || []).reduce((s, b) => s + (b.allocated || 0), 0);
     if (line > 0) return line;
     return (departments || []).reduce((s, d) => s + (d.budgetAllocated || 0), 0);
   }, [budgets, departments]);
-  const totalSpent = nobHealth?.operatingExpenses ?? 0;
   const budgetRatio = totalAllocated > 0 ? (totalSpent / totalAllocated) * 100 : 0;
   const remainingBudget = totalAllocated - totalSpent;
   const isOverBudget = totalAllocated > 0 && totalSpent > totalAllocated;
 
   // Filtered period transactions for ledger
   const periodTxs = useMemo(() => {
-    const start = new Date(period.startDate);
-    const end = new Date(period.endDate);
+    const start = new Date(period?.startDate || "2020-01-01");
+    const end = new Date(period?.endDate || "2030-12-31");
     end.setHours(23, 59, 59, 999);
 
     return transactions
@@ -112,6 +151,14 @@ export function FinancialDrillDownModal({
       onRequestClose={onClose}
     >
       <View style={[styles.overlay, { backgroundColor: "rgba(3, 7, 18, 0.82)" }]}>
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          onPress={() => {
+            if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            onClose();
+          }}
+          activeOpacity={1}
+        />
         <View
           style={[
             styles.modalBox,
@@ -203,13 +250,13 @@ export function FinancialDrillDownModal({
                         type === "budget"
                           ? (isOverBudget ? colors.expense : colors.income) + "12"
                           : type === "nob"
-                          ? nobHealth.statusColor + "12"
+                          ? nobStatusColor + "12"
                           : colors.primary + "12",
                       borderColor:
                         type === "budget"
                           ? (isOverBudget ? colors.expense : colors.income) + "30"
                           : type === "nob"
-                          ? nobHealth.statusColor + "30"
+                          ? nobStatusColor + "30"
                           : colors.primary + "30",
                     },
                   ]}
@@ -219,8 +266,8 @@ export function FinancialDrillDownModal({
                     {type === "budget"
                       ? getBudgetInsight(totalAllocated, totalSpent, currency)
                       : type === "nob"
-                      ? getNobInsight(nobHealth, currency)
-                      : getExpenseDistributionInsight(nobHealth.expenseBreakdown, nobHealth.operatingExpenses)}
+                      ? getNobInsight(effectiveNobHealth, currency)
+                      : getExpenseDistributionInsight(expenseBreakdown, totalSpent)}
                   </Text>
                 </View>
 
@@ -259,22 +306,22 @@ export function FinancialDrillDownModal({
                     <>
                       <View style={[styles.kpiCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border }]}>
                         <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>OPERATING INFLOW</Text>
-                        <Text style={[styles.kpiVal, { color: colors.income }]}>+{currency} {fmt(nobHealth.totalIncome)}</Text>
+                        <Text style={[styles.kpiVal, { color: colors.income }]}>+{currency} {fmt(totalIncome)}</Text>
                       </View>
                       <View style={[styles.kpiCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border }]}>
                         <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>OPERATING OUTFLOW</Text>
-                        <Text style={[styles.kpiVal, { color: colors.expense }]}>-{currency} {fmt(nobHealth.operatingExpenses)}</Text>
+                        <Text style={[styles.kpiVal, { color: colors.expense }]}>-{currency} {fmt(totalSpent)}</Text>
                       </View>
                       <View style={[styles.kpiCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border }]}>
                         <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>NET OPERATING BALANCE</Text>
-                        <Text style={[styles.kpiVal, { color: nobHealth.isDeficit ? colors.expense : colors.income }]}>
-                          {nobHealth.isDeficit ? "-" : "+"}{currency} {fmt(Math.abs(nobHealth.netOperatingBalance))}
+                        <Text style={[styles.kpiVal, { color: isDeficit ? colors.expense : colors.income }]}>
+                          {isDeficit ? "-" : "+"}{currency} {fmt(Math.abs(netOperatingBalance))}
                         </Text>
                       </View>
                       <View style={[styles.kpiCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border }]}>
                         <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>OPERATING MARGIN</Text>
-                        <Text style={[styles.kpiVal, { color: nobHealth.statusColor }]}>
-                          {nobHealth.isDeficit ? `-${Math.abs(nobHealth.operatingMargin).toFixed(1)}%` : `${nobHealth.operatingMargin.toFixed(1)}%`}
+                        <Text style={[styles.kpiVal, { color: nobStatusColor }]}>
+                          {isDeficit ? `-${Math.abs(operatingMargin).toFixed(1)}%` : `${operatingMargin.toFixed(1)}%`}
                         </Text>
                       </View>
                     </>
@@ -284,20 +331,20 @@ export function FinancialDrillDownModal({
                     <>
                       <View style={[styles.kpiCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border }]}>
                         <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>TOTAL DISBURSED</Text>
-                        <Text style={[styles.kpiVal, { color: colors.expense }]}>{currency} {fmt(nobHealth.operatingExpenses)}</Text>
+                        <Text style={[styles.kpiVal, { color: colors.expense }]}>{currency} {fmt(totalSpent)}</Text>
                       </View>
                       <View style={[styles.kpiCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border }]}>
                         <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>ACTIVE CATEGORIES</Text>
-                        <Text style={[styles.kpiVal, { color: colors.foreground }]}>{nobHealth.expenseBreakdown.length}</Text>
+                        <Text style={[styles.kpiVal, { color: colors.foreground }]}>{expenseBreakdown.length}</Text>
                       </View>
                       <View style={[styles.kpiCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border }]}>
                         <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>TRANSACTION COUNT</Text>
-                        <Text style={[styles.kpiVal, { color: colors.foreground }]}>{nobHealth.expenseCount} Records</Text>
+                        <Text style={[styles.kpiVal, { color: colors.foreground }]}>{expenseCount} Records</Text>
                       </View>
                       <View style={[styles.kpiCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border }]}>
                         <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>TOP COST DRIVER</Text>
                         <Text style={[styles.kpiVal, { color: colors.primary }]} numberOfLines={1}>
-                          {nobHealth.expenseBreakdown[0]?.category || "None"}
+                          {expenseBreakdown[0]?.category || "None"}
                         </Text>
                       </View>
                     </>
@@ -311,18 +358,18 @@ export function FinancialDrillDownModal({
                     <View style={styles.equationRow}>
                       <View style={styles.equationCol}>
                         <Text style={[styles.eqLabel, { color: colors.mutedForeground }]}>Total Operating Inflows</Text>
-                        <Text style={[styles.eqVal, { color: colors.income }]}>+{currency} {fmt(nobHealth.totalIncome)}</Text>
+                        <Text style={[styles.eqVal, { color: colors.income }]}>+{currency} {fmt(totalIncome)}</Text>
                       </View>
                       <Text style={[styles.eqOp, { color: colors.mutedForeground }]}>−</Text>
                       <View style={styles.equationCol}>
                         <Text style={[styles.eqLabel, { color: colors.mutedForeground }]}>Operating Outflows</Text>
-                        <Text style={[styles.eqVal, { color: colors.expense }]}>-{currency} {fmt(nobHealth.operatingExpenses)}</Text>
+                        <Text style={[styles.eqVal, { color: colors.expense }]}>-{currency} {fmt(totalSpent)}</Text>
                       </View>
                       <Text style={[styles.eqOp, { color: colors.mutedForeground }]}>=</Text>
                       <View style={styles.equationCol}>
                         <Text style={[styles.eqLabel, { color: colors.mutedForeground }]}>Net Operating Balance</Text>
-                        <Text style={[styles.eqVal, { color: nobHealth.isDeficit ? colors.expense : colors.income }]}>
-                          {nobHealth.isDeficit ? "-" : "+"}{currency} {fmt(Math.abs(nobHealth.netOperatingBalance))}
+                        <Text style={[styles.eqVal, { color: isDeficit ? colors.expense : colors.income }]}>
+                          {isDeficit ? "-" : "+"}{currency} {fmt(Math.abs(netOperatingBalance))}
                         </Text>
                       </View>
                     </View>
@@ -374,7 +421,7 @@ export function FinancialDrillDownModal({
                     })
                   )
                 ) : (
-                  nobHealth.expenseBreakdown.map((c) => (
+                  expenseBreakdown.map((c) => (
                     <TouchableOpacity
                       key={c.category}
                       style={[
@@ -406,7 +453,7 @@ export function FinancialDrillDownModal({
             {activeTab === "trend" && (
               <View style={{ gap: 10 }}>
                 <Text style={[styles.sectionHeading, { color: colors.foreground }]}>Monthly Financial Movement</Text>
-                {nobHealth.monthlyTrend.length === 0 ? (
+                {monthlyTrend.length === 0 ? (
                   <Text style={{ color: colors.mutedForeground, paddingVertical: 16 }}>No monthly trend data available.</Text>
                 ) : (
                   <View style={[styles.tableWrap, { borderColor: colors.border }]}>
@@ -416,7 +463,7 @@ export function FinancialDrillDownModal({
                       <Text style={[styles.th, { color: colors.mutedForeground, flex: 1, textAlign: "right" }]}>OUTFLOW</Text>
                       <Text style={[styles.th, { color: colors.mutedForeground, flex: 1, textAlign: "right" }]}>NET BALANCE</Text>
                     </View>
-                    {nobHealth.monthlyTrend.map((m) => (
+                    {monthlyTrend.map((m) => (
                       <View key={m.month} style={[styles.tableRow, { borderBottomColor: colors.border }]}>
                         <Text style={[styles.td, { color: colors.foreground, flex: 1 }]}>{m.month}</Text>
                         <Text style={[styles.td, { color: colors.income, flex: 1, textAlign: "right" }]}>+{currency} {fmt(m.income)}</Text>
@@ -484,9 +531,17 @@ export function FinancialDrillDownModal({
             <TouchableOpacity
               style={[styles.footerBtn, { backgroundColor: colors.primary }]}
               onPress={() => {
+                if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 onClose();
-                if (onNavigate) {
-                  onNavigate(type === "budget" ? "budgets" : type === "nob" ? "reports" : "expenses");
+                if (Platform.OS === "web") {
+                  if (onNavigate) {
+                    onNavigate(type === "budget" ? "budgets" : type === "nob" ? "reports" : "expenses");
+                  }
+                } else {
+                  const route = type === "budget" ? "/budget" : type === "nob" ? "/(tabs)/reports" : "/(tabs)/expenses";
+                  setTimeout(() => {
+                    router.push(route as any);
+                  }, 60);
                 }
               }}
               activeOpacity={0.8}

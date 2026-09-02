@@ -33,12 +33,12 @@ export function WebDepartments() {
 
   // Calculate actual spend for each department
   const deptsWithSpend = useMemo(() => {
-    return departments.map((d) => {
-      const actualSpend = transactions
-        .filter((t) => t.type === "expense" && t.department?.trim().toLowerCase() === d.name?.trim().toLowerCase())
-        .reduce((sum, t) => sum + t.amount, 0);
+    return (departments || []).map((d) => {
+      const actualSpend = (transactions || [])
+        .filter((t) => t && t.type === "expense" && t.department?.trim().toLowerCase() === d.name?.trim().toLowerCase())
+        .reduce((sum, t) => sum + (t.amount || 0), 0);
 
-      const ratio = d.budgetAllocated > 0 ? (actualSpend / d.budgetAllocated) * 100 : 0;
+      const ratio = (d.budgetAllocated || 0) > 0 ? (actualSpend / d.budgetAllocated) * 100 : 0;
       return {
         ...d,
         actualSpend,
@@ -50,17 +50,17 @@ export function WebDepartments() {
   }, [departments, transactions]);
 
   const totalHeadcount = useMemo(
-    () => departments.reduce((s, d) => s + (d.headCount || 0), 0),
+    () => (departments || []).reduce((s, d) => s + (d.headCount || 0), 0),
     [departments]
   );
 
   const totalAllocated = useMemo(
-    () => departments.reduce((s, d) => s + (d.budgetAllocated || 0), 0),
+    () => (departments || []).reduce((s, d) => s + (d.budgetAllocated || 0), 0),
     [departments]
   );
 
   const totalActualSpend = useMemo(
-    () => deptsWithSpend.reduce((s, d) => s + d.actualSpend, 0),
+    () => (deptsWithSpend || []).reduce((s, d) => s + (d.actualSpend || 0), 0),
     [deptsWithSpend]
   );
 

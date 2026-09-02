@@ -1,9 +1,10 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   Alert,
+  BackHandler,
   FlatList,
   KeyboardAvoidingView,
   Modal,
@@ -163,14 +164,36 @@ export default function DepartmentsScreen() {
     setDeptToDelete(dept);
   };
 
+  useEffect(() => {
+    const onBackPress = () => {
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace("/(tabs)");
+      }
+      return true;
+    };
+    const sub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+    return () => sub.remove();
+  }, []);
+
+  const handleGoBack = () => {
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(tabs)");
+    }
+  };
+
   return (
     <View style={[styles.flex, { backgroundColor: colors.background }]}>
-      {/* Executive Clean Header */}
+      {/* Header */}
       <View
         style={[
           styles.header,
           {
-            paddingTop: webTop + insets.top + (Platform.OS === "android" ? 20 : 12),
+            paddingTop: webTop + insets.top + (Platform.OS === "android" ? 16 : 10),
             backgroundColor: colors.background,
             borderBottomColor: colors.border,
           },
@@ -179,10 +202,7 @@ export default function DepartmentsScreen() {
         <View style={styles.headerRow}>
           <TouchableOpacity
             style={[styles.backBtn, { borderColor: colors.border }]}
-            onPress={() => {
-              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.back();
-            }}
+            onPress={handleGoBack}
           >
             <Feather name="arrow-left" size={18} color={colors.foreground} />
           </TouchableOpacity>
@@ -416,79 +436,7 @@ export default function DepartmentsScreen() {
         </TouchableOpacity>
       )}
 
-      {/* ─── Custom Dark-Themed Delete Confirmation Modal ─── */}
-      <Modal
-        visible={deptToDelete !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setDeptToDelete(null)}
-      >
-        <View style={styles.confirmOverlay}>
-          <View style={[styles.confirmCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            {/* Warning Icon Box */}
-            <View style={styles.confirmIconWrap}>
-              <Feather name="trash-2" size={24} color="#F43F5E" />
-            </View>
 
-            <Text style={[styles.confirmTitle, { color: colors.foreground }]}>Remove Department</Text>
-            <Text style={[styles.confirmSub, { color: colors.mutedForeground }]}>
-              Are you sure you want to remove this monitored department from fiscal budget tracking?
-            </Text>
-
-            {/* Department Summary Card */}
-            {deptToDelete && (
-              <View style={[styles.confirmDeptBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                  <View style={styles.confirmDeptDot} />
-                  <Text style={[styles.confirmDeptName, { color: colors.foreground }]} numberOfLines={1}>
-                    {deptToDelete.name}
-                  </Text>
-                </View>
-                <View style={styles.confirmDeptMetaRow}>
-                  <Text style={[styles.confirmDeptMetaText, { color: colors.mutedForeground }]}>
-                    {deptToDelete.headCount || 0} Staff Headcount
-                  </Text>
-                  <Text style={{ color: colors.mutedForeground }}>·</Text>
-                  <Text style={[styles.confirmDeptMetaText, { color: colors.primary, fontFamily: "Inter_600SemiBold" }]}>
-                    Budget: {fmt(deptToDelete.budgetAllocated || 0)}
-                  </Text>
-                </View>
-              </View>
-            )}
-
-            {/* Notice pill */}
-            <View style={styles.confirmWarningPill}>
-              <Feather name="info" size={12} color="#38BDF8" />
-              <Text style={styles.confirmWarningText}>
-                Historical transactions for this unit will be preserved.
-              </Text>
-            </View>
-
-            {/* Action Buttons */}
-            <View style={styles.confirmActionsRow}>
-              <TouchableOpacity
-                style={[styles.confirmCancelBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
-                onPress={() => {
-                  if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setDeptToDelete(null);
-                }}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.confirmCancelText, { color: colors.foreground }]}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.confirmDeleteBtn}
-                onPress={confirmDelete}
-                activeOpacity={0.85}
-              >
-                <Feather name="trash-2" size={14} color="#FFFFFF" />
-                <Text style={styles.confirmDeleteText}>Delete</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       {/* ─── Add/Edit Department Bottom Sheet Modal ─── */}
       <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
@@ -842,138 +790,6 @@ const styles = StyleSheet.create({
   addBtnText: {
     color: "#fff",
     fontSize: 14,
-    fontFamily: "Inter_700Bold",
-  },
-
-  // Custom Delete Confirmation Modal Styles
-  confirmOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.75)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  confirmCard: {
-    width: "100%",
-    maxWidth: 380,
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: 22,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.4,
-    shadowRadius: 20,
-    elevation: 12,
-    gap: 6,
-  },
-  confirmIconWrap: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: "#F43F5E18",
-    borderWidth: 1,
-    borderColor: "#F43F5E44",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 6,
-  },
-  confirmTitle: {
-    fontSize: 18,
-    fontFamily: "Inter_800ExtraBold",
-    textAlign: "center",
-  },
-  confirmSub: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    textAlign: "center",
-    lineHeight: 17,
-    paddingHorizontal: 8,
-    marginBottom: 8,
-  },
-  confirmDeptBox: {
-    width: "100%",
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 12,
-    gap: 4,
-    marginBottom: 6,
-  },
-  confirmDeptDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#F43F5E",
-  },
-  confirmDeptName: {
-    fontSize: 14.5,
-    fontFamily: "Inter_700Bold",
-    flex: 1,
-  },
-  confirmDeptMetaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginTop: 2,
-  },
-  confirmDeptMetaText: {
-    fontSize: 11,
-    fontFamily: "Inter_500Medium",
-  },
-  confirmWarningPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "#0284C714",
-    borderWidth: 1,
-    borderColor: "#0284C733",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 6,
-    width: "100%",
-    marginBottom: 12,
-  },
-  confirmWarningText: {
-    fontSize: 10.5,
-    fontFamily: "Inter_500Medium",
-    color: "#38BDF8",
-    flex: 1,
-  },
-  confirmActionsRow: {
-    flexDirection: "row",
-    gap: 10,
-    width: "100%",
-  },
-  confirmCancelBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  confirmCancelText: {
-    fontSize: 13.5,
-    fontFamily: "Inter_600SemiBold",
-  },
-  confirmDeleteBtn: {
-    flex: 1.3,
-    backgroundColor: "#F43F5E",
-    paddingVertical: 12,
-    borderRadius: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    shadowColor: "#F43F5E",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  confirmDeleteText: {
-    color: "#FFFFFF",
-    fontSize: 13.5,
     fontFamily: "Inter_700Bold",
   },
 });

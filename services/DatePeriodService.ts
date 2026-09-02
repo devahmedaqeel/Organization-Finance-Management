@@ -461,19 +461,26 @@ export function getBudgetInsight(allocated: number, spent: number, currency = "P
 }
 
 export function getNobInsight(nob: NetOperatingBalanceHealth, currency = "PKR"): string {
-  if (nob.totalIncome === 0 && nob.operatingExpenses === 0) {
+  if (!nob) return "No operating revenue or disbursements recorded in this period.";
+  const totalIncome = nob.totalIncome ?? 0;
+  const operatingExpenses = nob.operatingExpenses ?? 0;
+  const netOperatingBalance = nob.netOperatingBalance ?? (totalIncome - operatingExpenses);
+  const operatingMargin = nob.operatingMargin ?? 0;
+  const isDeficit = nob.isDeficit ?? (netOperatingBalance < 0);
+
+  if (totalIncome === 0 && operatingExpenses === 0) {
     return "No operating revenue or disbursements recorded in this period.";
   }
-  if (nob.isDeficit) {
-    return `🚨 Operating deficit of ${currency} ${Math.abs(nob.netOperatingBalance).toLocaleString()} detected (Expenses exceed revenue by ${Math.abs(nob.operatingMargin).toFixed(1)}%).`;
+  if (isDeficit) {
+    return `🚨 Operating deficit of ${currency} ${Math.abs(netOperatingBalance).toLocaleString()} detected (Expenses exceed revenue by ${Math.abs(operatingMargin).toFixed(1)}%).`;
   }
-  if (nob.operatingMargin >= 50) {
-    return `🟢 Strong operating surplus retaining ${nob.operatingMargin.toFixed(1)}% (+${currency} ${nob.netOperatingBalance.toLocaleString()}) of incoming revenue.`;
+  if (operatingMargin >= 50) {
+    return `🟢 Strong operating surplus retaining ${operatingMargin.toFixed(1)}% (+${currency} ${netOperatingBalance.toLocaleString()}) of incoming revenue.`;
   }
-  if (nob.operatingMargin < 20) {
-    return `⚠️ Tight operating margin: Only ${nob.operatingMargin.toFixed(1)}% of revenue retained after operational expenses.`;
+  if (operatingMargin < 20) {
+    return `⚠️ Tight operating margin: Only ${operatingMargin.toFixed(1)}% of revenue retained after operational expenses.`;
   }
-  return `🟢 Stable operating performance with ${nob.operatingMargin.toFixed(1)}% net cash flow retention.`;
+  return `🟢 Stable operating performance with ${operatingMargin.toFixed(1)}% net cash flow retention.`;
 }
 
 export function getExpenseDistributionInsight(

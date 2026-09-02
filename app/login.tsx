@@ -55,6 +55,23 @@ export default function LoginScreen() {
 
   const params = useLocalSearchParams();
 
+  // Safe Haptic Helpers for Web & Mobile
+  const safeHapticNotification = (type: Haptics.NotificationFeedbackType = Haptics.NotificationFeedbackType.Success) => {
+    if (Platform.OS !== "web") {
+      try {
+        Haptics.notificationAsync(type);
+      } catch {}
+    }
+  };
+
+  const safeHapticSelection = () => {
+    if (Platform.OS !== "web") {
+      try {
+        Haptics.selectionAsync();
+      } catch {}
+    }
+  };
+
   // Listen to Google OAuth credentials from deep links
   useEffect(() => {
     const handleDeepLinkAuth = async () => {
@@ -73,16 +90,16 @@ export default function LoginScreen() {
           );
           setLoading(false);
           if (success) {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            safeHapticNotification(Haptics.NotificationFeedbackType.Success);
             router.replace("/(tabs)");
           } else {
             setError("Unable to authenticate with Google. Please try again.");
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            safeHapticNotification(Haptics.NotificationFeedbackType.Error);
           }
         } catch (e: any) {
           setLoading(false);
           setError(e.message || "Google session restoration failed.");
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          safeHapticNotification(Haptics.NotificationFeedbackType.Error);
         }
       }
     };
@@ -98,14 +115,14 @@ export default function LoginScreen() {
     setEmail("");
     setPassword("");
     setConfirmPassword("");
-    Haptics.selectionAsync();
+    safeHapticSelection();
   };
 
   const handleLogin = async () => {
     const cleanEmail = email.trim();
     if (!cleanEmail || !password.trim()) {
       setError("Please enter your email and password.");
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      safeHapticNotification(Haptics.NotificationFeedbackType.Warning);
       return;
     }
     setLoading(true);
@@ -114,11 +131,11 @@ export default function LoginScreen() {
     const success = await login(cleanEmail, password);
     setLoading(false);
     if (success) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      safeHapticNotification(Haptics.NotificationFeedbackType.Success);
       router.replace("/(tabs)");
     } else {
       setError("Incorrect email or password. Please try again.");
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      safeHapticNotification(Haptics.NotificationFeedbackType.Error);
     }
   };
 
@@ -139,11 +156,11 @@ export default function LoginScreen() {
     const result = await signUp(cleanName, cleanEmail, password, selectedRole, cleanOrg);
     setLoading(false);
     if (result.success) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      safeHapticNotification(Haptics.NotificationFeedbackType.Success);
       router.replace("/(tabs)");
     } else {
       setError(result.error || "Unable to create account. Please try again.");
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      safeHapticNotification(Haptics.NotificationFeedbackType.Error);
     }
   };
 
@@ -154,13 +171,13 @@ export default function LoginScreen() {
       const success = await loginWithGoogle();
       setLoading(false);
       if (success) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        safeHapticNotification(Haptics.NotificationFeedbackType.Success);
         router.replace("/(tabs)");
       }
     } catch (e: any) {
       setLoading(false);
       setError(e.message || "Google sign-in was cancelled.");
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      safeHapticNotification(Haptics.NotificationFeedbackType.Error);
     }
   };
 
@@ -175,10 +192,10 @@ export default function LoginScreen() {
     setForgotLoading(false);
     if (result.success) {
       setForgotMsg({ type: "success", text: "Password reset instructions sent. Please check your inbox." });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      safeHapticNotification(Haptics.NotificationFeedbackType.Success);
     } else {
       setForgotMsg({ type: "error", text: result.error || "Unable to send reset email. Please verify address." });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      safeHapticNotification(Haptics.NotificationFeedbackType.Error);
     }
   };
 
@@ -258,7 +275,7 @@ export default function LoginScreen() {
                         styles.roleCard,
                         isSelected && { borderColor: "#3B82F6", backgroundColor: "rgba(59, 130, 246, 0.15)" },
                       ]}
-                      onPress={() => { setSelectedRole(r.id); Haptics.selectionAsync(); }}
+                      onPress={() => { setSelectedRole(r.id); safeHapticSelection(); }}
                       activeOpacity={0.75}
                     >
                       <Feather name={r.icon} size={15} color={activeColor} />

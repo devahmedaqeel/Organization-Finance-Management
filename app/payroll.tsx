@@ -1,9 +1,10 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   Alert,
+  BackHandler,
   FlatList,
   KeyboardAvoidingView,
   Modal,
@@ -299,12 +300,34 @@ export default function PayrollScreen() {
     }
   };
 
+  useEffect(() => {
+    const onBackPress = () => {
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace("/(tabs)");
+      }
+      return true;
+    };
+    const sub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+    return () => sub.remove();
+  }, []);
+
+  const handleGoBack = () => {
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(tabs)");
+    }
+  };
+
   return (
     <View style={[styles.flex, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: webTop + insets.top + (Platform.OS === "android" ? 16 : 10), backgroundColor: colors.background, borderBottomColor: colors.border }]}>
         <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => router.back()} hitSlop={10}>
+          <TouchableOpacity onPress={handleGoBack} hitSlop={10}>
             <Feather name="arrow-left" size={22} color={colors.foreground} />
           </TouchableOpacity>
           <View style={{ alignItems: "center" }}>

@@ -271,15 +271,15 @@ export function NetOperatingBalanceHealthCard({ data, currency, periodLabel }: P
             <View style={styles.sectionHeader}>
               <Text style={[styles.sectionHeading, { color: colors.expense }]}>OPERATING EXPENSES BY CATEGORY</Text>
               <Text style={{ fontSize: 11, color: colors.mutedForeground }}>
-                {data.expenseBreakdown.length} Categories
+                {(data?.expenseBreakdown?.length ?? 0)} Categories
               </Text>
             </View>
-            {data.expenseBreakdown.length === 0 ? (
+            {(!data?.expenseBreakdown || data.expenseBreakdown.length === 0) ? (
               <Text style={{ fontSize: 11.5, color: colors.mutedForeground, fontStyle: "italic", paddingVertical: 4 }}>
                 No operating expenses recorded for this period.
               </Text>
             ) : (
-              data.expenseBreakdown.map((item, idx) => (
+              (data.expenseBreakdown ?? []).map((item, idx) => (
                 <View
                   key={item.category + idx}
                   style={[

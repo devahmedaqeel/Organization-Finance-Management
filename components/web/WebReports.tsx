@@ -150,10 +150,10 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
 
   // Department matrix in period
   const deptMatrix = useMemo(() => {
-    return departments.map((d) => {
-      const actualSpend = periodTransactions
-        .filter((t) => t.type === "expense" && t.department?.trim().toLowerCase() === d.name?.trim().toLowerCase())
-        .reduce((sum, t) => sum + t.amount, 0);
+    return (departments || []).map((d) => {
+      const actualSpend = (periodTransactions || [])
+        .filter((t) => t && t.type === "expense" && t.department?.trim().toLowerCase() === d.name?.trim().toLowerCase())
+        .reduce((sum, t) => sum + (t.amount || 0), 0);
 
       const ratio = d.budgetAllocated > 0 ? (actualSpend / d.budgetAllocated) * 100 : 0;
       return {

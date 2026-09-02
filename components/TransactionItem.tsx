@@ -102,7 +102,9 @@ export function TransactionItem(props: TransactionItemProps) {
             {onEdit && (
               <TouchableOpacity
                 onPress={() => {
-                  try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+                  if (Platform.OS !== "web") {
+                    try { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); } catch {}
+                  }
                   onEdit(tx);
                 }}
                 hitSlop={12}

@@ -1,8 +1,8 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import React, { useMemo, useState } from "react";
-import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import React, { useMemo, useState, useEffect } from "react";
+import { BackHandler, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AreaLineChart } from "@/components/AreaLineChart";
 import { DonutChart } from "@/components/DonutChart";
@@ -57,6 +57,26 @@ export default function ReportsScreen() {
   const [activePeriod, setActivePeriod] = useState<NormalizedPeriod>(() =>
     getPresetPeriod("last_6m")
   );
+
+  useEffect(() => {
+    const onBackPress = () => {
+      if (drillDownModal !== null) {
+        setDrillDownModal(null);
+        return true;
+      }
+      if (periodModalVisible) {
+        setPeriodModalVisible(false);
+        return true;
+      }
+      if (exportModalVisible) {
+        setExportModalVisible(false);
+        return true;
+      }
+      return false;
+    };
+    const sub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+    return () => sub.remove();
+  }, [drillDownModal, periodModalVisible, exportModalVisible]);
 
   // Filtered transactions for the chosen period
   const periodTransactions = useMemo(
@@ -141,15 +161,16 @@ export default function ReportsScreen() {
   // Department Spend Breakdown
   const deptSpending = useMemo(() => {
     const map: Record<string, number> = {};
-    periodTransactions
-      .filter((t) => t.type === "expense")
+    (periodTransactions || [])
+      .filter((t) => t && t.type === "expense")
       .forEach((t) => {
-        map[t.department] = (map[t.department] || 0) + t.amount;
+        const deptKey = t.department || "General";
+        map[deptKey] = (map[deptKey] || 0) + (t.amount || 0);
       });
 
     const entries = Object.entries(map).map(([k, v]) => ({ label: k, value: v }));
     if (entries.length === 0) {
-      return departments.map((d, i) => ({
+      return (departments || []).map((d, i) => ({
         label: d.name,
         value: 0,
         color: EXPENSE_COLORS[i % EXPENSE_COLORS.length],
@@ -162,9 +183,9 @@ export default function ReportsScreen() {
     }));
   }, [periodTransactions, departments]);
 
-  const totalAllocatedBudget = budgets.reduce((s, b) => s + b.allocated, 0);
+  const totalAllocatedBudget = (budgets || []).reduce((s, b) => s + (b.allocated || 0), 0);
   const budgetUtilPct =
-    totalAllocatedBudget > 0 ? (metrics.totalExpense / totalAllocatedBudget) * 100 : 0;
+    totalAllocatedBudget > 0 ? ((metrics?.totalExpense || 0) / totalAllocatedBudget) * 100 : 0;
 
   return (
     <View style={[styles.flex, { backgroundColor: colors.background }]}>
@@ -402,7 +423,17 @@ export default function ReportsScreen() {
         budgets={budgets}
         departments={departments}
         nobHealth={nobHealth}
-        onNavigate={(route) => router.push(route as any)}
+        onNavigate={(route) => {
+          const target =
+            route === "budgets" || route === "/budgets" || route === "budget" || route === "/budget"
+              ? "/budget"
+              : route === "reports" || route === "/reports"
+              ? "/(tabs)/reports"
+              : route === "expenses" || route === "/expenses"
+              ? "/(tabs)/expenses"
+              : route;
+          router.push(target as any);
+        }}
       />
     </View>
   );

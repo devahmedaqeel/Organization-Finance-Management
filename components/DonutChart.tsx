@@ -7,6 +7,7 @@ import {
   PanResponder,
   GestureResponderEvent,
   Platform,
+  Animated,
 } from "react-native";
 import Svg, { Path, G, Circle } from "react-native-svg";
 import * as Haptics from "expo-haptics";
@@ -99,6 +100,10 @@ export function DonutChart({
   const colors = useColors();
   const [internalIndex, setInternalIndex] = useState<number | null>(null);
 
+  // Smooth spring scale & opacity animation for interactive center feedback
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const opacityAnim = useRef(new Animated.Value(1)).current;
+
   // Controlled or uncontrolled selection
   const effectiveIndex = useMemo(() => {
     if (selectedIndex !== undefined && selectedIndex !== null) return selectedIndex;
@@ -111,6 +116,24 @@ export function DonutChart({
     }
     return internalIndex;
   }, [selectedIndex, selectedLabel, segments, internalIndex]);
+
+  useEffect(() => {
+    scaleAnim.setValue(0.88);
+    opacityAnim.setValue(0.35);
+    Animated.parallel([
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        friction: 6,
+        tension: 140,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: 1,
+        duration: 160,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [effectiveIndex]);
 
   const setEffectiveIndex = (idx: number | null) => {
     setInternalIndex(idx);
@@ -296,7 +319,7 @@ export function DonutChart({
             activeOpacity={0.8}
           >
             {activeSegment ? (
-              <View style={{ alignItems: "center", justifyContent: "center", width: "100%", gap: 2 }}>
+              <Animated.View style={{ transform: [{ scale: scaleAnim }], opacity: opacityAnim, alignItems: "center", justifyContent: "center", width: "100%", gap: 2 }}>
                 <Text
                   style={[
                     styles.centerAmount,
@@ -338,9 +361,9 @@ export function DonutChart({
                     {((activeSegment.value / total) * 100).toFixed(1)}% of total
                   </Text>
                 </View>
-              </View>
+              </Animated.View>
             ) : (
-              <View style={{ alignItems: "center", justifyContent: "center", width: "100%", gap: 2 }}>
+              <Animated.View style={{ transform: [{ scale: scaleAnim }], opacity: opacityAnim, alignItems: "center", justifyContent: "center", width: "100%", gap: 2 }}>
                 <Text
                   style={[
                     styles.centerAmount,
@@ -360,7 +383,7 @@ export function DonutChart({
                 >
                   {centerSub}
                 </Text>
-              </View>
+              </Animated.View>
             )}
           </TouchableOpacity>
         </View>
@@ -369,7 +392,7 @@ export function DonutChart({
         {showLegend && (
           <View style={styles.legend}>
             {segments.map((seg, i) => {
-              const isSelected = selectedIndex === i;
+              const isSelected = effectiveIndex === i;
               const pct = ((seg.value / total) * 100).toFixed(0);
               return (
                 <TouchableOpacity
@@ -382,7 +405,7 @@ export function DonutChart({
                     },
                   ]}
                   onPress={() => {
-                    setSelectedIndex(selectedIndex === i ? null : i);
+                    setEffectiveIndex(effectiveIndex === i ? null : i);
                     if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
                   }}
                   activeOpacity={0.7}
@@ -427,12 +450,12 @@ export function DonutChart({
             style={[
               styles.chip,
               {
-                backgroundColor: selectedIndex === null ? colors.primary : (colors.cardAlt ?? colors.muted),
-                borderColor: selectedIndex === null ? colors.primary : colors.border,
+                backgroundColor: effectiveIndex === null ? colors.primary : (colors.cardAlt ?? colors.muted),
+                borderColor: effectiveIndex === null ? colors.primary : colors.border,
               },
             ]}
             onPress={() => {
-              setSelectedIndex(null);
+              setEffectiveIndex(null);
               if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
             }}
             activeOpacity={0.7}
@@ -440,8 +463,8 @@ export function DonutChart({
             <Text
               style={[
                 styles.chipText,
-                { color: selectedIndex === null ? "#FFFFFF" : colors.mutedForeground },
-                selectedIndex === null && { fontFamily: "Inter_700Bold" },
+                { color: effectiveIndex === null ? "#FFFFFF" : colors.mutedForeground },
+                effectiveIndex === null && { fontFamily: "Inter_700Bold" },
               ]}
             >
               All
@@ -449,7 +472,7 @@ export function DonutChart({
           </TouchableOpacity>
 
           {segments.map((seg, i) => {
-            const isSelected = selectedIndex === i;
+            const isSelected = effectiveIndex === i;
             return (
               <TouchableOpacity
                 key={`pill-${seg.label}`}
@@ -461,7 +484,7 @@ export function DonutChart({
                   },
                 ]}
                 onPress={() => {
-                  setSelectedIndex(selectedIndex === i ? null : i);
+                  setEffectiveIndex(effectiveIndex === i ? null : i);
                   if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
                 }}
                 activeOpacity={0.7}

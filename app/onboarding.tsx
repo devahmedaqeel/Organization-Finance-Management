@@ -112,12 +112,29 @@ export default function OnboardingScreen() {
     };
   }, [activeIndex, language, isVoiceEnabled]);
 
+  // Safe Haptic Helpers for Web & Mobile
+  const safeHaptic = (style: Haptics.ImpactFeedbackStyle = Haptics.ImpactFeedbackStyle.Light) => {
+    if (Platform.OS !== "web") {
+      try {
+        Haptics.impactAsync(style);
+      } catch {}
+    }
+  };
+
+  const safeHapticNotification = (type: Haptics.NotificationFeedbackType = Haptics.NotificationFeedbackType.Success) => {
+    if (Platform.OS !== "web") {
+      try {
+        Haptics.notificationAsync(type);
+      } catch {}
+    }
+  };
+
   const handleScroll = (event: any) => {
     const scrollOffset = event.nativeEvent.contentOffset.x;
     const index = Math.round(scrollOffset / width);
     if (index !== activeIndex && index >= 0 && index < SLIDES.length) {
       setActiveIndex(index);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      safeHaptic(Haptics.ImpactFeedbackStyle.Light);
     }
   };
 
@@ -126,14 +143,14 @@ export default function OnboardingScreen() {
     if (nextIndex < SLIDES.length) {
       flatListRef.current?.scrollToIndex({ index: nextIndex, animated: true });
       setActiveIndex(nextIndex);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      safeHaptic(Haptics.ImpactFeedbackStyle.Medium);
     } else {
       handleFinish();
     }
   };
 
   const handleSkip = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    safeHaptic(Haptics.ImpactFeedbackStyle.Medium);
     handleFinish();
   };
 
@@ -141,7 +158,7 @@ export default function OnboardingScreen() {
     try {
       Speech.stop();
       await AsyncStorage.setItem("ofm_onboarding_seen", "true");
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      safeHapticNotification(Haptics.NotificationFeedbackType.Success);
       router.replace("/login");
     } catch (e) {
       console.warn("AsyncStorage Error saving onboarding state:", e);
@@ -157,14 +174,14 @@ export default function OnboardingScreen() {
         <View style={[styles.langSwitcher, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <TouchableOpacity
             style={[styles.langBtn, language === "en" && { backgroundColor: colors.primary }]}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setLanguage("en"); }}
+            onPress={() => { safeHaptic(Haptics.ImpactFeedbackStyle.Light); setLanguage("en"); }}
             activeOpacity={0.7}
           >
             <Text style={[styles.langText, { color: language === "en" ? "#fff" : colors.mutedForeground }]}>EN</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.langBtn, language === "ur" && { backgroundColor: colors.primary }]}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setLanguage("ur"); }}
+            onPress={() => { safeHaptic(Haptics.ImpactFeedbackStyle.Light); setLanguage("ur"); }}
             activeOpacity={0.7}
           >
             <Text style={[styles.langText, { color: language === "ur" ? "#fff" : colors.mutedForeground, fontSize: 11 }]}>اردو</Text>
@@ -182,7 +199,7 @@ export default function OnboardingScreen() {
             }
           ]}
           onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            safeHaptic(Haptics.ImpactFeedbackStyle.Medium);
             setIsVoiceEnabled(!isVoiceEnabled);
           }}
           activeOpacity={0.7}

@@ -6,6 +6,7 @@ import { router } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
+  BackHandler,
   FlatList,
   KeyboardAvoidingView,
   Linking,
@@ -25,7 +26,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useSettings, AppTheme } from "@/context/SettingsContext";
 import { POPULAR_CURRENCIES, WORLD_CURRENCIES } from "@/constants/currencies";
 import { useColors } from "@/hooks/useColors";
-import { showFloatingToast } from "./_layout";
+import { showFloatingToast } from "@/utils/toast";
 
 interface FieldConfig {
   key: string;
@@ -58,6 +59,31 @@ export default function SettingsScreen() {
   const canEdit = user?.role === "admin";
   const webTop = Platform.OS === "web" ? 67 : 0;
 
+  // Safe Haptic Helpers for Web & Mobile
+  const safeHaptic = (style: Haptics.ImpactFeedbackStyle = Haptics.ImpactFeedbackStyle.Light) => {
+    if (Platform.OS !== "web") {
+      try {
+        Haptics.impactAsync(style);
+      } catch {}
+    }
+  };
+
+  const safeHapticNotification = (type: Haptics.NotificationFeedbackType = Haptics.NotificationFeedbackType.Success) => {
+    if (Platform.OS !== "web") {
+      try {
+        Haptics.notificationAsync(type);
+      } catch {}
+    }
+  };
+
+  const safeHapticSelection = () => {
+    if (Platform.OS !== "web") {
+      try {
+        Haptics.selectionAsync();
+      } catch {}
+    }
+  };
+
   // Logo Picker & Crop Handlers
   const handlePickLogo = async () => {
     if (!canEdit) return;
@@ -80,7 +106,7 @@ export default function SettingsScreen() {
         const asset = result.assets[0];
         const logoData = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
         handleChange("organizationLogo", logoData);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        safeHapticNotification(Haptics.NotificationFeedbackType.Success);
         showFloatingToast("Logo Selected", "Tap 'Save' above to save changes!");
       }
     } catch (e) {
@@ -109,7 +135,7 @@ export default function SettingsScreen() {
         const asset = result.assets[0];
         const logoData = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
         handleChange("organizationLogo", logoData);
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        safeHapticNotification(Haptics.NotificationFeedbackType.Success);
         showFloatingToast("Logo Captured", "Tap 'Save' above to save changes!");
       }
     } catch (e) {
@@ -120,7 +146,7 @@ export default function SettingsScreen() {
 
   const handleRemoveLogo = () => {
     handleChange("organizationLogo", "");
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    safeHapticNotification(Haptics.NotificationFeedbackType.Warning);
     showFloatingToast("Logo Removed", "Default initials restored. Tap 'Save' to apply.");
   };
 
@@ -142,7 +168,7 @@ export default function SettingsScreen() {
     await updateSettings(form);
     setSaved(true);
     setDirty(false);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    safeHapticNotification(Haptics.NotificationFeedbackType.Success);
     setTimeout(() => setSaved(false), 2500);
   };
 
@@ -169,6 +195,28 @@ export default function SettingsScreen() {
 
   const popularList = WORLD_CURRENCIES.filter((c) => POPULAR_CURRENCIES.includes(c.code));
 
+  useEffect(() => {
+    const onBackPress = () => {
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace("/(tabs)");
+      }
+      return true;
+    };
+    const sub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+    return () => sub.remove();
+  }, []);
+
+  const handleGoBack = () => {
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(tabs)");
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       style={[styles.flex, { backgroundColor: colors.background }]}
@@ -179,10 +227,7 @@ export default function SettingsScreen() {
         <View style={styles.headerRow}>
           <TouchableOpacity
             style={[styles.backBtn, { borderColor: colors.border }]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.back();
-            }}
+            onPress={handleGoBack}
           >
             <Feather name="arrow-left" size={18} color={colors.foreground} />
           </TouchableOpacity>
@@ -214,7 +259,7 @@ export default function SettingsScreen() {
             style={styles.logoContainerTouchable}
             onPress={() => {
               if (canEdit) {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                safeHaptic(Haptics.ImpactFeedbackStyle.Light);
                 setLogoModalVisible(true);
               }
             }}
@@ -266,7 +311,7 @@ export default function SettingsScreen() {
               <TouchableOpacity
                 style={[styles.changeLogoPill, { backgroundColor: colors.primary + "16", borderColor: colors.primary + "38" }]}
                 onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  safeHaptic(Haptics.ImpactFeedbackStyle.Light);
                   setLogoModalVisible(true);
                 }}
                 activeOpacity={0.75}
@@ -304,7 +349,7 @@ export default function SettingsScreen() {
                 onPress={async () => {
                   handleChange("theme", opt.value);
                   await updateSettings({ theme: opt.value });
-                  Haptics.selectionAsync();
+                  safeHapticSelection();
                 }}
                 activeOpacity={0.75}
               >
@@ -359,7 +404,7 @@ export default function SettingsScreen() {
           onPress={() => {
             if (canEdit) {
               setCurrencyModal(true);
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              safeHaptic(Haptics.ImpactFeedbackStyle.Light);
             }
           }}
           activeOpacity={canEdit ? 0.75 : 1}
@@ -576,7 +621,7 @@ export default function SettingsScreen() {
                         ]}
                         onPress={() => {
                           handleChange("currency", c.code);
-                          Haptics.selectionAsync();
+                          safeHapticSelection();
                           setCurrencyModal(false);
                           setCurrencySearch("");
                         }}
@@ -624,7 +669,7 @@ export default function SettingsScreen() {
                       ]}
                       onPress={() => {
                         handleChange("currency", c.code);
-                        Haptics.selectionAsync();
+                        safeHapticSelection();
                         setCurrencyModal(false);
                         setCurrencySearch("");
                       }}

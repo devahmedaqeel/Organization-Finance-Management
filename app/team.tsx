@@ -5,6 +5,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   FlatList,
   KeyboardAvoidingView,
   Linking,
@@ -76,9 +77,18 @@ export default function TeamScreen() {
   const [selectedMember, setSelectedMember] = useState<User | null>(null);
   const [memberModalVisible, setMemberModalVisible] = useState(false);
 
+  // Safe Haptic Helper for Web & Mobile
+  const safeHaptic = (style: Haptics.ImpactFeedbackStyle = Haptics.ImpactFeedbackStyle.Light) => {
+    if (Platform.OS !== "web") {
+      try {
+        Haptics.impactAsync(style);
+      } catch {}
+    }
+  };
+
   const handleUpdateRole = async (targetUser: User, newRole: UserRole) => {
     if (targetUser.role === newRole) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    safeHaptic(Haptics.ImpactFeedbackStyle.Medium);
 
     // Optimistically update local state
     setMembers((prev) =>
@@ -108,7 +118,7 @@ export default function TeamScreen() {
       Alert.alert("Cannot Remove", "You cannot remove your own account from the team.");
       return;
     }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    safeHaptic(Haptics.ImpactFeedbackStyle.Heavy);
     Alert.alert(
       "Remove Team Member",
       `Are you sure you want to remove ${targetUser.name} (${targetUser.email}) from ${settings.organizationName}?`,
@@ -378,7 +388,7 @@ ${orgName}`;
     if (settings.emailAutomatedEnabled && settings.emailjsServiceId && settings.emailjsTemplateId && settings.emailjsPublicKey) {
       try {
         setSendingInvite(true);
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        safeHaptic(Haptics.ImpactFeedbackStyle.Medium);
 
         const response = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
           method: "POST",
@@ -419,6 +429,28 @@ ${orgName}`;
     }
   };
 
+  useEffect(() => {
+    const onBackPress = () => {
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace("/(tabs)");
+      }
+      return true;
+    };
+    const sub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+    return () => sub.remove();
+  }, []);
+
+  const handleGoBack = () => {
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(tabs)");
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       style={[styles.flex, { backgroundColor: colors.background }]}
@@ -429,7 +461,7 @@ ${orgName}`;
         <View style={styles.headerRow}>
           <TouchableOpacity
             style={[styles.backBtn, { borderColor: colors.border }]}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
+            onPress={handleGoBack}
           >
             <Feather name="arrow-left" size={18} color={colors.foreground} />
           </TouchableOpacity>
@@ -473,7 +505,7 @@ ${orgName}`;
                       },
                     ]}
                     onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      safeHaptic(Haptics.ImpactFeedbackStyle.Light);
                       setSelectedRole(stat.filterKey);
                     }}
                     activeOpacity={0.8}
@@ -530,7 +562,7 @@ ${orgName}`;
                         borderColor: isActive ? colors.primary : colors.border,
                       },
                     ]}
-                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedRole(filter.id); }}
+                    onPress={() => { safeHaptic(Haptics.ImpactFeedbackStyle.Light); setSelectedRole(filter.id); }}
                     activeOpacity={0.8}
                   >
                     <Text style={[styles.filterChipText, { color: isActive ? "#fff" : colors.mutedForeground }]}>
@@ -567,7 +599,7 @@ ${orgName}`;
               style={[styles.memberCard, { backgroundColor: colors.card, borderColor: colors.border }]}
               activeOpacity={0.85}
               onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                safeHaptic(Haptics.ImpactFeedbackStyle.Light);
                 setSelectedMember(item);
                 setMemberModalVisible(true);
               }}
@@ -616,7 +648,7 @@ ${orgName}`;
             },
           ]}
           onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            safeHaptic(Haptics.ImpactFeedbackStyle.Light);
             setInviteModal(true);
           }}
           activeOpacity={0.85}
@@ -823,7 +855,7 @@ ${orgName}`;
                   <TouchableOpacity
                     style={[styles.actionBtnSecondary, { flex: 1, backgroundColor: colors.card, borderColor: colors.border }]}
                     onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      safeHaptic(Haptics.ImpactFeedbackStyle.Light);
                       Linking.openURL(`mailto:${selectedMember.email}`);
                     }}
                     activeOpacity={0.8}

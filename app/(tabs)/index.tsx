@@ -2,9 +2,10 @@ import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   Animated,
+  BackHandler,
   Dimensions,
   KeyboardAvoidingView,
   Platform,
@@ -225,6 +226,35 @@ export default function DashboardScreen() {
   const [activePeriod, setActivePeriod] = useState<NormalizedPeriod>(() =>
     getPresetPeriod("last_6m")
   );
+
+  // Hardware Back button handling on Android
+  useEffect(() => {
+    const onBackPress = () => {
+      if (mobileDrillDown !== null) {
+        setMobileDrillDown(null);
+        return true;
+      }
+      if (txModalVisible) {
+        setTxModalVisible(false);
+        return true;
+      }
+      if (exportModalVisible) {
+        setExportModalVisible(false);
+        return true;
+      }
+      if (netModalVisible) {
+        setNetModalVisible(false);
+        return true;
+      }
+      if (notificationModalVisible) {
+        setNotificationModalVisible(false);
+        return true;
+      }
+      return false; // allow native Android app exit
+    };
+    const sub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+    return () => sub.remove();
+  }, [mobileDrillDown, txModalVisible, exportModalVisible, netModalVisible, notificationModalVisible]);
 
   const currentGranularity = activePeriod.userGranularityOverride || activePeriod.granularity;
   const granularityLabel =
@@ -1403,7 +1433,17 @@ export default function DashboardScreen() {
         budgets={budgets}
         departments={departments}
         nobHealth={nobHealth}
-        onNavigate={(route) => router.push(route as any)}
+        onNavigate={(route) => {
+          const target =
+            route === "budgets" || route === "/budgets" || route === "budget" || route === "/budget"
+              ? "/budget"
+              : route === "reports" || route === "/reports"
+              ? "/(tabs)/reports"
+              : route === "expenses" || route === "/expenses"
+              ? "/(tabs)/expenses"
+              : route;
+          router.push(target as any);
+        }}
       />
     </ScrollView>
   );

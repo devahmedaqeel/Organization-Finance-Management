@@ -1,9 +1,10 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   Alert,
+  BackHandler,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -186,6 +187,28 @@ export default function BudgetScreen() {
     setDeletingBudget(item);
   };
 
+  useEffect(() => {
+    const onBackPress = () => {
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace("/(tabs)");
+      }
+      return true;
+    };
+    const sub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
+    return () => sub.remove();
+  }, []);
+
+  const handleGoBack = () => {
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/(tabs)");
+    }
+  };
+
   return (
     <View style={[styles.flex, { backgroundColor: colors.background }]}>
       {/* Header */}
@@ -193,7 +216,7 @@ export default function BudgetScreen() {
         style={[
           styles.header,
           {
-            paddingTop: webTop + insets.top + (Platform.OS === "android" ? 20 : 12),
+            paddingTop: webTop + insets.top + (Platform.OS === "android" ? 22 : 12),
             backgroundColor: colors.background,
             borderBottomColor: colors.border,
           },
@@ -201,7 +224,7 @@ export default function BudgetScreen() {
       >
         <View style={styles.headerRow}>
           <TouchableOpacity
-            onPress={() => router.back()}
+            onPress={handleGoBack}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <Feather name="arrow-left" size={24} color={colors.foreground} />
@@ -280,13 +303,23 @@ export default function BudgetScreen() {
               centerLabel={`${settings.currency} ${fmtNum(totalAllocated)}`}
               centerSub="Total Allocated"
               currency={settings.currency}
+              selectedLabel={selectedDeptFilter === "All" ? undefined : selectedDeptFilter}
+              onSelectLabel={(label) => {
+                if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
+                setSelectedDeptFilter(label || "All");
+              }}
               showChips={false}
             />
 
-            {/* Department Filter Pills */}
+            {/* Department Filter Pills (Smooth Edge-to-Edge Slider) */}
             <View style={styles.filterPillsSection}>
               <Text style={[styles.filterLabel, { color: colors.mutedForeground }]}>FILTER BY DEPARTMENT</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterPillsRow}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.filterPillsScroll}
+                contentContainerStyle={styles.filterPillsRow}
+              >
                 <TouchableOpacity
                   style={[
                     styles.deptPill,
@@ -337,7 +370,6 @@ export default function BudgetScreen() {
                           { color: isSelected ? "#FFFFFF" : colors.foreground },
                           isSelected && { fontFamily: "Inter_700Bold" },
                         ]}
-                        numberOfLines={1}
                       >
                         {d.label}
                       </Text>
@@ -656,35 +688,41 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
   },
   filterPillsSection: {
-    gap: 6,
-    marginTop: 4,
+    gap: 8,
+    marginTop: 6,
   },
   filterLabel: {
     fontSize: 9.5,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.6,
   },
+  filterPillsScroll: {
+    marginHorizontal: -14,
+  },
   filterPillsRow: {
     flexDirection: "row",
-    gap: 6,
-    paddingVertical: 2,
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 4,
   },
   deptPill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 14,
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 16,
     borderWidth: 1,
+    flexShrink: 0,
   },
   deptDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
   },
   deptPillText: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontFamily: "Inter_600SemiBold",
   },
   listHeaderRow: {
