@@ -69,6 +69,40 @@ interface NavItem {
   roleRestriction?: ("admin" | "accountant" | "manager" | "employee")[];
 }
 
+const VALID_TABS: WebTabKey[] = [
+  "dashboard",
+  "income",
+  "expenses",
+  "transactions",
+  "budgets",
+  "departments",
+  "payroll",
+  "team",
+  "reports",
+  "ai-insights",
+  "settings",
+];
+
+const TAB_ALIASES: Record<string, WebTabKey> = {
+  ledger: "transactions",
+  transaction: "transactions",
+  budget: "budgets",
+  department: "departments",
+  report: "reports",
+  insight: "ai-insights",
+  insights: "ai-insights",
+  setting: "settings",
+  salary: "payroll",
+};
+
+export function normalizeWebTab(raw: string | null | undefined): WebTabKey {
+  if (!raw) return "dashboard";
+  const lower = raw.toLowerCase().trim();
+  if (TAB_ALIASES[lower]) return TAB_ALIASES[lower];
+  if (VALID_TABS.includes(lower as WebTabKey)) return lower as WebTabKey;
+  return "dashboard";
+}
+
 export function WebShell() {
   const colors = useColors();
   const { width } = useWindowDimensions();
@@ -91,13 +125,14 @@ export function WebShell() {
   const [tabHistory, setTabHistory] = useState<WebTabKey[]>(["dashboard"]);
 
   const navigateToTab = useCallback((tab: WebTabKey) => {
+    const valid = normalizeWebTab(tab);
     setActiveTab((prev) => {
-      if (prev === tab) return prev;
-      setTabHistory((h) => [...h, tab]);
+      if (prev === valid) return prev;
+      setTabHistory((h) => [...h, valid]);
       if (typeof window !== "undefined" && window.history) {
-        window.history.pushState({ tab }, "", "?tab=" + tab);
+        window.history.pushState({ tab: valid }, "", "?tab=" + valid);
       }
-      return tab;
+      return valid;
     });
   }, []);
 
@@ -122,7 +157,7 @@ export function WebShell() {
       if (prevHistory.length > 1) {
         const nextHistory = [...prevHistory];
         nextHistory.pop();
-        const targetTab = nextHistory[nextHistory.length - 1];
+        const targetTab = normalizeWebTab(nextHistory[nextHistory.length - 1]);
         setActiveTab(targetTab);
         if (typeof window !== "undefined" && window.history) {
           window.history.replaceState({ tab: targetTab }, "", "?tab=" + targetTab);
@@ -150,20 +185,22 @@ export function WebShell() {
   useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
-      const tabParam = params.get("tab") as WebTabKey;
-      if (tabParam) {
-        setActiveTab(tabParam);
-        setTabHistory(["dashboard", tabParam]);
+      const rawTab = params.get("tab");
+      if (rawTab) {
+        const normalized = normalizeWebTab(rawTab);
+        setActiveTab(normalized);
+        setTabHistory(["dashboard", normalized]);
       }
 
       const handlePopState = (e: PopStateEvent) => {
         if (e.state && e.state.tab) {
-          setActiveTab(e.state.tab);
+          const target = normalizeWebTab(e.state.tab);
+          setActiveTab(target);
           setTabHistory((prev) => {
-            if (prev.length > 1 && prev[prev.length - 2] === e.state.tab) {
+            if (prev.length > 1 && prev[prev.length - 2] === target) {
               return prev.slice(0, -1);
             }
-            return [...prev, e.state.tab];
+            return [...prev, target];
           });
         }
       };
@@ -681,6 +718,13 @@ export function WebShell() {
             {activeTab === "reports" && <WebReports onNavigate={(route) => navigateToTab(route as WebTabKey)} />}
             {activeTab === "ai-insights" && <WebAIInsights />}
             {activeTab === "settings" && <WebSettings />}
+            {!VALID_TABS.includes(activeTab) && (
+              <WebDashboard
+                onNavigate={(route) => navigateToTab(route as WebTabKey)}
+                onOpenTransactionModal={handleOpenTx}
+                onOpenBudgetModal={() => setBudgetModalVisible(true)}
+              />
+            )}
           </WebPageTransition>
         </View>
 

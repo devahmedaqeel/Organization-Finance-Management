@@ -222,36 +222,9 @@ export function WebDashboard({
       {/* ─── Executive Welcome & Quick Action Bar ─── */}
       <View style={[styles.topActionRow, isMobile && { flexDirection: "column", alignItems: "flex-start", gap: 12 }]}>
         <View style={{ maxWidth: "100%" }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <Text style={[styles.welcomeTitle, { color: colors.foreground, fontSize: isMobile ? 18 : 22 }]}>
-              Executive Financial Overview
-            </Text>
-            <View style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 5,
-              backgroundColor: syncStatus === "synced" ? "rgba(16, 185, 129, 0.12)" : "rgba(245, 158, 11, 0.12)",
-              paddingHorizontal: 8,
-              paddingVertical: 3,
-              borderRadius: 12,
-              borderWidth: 1,
-              borderColor: syncStatus === "synced" ? "rgba(16, 185, 129, 0.3)" : "rgba(245, 158, 11, 0.3)",
-            }}>
-              <View style={{
-                width: 6,
-                height: 6,
-                borderRadius: 3,
-                backgroundColor: syncStatus === "synced" ? "#10B981" : "#F59E0B",
-              }} />
-              <Text style={{
-                fontSize: 11,
-                fontWeight: "600",
-                color: syncStatus === "synced" ? "#10B981" : "#F59E0B",
-              }}>
-                {syncStatus === "synced" ? "Live Cloud Synchronized" : "Syncing..."}
-              </Text>
-            </View>
-          </View>
+          <Text style={[styles.welcomeTitle, { color: colors.foreground, fontSize: isMobile ? 18 : 22 }]}>
+            Executive Financial Overview
+          </Text>
           <Text style={[styles.welcomeSubtitle, { color: colors.mutedForeground, fontSize: isMobile ? 11.5 : 13, marginTop: 2 }]} numberOfLines={1}>
             {settings.organizationName || user?.organization || "Organization Finance Management"} · Real-Time Institutional Ledger
           </Text>
@@ -455,8 +428,8 @@ export function WebDashboard({
             activeOpacity={0.8}
           >
             <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#10B981" }} />
-            <Text style={{ color: balanceViewMode === "cashflow" ? "#FFFFFF" : "rgba(255, 255, 255, 0.75)", fontSize: isMobile ? 10.5 : 12, fontFamily: "Inter_700Bold" }} numberOfLines={1}>
-              Net Surplus ({netBalance >= 0 ? "+" : "-"}{settings.currency} {fmt(Math.abs(netBalance))})
+            <Text style={{ color: balanceViewMode === "cashflow" ? "#FFFFFF" : "rgba(255, 255, 255, 0.75)", fontSize: isMobile ? 10 : 12, fontFamily: "Inter_700Bold" }} numberOfLines={1}>
+              {isMobile ? `Surplus (${netBalance >= 0 ? "+" : "-"}${fmt(Math.abs(netBalance))})` : `Net Surplus (${netBalance >= 0 ? "+" : "-"}${settings.currency} ${fmt(Math.abs(netBalance))})`}
             </Text>
           </TouchableOpacity>
 
@@ -479,8 +452,8 @@ export function WebDashboard({
             activeOpacity={0.8}
           >
             <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#F43F5E" }} />
-            <Text style={{ color: balanceViewMode === "expenses" ? "#FFFFFF" : "rgba(255, 255, 255, 0.75)", fontSize: isMobile ? 10.5 : 12, fontFamily: "Inter_700Bold" }} numberOfLines={1}>
-              Total Outflows (-{settings.currency} {fmt(totalExpenses)})
+            <Text style={{ color: balanceViewMode === "expenses" ? "#FFFFFF" : "rgba(255, 255, 255, 0.75)", fontSize: isMobile ? 10 : 12, fontFamily: "Inter_700Bold" }} numberOfLines={1}>
+              {isMobile ? `Outflows (-${fmt(totalExpenses)})` : `Total Outflows (-${settings.currency} ${fmt(totalExpenses)})`}
             </Text>
           </TouchableOpacity>
         </View>

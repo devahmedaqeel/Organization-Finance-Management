@@ -318,26 +318,15 @@ export default function RootLayout() {
       `;
     }
 
-    // Safety timeout: Always hide splash screen within 400ms to guarantee instant app load
-    const timer = setTimeout(() => {
-      SplashScreen.hideAsync().catch(() => {});
-    }, 400);
+    // Always hide splash screen immediately to guarantee instant app launch on Expo Go & Native
+    SplashScreen.hideAsync().catch(() => {});
 
     if (fontsLoaded || fontError) {
-      clearTimeout(timer);
-      SplashScreen.hideAsync().catch(() => {});
       if (Platform.OS !== "web") {
         requestNotificationPermissions();
       }
     }
-
-    return () => clearTimeout(timer);
   }, [fontsLoaded, fontError]);
-
-  // Only block on native mobile — on Web, CSS fonts & system-ui render immediately with zero delay
-  if (Platform.OS !== "web" && !fontsLoaded && !fontError) {
-    return <View style={{ flex: 1, backgroundColor: '#0f172a' }} />;
-  }
 
   return (
     <SafeAreaProvider>

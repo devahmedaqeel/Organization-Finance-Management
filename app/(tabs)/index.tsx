@@ -503,11 +503,13 @@ export default function DashboardScreen() {
         <View style={{ flexDirection: "row", gap: 6, marginTop: -4, marginBottom: 2 }}>
           <TouchableOpacity
             style={{
+              flex: 1,
               flexDirection: "row",
               alignItems: "center",
+              justifyContent: "center",
               gap: 4,
               paddingHorizontal: 8,
-              paddingVertical: 3.5,
+              paddingVertical: 4,
               borderRadius: 8,
               backgroundColor: balanceViewMode === "cashflow" ? "rgba(59, 130, 246, 0.35)" : "rgba(255, 255, 255, 0.08)",
               borderWidth: 1,
@@ -519,18 +521,20 @@ export default function DashboardScreen() {
             }}
           >
             <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: "#10B981" }} />
-            <Text style={{ color: balanceViewMode === "cashflow" ? "#FFFFFF" : "rgba(255, 255, 255, 0.7)", fontSize: 10, fontFamily: "Inter_700Bold" }}>
-              Net Surplus ({netBalance >= 0 ? "+" : "-"}{settings.currency} {fmt(Math.abs(netBalance))})
+            <Text style={{ color: balanceViewMode === "cashflow" ? "#FFFFFF" : "rgba(255, 255, 255, 0.7)", fontSize: 10, fontFamily: "Inter_700Bold" }} numberOfLines={1}>
+              Surplus ({netBalance >= 0 ? "+" : "-"}{fmt(Math.abs(netBalance))})
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={{
+              flex: 1,
               flexDirection: "row",
               alignItems: "center",
+              justifyContent: "center",
               gap: 4,
               paddingHorizontal: 8,
-              paddingVertical: 3.5,
+              paddingVertical: 4,
               borderRadius: 8,
               backgroundColor: balanceViewMode === "expenses" ? "rgba(244, 63, 94, 0.35)" : "rgba(255, 255, 255, 0.08)",
               borderWidth: 1,
@@ -542,8 +546,8 @@ export default function DashboardScreen() {
             }}
           >
             <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: "#F43F5E" }} />
-            <Text style={{ color: balanceViewMode === "expenses" ? "#FFFFFF" : "rgba(255, 255, 255, 0.7)", fontSize: 10, fontFamily: "Inter_700Bold" }}>
-              Total Outflows (-{settings.currency} {fmt(totalExpenses)})
+            <Text style={{ color: balanceViewMode === "expenses" ? "#FFFFFF" : "rgba(255, 255, 255, 0.7)", fontSize: 10, fontFamily: "Inter_700Bold" }} numberOfLines={1}>
+              Outflows (-{fmt(totalExpenses)})
             </Text>
           </TouchableOpacity>
         </View>

@@ -177,14 +177,14 @@ export function FinancialAnalyticsSuite({
                   : budgetMode === "remaining"
                   ? `${remRatio < 100 && remRatio > 99 ? remRatio.toFixed(1) : remRatio.toFixed(0)}% LEFT`
                   : budget.isOverBudget
-                  ? `${formatCompactCurrency(budget.excessAmount, currency)} OVER`
-                  : `${formatCompactCurrency(budget.actualSpending, currency)} SPENT`;
+                  ? `${formatCompactCurrency(budget.excessAmount, currency)} Over`
+                  : `${formatCompactCurrency(budget.actualSpending, currency)} Spent`;
 
               return (
                 <RingProgress
                   percentage={activePct}
-                  size={135}
-                  strokeWidth={13}
+                  size={145}
+                  strokeWidth={12}
                   color={budgetMode === "remaining" ? colors.income : budget.statusColor}
                   centerLabel={centerLabel}
                   label={label}
@@ -373,7 +373,7 @@ export function FinancialAnalyticsSuite({
                 ringColor = colors.expense;
                 centerLabel = `${outflowSharePct.toFixed(1)}%`;
                 label = "Expenses Share";
-                sublabel = `-${formatCompactCurrency(expenses, currency)} Expenses`;
+                sublabel = `-${formatCompactCurrency(expenses, currency)}`;
               } else if (marginMode === "net") {
                 activePct = isLoss
                   ? Math.min(98.5, Math.max(5, deficitSharePct))
@@ -381,7 +381,7 @@ export function FinancialAnalyticsSuite({
                 ringColor = isLoss ? colors.expense : colors.income;
                 centerLabel = `${isLoss ? "-" : "+"}${formatCompactCurrency(Math.abs(income), currency)}`;
                 label = isLoss ? "Net Deficit" : "Net Surplus";
-                sublabel = `${isLoss ? "Loss" : "Profit"}: ${margin.displayMargin}`;
+                sublabel = margin.displayMargin;
               } else {
                 // marginMode === "margin" (Profit / Loss %)
                 if (!margin.hasRevenue) {
@@ -389,7 +389,7 @@ export function FinancialAnalyticsSuite({
                   ringColor = expenses > 0 ? colors.expense : colors.mutedForeground;
                   centerLabel = expenses > 0 ? "-100%" : "0%";
                   label = expenses > 0 ? "Zero Income" : "No Activity";
-                  sublabel = expenses > 0 ? `-${formatCompactCurrency(expenses, currency)} Deficit` : "PKR 0";
+                  sublabel = expenses > 0 ? `-${formatCompactCurrency(expenses, currency)}` : "PKR 0";
                 } else if (isLoss) {
                   // If moderate loss (within -100%), show proportional arc
                   // If extreme deficit (e.g. -4920%), show 98% deficit arc so it is NOT a fake solid 100% circle
@@ -400,22 +400,22 @@ export function FinancialAnalyticsSuite({
                   ringColor = colors.expense;
                   centerLabel = margin.displayMargin;
                   label = "Operating Loss";
-                  sublabel = `Loss: -${formatCompactCurrency(Math.abs(income), currency)}`;
+                  sublabel = `-${formatCompactCurrency(Math.abs(income), currency)}`;
                 } else {
                   // Healthy Surplus
                   activePct = Math.min(100, Math.max(0, margin.rawMarginPct));
                   ringColor = colors.income;
                   centerLabel = margin.displayMargin;
                   label = "Operating Profit";
-                  sublabel = `Profit: +${formatCompactCurrency(income, currency)}`;
+                  sublabel = `+${formatCompactCurrency(income, currency)}`;
                 }
               }
 
               return (
                 <RingProgress
                   percentage={activePct}
-                  size={135}
-                  strokeWidth={13}
+                  size={145}
+                  strokeWidth={12}
                   color={ringColor}
                   centerLabel={centerLabel}
                   label={label}

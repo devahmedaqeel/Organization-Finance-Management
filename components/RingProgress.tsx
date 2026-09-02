@@ -142,10 +142,10 @@ export function RingProgress({
         style={[
           styles.center,
           {
-            width: (radius - strokeWidth / 2) * 2,
-            height: (radius - strokeWidth / 2) * 2,
-            maxWidth: (radius - strokeWidth / 2) * 2,
-            maxHeight: (radius - strokeWidth / 2) * 2,
+            width: (radius - strokeWidth / 2) * 2 - 4,
+            height: (radius - strokeWidth / 2) * 2 - 4,
+            maxWidth: (radius - strokeWidth / 2) * 2 - 4,
+            maxHeight: (radius - strokeWidth / 2) * 2 - 4,
           },
         ]}
       >
@@ -156,12 +156,12 @@ export function RingProgress({
               color: ringColor,
               fontSize:
                 (centerLabel || "").length > 9
-                  ? 12.5
+                  ? 13.5
                   : (centerLabel || "").length > 6
-                  ? 14.5
-                  : size >= 130
-                  ? 19
-                  : 16,
+                  ? 16
+                  : size >= 135
+                  ? 20
+                  : 17,
             },
           ]}
           numberOfLines={1}
@@ -173,8 +173,8 @@ export function RingProgress({
           style={[
             styles.label,
             {
-              color: colors.foreground,
-              fontSize: size >= 130 ? 9.5 : 8.5,
+              color: colors.mutedForeground,
+              fontSize: size >= 135 ? 10 : 9,
             },
           ]}
           numberOfLines={1}
@@ -187,6 +187,10 @@ export function RingProgress({
             {
               backgroundColor: ringColor + "14",
               borderColor: ringColor + "25",
+              maxWidth: "92%",
+              paddingHorizontal: 6,
+              paddingVertical: 1.5,
+              borderRadius: 6,
             },
           ]}
         >
@@ -195,10 +199,11 @@ export function RingProgress({
               styles.sublabel,
               {
                 color: ringColor,
-                fontSize: size >= 130 ? 8 : 7,
+                fontSize: size >= 135 ? 8.5 : 7.5,
               },
             ]}
             numberOfLines={1}
+            adjustsFontSizeToFit
           >
             {sublabel || statusLabel}
           </Text>
