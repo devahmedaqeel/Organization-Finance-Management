@@ -131,10 +131,11 @@ export function WebSettings() {
               return;
             }
             const reader = new FileReader();
-            reader.onload = (loadEvent) => {
+            reader.onload = async (loadEvent) => {
               const result = loadEvent.target?.result as string;
               if (result) {
-                setTempLogoUrl(result);
+                handleChange("organizationLogo", result);
+                await updateSettings({ organizationLogo: result });
               }
             };
             reader.readAsDataURL(file);
@@ -155,18 +156,12 @@ export function WebSettings() {
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const asset = result.assets[0];
         const uri = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
-        setTempLogoUrl(uri);
+        handleChange("organizationLogo", uri);
+        await updateSettings({ organizationLogo: uri });
       }
     } catch (err: any) {
       alert("Could not select image: " + (err?.message || err));
     }
-  };
-
-  const handleApplyLogoUrl = async () => {
-    const trimmed = tempLogoUrl.trim();
-    handleChange("organizationLogo", trimmed);
-    setLogoModalVisible(false);
-    await updateSettings({ organizationLogo: trimmed });
   };
 
   const selectedCurrency = useMemo(() => {
@@ -292,28 +287,12 @@ export function WebSettings() {
                   <View style={{ flexDirection: "row", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
                     <TouchableOpacity
                       style={[styles.logoActionBtn, { borderColor: colors.primary, backgroundColor: colors.primary }]}
-                      onPress={async () => {
-                        await handlePickFromDevice();
-                        setLogoModalVisible(true);
-                      }}
+                      onPress={handlePickFromDevice}
                       activeOpacity={0.8}
                     >
                       <SvgUpload size={13} color="#FFFFFF" />
                       <Text style={[styles.logoActionText, { color: "#FFFFFF" }]}>
-                        From Device
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[styles.logoActionBtn, { borderColor: colors.border, backgroundColor: colors.card }]}
-                      onPress={() => {
-                        setTempLogoUrl(form.organizationLogo || "");
-                        setLogoModalVisible(true);
-                      }}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[styles.logoActionText, { color: colors.foreground }]}>
-                        Web URL
+                        Upload Logo
                       </Text>
                     </TouchableOpacity>
 
@@ -448,102 +427,8 @@ export function WebSettings() {
               })}
             </View>
           </View>
-
         </View>
       </View>
-
-      {/* Logo URL Modal */}
-      <Modal visible={logoModalVisible} transparent animationType="fade" onRequestClose={() => setLogoModalVisible(false)}>
-        <View style={styles.modalBackdrop}>
-          <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-              <View>
-                <Text style={[styles.modalTitle, { color: colors.foreground }]}>Upload Organization Logo</Text>
-                <Text style={[styles.modalSub, { color: colors.mutedForeground }]}>Choose an image from your device or paste a web URL</Text>
-              </View>
-              <TouchableOpacity onPress={() => setLogoModalVisible(false)} style={styles.modalCloseBtn}>
-                <SvgX size={16} color={colors.mutedForeground} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={{ padding: 20, gap: 16 }}>
-              {/* Option 1: Upload from Device */}
-              <TouchableOpacity
-                style={[
-                  styles.deviceUploadCard,
-                  {
-                    backgroundColor: colors.primary + "12",
-                    borderColor: colors.primary + "40",
-                  },
-                ]}
-                onPress={handlePickFromDevice}
-                activeOpacity={0.75}
-              >
-                <View style={[styles.deviceUploadIconCircle, { backgroundColor: colors.primary }]}>
-                  <SvgUpload size={18} color="#FFFFFF" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.deviceUploadTitle, { color: colors.foreground }]}>Choose Image from Device</Text>
-                  <Text style={[styles.deviceUploadSub, { color: colors.mutedForeground }]}>
-                    PNG, JPG, SVG, WEBP up to 5MB
-                  </Text>
-                </View>
-                <View style={[styles.deviceUploadBadge, { backgroundColor: colors.primary }]}>
-                  <Text style={styles.deviceUploadBadgeText}>Browse</Text>
-                </View>
-              </TouchableOpacity>
-
-              {/* Divider */}
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
-                <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: colors.mutedForeground, letterSpacing: 0.5 }}>
-                  OR ENTER WEB URL
-                </Text>
-                <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
-              </View>
-
-              {/* Option 2: Web URL input */}
-              <View style={styles.formGroup}>
-                <Text style={[styles.label, { color: colors.mutedForeground }]}>IMAGE WEB URL</Text>
-                <View style={[styles.inputWrap, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                  <TextInput
-                    style={[styles.input, { color: colors.foreground }]}
-                    placeholder="https://your-domain.com/logo.png"
-                    placeholderTextColor={colors.mutedForeground + "80"}
-                    value={tempLogoUrl}
-                    onChangeText={setTempLogoUrl}
-                    autoCapitalize="none"
-                  />
-                </View>
-              </View>
-
-              {/* Live Preview */}
-              {tempLogoUrl ? (
-                <View style={{ alignItems: "center", padding: 14, backgroundColor: colors.background, borderRadius: 12, borderWidth: 1, borderColor: colors.border, gap: 10 }}>
-                  <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: colors.mutedForeground }}>PREVIEW</Text>
-                  <Image source={{ uri: tempLogoUrl }} style={{ width: 80, height: 80, borderRadius: 12 }} resizeMode="contain" />
-                  <TouchableOpacity
-                    style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 4, paddingHorizontal: 8 }}
-                    onPress={() => setTempLogoUrl("")}
-                  >
-                    <SvgTrash size={13} color={colors.expense} />
-                    <Text style={{ fontSize: 11.5, fontFamily: "Inter_600SemiBold", color: colors.expense }}>Clear Image</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : null}
-            </View>
-
-            <View style={[styles.modalFooter, { borderTopColor: colors.border }]}>
-              <TouchableOpacity style={[styles.cancelBtn, { borderColor: colors.border }]} onPress={() => setLogoModalVisible(false)}>
-                <Text style={[styles.cancelBtnText, { color: colors.foreground }]}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: colors.primary }]} onPress={handleApplyLogoUrl}>
-                <Text style={styles.primaryBtnText}>Save Logo</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       {/* Currency Modal */}
       <Modal visible={currencyModal} transparent animationType="fade" onRequestClose={() => setCurrencyModal(false)}>
