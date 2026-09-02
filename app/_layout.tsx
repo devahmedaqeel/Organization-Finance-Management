@@ -33,10 +33,6 @@ LogBox.ignoreLogs([
   /warnOfExpoGoPushUsage/,
 ]);
 
-if (Platform.OS !== "web") {
-  SplashScreen.preventAutoHideAsync().catch(() => {});
-}
-
 const queryClient = new QueryClient();
 
 function ThemedStatusBar() {
@@ -204,8 +200,12 @@ const toastStyles = StyleSheet.create({
   },
 });
 
+import Constants, { ExecutionEnvironment } from "expo-constants";
+
+const isExpoGo = Constants?.executionEnvironment === ExecutionEnvironment.StoreClient;
+
 const SafeKeyboardProvider: React.ComponentType<{ children?: React.ReactNode }> = (() => {
-  if (Platform.OS === "web") {
+  if (Platform.OS === "web" || isExpoGo) {
     return ({ children }: { children?: React.ReactNode }) => <>{children}</>;
   }
   try {
@@ -288,7 +288,6 @@ export default function RootLayout() {
     Inter_700Bold,
     Inter_800ExtraBold,
     Inter_900Black,
-    ...(Platform.OS !== "web" ? (Feather.font ?? {}) : {}),
   });
 
   useEffect(() => {
