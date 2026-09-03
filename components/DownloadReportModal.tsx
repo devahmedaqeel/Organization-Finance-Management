@@ -118,10 +118,38 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
   const [customStart, setCustomStart] = useState(() => activePeriod?.startDate || "2026-01-01");
   const [customEnd, setCustomEnd] = useState(() => activePeriod?.endDate || "2026-09-01");
   const [selectedDept, setSelectedDept] = useState<string>("all");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedTypeFilter, setSelectedTypeFilter] = useState<"all" | "income" | "expense">("all");
+  const [customTitle, setCustomTitle] = useState("");
+  const [customNotes, setCustomNotes] = useState("");
   const [generating, setGenerating] = useState(false);
   const [loadingStep, setLoadingStep] = useState<string>("");
   const [previewModalVisible, setPreviewModalVisible] = useState(false);
   const [previewHtml, setPreviewHtml] = useState<string>("");
+
+  // Section selections
+  const [sections, setSections] = useState({
+    executiveSummary: true,
+    kpis: true,
+    healthEvaluation: true,
+    radialRings: true,
+    monthlyTrends: true,
+    revenueAnalysis: true,
+    expenseAnalysis: true,
+    departmentBreakdown: true,
+    budgetPerformance: true,
+    payrollAudit: true,
+    generalLedger: true,
+  });
+
+  // Chart selections
+  const [charts, setCharts] = useState({
+    trendLine: true,
+    revenueDonut: true,
+    expenseDonut: true,
+    departmentBars: true,
+    radialGauges: true,
+  });
 
   const [successModalData, setSuccessModalData] = useState<{
     visible: boolean;
@@ -142,6 +170,13 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
     return ["all", ...unique];
   }, [departments, transactions, payroll]);
 
+  const availableCategories = useMemo(() => {
+    const fromTx = transactions.map((t) => t.category).filter(Boolean);
+    const fromBg = budgets.map((b) => b.category).filter(Boolean);
+    const unique = Array.from(new Set([...fromTx, ...fromBg])).filter(Boolean);
+    return ["all", ...unique];
+  }, [transactions, budgets]);
+
   const effectivePeriod = useMemo(() => {
     if (scope === "custom") {
       return createCustomDatePeriod(customStart, customEnd);
@@ -159,7 +194,13 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
         period: effectivePeriod,
         scope: scope === "custom" ? "period" : scope,
         departmentFilter: selectedDept,
+        categoryFilter: selectedCategory,
+        typeFilter: selectedTypeFilter,
         reportType: selectedType,
+        customTitle: customTitle.trim() || undefined,
+        notes: customNotes.trim() || undefined,
+        selectedSections: sections,
+        selectedCharts: charts,
       },
       {
         organizationName: settings.organizationName || user?.organization || "DevOrbit Tech Kotli",
@@ -177,7 +218,7 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
         organization: settings.organizationName || user?.organization || "DevOrbit Tech Kotli",
       }
     );
-  }, [transactions, budgets, payroll, departments, effectivePeriod, scope, selectedDept, selectedType, settings, user]);
+  }, [transactions, budgets, payroll, departments, effectivePeriod, scope, selectedDept, selectedCategory, selectedTypeFilter, selectedType, customTitle, customNotes, sections, charts, settings, user]);
 
   const reportOptsForViewer: ReportOptions = useMemo(() => {
     return {
@@ -340,8 +381,29 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
                 })}
               </View>
 
+              {/* Custom Report Title & Auditor Notes */}
+              <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 14 }]}>2. Custom Report Title & Notes</Text>
+              <View style={{ gap: 8, marginBottom: 16 }}>
+                <TextInput
+                  value={customTitle}
+                  onChangeText={setCustomTitle}
+                  placeholder="Custom Report Title (e.g. January Operations Financial Report)"
+                  placeholderTextColor={colors.mutedForeground}
+                  style={[styles.inputBox, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground }]}
+                />
+                <TextInput
+                  value={customNotes}
+                  onChangeText={setCustomNotes}
+                  placeholder="Auditor Observations / Custom Executive Notes (optional)"
+                  placeholderTextColor={colors.mutedForeground}
+                  multiline
+                  numberOfLines={2}
+                  style={[styles.inputBox, { backgroundColor: colors.background, borderColor: colors.border, color: colors.foreground, minHeight: 52, textAlignVertical: "top" }]}
+                />
+              </View>
+
               {/* Scope & Date Filters */}
-              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>2. Financial Scope & Date Filter</Text>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>3. Financial Scope & Date Filter</Text>
               <View style={[styles.toggleRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
                 <TouchableOpacity
                   style={[styles.toggleBtn, scope === "period" && { backgroundColor: colors.primary }]}
@@ -415,8 +477,8 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
               )}
 
               {/* Department Cost Center Filter */}
-              <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 14 }]}>3. Cost Center Filter</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+              <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 14 }]}>4. Cost Center Filter</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
                 <View style={{ flexDirection: "row", gap: 6 }}>
                   {availableDepartments.map((dept) => {
                     const isSel = selectedDept === dept;
@@ -440,6 +502,107 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
                   })}
                 </View>
               </ScrollView>
+
+              {/* Category Filter */}
+              <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 14 }]}>5. Category Filter</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+                <View style={{ flexDirection: "row", gap: 6 }}>
+                  {availableCategories.map((cat) => {
+                    const isSel = selectedCategory === cat;
+                    return (
+                      <TouchableOpacity
+                        key={cat}
+                        style={[
+                          styles.deptChip,
+                          {
+                            backgroundColor: isSel ? colors.primary : colors.background,
+                            borderColor: isSel ? "transparent" : colors.border,
+                          },
+                        ]}
+                        onPress={() => setSelectedCategory(cat)}
+                      >
+                        <Text style={[styles.deptChipText, { color: isSel ? "#FFF" : colors.foreground }]}>
+                          {cat === "all" ? "All Categories" : cat}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+
+              {/* Transaction Flow Type Filter */}
+              <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 14 }]}>6. Transaction Flow Filter</Text>
+              <View style={[styles.toggleRow, { backgroundColor: colors.background, borderColor: colors.border, marginBottom: 16 }]}>
+                <TouchableOpacity
+                  style={[styles.toggleBtn, selectedTypeFilter === "all" && { backgroundColor: colors.primary }]}
+                  onPress={() => setSelectedTypeFilter("all")}
+                >
+                  <Text style={[styles.toggleBtnText, { color: selectedTypeFilter === "all" ? "#FFF" : colors.foreground }]}>
+                    All Flows
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.toggleBtn, selectedTypeFilter === "income" && { backgroundColor: "#10B981" }]}
+                  onPress={() => setSelectedTypeFilter("income")}
+                >
+                  <Text style={[styles.toggleBtnText, { color: selectedTypeFilter === "income" ? "#FFF" : colors.foreground }]}>
+                    Inflows Only
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.toggleBtn, selectedTypeFilter === "expense" && { backgroundColor: "#F43F5E" }]}
+                  onPress={() => setSelectedTypeFilter("expense")}
+                >
+                  <Text style={[styles.toggleBtnText, { color: selectedTypeFilter === "expense" ? "#FFF" : colors.foreground }]}>
+                    Outflows Only
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Section & Chart Inclusion Toggles */}
+              <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 14 }]}>7. Report Content & Visualization Toggles</Text>
+              <View style={{ gap: 6, marginBottom: 16 }}>
+                {[
+                  { key: "executiveSummary", label: "Executive Summary & KPIs" },
+                  { key: "healthEvaluation", label: "Financial Health Scorecard" },
+                  { key: "radialRings", label: "Radial Progress Rings & Gauges" },
+                  { key: "monthlyTrends", label: "Monthly Historical Trend Line Chart" },
+                  { key: "revenueAnalysis", label: "Institutional Inflow Streams (Donut + Table)" },
+                  { key: "expenseAnalysis", label: "Operational Expenditures (Donut + Table)" },
+                  { key: "departmentBreakdown", label: "Cost Center Allocations & Profitability" },
+                  { key: "budgetPerformance", label: "Fiscal Budget Performance Ceilings" },
+                  { key: "payrollAudit", label: "Staff Payroll & Remuneration Audit" },
+                  { key: "generalLedger", label: "Audited General Ledger Transaction Trail" },
+                ].map((secItem) => {
+                  const isEnabled = (sections as any)[secItem.key] !== false;
+                  return (
+                    <TouchableOpacity
+                      key={secItem.key}
+                      style={[
+                        styles.sectionToggleRow,
+                        {
+                          backgroundColor: isEnabled ? colors.primary + "10" : colors.background,
+                          borderColor: isEnabled ? colors.primary + "40" : colors.border,
+                        },
+                      ]}
+                      onPress={() => {
+                        setSections((prev) => ({
+                          ...prev,
+                          [secItem.key]: !isEnabled,
+                        }));
+                        if (Platform.OS !== "web") Haptics.selectionAsync();
+                      }}
+                    >
+                      <View style={[styles.checkboxBox, { backgroundColor: isEnabled ? colors.primary : "transparent", borderColor: isEnabled ? colors.primary : colors.border }]}>
+                        {isEnabled && <Feather name="check" size={12} color="#FFF" />}
+                      </View>
+                      <Text style={[styles.sectionToggleText, { color: isEnabled ? colors.foreground : colors.mutedForeground }]}>
+                        {secItem.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
 
               {/* Format Selection */}
               <Text style={[styles.sectionTitle, { color: colors.foreground }]}>4. Output Format</Text>
@@ -720,6 +883,35 @@ const styles = StyleSheet.create({
     fontSize: 11,
     textAlign: "center",
     lineHeight: 14,
+  },
+  inputBox: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  sectionToggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  checkboxBox: {
+    width: 18,
+    height: 18,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sectionToggleText: {
+    fontSize: 12.5,
+    fontWeight: "600",
   },
   footer: {
     paddingHorizontal: 20,

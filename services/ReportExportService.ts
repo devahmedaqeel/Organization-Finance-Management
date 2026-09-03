@@ -58,6 +58,13 @@ export interface ReportOptions {
   budgets: Budget[];
   members?: TeamMemberReportItem[];
   chartPoints?: ChartPointReportItem[];
+  customTitle?: string;
+  notes?: string;
+  selectedDepartment?: string;
+  selectedCategory?: string;
+  selectedTypeFilter?: "all" | "income" | "expense";
+  selectedSections?: any;
+  selectedCharts?: any;
   includeSummary?: boolean;
   includeCharts?: boolean;
   includeCategories?: boolean;
@@ -130,7 +137,14 @@ function normalizeToEnterpriseData(input: ReportOptions | EnterpriseReportData):
             granularity: "month",
           }
         : undefined,
+      departmentFilter: opts.selectedDepartment,
+      categoryFilter: opts.selectedCategory,
+      typeFilter: opts.selectedTypeFilter,
       reportType,
+      customTitle: opts.customTitle,
+      notes: opts.notes,
+      selectedSections: opts.selectedSections,
+      selectedCharts: opts.selectedCharts,
     },
     {
       organizationName: opts.organizationName,
@@ -609,21 +623,25 @@ export function buildPayslipHtml(
  */
 export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseReportData): string {
   const data = normalizeToEnterpriseData(input);
-  const { metadata, filters, executiveSummary, financialHealth, revenueAnalysis, expenseAnalysis, payrollSection, budgetPerformance, departmentFinancials, monthlyTrends, generalLedger } = data;
+  const { metadata, filters, executiveSummary, financialHealth, revenueAnalysis, expenseAnalysis, payrollSection, budgetPerformance, departmentFinancials, monthlyTrends, generalLedger, selectedSections, selectedCharts } = data;
   const currency = metadata.currency;
+
+  const sec = selectedSections || {};
+  const ch = selectedCharts || {};
 
   const type = data.reportType || "consolidated_statement";
   const isConsolidated = type === "consolidated_statement";
-  const isExecutive = isConsolidated || type === "executive_summary";
-  const isPayroll = isConsolidated || type === "payroll_audit";
-  const isRevenue = isConsolidated || type === "revenue_analysis";
-  const isExpense = isConsolidated || type === "expense_analysis";
-  const isDepartment = isConsolidated || type === "department_analysis";
-  const isBudget = isConsolidated || type === "budget_performance";
-  const isLedger = isConsolidated || type === "general_ledger";
+  const isExecutive = (isConsolidated || type === "executive_summary") && (sec.executiveSummary !== false);
+  const isPayroll = (isConsolidated || type === "payroll_audit") && (sec.payrollAudit !== false);
+  const isRevenue = (isConsolidated || type === "revenue_analysis") && (sec.revenueAnalysis !== false);
+  const isExpense = (isConsolidated || type === "expense_analysis") && (sec.expenseAnalysis !== false);
+  const isDepartment = (isConsolidated || type === "department_analysis") && (sec.departmentBreakdown !== false);
+  const isBudget = (isConsolidated || type === "budget_performance") && (sec.budgetPerformance !== false);
+  const isLedger = (isConsolidated || type === "general_ledger") && (sec.generalLedger !== false);
 
   let kpisHtml = "";
-  if (type === "payroll_audit") {
+  if (sec.kpis !== false) {
+    if (type === "payroll_audit") {
     kpisHtml = `
       <div class="kpi-card">
         <div class="kpi-label">Gross Payroll Budget</div>
@@ -746,10 +764,10 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
         <div class="kpi-sub">${executiveSummary.isNetPositive ? "Retained Surplus" : "Operating Deficit"}</div>
       </div>
     `;
-  } else {
-    kpisHtml = `
+    } else {
+      kpisHtml = `
       <div class="kpi-card">
-        <div class="kpi-label">Total Realized Revenue</div>
+        <div class="kpi-label">Total Realized Inflows</div>
         <div class="kpi-val" style="color: #10B981;">+${currency} ${fmt(executiveSummary.totalRevenue)}</div>
         <div class="kpi-sub">${revenueAnalysis.transactions.length} Inflow Receipts</div>
       </div>
@@ -773,6 +791,7 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
         <div class="kpi-sub">${currency} ${fmtShort(executiveSummary.budgetRemaining)} Remaining Limit</div>
       </div>
     `;
+    }
   }
 
   const contactParts: string[] = [];
@@ -931,8 +950,8 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
         </div>
       `}
       <div>
-        <div class="org-title">${metadata.organizationName}</div>
-        <div class="org-sub">${data.reportSubtitle}</div>
+        <div class="org-title">${data.reportTitle}</div>
+        <div class="org-sub">${metadata.organizationName} · ${data.reportSubtitle}</div>
         <div class="org-contact">${cleanContact}</div>
       </div>
     </div>
@@ -952,13 +971,25 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
     <div><strong>Type:</strong> <span class="filter-tag">${filters.type}</span></div>
   </div>
 
+  ${metadata.notes ? `
+  <!-- Executive / Auditor Observations Block -->
+  <div style="background:#FFFBEB; border:1px solid #FDE68A; border-radius:6px; padding:7px 11px; margin-bottom:8px; font-size:9px; color:#92400E;">
+    <div style="font-weight:800; text-transform:uppercase; font-size:8px; letter-spacing:0.4px; margin-bottom:2px; display:flex; align-items:center; gap:5px;">
+      <span>📝</span><span>Auditor & Executive Observations / Custom Notes</span>
+    </div>
+    <div>${metadata.notes}</div>
+  </div>
+  ` : ""}
+
   <!-- Dynamic KPI Scorecard Grid -->
+  ${sec.kpis !== false && kpisHtml ? `
   <div class="kpi-grid">
     ${kpisHtml}
   </div>
+  ` : ""}
 
   <!-- Financial Health & Executive Assessment -->
-  ${isExecutive ? `
+  ${isExecutive && sec.healthEvaluation !== false ? `
   <div class="health-card">
     <div style="flex:1;">
       <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px;">
@@ -973,7 +1004,7 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
   ` : ""}
 
   <!-- Executive Analytics & Radial Indicator Gauges (App Circular Progress Rings) -->
-  ${(isExecutive || isBudget || isConsolidated) ? buildExecutiveRingsSuiteSvg(
+  ${(isExecutive || isBudget || isConsolidated) && sec.radialRings !== false && ch.radialGauges !== false ? buildExecutiveRingsSuiteSvg(
     budgetPerformance.overallUtilizationPct,
     budgetPerformance.totalAllocated,
     budgetPerformance.totalSpent,
@@ -986,7 +1017,7 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
   ) : ""}
 
   <!-- Inflow vs Outflow Historical Trend Area Line Chart -->
-  ${(isExecutive || isRevenue || isExpense) && monthlyTrends.chartPoints.length > 0 ? `
+  ${(isExecutive || isRevenue || isExpense) && monthlyTrends.chartPoints.length > 0 && sec.monthlyTrends !== false && ch.trendLine !== false ? `
   <div class="avoid-break" style="margin-bottom: 14px;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
       <span style="font-weight:800; font-size:11px; color:#0F172A;">Monthly Inflow vs Outflow Trend Analysis</span>
@@ -1005,7 +1036,7 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
     <span>1. Institutional Inflows & Revenue Streams</span>
     <span class="section-tag">${revenueAnalysis.byCategory.length} Revenue Streams · Total: +${currency} ${fmt(revenueAnalysis.totalRevenue)}</span>
   </div>
-  ${revenueAnalysis.byCategory.length > 0 ? buildCategoryDonutSvg(revenueAnalysis.byCategory, revenueAnalysis.totalRevenue, currency) : ""}
+  ${revenueAnalysis.byCategory.length > 0 && ch.revenueDonut !== false ? buildCategoryDonutSvg(revenueAnalysis.byCategory, revenueAnalysis.totalRevenue, currency) : ""}
   <div class="table-wrap">
     <table style="table-layout: fixed; width: 100%;">
       <thead>
@@ -1044,7 +1075,7 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
     <span>2. Operational Expenditures & Cost Outflows</span>
     <span class="section-tag">${expenseAnalysis.byCategory.length} Cost Categories · Total: -${currency} ${fmt(expenseAnalysis.totalExpenses)}</span>
   </div>
-  ${expenseAnalysis.byCategory.length > 0 ? buildCategoryDonutSvg(expenseAnalysis.byCategory, expenseAnalysis.totalExpenses, currency) : ""}
+  ${expenseAnalysis.byCategory.length > 0 && ch.expenseDonut !== false ? buildCategoryDonutSvg(expenseAnalysis.byCategory, expenseAnalysis.totalExpenses, currency) : ""}
   <div class="table-wrap">
     <table style="table-layout: fixed; width: 100%;">
       <thead>
@@ -1083,7 +1114,7 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
     <span>3. Department Cost Center Allocations & Profitability</span>
     <span class="section-tag">${departmentFinancials.departments.length} Cost Centers Monitored</span>
   </div>
-  ${buildDepartmentBudgetSvg(departmentFinancials.departments, currency)}
+  ${ch.departmentBars !== false ? buildDepartmentBudgetSvg(departmentFinancials.departments, currency) : ""}
   <div class="table-wrap">
     <table style="table-layout: fixed; width: 100%;">
       <thead>

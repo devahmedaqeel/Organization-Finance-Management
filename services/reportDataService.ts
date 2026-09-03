@@ -38,6 +38,28 @@ export type ReportType =
   | "department_analysis"
   | "general_ledger";
 
+export interface ReportSectionSelections {
+  executiveSummary?: boolean;
+  kpis?: boolean;
+  healthEvaluation?: boolean;
+  radialRings?: boolean;
+  monthlyTrends?: boolean;
+  revenueAnalysis?: boolean;
+  expenseAnalysis?: boolean;
+  departmentBreakdown?: boolean;
+  budgetPerformance?: boolean;
+  payrollAudit?: boolean;
+  generalLedger?: boolean;
+}
+
+export interface ReportChartSelections {
+  trendLine?: boolean;
+  revenueDonut?: boolean;
+  expenseDonut?: boolean;
+  departmentBars?: boolean;
+  radialGauges?: boolean;
+}
+
 export interface ReportFilterOptions {
   period?: NormalizedPeriod;
   scope?: "period" | "all";
@@ -45,6 +67,10 @@ export interface ReportFilterOptions {
   categoryFilter?: string;
   typeFilter?: "all" | "income" | "expense";
   reportType?: ReportType;
+  customTitle?: string;
+  notes?: string;
+  selectedSections?: ReportSectionSelections;
+  selectedCharts?: ReportChartSelections;
 }
 
 export interface UserContext {
@@ -152,6 +178,7 @@ export interface EnterpriseReportData {
     generatedDate: string;
     generatedTime: string;
     reportRefId: string;
+    notes?: string;
   };
   filters: {
     periodLabel: string;
@@ -161,7 +188,11 @@ export interface EnterpriseReportData {
     department: string;
     category: string;
     type: string;
+    customTitle?: string;
+    notes?: string;
   };
+  selectedSections: ReportSectionSelections;
+  selectedCharts: ReportChartSelections;
   executiveSummary: {
     totalRevenue: number;
     totalExpenses: number;
@@ -325,10 +356,19 @@ export function buildEnterpriseReportData(
   const netProfitMarginPct = totalRevenue > 0 ? (netOperatingBalance / totalRevenue) * 100 : (isNetPositive ? 0 : -100);
   const expenseRatioPct = totalRevenue > 0 ? (totalExpenses / totalRevenue) * 100 : (totalExpenses > 0 ? 100 : 0);
 
-  // 5. Scoped Payroll calculation
+  // 5. Scoped Payroll calculation strictly respecting department AND selected date period
   const scopedPayroll = allPayroll.filter((p) => {
     if (filters.departmentFilter && filters.departmentFilter !== "all") {
       if ((p.department || "").trim().toLowerCase() !== filters.departmentFilter.trim().toLowerCase()) {
+        return false;
+      }
+    }
+    // Strict Date filtering for payroll: p.month is 'YYYY-MM'
+    if (!isAllTime && p.month) {
+      const pMonth = p.month.slice(0, 7);
+      const startMonth = startDate.slice(0, 7);
+      const endMonth = endDate.slice(0, 7);
+      if (pMonth < startMonth || pMonth > endMonth) {
         return false;
       }
     }
@@ -348,10 +388,15 @@ export function buildEnterpriseReportData(
   const payrollCostPctOfExpenses = totalExpenses > 0 ? (netPayroll / totalExpenses) * 100 : 0;
   const operatingExpenses = Math.max(0, totalExpenses - netPayroll);
 
-  // 6. Scoped Budgets calculation
+  // 6. Scoped Budgets calculation respecting department AND category filters
   const scopedBudgets = allBudgets.filter((b) => {
     if (filters.departmentFilter && filters.departmentFilter !== "all") {
       if ((b.department || "").trim().toLowerCase() !== filters.departmentFilter.trim().toLowerCase()) {
+        return false;
+      }
+    }
+    if (filters.categoryFilter && filters.categoryFilter !== "all") {
+      if ((b.category || "").trim().toLowerCase() !== filters.categoryFilter.trim().toLowerCase()) {
         return false;
       }
     }
@@ -687,9 +732,37 @@ export function buildEnterpriseReportData(
   const printTime = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
   const reportRefId = "OFM-" + Math.random().toString(36).substring(2, 9).toUpperCase();
 
+  const finalTitle = filters.customTitle && filters.customTitle.trim().length > 0
+    ? filters.customTitle.trim()
+    : `${orgName} — ${reportTitle}`;
+
+  const resolvedSections: ReportSectionSelections = {
+    executiveSummary: true,
+    kpis: true,
+    healthEvaluation: true,
+    radialRings: true,
+    monthlyTrends: true,
+    revenueAnalysis: true,
+    expenseAnalysis: true,
+    departmentBreakdown: true,
+    budgetPerformance: true,
+    payrollAudit: true,
+    generalLedger: true,
+    ...filters.selectedSections,
+  };
+
+  const resolvedCharts: ReportChartSelections = {
+    trendLine: true,
+    revenueDonut: true,
+    expenseDonut: true,
+    departmentBars: true,
+    radialGauges: true,
+    ...filters.selectedCharts,
+  };
+
   return {
     reportType,
-    reportTitle: `${orgName} — ${reportTitle}`,
+    reportTitle: finalTitle,
     reportSubtitle: `Organization Finance Management (OFM) · ${reportSubtitle}`,
     metadata: {
       organizationName: orgName,
@@ -705,6 +778,7 @@ export function buildEnterpriseReportData(
       generatedDate: printDate,
       generatedTime: printTime,
       reportRefId,
+      notes: filters.notes || undefined,
     },
     filters: {
       periodLabel,
@@ -713,8 +787,12 @@ export function buildEnterpriseReportData(
       scope: filters.scope || "period",
       department: filters.departmentFilter && filters.departmentFilter !== "all" ? filters.departmentFilter : "All Cost Centers",
       category: filters.categoryFilter && filters.categoryFilter !== "all" ? filters.categoryFilter : "All Categories",
-      type: filters.typeFilter && filters.typeFilter !== "all" ? filters.typeFilter.toUpperCase() : "All Transactions",
+      type: filters.typeFilter && filters.typeFilter !== "all" ? (filters.typeFilter === "income" ? "Inflows (Income Only)" : "Outflows (Expenses Only)") : "All Transactions",
+      customTitle: filters.customTitle || "",
+      notes: filters.notes || "",
     },
+    selectedSections: resolvedSections,
+    selectedCharts: resolvedCharts,
     executiveSummary: {
       totalRevenue,
       totalExpenses,
