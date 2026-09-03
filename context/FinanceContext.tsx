@@ -949,10 +949,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     return departments.reduce((s, d) => s + Number(d.budgetAllocated || 0), 0);
   }, [departments]);
 
-  const totalBudgeted = totalLineBudgeted;
+  const totalBudgeted = totalLineBudgeted > 0 ? totalLineBudgeted : totalDeptBudgeted;
   
-  // Authoritative Net Operating Result: strictly Total Inflows minus Total Outflows
-  const netBalance = useMemo(() => totalIncome - totalExpenses, [totalIncome, totalExpenses]);
+  // Real-time Total Balance includes Total Income + Total Allocated Budget - Total Expenses
+  // Whenever Income OR Budget is added/allocated, this Top Balance increases immediately!
+  const netBalance = useMemo(() => (totalIncome + totalBudgeted) - totalExpenses, [totalIncome, totalBudgeted, totalExpenses]);
   const actualCash = useMemo(() => calculateActualCash(transactions), [transactions]);
   const totalBudgetSpent = useMemo(() => calculateBudgetUsed(transactions, budgets), [transactions, budgets]);
   const totalBudgetRemaining = useMemo(() => calculateBudgetRemaining(totalBudgeted, totalBudgetSpent), [totalBudgeted, totalBudgetSpent]);
