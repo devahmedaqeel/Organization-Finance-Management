@@ -38,6 +38,10 @@ LogBox.ignoreLogs([
   /Firestore \([0-9.]+\): Could not reach Cloud Firestore backend/,
 ]);
 
+if (Platform.OS === "web") {
+  LogBox.ignoreAllLogs(true);
+}
+
 // Demote harmless offline network notices so they don't trigger full-screen LogBox modal on mobile
 if (__DEV__) {
   const originalError = console.error;

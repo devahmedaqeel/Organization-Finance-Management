@@ -26,6 +26,21 @@ interface Props {
   notifications: AppNotification[];
 }
 
+function getTimeAgo(dateStr: string): string {
+  try {
+    const diffMs = Date.now() - new Date(dateStr).getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return "Just now";
+    if (diffMins < 60) return `${diffMins}m ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays}d ago`;
+  } catch {
+    return "";
+  }
+}
+
 export function NotificationCenterModal({ visible, onClose, notifications }: Props) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -78,140 +93,166 @@ export function NotificationCenterModal({ visible, onClose, notifications }: Pro
     }
   };
 
-  return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View style={[styles.container, { backgroundColor: colors.background, paddingTop: webTop + insets.top }]}>
-        
-        {/* Header */}
-        <View style={[styles.header, { borderBottomColor: colors.border }]}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1 }}>
-            <View style={[styles.bellBox, { backgroundColor: colors.primary + "18" }]}>
-              <Feather name="bell" size={18} color={colors.primary} />
-            </View>
-            <View>
-              <Text style={[styles.title, { color: colors.foreground }]}>Notifications</Text>
-              <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-                {unreadCount > 0 ? `${unreadCount} unread alert${unreadCount > 1 ? "s" : ""}` : "All systems up to date"}
-              </Text>
-            </View>
+  const isWeb = Platform.OS === "web";
+
+  const modalBody = (
+    <View style={[isWeb ? styles.webDialog : styles.container, { backgroundColor: colors.background, borderColor: colors.border }, !isWeb && { paddingTop: insets.top }]}>
+      {/* Header */}
+      <View style={[styles.header, { borderBottomColor: colors.border }]}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1 }}>
+          <View style={[styles.bellBox, { backgroundColor: colors.primary + "18" }]}>
+            <Feather name="bell" size={18} color={colors.primary} />
           </View>
-
-          {unreadCount > 0 && (
-            <TouchableOpacity style={styles.markReadBtn} onPress={handleMarkAllRead} activeOpacity={0.8}>
-              <Text style={[styles.markReadText, { color: colors.primary }]}>Mark all read</Text>
-            </TouchableOpacity>
-          )}
-
-          <TouchableOpacity style={[styles.closeBtn, { backgroundColor: colors.card }]} onPress={onClose} activeOpacity={0.8}>
-            <Feather name="x" size={18} color={colors.foreground} />
-          </TouchableOpacity>
+          <View>
+            <Text style={[styles.title, { color: colors.foreground }]}>Notifications</Text>
+            <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
+              {unreadCount > 0 ? `${unreadCount} unread alert${unreadCount > 1 ? "s" : ""}` : "All systems up to date"}
+            </Text>
+          </View>
         </View>
 
-        {/* Filter Chips */}
-        <View style={styles.filterRow}>
-          {[
-            { id: "all", label: `All (${notifications.length})` },
-            { id: "unread", label: `Unread (${unreadCount})` },
-            { id: "critical", label: "Alerts & Warnings" },
-          ].map((tab) => {
-            const active = filter === tab.id;
+        {unreadCount > 0 && (
+          <TouchableOpacity style={styles.markReadBtn} onPress={handleMarkAllRead} activeOpacity={0.8}>
+            <Text style={[styles.markReadText, { color: colors.primary }]}>Mark all read</Text>
+          </TouchableOpacity>
+        )}
+
+        <TouchableOpacity style={[styles.closeBtn, { backgroundColor: colors.card }]} onPress={onClose} activeOpacity={0.8}>
+          <Feather name="x" size={18} color={colors.foreground} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Filter Chips */}
+      <View style={styles.filterRow}>
+        {[
+          { id: "all", label: `All (${notifications.length})` },
+          { id: "unread", label: `Unread (${unreadCount})` },
+          { id: "critical", label: "Alerts & Warnings" },
+        ].map((tab) => {
+          const active = filter === tab.id;
+          return (
+            <TouchableOpacity
+              key={tab.id}
+              style={[
+                styles.filterChip,
+                {
+                  backgroundColor: active ? colors.primary : colors.card,
+                  borderColor: active ? colors.primary : colors.border,
+                },
+              ]}
+              onPress={() => setFilter(tab.id as any)}
+              activeOpacity={0.8}
+            >
+              <Text
+                style={[
+                  styles.filterChipText,
+                  { color: active ? "#FFFFFF" : colors.mutedForeground, fontFamily: active ? "Inter_700Bold" : "Inter_500Medium" },
+                ]}
+              >
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {/* Notification List */}
+      <ScrollView contentContainerStyle={styles.listContent} showsVerticalScrollIndicator={false}>
+        {filteredNotifications.length === 0 ? (
+          <View style={styles.emptyWrap}>
+            <View style={[styles.emptyIconBox, { backgroundColor: colors.muted }]}>
+              <Feather name="bell-off" size={28} color={colors.mutedForeground} />
+            </View>
+            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No Notifications</Text>
+            <Text style={[styles.emptySub, { color: colors.mutedForeground }]}>
+              {filter === "unread"
+                ? "You're all caught up! No unread system alerts."
+                : "No notifications found in this category."}
+            </Text>
+          </View>
+        ) : (
+          filteredNotifications.map((item) => {
+            const sev = getSeverityStyle(item.severity);
+            const timeAgo = getTimeAgo(item.createdAt);
+
             return (
               <TouchableOpacity
-                key={tab.id}
+                key={item.id}
                 style={[
-                  styles.filterChip,
+                  styles.card,
                   {
-                    backgroundColor: active ? colors.primary : colors.card,
-                    borderColor: active ? colors.primary : colors.border,
+                    backgroundColor: item.read ? colors.card : colors.primary + "08",
+                    borderColor: item.read ? colors.border : colors.primary + "30",
                   },
                 ]}
-                onPress={() => setFilter(tab.id as any)}
+                onPress={() => handleSelect(item)}
                 activeOpacity={0.8}
               >
-                <Text
-                  style={[
-                    styles.filterChipText,
-                    { color: active ? "#FFFFFF" : colors.mutedForeground, fontFamily: active ? "Inter_700Bold" : "Inter_500Medium" },
-                  ]}
-                >
-                  {tab.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* Notification List */}
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 40 }]}
-          showsVerticalScrollIndicator={false}
-        >
-          {filteredNotifications.length === 0 ? (
-            <View style={styles.emptyWrap}>
-              <View style={[styles.emptyIconBox, { backgroundColor: colors.muted }]}>
-                <Feather name="bell-off" size={32} color={colors.mutedForeground} />
-              </View>
-              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No notifications</Text>
-              <Text style={[styles.emptySub, { color: colors.mutedForeground }]}>
-                {filter === "unread"
-                  ? "You have reviewed all current notifications."
-                  : "No alerts or automated events recorded yet."}
-              </Text>
-            </View>
-          ) : (
-            filteredNotifications.map((n) => {
-              const sev = getSeverityStyle(n.severity);
-              return (
-                <TouchableOpacity
-                  key={n.id}
-                  style={[
-                    styles.card,
-                    {
-                      backgroundColor: n.read ? colors.card : colors.card,
-                      borderColor: n.read ? colors.border : colors.primary + "60",
-                      borderLeftColor: sev.color,
-                      borderLeftWidth: 4,
-                    },
-                  ]}
-                  onPress={() => handleSelect(n)}
-                  activeOpacity={0.85}
-                >
-                  <View style={styles.cardHeader}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1 }}>
-                      <View style={[styles.sevBadge, { backgroundColor: sev.bg, borderColor: sev.border }]}>
-                        <Feather name={sev.icon} size={11} color={sev.color} />
-                        <Text style={[styles.sevText, { color: sev.color }]}>{n.severity}</Text>
-                      </View>
-                      <Text style={[styles.timeText, { color: colors.mutedForeground }]}>
-                        {new Date(n.createdAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
-                      </Text>
-                    </View>
-
-                    <TouchableOpacity onPress={(e) => handleDelete(n.id, e)} hitSlop={8}>
-                      <Feather name="trash-2" size={14} color={colors.mutedForeground} />
+                <View style={styles.cardHeader}>
+                  <View style={[styles.sevBadge, { backgroundColor: sev.bg, borderColor: sev.border }]}>
+                    <Feather name={sev.icon} size={11} color={sev.color} />
+                    <Text style={[styles.sevText, { color: sev.color }]}>{item.severity}</Text>
+                  </View>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                    <Text style={[styles.timeText, { color: colors.mutedForeground }]}>{timeAgo}</Text>
+                    <TouchableOpacity
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      onPress={(e) => handleDelete(item.id, e)}
+                    >
+                      <Feather name="trash-2" size={13} color={colors.mutedForeground} />
                     </TouchableOpacity>
                   </View>
+                </View>
 
-                  <Text style={[styles.cardTitle, { color: colors.foreground }]}>{n.title}</Text>
-                  <Text style={[styles.cardMessage, { color: colors.mutedForeground }]}>{n.message}</Text>
+                <Text style={[styles.cardTitle, { color: colors.foreground }]}>{item.title}</Text>
+                <Text style={[styles.cardMessage, { color: colors.mutedForeground }]}>{item.message}</Text>
 
-                  {n.actionRoute && (
-                    <View style={styles.actionRow}>
-                      <Text style={[styles.actionText, { color: colors.primary }]}>View Details →</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            })
-          )}
-        </ScrollView>
-      </View>
+                {Boolean(item.actionRoute) && (
+                  <View style={styles.actionRow}>
+                    <Text style={[styles.actionText, { color: colors.primary }]}>View Details →</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })
+        )}
+      </ScrollView>
+    </View>
+  );
+
+  return (
+    <Modal visible={visible} transparent={isWeb} animationType={isWeb ? "fade" : "slide"} onRequestClose={onClose}>
+      {isWeb ? (
+        <View style={styles.webBackdrop}>
+          {modalBody}
+        </View>
+      ) : (
+        modalBody
+      )}
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  webBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+  },
+  webDialog: {
+    width: "100%",
+    maxWidth: 540,
+    maxHeight: "85%" as any,
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+  },
   container: {
     flex: 1,
   },

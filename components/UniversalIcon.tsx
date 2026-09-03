@@ -1,3 +1,4 @@
+// UniversalIcon: Multiplatform SVG icon wrapper for OFM web & native
 import React from "react";
 import {
   SvgSun,

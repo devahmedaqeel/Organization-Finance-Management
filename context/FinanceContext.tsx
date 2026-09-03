@@ -192,18 +192,33 @@ const SEED_PAYROLL: PayrollEntry[] = [
   { id: "p12", employeeName: "Sana Mir", employeeId: "EMP012", department: "Administration", designation: "Executive Office Administrator", baseSalary: 48000, bonus: 3500, deductions: 4800, month: "2026-05", paymentStatus: "paid", bankAccountNumber: "PK36HABB000123456800" },
 ];
 
+function getWebInitialCache<T>(keySub: string, fallback: T): T {
+  try {
+    if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.includes(keySub)) {
+          const raw = localStorage.getItem(k);
+          if (raw) return JSON.parse(raw);
+        }
+      }
+    }
+  } catch {}
+  return fallback;
+}
+
 const FinanceContext = createContext<FinanceContextValue>({} as FinanceContextValue);
 
 export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const { settings } = useSettings();
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [budgets, setBudgets] = useState<Budget[]>([]);
-  const [payroll, setPayroll] = useState<PayrollEntry[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>(() => getWebInitialCache("transactions", []));
+  const [budgets, setBudgets] = useState<Budget[]>(() => getWebInitialCache("budgets", []));
+  const [payroll, setPayroll] = useState<PayrollEntry[]>(() => getWebInitialCache("payroll", []));
+  const [departments, setDepartments] = useState<Department[]>(() => getWebInitialCache("departments", []));
+  const [notifications, setNotifications] = useState<AppNotification[]>(() => getWebInitialCache("notifications", []));
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("synced");
-  const [loaded, setLoaded] = useState(false);
+  const [loaded, setLoaded] = useState(() => (typeof window !== "undefined" && Boolean(window.localStorage)));
 
   const prevTransactionsRef = useRef<Transaction[]>([]);
   const deletedIdsRef = useRef<Set<string>>(new Set());
@@ -238,7 +253,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
   // Real-time Notification Subscription
   useEffect(() => {
-    if (!user || !user.organizationId) {
+    if (!user) {
       setNotifications([]);
       return;
     }
@@ -248,7 +263,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     return () => {
       if (typeof unsub === "function") unsub();
     };
-  }, [user?.organizationId, activeOrgId]);
+  }, [user?.id, activeOrgId]);
 
   // Automated evaluation of ledger notification events
   useEffect(() => {

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, Suspense, lazy } from "react";
+import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from "react";
+// WebShell: Master desktop/tablet/mobile responsive shell for OFM with real-time notification center
 import { StyleSheet, Text, TouchableOpacity, View, ScrollView, useWindowDimensions, Modal, Image, ActivityIndicator } from "react-native";
 import { useAuth } from "@/context/AuthContext";
 import { useFinance } from "@/context/FinanceContext";
@@ -24,6 +25,7 @@ import {
   SvgSun,
   SvgMoon,
   SvgPlus,
+  SvgBell,
 } from "./SvgIcons";
 
 import { WebDashboard } from "./WebDashboard";
@@ -55,6 +57,7 @@ function TabLoadingSkeleton() {
 
 import { WebTransactionModal } from "./modals/WebTransactionModal";
 import { WebBudgetModal } from "./modals/WebBudgetModal";
+import { NotificationCenterModal } from "@/components/NotificationCenterModal";
 import { WebPageTransition } from "./animations/WebPageTransition";
 import { injectWebMicroAnimations } from "./animations/webStyles";
 import { useEdgeSwipeBack } from "./navigation/useEdgeSwipeBack";
@@ -124,11 +127,12 @@ export function WebShell() {
 
   const { user, logout } = useAuth();
   const { settings, updateSettings } = useSettings();
-  const { transactions, budgets, departments, payroll } = useFinance();
+  const { transactions, budgets, departments, payroll, notifications, unreadNotificationCount } = useFinance();
 
   const [activeTab, setActiveTab] = useState<WebTabKey>("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(isTablet);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [notificationModalVisible, setNotificationModalVisible] = useState(false);
 
   // Global Quick Modals
   const [txModalVisible, setTxModalVisible] = useState(false);
@@ -153,6 +157,10 @@ export function WebShell() {
     // 1. Intelligent Modal Priority: Close drawer or modals first
     if (mobileDrawerOpen) {
       setMobileDrawerOpen(false);
+      return true;
+    }
+    if (notificationModalVisible) {
+      setNotificationModalVisible(false);
       return true;
     }
     if (txModalVisible) {
@@ -695,6 +703,36 @@ export function WebShell() {
 
 
 
+            {/* Real-Time Notification Center Bell */}
+            <TouchableOpacity
+              style={[styles.topIconBtn, { borderColor: colors.border, position: "relative" }]}
+              onPress={() => setNotificationModalVisible(true)}
+              title="Notifications & System Alerts"
+              activeOpacity={0.75}
+            >
+              <SvgBell size={16} color={colors.foreground} />
+              {unreadNotificationCount > 0 && (
+                <View
+                  style={{
+                    position: "absolute",
+                    top: -3,
+                    right: -3,
+                    minWidth: 15,
+                    height: 15,
+                    borderRadius: 7.5,
+                    backgroundColor: "#EF4444",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    paddingHorizontal: 3,
+                  }}
+                >
+                  <Text style={{ fontSize: 9, fontFamily: "Inter_800ExtraBold", color: "#FFFFFF" }}>
+                    {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
             {/* Theme Toggle */}
             <TouchableOpacity
               style={[styles.topIconBtn, { borderColor: colors.border }]}
@@ -916,6 +954,15 @@ export function WebShell() {
         visible={budgetModalVisible}
         onClose={() => setBudgetModalVisible(false)}
       />
+
+      {/* Global Real-Time Notification Center Modal */}
+      {notificationModalVisible && (
+        <NotificationCenterModal
+          visible={notificationModalVisible}
+          onClose={() => setNotificationModalVisible(false)}
+          notifications={notifications}
+        />
+      )}
     </View>
   );
 }

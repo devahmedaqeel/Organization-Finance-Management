@@ -23,8 +23,10 @@ import {
 } from "firebase/firestore";
 import { db } from "@/config/firebase";
 import { EvaluatedNotificationEvent, NotificationType } from "./notificationRules";
+import { showFloatingToast } from "@/utils/toast";
+import { triggerLocalNotification } from "@/hooks/NotificationHelper";
 
-const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+const isExpoGo = Constants?.executionEnvironment === ExecutionEnvironment?.StoreClient;
 
 export interface AppNotification {
   id: string;
@@ -47,25 +49,6 @@ const PROCESSED_KEYS_KEY = "@ofm_processed_idempotency_keys";
 // In-memory processed cache
 const processedKeysSet = new Set<string>();
 
-/**
- * Configure default notification handler for foreground notifications.
- */
-if (Platform.OS !== "web" && !isExpoGo) {
-  try {
-    const Notifications = require("expo-notifications");
-    Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: true,
-        shouldShowBanner: true,
-        shouldShowList: true,
-      }),
-    });
-  } catch {
-    // Ignored in unsupported environments
-  }
-}
 
 /**
  * Registers device for Expo Push Notifications and returns the token.
@@ -74,7 +57,8 @@ export async function registerForPushNotificationsAsync(userId?: string, orgId?:
   if (Platform.OS === "web" || isExpoGo) return null;
 
   try {
-    const Notifications = require("expo-notifications");
+    const notifModule = "expo-notifications";
+    const Notifications = require(notifModule);
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
 
@@ -170,22 +154,15 @@ export async function dispatchNotification(
     console.warn("[NOTIFICATIONS] Firestore save error:", err);
   }
 
-  // 3. Trigger Local Device Push Notification
-  if (Platform.OS !== "web") {
-    try {
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: event.title,
-          body: event.message,
-          data: { route: event.actionRoute, id: notifId },
-          sound: true,
-        },
-        trigger: null, // trigger immediately
-      });
-    } catch (pushErr) {
-      console.warn("[NOTIFICATIONS] Local push error:", pushErr);
-    }
-  }
+  // 3. Trigger In-App Floating Alert Banner (Web & Mobile)
+  try {
+    showFloatingToast(event.title, event.message);
+  } catch {}
+
+  // 4. Trigger Native Mobile Local Device Push Notification
+  try {
+    triggerLocalNotification(event.title, event.message);
+  } catch {}
 
   return true;
 }
