@@ -12,6 +12,7 @@ import {
   signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
+  signInAnonymously,
 } from "firebase/auth";
 import { doc, getDoc, setDoc, collection, query, where, getDocs, Timestamp } from "firebase/firestore";
 import { Platform } from "react-native";
@@ -146,8 +147,8 @@ const DEMO_USERS: Record<string, { password: string; user: User }> = {
       name: "Ahmed Aqeel",
       email: "admin@ofm.com",
       role: "admin",
-      organization: "Organization Finance Management",
-      organizationId: "demo-org",
+      organization: "Devorbit Tech",
+      organizationId: "org-9icgv4ijp",
     },
   },
   "accountant@ofm.com": {
@@ -157,8 +158,8 @@ const DEMO_USERS: Record<string, { password: string; user: User }> = {
       name: "Maryam Naz",
       email: "accountant@ofm.com",
       role: "accountant",
-      organization: "Organization Finance Management",
-      organizationId: "demo-org",
+      organization: "Devorbit Tech",
+      organizationId: "org-9icgv4ijp",
     },
   },
   "manager@ofm.com": {
@@ -168,8 +169,8 @@ const DEMO_USERS: Record<string, { password: string; user: User }> = {
       name: "Dr. Sundas Iftikhar",
       email: "manager@ofm.com",
       role: "manager",
-      organization: "Organization Finance Management",
-      organizationId: "demo-org",
+      organization: "Devorbit Tech",
+      organizationId: "org-9icgv4ijp",
     },
   },
   "employee@ofm.com": {
@@ -179,8 +180,8 @@ const DEMO_USERS: Record<string, { password: string; user: User }> = {
       name: "Tariq Mahmood",
       email: "employee@ofm.com",
       role: "employee",
-      organization: "Organization Finance Management",
-      organizationId: "demo-org",
+      organization: "Devorbit Tech",
+      organizationId: "org-9icgv4ijp",
     },
   },
 };
@@ -276,8 +277,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           try {
             const parsed = JSON.parse(data);
             if (parsed && (parsed.email || parsed.id)) {
+              if (parsed.email === "admin@ofm.com" || !parsed.organizationId || parsed.organizationId === "demo-org" || !parsed.organization) {
+                parsed.organization = "Devorbit Tech";
+                parsed.organizationId = "org-9icgv4ijp";
+                AsyncStorage.setItem("ofm_user", JSON.stringify(parsed)).catch(() => {});
+              }
               setUser(parsed);
               setIsLoading(false);
+              // Ensure Firebase Auth session is active so Firestore allows cloud read/write
+              if (!auth.currentUser) {
+                signInAnonymously(auth).catch(() => {});
+              }
             }
           } catch (e) {}
         }
@@ -369,6 +379,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const demoRecord = DEMO_USERS[formattedEmail];
 
     if (demoRecord && demoRecord.password === password && (!role || demoRecord.user.role === role)) {
+      // Connect to Firebase Auth so Firestore security rules allow full cloud sync
+      try {
+        if (!auth.currentUser) {
+          await signInWithEmailAndPassword(auth, formattedEmail, password).catch(async () => {
+            await createUserWithEmailAndPassword(auth, formattedEmail, password).catch(async () => {
+              await signInAnonymously(auth).catch(() => {});
+            });
+          });
+        }
+      } catch (e) {}
+
       await AsyncStorage.setItem("ofm_user", JSON.stringify(demoRecord.user));
       setUser(demoRecord.user);
       return true;

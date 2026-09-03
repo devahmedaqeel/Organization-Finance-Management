@@ -66,8 +66,10 @@ interface Props {
 }
 
 function fmtAmount(n: number) {
-  if (Math.abs(n) >= 1000000) return `${(n / 1000000).toFixed(2)}M`;
-  if (Math.abs(n) >= 1000) return `${(n / 1000).toFixed(0)}K`;
+  const abs = Math.abs(n);
+  if (abs >= 1000000000) return `${(n / 1000000000).toFixed(2)}B`;
+  if (abs >= 1000000) return `${(n / 1000000).toFixed(2)}M`;
+  if (abs >= 1000) return `${(n / 1000).toFixed(0)}K`;
   return n.toLocaleString();
 }
 
@@ -77,7 +79,10 @@ function roundToNiceStep(val: number): number {
   if (val <= 100000) return Math.ceil(val / 5000) * 5000;
   if (val <= 500000) return Math.ceil(val / 25000) * 25000;
   if (val <= 1000000) return Math.ceil(val / 50000) * 50000;
-  return Math.ceil(val / 100000) * 100000;
+  if (val <= 10000000) return Math.ceil(val / 500000) * 500000;
+  if (val <= 100000000) return Math.ceil(val / 5000000) * 5000000;
+  if (val <= 1000000000) return Math.ceil(val / 50000000) * 50000000;
+  return Math.ceil(val / 500000000) * 500000000;
 }
 
 export function AreaLineChart({
@@ -97,9 +102,7 @@ export function AreaLineChart({
   onPointSelect,
 }: Props) {
   const colors = useColors();
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(
-    data && data.length > 0 ? data.length - 1 : null
-  );
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const prevIndexRef = useRef<number | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
@@ -123,12 +126,37 @@ export function AreaLineChart({
 
   useEffect(() => {
     if (data && data.length > 0) {
-      setSelectedIndex(data.length - 1);
+      // Find the most significant active point (highest total transaction volume)
+      let bestIdx = -1;
+      let maxVolume = 0;
+      for (let i = 0; i < data.length; i++) {
+        const vol = (Number(data[i].income) || 0) + (Number(data[i].expense) || 0);
+        if (vol > maxVolume) {
+          maxVolume = vol;
+          bestIdx = i;
+        }
+      }
+      // If no points have positive volume, pick latest point with non-zero
+      if (bestIdx === -1) {
+        for (let i = data.length - 1; i >= 0; i--) {
+          if ((Number(data[i].income) || 0) > 0 || (Number(data[i].expense) || 0) > 0) {
+            bestIdx = i;
+            break;
+          }
+        }
+      }
+      if (bestIdx === -1) {
+        bestIdx = data.length - 1;
+      }
+      setSelectedIndex(bestIdx);
+      if (onPointSelect && data[bestIdx]) {
+        onPointSelect(data[bestIdx]);
+      }
     }
   }, [data]);
 
-  // Layout metrics
-  const padLeft = 40;
+  // Layout metrics - generous left pad so Billion & Million figures never get truncated
+  const padLeft = 58;
   const padRight = 20;
   const padTop = 22;
   const padBottom = 26;
@@ -141,15 +169,23 @@ export function AreaLineChart({
   const chartH = Math.max(height - padTop - padBottom, 10);
 
   // Dynamic Y-axis scale calculated directly from active points so curves are never flat!
-  const allValues = data && data.length > 0 ? data.flatMap((d) => [d.income, d.expense]) : [10000];
-  const rawMax = Math.max(...allValues, 1000);
-  const maxVal = roundToNiceStep(rawMax * 1.22);
+  const allValues =
+    data && data.length > 0
+      ? data.flatMap((d) => [Number(d.income || 0), Number(d.expense || 0)])
+      : [1000];
+  const positiveValues = allValues.filter((v) => !isNaN(v) && v > 0);
+  const rawMax = positiveValues.length > 0 ? Math.max(...positiveValues) : 1000;
+  const maxVal = roundToNiceStep(rawMax * 1.25);
   const midVal = Math.round(maxVal / 2);
 
   const toX = (i: number) =>
     padLeft + (i / Math.max((data ? data.length : 1) - 1, 1)) * chartW;
-  const toY = (v: number) =>
-    padTop + chartH - (Math.max(v, 0) / maxVal) * chartH;
+  const toY = (v: number) => {
+    const num = Number(v || 0);
+    if (isNaN(num) || maxVal <= 0) return padTop + chartH;
+    const clamped = Math.max(num, 0);
+    return padTop + chartH - (clamped / maxVal) * chartH;
+  };
 
   const buildPath = (key: "income" | "expense") => {
     if (!data || data.length === 0) return "";
@@ -493,13 +529,29 @@ export function AreaLineChart({
           contentContainerStyle={{ minWidth: width }}
         >
           <View
-            style={{ width: effectiveCanvasWidth, height }}
+            style={{ width: effectiveCanvasWidth, height, cursor: "crosshair" as any }}
             {...(isScrollable ? {} : panResponder.panHandlers)}
-            onTouchEnd={(e) => {
-              if (isScrollable) {
-                handleTouchAtX(e.nativeEvent.locationX);
-              }
-            }}
+            onTouchStart={(e) => handleTouchAtX(e.nativeEvent.locationX)}
+            onTouchMove={(e) => handleTouchAtX(e.nativeEvent.locationX)}
+            onTouchEnd={(e) => handleTouchAtX(e.nativeEvent.locationX)}
+            {...(Platform.OS === "web"
+              ? {
+                  onPointerMove: (e: any) => {
+                    const rect = e.currentTarget?.getBoundingClientRect?.();
+                    if (rect) {
+                      const clientX = e.clientX - rect.left;
+                      handleTouchAtX(clientX);
+                    }
+                  },
+                  onPointerDown: (e: any) => {
+                    const rect = e.currentTarget?.getBoundingClientRect?.();
+                    if (rect) {
+                      const clientX = e.clientX - rect.left;
+                      handleTouchAtX(clientX);
+                    }
+                  },
+                }
+              : {})}
           >
             <Svg width={effectiveCanvasWidth} height={height}>
               <Defs>
@@ -567,6 +619,23 @@ export function AreaLineChart({
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
+
+              {/* Permanent Activity Anchor Dots along the curves */}
+              {data.map((d, i) => {
+                const px = toX(i);
+                const pyInc = toY(Number(d.income || 0));
+                const pyExp = toY(Number(d.expense || 0));
+                return (
+                  <React.Fragment key={`anchor-${i}`}>
+                    {d.income > 0 && (
+                      <SvgCircle cx={px} cy={pyInc} r={3.5} fill={colors.income} opacity={0.85} />
+                    )}
+                    {d.expense > 0 && (
+                      <SvgCircle cx={px} cy={pyExp} r={3.5} fill={colors.expense} opacity={0.85} />
+                    )}
+                  </React.Fragment>
+                );
+              })}
 
               {/* Active Vertical Guideline */}
               <Line

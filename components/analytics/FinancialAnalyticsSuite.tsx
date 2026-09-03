@@ -75,11 +75,11 @@ export function FinancialAnalyticsSuite({
   return (
     <View style={styles.container}>
       {/* ─── 3 Column Responsive Section ─── */}
-      <View style={styles.grid}>
+      <View style={[styles.grid, isMobile && styles.gridMobile]}>
         {/* ========================================================================= */}
         {/* CARD 1: BUDGET UTILIZATION CARD                                          */}
         {/* ========================================================================= */}
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 300 }]}>
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, isMobile && styles.cardMobile]}>
           {/* Header */}
           <View style={styles.cardHeader}>
             <View style={styles.headerTitleRow}>
@@ -342,7 +342,7 @@ export function FinancialAnalyticsSuite({
         {/* ========================================================================= */}
         {/* CARD 2: NET OPERATING MARGIN (NOM) CARD                                  */}
         {/* ========================================================================= */}
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 300 }]}>
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, isMobile && styles.cardMobile]}>
           {/* Header */}
           <View style={styles.cardHeader}>
             <View style={styles.headerTitleRow}>
@@ -644,7 +644,7 @@ export function FinancialAnalyticsSuite({
         {/* ========================================================================= */}
         {/* CARD 3: EXPENSE DISTRIBUTION DONUT & RANKED LIST CARD                     */}
         {/* ========================================================================= */}
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 300 }]}>
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, isMobile && styles.cardMobile]}>
           {/* Header */}
           <View style={styles.cardHeader}>
             <View style={styles.headerTitleRow}>
@@ -936,6 +936,7 @@ export function FinancialAnalyticsSuite({
 const styles = StyleSheet.create({
   container: {
     width: "100%",
+    marginBottom: 16,
   },
   grid: {
     flexDirection: "row",
@@ -943,14 +944,28 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     alignItems: "stretch",
   },
+  gridMobile: {
+    flexDirection: "column",
+    flexWrap: "nowrap",
+    gap: 14,
+  },
   card: {
     flex: 1,
     borderRadius: 16,
     borderWidth: 1,
     padding: 18,
     gap: 12,
-    justifyContent: "space-between",
-    alignSelf: "stretch",
+    justifyContent: "flex-start",
+    overflow: "hidden",
+    minWidth: 300,
+  },
+  cardMobile: {
+    flex: 0,
+    flexGrow: 0,
+    flexShrink: 0,
+    width: "100%",
+    minWidth: "100%",
+    padding: 16,
   },
   cardHeader: {
     flexDirection: "row",
@@ -1125,7 +1140,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingVertical: 9,
     paddingHorizontal: 6,
-    marginTop: "auto",
+    marginTop: 10,
   },
   bentoCol: {
     flex: 1,

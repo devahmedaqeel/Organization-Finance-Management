@@ -404,12 +404,30 @@ export function FinancialDrillDownModal({
                       const isDeptOver = b.allocated > 0 && deptSpent > b.allocated;
 
                       return (
-                        <View key={b.id} style={[styles.breakdownRow, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border }]}>
-                          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                            <Text style={[styles.rowTitle, { color: colors.foreground }]}>{b.department} - {b.category}</Text>
-                            <Text style={[styles.rowVal, { color: isDeptOver ? colors.expense : colors.foreground }]}>
-                              {currency} {fmt(deptSpent)} / {currency} {fmt(b.allocated)} ({pct}%)
-                            </Text>
+                        <View key={b.id} style={[styles.breakdownRow, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border, padding: 12, borderRadius: 12, gap: 8 }]}>
+                          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                            <View style={{ flex: 1, minWidth: 0 }}>
+                              <Text style={[styles.rowTitle, { color: colors.foreground }]} numberOfLines={1} ellipsizeMode="tail">
+                                {b.department}
+                              </Text>
+                              <Text style={{ fontSize: 11, color: colors.mutedForeground, fontFamily: "Inter_500Medium", marginTop: 1 }} numberOfLines={1} ellipsizeMode="tail">
+                                {b.category || "General"}
+                              </Text>
+                            </View>
+                            <View style={{ alignItems: "flex-end", flexShrink: 0 }}>
+                              <Text style={[styles.rowVal, { color: isDeptOver ? colors.expense : colors.foreground }]}>
+                                {currency} {fmt(deptSpent)}{" "}
+                                <Text style={{ color: colors.mutedForeground, fontSize: 10.5, fontFamily: "Inter_500Medium" }}>
+                                  / {currency} {fmt(b.allocated)}
+                                </Text>
+                              </Text>
+                              <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
+                                <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: isDeptOver ? colors.expense : colors.income }} />
+                                <Text style={{ fontSize: 10.5, fontFamily: "Inter_700Bold", color: isDeptOver ? colors.expense : colors.income }}>
+                                  {pct}% {isDeptOver ? "Over Limit" : "Used"}
+                                </Text>
+                              </View>
+                            </View>
                           </View>
                           <View style={[styles.track, { backgroundColor: colors.border }]}>
                             <View style={[styles.fill, { width: `${pct}%`, backgroundColor: isDeptOver ? colors.expense : colors.income }]} />
@@ -427,16 +445,28 @@ export function FinancialDrillDownModal({
                         {
                           backgroundColor: selectedCategory === c.category ? colors.primary + "18" : (colors.cardAlt ?? colors.muted) + "30",
                           borderColor: selectedCategory === c.category ? colors.primary : colors.border,
+                          padding: 12,
+                          borderRadius: 12,
+                          gap: 8,
                         },
                       ]}
                       onPress={() => setSelectedCategory(selectedCategory === c.category ? null : c.category)}
                       activeOpacity={0.7}
                     >
-                      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                        <Text style={[styles.rowTitle, { color: colors.foreground }]}>{c.category}</Text>
-                        <Text style={[styles.rowVal, { color: colors.expense }]}>
-                          {currency} {fmt(c.amount)} · {c.pct.toFixed(1)}% ({c.count} txs)
-                        </Text>
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={[styles.rowTitle, { color: colors.foreground }]} numberOfLines={1} ellipsizeMode="tail">
+                            {c.category}
+                          </Text>
+                          <Text style={{ fontSize: 11, color: colors.mutedForeground, fontFamily: "Inter_500Medium", marginTop: 1 }}>
+                            {c.pct.toFixed(1)}% of total · {c.count} txs
+                          </Text>
+                        </View>
+                        <View style={{ alignItems: "flex-end", flexShrink: 0 }}>
+                          <Text style={[styles.rowVal, { color: colors.expense }]}>
+                            {currency} {fmt(c.amount)}
+                          </Text>
+                        </View>
                       </View>
                       <View style={[styles.track, { backgroundColor: colors.border }]}>
                         <View style={[styles.fill, { width: `${Math.min(c.pct, 100)}%`, backgroundColor: colors.expense }]} />
@@ -699,8 +729,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   rowTitle: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
+    fontSize: 12.5,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: -0.2,
   },
   rowVal: {
     fontSize: 11.5,

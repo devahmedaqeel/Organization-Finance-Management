@@ -535,9 +535,11 @@ export function aggregateTransactionsByGranularity(
     const dayMap: Record<string, { inc: number; exp: number; count: number }> = {};
     filtered.forEach((t) => {
       const dKey = (t.date || "").slice(0, 10);
+      const amt = Number(t.amount || 0);
+      if (isNaN(amt) || amt <= 0) return;
       if (!dayMap[dKey]) dayMap[dKey] = { inc: 0, exp: 0, count: 0 };
-      if (t.type === "income") dayMap[dKey].inc += t.amount;
-      else if (t.type === "expense") dayMap[dKey].exp += t.amount;
+      if (t.type === "income") dayMap[dKey].inc += amt;
+      else if (t.type === "expense") dayMap[dKey].exp += amt;
       dayMap[dKey].count += 1;
     });
 
@@ -592,8 +594,12 @@ export function aggregateTransactionsByGranularity(
         const dKey = (t.date || "").slice(0, 10);
         return dKey >= sYMD && dKey <= eYMD;
       });
-      const inc = weekTxs.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
-      const exp = weekTxs.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+      const inc = weekTxs
+        .filter((t) => t.type === "income")
+        .reduce((s, t) => s + Number(t.amount || 0), 0);
+      const exp = weekTxs
+        .filter((t) => t.type === "expense")
+        .reduce((s, t) => s + Number(t.amount || 0), 0);
 
       const mLabel = MONTH_NAMES_SHORT[wStart.getMonth()];
 
@@ -620,9 +626,11 @@ export function aggregateTransactionsByGranularity(
     const monthMap: Record<string, { inc: number; exp: number; count: number }> = {};
     filtered.forEach((t) => {
       const ym = (t.date || "").slice(0, 7);
+      const amt = Number(t.amount || 0);
+      if (isNaN(amt) || amt <= 0) return;
       if (!monthMap[ym]) monthMap[ym] = { inc: 0, exp: 0, count: 0 };
-      if (t.type === "income") monthMap[ym].inc += t.amount;
-      else if (t.type === "expense") monthMap[ym].exp += t.amount;
+      if (t.type === "income") monthMap[ym].inc += amt;
+      else if (t.type === "expense") monthMap[ym].exp += amt;
       monthMap[ym].count += 1;
     });
 
@@ -664,10 +672,12 @@ export function aggregateTransactionsByGranularity(
 
   const yearMap: Record<string, { inc: number; exp: number; count: number }> = {};
   filtered.forEach((t) => {
-    const yr = t.date.substring(0, 4);
+    const yr = (t.date || "").substring(0, 4);
+    const amt = Number(t.amount || 0);
+    if (isNaN(amt) || amt <= 0) return;
     if (!yearMap[yr]) yearMap[yr] = { inc: 0, exp: 0, count: 0 };
-    if (t.type === "income") yearMap[yr].inc += t.amount;
-    else if (t.type === "expense") yearMap[yr].exp += t.amount;
+    if (t.type === "income") yearMap[yr].inc += amt;
+    else if (t.type === "expense") yearMap[yr].exp += amt;
     yearMap[yr].count += 1;
   });
 

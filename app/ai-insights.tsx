@@ -264,7 +264,7 @@ export default function AIInsightsScreen() {
   }, [chartPoints, selectedPoint]);
 
   // Dynamic MoM growth computed from active sorted monthly ledger
-  const { incomeGrowth, lastMonthLabel, prevMonthLabel } = useMemo(() => {
+  const { incomeGrowth, hasMoMComparison, lastMonthLabel, prevMonthLabel } = useMemo(() => {
     const monthlyNet: Record<string, { inc: number; exp: number; net: number }> = {};
     transactions.forEach(t => {
       const m = t.date?.substring(0, 7);

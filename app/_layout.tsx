@@ -31,7 +31,30 @@ LogBox.ignoreLogs([
   /expo-notifications: Android Push notifications/,
   /removed from Expo Go with the release of SDK 53/,
   /warnOfExpoGoPushUsage/,
+  /@firebase\/firestore/,
+  /Could not reach Cloud Firestore backend/,
+  /Backend didn't respond within 10 seconds/,
+  /The client will operate in offline mode/,
+  /Firestore \([0-9.]+\): Could not reach Cloud Firestore backend/,
 ]);
+
+// Demote harmless offline network notices so they don't trigger full-screen LogBox modal on mobile
+if (__DEV__) {
+  const originalError = console.error;
+  console.error = (...args: any[]) => {
+    const raw = typeof args[0] === "string" ? args[0] : "";
+    if (
+      raw.includes("Could not reach Cloud Firestore backend") ||
+      raw.includes("@firebase/firestore") ||
+      raw.includes("operate in offline mode") ||
+      raw.includes("Firestore (12.17.0)")
+    ) {
+      console.log("[Firestore Offline Note]:", ...args);
+      return;
+    }
+    originalError(...args);
+  };
+}
 
 const queryClient = new QueryClient();
 

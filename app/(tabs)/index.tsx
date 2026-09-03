@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
 import {
   Animated,
   BackHandler,
@@ -16,6 +16,7 @@ import {
   View,
   Modal,
   TextInput,
+  RefreshControl,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AreaLineChart } from "@/components/AreaLineChart";
@@ -166,6 +167,7 @@ export default function DashboardScreen() {
     unreadNotificationCount,
     deleteTransaction,
     syncStatus,
+    refreshData,
   } = useFinance();
   const { settings } = useSettings();
   const keyboardHeight = useKeyboardHeight();
@@ -257,6 +259,11 @@ export default function DashboardScreen() {
     const sub = BackHandler.addEventListener("hardwareBackPress", onBackPress);
     return () => sub.remove();
   }, [mobileDrillDown, txModalVisible, exportModalVisible, netModalVisible, notificationModalVisible]);
+
+  // Auto-sync authoritative cloud data once on mount
+  useEffect(() => {
+    refreshData().catch(() => {});
+  }, []);
 
   const currentGranularity = activePeriod.userGranularityOverride || activePeriod.granularity;
   const granularityLabel =
@@ -360,6 +367,14 @@ export default function DashboardScreen() {
         },
       ]}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={syncStatus === "syncing"}
+          onRefresh={refreshData}
+          tintColor="#3B82F6"
+          colors={["#3B82F6"]}
+        />
+      }
     >
       {/* Header */}
       <View style={styles.headerRow}>
@@ -443,14 +458,16 @@ export default function DashboardScreen() {
         </View>
       </View>
 
-      {/* ─── Premium Hero Balance Card (Senior UI Design) ─── */}
+      {/* ─── Premium Hero Balance Card (Matching Web Exactly) ─── */}
       <LinearGradient
-        colors={["#060D1F", "#0B1B3D", "#112D66", "#1D4ED8"]}
+        colors={["#081229", "#112D6F", "#1D4ED8"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[
           styles.heroBalanceCard,
           {
+            borderRadius: 22,
+            padding: 18,
             borderWidth: 1.2,
             borderColor: "rgba(255, 255, 255, 0.18)",
             shadowColor: "#1d4ed8",
@@ -458,6 +475,9 @@ export default function DashboardScreen() {
             shadowOpacity: 0.35,
             shadowRadius: 18,
             elevation: 10,
+            overflow: "hidden",
+            position: "relative",
+            marginBottom: 16,
           },
         ]}
       >
@@ -465,31 +485,51 @@ export default function DashboardScreen() {
         <View style={styles.ambientGlowTopRight} pointerEvents="none" />
         <View style={styles.ambientGlowBottomLeft} pointerEvents="none" />
 
-        {/* Top Row: Title + Mode Toggle + Privacy Eye + Interactive Dossier Trigger Button */}
-        <View style={styles.heroTopRow}>
-          <View style={styles.heroLabelWrap}>
-            <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: "rgba(56, 189, 248, 0.18)", alignItems: "center", justifyContent: "center" }}>
-              <Feather name="shield" size={10} color="#38BDF8" />
+        {/* Top Row: Title + Privacy Eye + Fiscal Dossier Button */}
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1, minWidth: 0, marginRight: 10 }}>
+            <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: "rgba(56, 189, 248, 0.18)", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <Feather name="shield" size={11} color="#38BDF8" />
             </View>
-            <Text style={styles.heroLabel}>
-              {balanceViewMode === "cashflow" ? "OPERATING RESULT" : "TOTAL DISBURSEMENTS"}
+            <Text
+              style={{ color: "#FFFFFF", fontSize: 11.5, fontFamily: "Inter_800ExtraBold", letterSpacing: 0.6, flexShrink: 1 }}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.85}
+            >
+              {balanceViewMode === "cashflow"
+                ? "OPERATING RESULT"
+                : balanceViewMode === "budget"
+                ? "BUDGET CAP"
+                : "OUTFLOW AUDIT"}
             </Text>
             <TouchableOpacity
               onPress={() => {
                 setHideBalance(!hideBalance);
                 if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               }}
-              style={styles.heroEyeBtn}
+              style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: "rgba(255, 255, 255, 0.12)", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               activeOpacity={0.7}
             >
-              <Feather name={hideBalance ? "eye-off" : "eye"} size={12} color="rgba(255, 255, 255, 0.9)" />
+              <Feather name={hideBalance ? "eye-off" : "eye"} size={11} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
 
           {/* Direct Trigger to Open Net Operating Balance Dossier */}
           <TouchableOpacity
-            style={styles.heroDossierPill}
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 4,
+              backgroundColor: "rgba(255, 255, 255, 0.10)",
+              paddingHorizontal: 9,
+              paddingVertical: 5,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: "rgba(255, 255, 255, 0.22)",
+              flexShrink: 0,
+            }}
             onPress={() => {
               if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               setNetModalVisible(true);
@@ -497,34 +537,46 @@ export default function DashboardScreen() {
             activeOpacity={0.8}
           >
             <Feather name="bar-chart-2" size={10} color="#38BDF8" />
-            <Text style={styles.heroDossierText}>Fiscal Dossier →</Text>
+            <Text style={{ color: "#FFFFFF", fontSize: 10.5, fontFamily: "Inter_700Bold", letterSpacing: 0.2 }}>
+              Fiscal Dossier →
+            </Text>
           </TouchableOpacity>
         </View>
 
-        {/* View Mode Switcher Pills (Net Operating Result vs Total Outflows) */}
-        <View style={{ flexDirection: "row", gap: 6, marginTop: -4, marginBottom: 2 }}>
+        {/* View Mode Switcher Pills (Symmetrical Side-by-Side Flex, 10px Gap, Zero Touch) */}
+        <View style={{ flexDirection: "row", gap: 10, marginBottom: 14 }}>
           <TouchableOpacity
             style={{
               flex: 1,
               flexDirection: "row",
               alignItems: "center",
               justifyContent: "center",
-              gap: 4,
-              paddingHorizontal: 8,
-              paddingVertical: 4,
-              borderRadius: 8,
-              backgroundColor: balanceViewMode === "cashflow" ? "rgba(59, 130, 246, 0.35)" : "rgba(255, 255, 255, 0.08)",
-              borderWidth: 1,
+              gap: 4.5,
+              paddingHorizontal: 6,
+              paddingVertical: 5.5,
+              borderRadius: 10,
+              backgroundColor: balanceViewMode === "cashflow" ? "rgba(59, 130, 246, 0.30)" : "rgba(255, 255, 255, 0.08)",
+              borderWidth: 1.2,
               borderColor: balanceViewMode === "cashflow" ? "#60A5FA" : "rgba(255, 255, 255, 0.15)",
             }}
             onPress={() => {
               setBalanceViewMode("cashflow");
               if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             }}
+            activeOpacity={0.8}
           >
-            <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: "#10B981" }} />
-            <Text style={{ color: balanceViewMode === "cashflow" ? "#FFFFFF" : "rgba(255, 255, 255, 0.7)", fontSize: 10, fontFamily: "Inter_700Bold" }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-              Surplus ({netBalance >= 0 ? "+" : "-"}{fmt(Math.abs(netBalance))})
+            <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: "#10B981", flexShrink: 0 }} />
+            <Text
+              style={{
+                color: balanceViewMode === "cashflow" ? "#FFFFFF" : "rgba(255, 255, 255, 0.75)",
+                fontSize: 9.5,
+                fontFamily: "Inter_700Bold",
+              }}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.75}
+            >
+              Surplus ({netBalance >= 0 ? "+" : "-"}{settings.currency} {fmt(Math.abs(netBalance))})
             </Text>
           </TouchableOpacity>
 
@@ -534,150 +586,125 @@ export default function DashboardScreen() {
               flexDirection: "row",
               alignItems: "center",
               justifyContent: "center",
-              gap: 4,
-              paddingHorizontal: 8,
-              paddingVertical: 4,
-              borderRadius: 8,
-              backgroundColor: balanceViewMode === "expenses" ? "rgba(244, 63, 94, 0.35)" : "rgba(255, 255, 255, 0.08)",
-              borderWidth: 1,
+              gap: 4.5,
+              paddingHorizontal: 6,
+              paddingVertical: 5.5,
+              borderRadius: 10,
+              backgroundColor: balanceViewMode === "expenses" ? "rgba(244, 63, 94, 0.30)" : "rgba(255, 255, 255, 0.08)",
+              borderWidth: 1.2,
               borderColor: balanceViewMode === "expenses" ? "#F43F5E" : "rgba(255, 255, 255, 0.15)",
             }}
             onPress={() => {
               setBalanceViewMode("expenses");
               if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             }}
+            activeOpacity={0.8}
           >
-            <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: "#F43F5E" }} />
-            <Text style={{ color: balanceViewMode === "expenses" ? "#FFFFFF" : "rgba(255, 255, 255, 0.7)", fontSize: 10, fontFamily: "Inter_700Bold" }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-              Outflows (-{fmt(totalExpenses)})
+            <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: "#F43F5E", flexShrink: 0 }} />
+            <Text
+              style={{
+                color: balanceViewMode === "expenses" ? "#FFFFFF" : "rgba(255, 255, 255, 0.75)",
+                fontSize: 9.5,
+                fontFamily: "Inter_700Bold",
+              }}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.75}
+            >
+              Outflows (-{settings.currency} {fmt(totalExpenses)})
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* Balance Hero Amount Display + Single Interactive Growth Metric Pill */}
-        <View style={styles.heroAmountSection}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%", gap: 8 }}>
-            <TouchableOpacity
-              onPress={() => {
-                if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                setNetModalVisible(true);
-              }}
-              activeOpacity={0.85}
-              style={{ flex: 1 }}
-            >
+        {/* Balance Hero Amount Display + Margin Pill (Matching Web Exactly) */}
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <TouchableOpacity
+            onPress={() => {
+              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              setNetModalVisible(true);
+            }}
+            activeOpacity={0.85}
+            style={{ flex: 1, marginRight: 8 }}
+          >
+            {hideBalance ? (
+              <Text style={styles.heroAmountText} numberOfLines={1}>
+                {settings.currency} ••••••
+              </Text>
+            ) : (
               <Text
                 style={[
                   styles.heroAmountText,
-                  { color: balanceViewMode === "expenses" ? "#FB7185" : "#FFFFFF" },
+                  {
+                    fontSize: 30,
+                    color: balanceViewMode === "expenses" ? "#FB7185" : "#FFFFFF",
+                    fontFamily: "Inter_800ExtraBold",
+                    letterSpacing: -0.8,
+                  },
                 ]}
                 numberOfLines={1}
                 adjustsFontSizeToFit
+                minimumFontScale={0.75}
               >
-                {hideBalance ? `${settings.currency} ••••••` : `${currentHeroBalance >= 0 ? "+" : "-"}${settings.currency} ${fmt(Math.abs(currentHeroBalance))}`}
+                {`${currentHeroBalance >= 0 ? "+" : "-"}${settings.currency} ${fmt(Math.abs(currentHeroBalance))}`}
               </Text>
-            </TouchableOpacity>
+            )}
+          </TouchableOpacity>
 
-            {/* Single Unified Interactive Growth / Health Pill */}
-            <TouchableOpacity
-              style={[
-                styles.heroGrowthPill,
-                {
-                  backgroundColor:
-                    growthMode === 0
-                      ? (currentHeroIsDeficit ? "rgba(244, 63, 94, 0.28)" : "rgba(16, 185, 129, 0.28)")
-                      : growthMode === 1
-                      ? (netMargin < 0 ? "rgba(244, 63, 94, 0.25)" : "rgba(56, 189, 248, 0.20)")
-                      : growthMode === 2
-                      ? "rgba(59, 130, 246, 0.25)"
-                      : (currentHeroIsDeficit ? "rgba(244, 63, 94, 0.28)" : "rgba(245, 158, 11, 0.28)"),
-                  borderColor:
-                    growthMode === 0
-                      ? (currentHeroIsDeficit ? "rgba(244, 63, 94, 0.55)" : "rgba(16, 185, 129, 0.55)")
-                      : growthMode === 1
-                      ? (netMargin < 0 ? "rgba(244, 63, 94, 0.55)" : "rgba(56, 189, 248, 0.45)")
-                      : growthMode === 2
-                      ? "rgba(59, 130, 246, 0.55)"
-                      : (currentHeroIsDeficit ? "rgba(244, 63, 94, 0.55)" : "rgba(245, 158, 11, 0.55)"),
-                },
-              ]}
-              onPress={() => {
-                setGrowthMode((m) => (m + 1) % 4);
-                if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              }}
-              activeOpacity={0.8}
-            >
-              {growthMode === 0 && (
-                <>
-                  <Feather
-                    name={currentHeroIsDeficit ? "trending-down" : "trending-up"}
-                    size={12}
-                    color={currentHeroIsDeficit ? "#FB7185" : "#4ADE80"}
-                  />
-                  <Text style={[styles.heroGrowthText, { color: currentHeroIsDeficit ? "#FB7185" : "#4ADE80" }]}>
-                    {balanceViewMode === "budget" && totalBudgeted > 0
-                      ? `${netBudgetUtilization.toFixed(0)}% Used`
-                      : `${netMargin >= 0 ? "+" : ""}${netMargin.toFixed(1)}%`}
-                  </Text>
-                  <Text style={styles.heroGrowthSub}>{balanceViewMode === "budget" && totalBudgeted > 0 ? "Cap" : isDeficit ? "Deficit" : "Margin"}</Text>
-                </>
-              )}
-              {growthMode === 1 && (
-                <>
-                  <Feather name="pie-chart" size={12} color={netMargin < 0 ? "#FB7185" : "#38BDF8"} />
-                  <Text style={[styles.heroGrowthText, { color: netMargin < 0 ? "#FB7185" : "#38BDF8" }]}>
-                    {netMargin > 0 ? `+${netMargin.toFixed(1)}%` : `${netMargin.toFixed(1)}%`}
-                  </Text>
-                  <Text style={styles.heroGrowthSub}>Margin</Text>
-                </>
-              )}
-              {growthMode === 2 && (
-                <>
-                  <Feather name="layers" size={12} color="#60A5FA" />
-                  <Text style={[styles.heroGrowthText, { color: "#60A5FA" }]}>
-                    {budgetUtilization.toFixed(0)}%
-                  </Text>
-                  <Text style={styles.heroGrowthSub}>Budget</Text>
-                </>
-              )}
-              {growthMode === 3 && (
-                <>
-                  <View style={[styles.heroStatusDot, { backgroundColor: currentHeroIsDeficit ? "#FB7185" : "#4ADE80" }]} />
-                  <Text style={[styles.heroGrowthText, { color: "#FFFFFF" }]}>
-                    {currentHeroIsDeficit ? "Deficit Alert" : "Surplus Buffer"}
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
+          {/* Growth Pill Badge Matching Web */}
+          <TouchableOpacity
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 5,
+              paddingHorizontal: 11,
+              paddingVertical: 6,
+              borderRadius: 18,
+              backgroundColor: currentHeroIsDeficit ? "rgba(244, 63, 94, 0.20)" : "rgba(16, 185, 129, 0.20)",
+              borderWidth: 1.5,
+              borderColor: currentHeroIsDeficit ? "rgba(244, 63, 94, 0.50)" : "rgba(16, 185, 129, 0.50)",
+              flexShrink: 0,
+            }}
+            onPress={() => {
+              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setNetModalVisible(true);
+            }}
+            activeOpacity={0.8}
+          >
+            <Feather
+              name={currentHeroIsDeficit ? "trending-down" : "trending-up"}
+              size={12}
+              color={currentHeroIsDeficit ? "#FB7185" : "#34D399"}
+            />
+            <Text style={{ color: currentHeroIsDeficit ? "#FB7185" : "#34D399", fontSize: 12, fontFamily: "Inter_700Bold" }}>
+              {balanceViewMode === "expenses"
+                ? `${clampedSpendRatio}% Outflow`
+                : `${netMargin >= 0 ? "+" : ""}${netMargin.toFixed(1)}% Margin`}
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Dynamic Cash Flow / Budget Utilization Track */}
-        <View style={styles.retentionContainer}>
-          <View style={styles.retentionLabels}>
-            <Text style={[styles.retentionText, currentHeroIsDeficit && { color: "#FB7185" }]}>
-              {balanceViewMode === "budget" && totalBudgeted > 0
-                ? `${netBudgetUtilization.toFixed(0)}% Spent of Budget (${settings.currency} ${fmt(totalExpenses)})`
-                : isDeficit
-                ? `${Math.round(rawSpendRatio)}% Outflows (${settings.currency} ${fmt(Math.abs(netBalance))} Deficit)`
-                : `${clampedSpendRatio}% Spent of Inflows`}
+        {/* Dynamic Cash Flow / Budget Retention Progress Bar & Labels (Matching Web Exactly) */}
+        <View style={{ gap: 7, marginTop: 2 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <Text style={{ color: "#CBD5E1", fontSize: 11, fontFamily: "Inter_500Medium" }}>
+              {isDeficit
+                ? `${Math.round(rawSpendRatio)}% Overspent`
+                : `${clampedSpendRatio}% Total Spent`}
             </Text>
-            <Text style={[styles.retentionText, { color: currentHeroIsDeficit ? "#FB7185" : "#4ADE80", fontFamily: "Inter_700Bold" }]}>
-              {balanceViewMode === "budget" && totalBudgeted > 0
-                ? `${Math.max(0, 100 - netBudgetUtilization).toFixed(0)}% Available (${settings.currency} ${fmt(Math.max(0, netBudgetRemaining))})`
-                : isDeficit
+            <Text style={{ color: currentHeroIsDeficit ? "#FB7185" : "#34D399", fontSize: 11, fontFamily: "Inter_700Bold" }}>
+              {isDeficit
                 ? "Operating Deficit"
-                : `${retainedSurplusPct}% Retained Surplus`}
+                : `${retainedSurplusPct}% Net Surplus`}
             </Text>
           </View>
-          <View style={styles.retentionTrack}>
+          <View style={{ height: 6, borderRadius: 3, backgroundColor: "rgba(255, 255, 255, 0.12)", overflow: "hidden" }}>
             <View
-              style={[
-                styles.retentionFill,
-                {
-                  width: `${balanceViewMode === "budget" && totalBudgeted > 0 ? Math.min(Math.max(netBudgetUtilization, 4), 100) : isDeficit ? 100 : clampedSpendRatio}%`,
-                  backgroundColor: currentHeroIsDeficit ? "#FB7185" : (balanceViewMode === "budget" ? "#60A5FA" : clampedSpendRatio > 80 ? "#F59E0B" : "#38BDF8"),
-                },
-              ]}
+              style={{
+                height: "100%",
+                width: `${Math.min(Math.max(clampedSpendRatio, 2), 100)}%`,
+                backgroundColor: currentHeroIsDeficit ? "#FB7185" : "#38BDF8",
+                borderRadius: 3,
+              }}
             />
           </View>
         </View>
@@ -712,7 +739,7 @@ export default function DashboardScreen() {
               </View>
               <View style={[styles.kpiTag, { backgroundColor: colors.income + "18" }]}>
                 <Text style={[styles.kpiTagText, { color: colors.income }]}>
-                  {incomeGrowth !== 0 ? `${incomeGrowth > 0 ? "+" : ""}${incomeGrowth.toFixed(1)}%` : "Inflows"}
+                  {incomeGrowth !== 0 ? `${incomeGrowth > 0 ? "+" : ""}${incomeGrowth.toFixed(1)}%` : "Income"}
                 </Text>
               </View>
             </View>
@@ -732,7 +759,7 @@ export default function DashboardScreen() {
                 ? isDeficit
                   ? `Deficit: -${settings.currency} ${fmt(Math.abs(netBalance))}`
                   : `${retainedSurplusPct}% Retained`
-                : "No Inflows"}
+                : "No Income"}
             </Text>
             <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 4, overflow: "hidden" }}>
               <View
@@ -773,7 +800,7 @@ export default function DashboardScreen() {
                 ]}
               >
                 <Text style={[styles.kpiTagText, { color: totalExpenses === 0 ? colors.income : isDeficit ? colors.expense : colors.warning }]}>
-                  {totalExpenses === 0 ? "No Outflows" : isDeficit ? "Over Inflows" : "Outflows"}
+                  {totalExpenses === 0 ? "No Expenses" : isDeficit ? "Over Budget" : "Expenses"}
                 </Text>
               </View>
             </View>
@@ -790,10 +817,10 @@ export default function DashboardScreen() {
               }}
             >
               {totalExpenses === 0
-                ? "No Outflows (0%)"
+                ? "No Expenses (0%)"
                 : totalIncome > 0
-                ? `${Math.round(rawSpendRatio)}% of Inflows`
-                : "100% Outflow"}
+                ? `${Math.round(rawSpendRatio)}% Total Spent`
+                : "100% Spent"}
             </Text>
             <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 4, overflow: "hidden" }}>
               <View
@@ -1055,6 +1082,12 @@ export default function DashboardScreen() {
           currency={settings.currency}
           activeRange={customSelection ? undefined : trendRange}
           activePeriod={activePeriod}
+          onGranularityChange={(g) => {
+            setActivePeriod((prev) => ({
+              ...prev,
+              userGranularityOverride: g,
+            }));
+          }}
           onPeriodSelect={(p) => {
             setActivePeriod(p);
             setCustomPeriodName(p.label);

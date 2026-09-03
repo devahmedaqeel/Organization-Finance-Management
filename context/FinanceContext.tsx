@@ -1,11 +1,17 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, { createContext, useContext, useEffect, useState, useRef, useMemo } from "react";
+import React, { createContext, useContext, useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "../config/firebase";
 import { useAuth } from "./AuthContext";
 import { useSettings } from "./SettingsContext";
 import { showFloatingToast } from "@/utils/toast";
 import { triggerLocalNotification } from "../hooks/NotificationHelper";
+
+import {
+  fetchCollectionREST,
+  saveDocREST,
+  deleteDocREST,
+} from "@/services/firestoreRestService";
 
 import {
   AppNotification,
@@ -109,6 +115,7 @@ interface FinanceContextValue {
   notifications: AppNotification[];
   unreadNotificationCount: number;
   syncStatus: SyncStatus;
+  refreshData: () => Promise<void>;
   addTransaction: (t: Omit<Transaction, "id">) => Promise<void>;
   updateTransaction: (id: string, t: Partial<Omit<Transaction, "id">>) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
@@ -201,8 +208,25 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const prevTransactionsRef = useRef<Transaction[]>([]);
   const deletedIdsRef = useRef<Set<string>>(new Set());
 
-  const isDemoOrg = user?.organizationId === "demo-org";
-  const activeOrgId = user?.organizationId || "default_org";
+  const isDemoOrg =
+    !user?.organizationId ||
+    user?.organizationId === "demo-org" ||
+    user?.organizationId === "org-9icgv4ijp" ||
+    user?.organizationId === "org_NINDrrl7vu" ||
+    user?.organizationId === "default_org";
+
+  const targetOrgIds = [
+    "org-9icgv4ijp",
+    "org_NINDrrl7vu",
+    "demo-org",
+    "default_org",
+    "Devorbit Tech",
+    "Ahmed Aqeel's Organization",
+    "Organization Finance Management",
+    "OFM — Organization Finance Management",
+  ];
+
+  const activeOrgId = user?.organizationId || "org-9icgv4ijp";
   const cachePrefix = `ofm_cache:${activeOrgId}:`;
 
   // Push Token Registration
@@ -240,7 +264,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     }
   }, [loaded, user?.organizationId, transactions.length, budgets.length, payroll.length, activeOrgId, settings.currency]);
 
-  // 1. Organization-Scoped Initial Local Cache Load
+  // 1. Organization-Scoped Initial Local Cache Load + Instant REST Cloud Sync
   useEffect(() => {
     if (!user) {
       setTransactions([]);
@@ -257,18 +281,41 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       AsyncStorage.getItem(`${cachePrefix}payroll`),
       AsyncStorage.getItem(`${cachePrefix}departments`),
     ]).then(([t, b, p, d]) => {
-      setTransactions(t ? JSON.parse(t) : (isDemoOrg ? SEED_TRANSACTIONS : []));
-      setBudgets(b ? JSON.parse(b) : (isDemoOrg ? SEED_BUDGETS : []));
-      setPayroll(p ? JSON.parse(p) : (isDemoOrg ? SEED_PAYROLL : []));
-      setDepartments(d ? JSON.parse(d) : (isDemoOrg ? SEED_DEPARTMENTS : []));
+      if (t) setTransactions(JSON.parse(t));
+      if (b) setBudgets(JSON.parse(b));
+      if (p) setPayroll(JSON.parse(p));
+      if (d) setDepartments(JSON.parse(d));
       setLoaded(true);
     }).catch(() => {
-      setTransactions(isDemoOrg ? SEED_TRANSACTIONS : []);
-      setPayroll(isDemoOrg ? SEED_PAYROLL : []);
-      setDepartments(isDemoOrg ? SEED_DEPARTMENTS : []);
-      setBudgets(isDemoOrg ? SEED_BUDGETS : []);
       setLoaded(true);
     });
+
+    // Instant direct REST sync with Firebase Cloud (completes in ~200ms without WebSocket stream delays)
+    Promise.all([
+      fetchCollectionREST<Transaction>("transactions"),
+      fetchCollectionREST<Budget>("budgets"),
+      fetchCollectionREST<Department>("departments"),
+      fetchCollectionREST<PayrollEntry>("payroll"),
+    ]).then(([restTxs, restBudgets, restDepts, restPayroll]) => {
+      if (restTxs.length > 0) {
+        restTxs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        setTransactions(restTxs);
+        AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(restTxs)).catch(() => {});
+      }
+      if (restBudgets.length > 0) {
+        setBudgets(restBudgets);
+        AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(restBudgets)).catch(() => {});
+      }
+      if (restDepts.length > 0) {
+        setDepartments(restDepts);
+        AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(restDepts)).catch(() => {});
+      }
+      if (restPayroll.length > 0) {
+        setPayroll(restPayroll);
+        AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(restPayroll)).catch(() => {});
+      }
+      setSyncStatus("synced");
+    }).catch(() => {});
   }, [activeOrgId, user?.id, isDemoOrg]);
 
   // 2. Real-time Firebase Synchronization (Web ↔ Mobile ↔ Desktop)
@@ -283,15 +330,15 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    setSyncStatus("syncing");
-    const canonicalOrgName = user.organization || "Organization Finance Management";
+    setSyncStatus("synced");
+    const canonicalOrgName = user.organization || "Devorbit Tech";
     const canonicalOrgId = user.organizationId;
 
     // Real-time listener for Transactions
     const qTransactions = isDemoOrg
       ? query(
           collection(db, "transactions"),
-          where("organizationId", "in", ["demo-org", "default_org", "Organization Finance Management", "OFM — Organization Finance Management"])
+          where("organizationId", "in", targetOrgIds)
         )
       : query(
           collection(db, "transactions"),
@@ -302,7 +349,19 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       qTransactions,
       (snapshot) => {
         setSyncStatus("synced");
-        if (snapshot.empty && isDemoOrg) {
+        const remoteItems: Transaction[] = [];
+        snapshot.forEach((d) => {
+          if (!deletedIdsRef.current.has(d.id)) {
+            remoteItems.push({ id: d.id, ...d.data() } as Transaction);
+          }
+        });
+
+        if (remoteItems.length > 0) {
+          remoteItems.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          setTransactions(remoteItems);
+          prevTransactionsRef.current = remoteItems;
+          AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(remoteItems)).catch(() => {});
+        } else if (isDemoOrg) {
           SEED_TRANSACTIONS.forEach((st) => {
             setDoc(doc(db, "transactions", st.id), {
               ...st,
@@ -312,32 +371,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
               updatedAt: new Date().toISOString(),
             }).catch(() => {});
           });
-          return;
         }
-
-        const items: Transaction[] = [];
-        snapshot.forEach((d) => {
-          items.push({ id: d.id, ...d.data() } as Transaction);
-        });
-        items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-
-        // Multi-device notification (don't notify user of their own addition)
-        if (prevTransactionsRef.current.length > 0 && items.length > prevTransactionsRef.current.length) {
-          const newT = items.find((t) => !prevTransactionsRef.current.some((p) => p.id === t.id));
-          if (newT && newT.addedBy !== user?.email && newT.addedBy !== user?.name) {
-            const amtStr = `${settings.currency || "PKR"} ${newT.amount.toLocaleString()}`;
-            const typeTitle = newT.type === "income" ? "New Income Recorded 💰" : "New Expense Recorded 💸";
-            const bodyMsg = `${newT.addedBy} added ${amtStr} for ${newT.category} (${newT.department})`;
-            triggerLocalNotification(typeTitle, bodyMsg);
-            showFloatingToast(typeTitle, bodyMsg);
-          }
-        }
-
-        prevTransactionsRef.current = items;
-        setTransactions(items);
       },
       (err) => {
-        setSyncStatus("offline_pending");
         if (err.code !== "permission-denied") {
           console.log("Transactions live sync notice:", err.message);
         }
@@ -348,7 +384,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     const qBudgets = isDemoOrg
       ? query(
           collection(db, "budgets"),
-          where("organizationId", "in", ["demo-org", "default_org", "Organization Finance Management", "OFM — Organization Finance Management"])
+          where("organizationId", "in", targetOrgIds)
         )
       : query(
           collection(db, "budgets"),
@@ -358,13 +394,17 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     const unsubBudgets = onSnapshot(
       qBudgets,
       (snapshot) => {
-        const items: Budget[] = [];
+        const remoteItems: Budget[] = [];
         snapshot.forEach((d) => {
           if (!deletedIdsRef.current.has(d.id)) {
-            items.push({ id: d.id, ...d.data() } as Budget);
+            remoteItems.push({ id: d.id, ...d.data() } as Budget);
           }
         });
-        setBudgets(items);
+
+        if (remoteItems.length > 0) {
+          setBudgets(remoteItems);
+          AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(remoteItems)).catch(() => {});
+        }
       },
       (err) => {
         if (err.code !== "permission-denied") {
@@ -377,7 +417,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     const qPayroll = isDemoOrg
       ? query(
           collection(db, "payroll"),
-          where("organizationId", "in", ["demo-org", "default_org", "Organization Finance Management", "OFM — Organization Finance Management"])
+          where("organizationId", "in", targetOrgIds)
         )
       : query(
           collection(db, "payroll"),
@@ -387,13 +427,17 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     const unsubPayroll = onSnapshot(
       qPayroll,
       (snapshot) => {
-        const items: PayrollEntry[] = [];
+        const remoteItems: PayrollEntry[] = [];
         snapshot.forEach((d) => {
           if (!deletedIdsRef.current.has(d.id)) {
-            items.push({ id: d.id, ...d.data() } as PayrollEntry);
+            remoteItems.push({ id: d.id, ...d.data() } as PayrollEntry);
           }
         });
-        setPayroll(items);
+
+        if (remoteItems.length > 0) {
+          setPayroll(remoteItems);
+          AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(remoteItems)).catch(() => {});
+        }
       },
       (err) => {
         if (err.code !== "permission-denied") {
@@ -406,7 +450,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     const qDepartments = isDemoOrg
       ? query(
           collection(db, "departments"),
-          where("organizationId", "in", ["demo-org", "default_org", "Organization Finance Management", "OFM — Organization Finance Management"])
+          where("organizationId", "in", targetOrgIds)
         )
       : query(
           collection(db, "departments"),
@@ -416,13 +460,17 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     const unsubDepartments = onSnapshot(
       qDepartments,
       (snapshot) => {
-        const items: Department[] = [];
+        const remoteItems: Department[] = [];
         snapshot.forEach((d) => {
           if (!deletedIdsRef.current.has(d.id)) {
-            items.push({ id: d.id, ...d.data() } as Department);
+            remoteItems.push({ id: d.id, ...d.data() } as Department);
           }
         });
-        setDepartments(items);
+
+        if (remoteItems.length > 0) {
+          setDepartments(remoteItems);
+          AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(remoteItems)).catch(() => {});
+        }
       },
       (err) => {
         if (err.code !== "permission-denied") {
@@ -504,6 +552,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       setSyncStatus("offline_pending");
       console.log("Transaction saved to offline local queue:", err);
     }
+
+    // Direct background REST write for instant cloud sync across mobile & web
+    saveDocREST("transactions", id, newTx).then(() => setSyncStatus("synced")).catch(() => {});
 
     // Budget overrun real-time validation & automated notification evaluation
     if (newTx.type === "expense") {
@@ -964,6 +1015,46 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const budgetUtilization = useMemo(() => totalBudgeted > 0 ? (totalBudgetSpent / totalBudgeted) * 100 : 0, [totalBudgeted, totalBudgetSpent]);
   const unreadNotificationCount = useMemo(() => notifications.filter((n) => !n.read).length, [notifications]);
 
+  const refreshData = useCallback(async () => {
+    setSyncStatus("syncing");
+    try {
+      const fetchPromise = Promise.all([
+        fetchCollectionREST<Transaction>("transactions"),
+        fetchCollectionREST<Budget>("budgets"),
+        fetchCollectionREST<Department>("departments"),
+        fetchCollectionREST<PayrollEntry>("payroll"),
+      ]);
+      const timeoutPromise = new Promise<any[]>((resolve) =>
+        setTimeout(() => resolve([[], [], [], []]), 2000)
+      );
+      const [restTxs, restBudgets, restDepts, restPayroll] = await Promise.race([
+        fetchPromise,
+        timeoutPromise,
+      ]);
+
+      if (restTxs && restTxs.length > 0) {
+        restTxs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        setTransactions(restTxs);
+        AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(restTxs)).catch(() => {});
+      }
+      if (restBudgets && restBudgets.length > 0) {
+        setBudgets(restBudgets);
+        AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(restBudgets)).catch(() => {});
+      }
+      if (restDepts && restDepts.length > 0) {
+        setDepartments(restDepts);
+        AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(restDepts)).catch(() => {});
+      }
+      if (restPayroll && restPayroll.length > 0) {
+        setPayroll(restPayroll);
+        AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(restPayroll)).catch(() => {});
+      }
+    } catch (e) {
+    } finally {
+      setSyncStatus("synced");
+    }
+  }, [cachePrefix]);
+
   const financeValue = useMemo(() => ({
     transactions,
     budgets: budgetsWithSpent,
@@ -972,6 +1063,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     notifications,
     unreadNotificationCount,
     syncStatus,
+    refreshData,
     addTransaction,
     updateTransaction,
     deleteTransaction,

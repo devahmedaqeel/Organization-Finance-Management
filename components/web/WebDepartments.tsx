@@ -129,10 +129,10 @@ export function WebDepartments() {
         <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 200 }]}>
           <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>TOTAL BUDGETED CEILINGS</Text>
           <Text style={[styles.metricValue, { color: colors.foreground }]}>
-            {settings.currency} {totalAllocated.toLocaleString()}
+            {settings.currency} {Number(totalAllocated || 0).toLocaleString()}
           </Text>
           <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
-            Disbursed: {settings.currency} {totalActualSpend.toLocaleString()}
+            Disbursed: {settings.currency} {Number(totalActualSpend || 0).toLocaleString()}
           </Text>
         </View>
       </View>
@@ -200,10 +200,10 @@ export function WebDepartments() {
                 <View style={styles.deptTrackWrap}>
                   <View style={styles.deptTrackLabels}>
                     <Text style={[styles.trackRatio, { color: statusColor }]}>
-                      {dept.ratio.toFixed(1)}% Budget Spent
+                      {(dept.ratio || 0).toFixed(1)}% Budget Spent
                     </Text>
                     <Text style={[styles.trackSpend, { color: colors.mutedForeground }]}>
-                      {settings.currency} {dept.actualSpend.toLocaleString()} / {settings.currency} {dept.budgetAllocated.toLocaleString()}
+                      {settings.currency} {Number(dept.actualSpend || 0).toLocaleString()} / {settings.currency} {Number(dept.budgetAllocated || 0).toLocaleString()}
                     </Text>
                   </View>
                   <View style={[styles.deptTrack, { backgroundColor: colors.border }]}>

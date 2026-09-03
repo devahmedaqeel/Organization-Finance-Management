@@ -38,10 +38,12 @@ export const auth =
         }
       })();
 
-// Firestore: Web = persistent cache, Native = memory cache (IndexedDB not available on Android)
+// Firestore: Web = persistent cache, Native = memory cache + long-polling fallback for mobile ISPs
 export const db = (() => {
   try {
     return initializeFirestore(app, {
+      experimentalAutoDetectLongPolling: true,
+      ...(Platform.OS !== "web" ? { experimentalForceLongPolling: true } : {}),
       localCache:
         Platform.OS === "web"
           ? persistentLocalCache({ tabManager: persistentMultipleTabManager() })

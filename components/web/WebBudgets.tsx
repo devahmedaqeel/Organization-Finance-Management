@@ -166,9 +166,9 @@ export function WebBudgets() {
         <Text style={[styles.filterLabel, { color: colors.mutedForeground }]}>Filter by Department:</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View style={{ flexDirection: "row", gap: 6 }}>
-            {["all", ...(departments.length > 0 ? departments.map((d) => d.name) : ["Software Engineering", "Administration", "Finance", "Research & Development"])].map((dept) => (
+            {Array.from(new Set(["all", ...(departments.length > 0 ? departments.map((d) => d.name) : ["Software Engineering", "Administration", "Finance", "Research & Development"])].filter(Boolean))).map((dept, idx) => (
               <TouchableOpacity
-                key={dept}
+                key={`${dept}-${idx}`}
                 style={[
                   styles.filterChip,
                   {

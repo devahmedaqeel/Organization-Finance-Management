@@ -479,10 +479,14 @@ export function WebDashboard({
         <View style={{ gap: 7, marginTop: 2 }}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
             <Text style={{ color: "#CBD5E1", fontSize: isMobile ? 11 : 11.5, fontFamily: "Inter_500Medium" }}>
-              {clampedSpendRatio}% Spent of Inflows
+              {isDeficit
+                ? `${Math.round(rawSpendRatio)}% Overspent`
+                : `${clampedSpendRatio}% Total Spent`}
             </Text>
             <Text style={{ color: currentHeroIsDeficit ? "#FB7185" : "#34D399", fontSize: isMobile ? 11 : 11.5, fontFamily: "Inter_700Bold" }}>
-              {retainedSurplusPct}% Retained Surplus
+              {isDeficit
+                ? "Operating Deficit"
+                : `${retainedSurplusPct}% Net Surplus`}
             </Text>
           </View>
           <View style={{ height: 6, borderRadius: 3, backgroundColor: "rgba(255, 255, 255, 0.12)", overflow: "hidden" }}>
