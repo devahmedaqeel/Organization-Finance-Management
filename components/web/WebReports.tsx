@@ -567,8 +567,8 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
             <View style={{ paddingVertical: 10 }}>
               <DonutChart
                 segments={expenseDonutSegments}
-                size={isMobile ? 140 : 180}
-                strokeWidth={isMobile ? 14 : 18}
+                size={isMobile ? 134 : 164}
+                strokeWidth={isMobile ? 11 : 13}
                 centerLabel={`${settings.currency} ${fmtShort(metrics.totalExpense)}`}
                 centerSub="Total Spent"
                 currency={settings.currency}

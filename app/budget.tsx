@@ -298,8 +298,8 @@ export default function BudgetScreen() {
                 value: d.value,
                 color: d.color,
               }))}
-              size={144}
-              strokeWidth={14}
+              size={132}
+              strokeWidth={11}
               centerLabel={`${settings.currency} ${fmtNum(totalAllocated)}`}
               centerSub="Total Allocated"
               currency={settings.currency}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View, ScrollView, useWindowDimensions } from "react-native";
+import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View, ScrollView, useWindowDimensions, Platform } from "react-native";
 import { Budget, useFinance } from "@/context/FinanceContext";
 import { useColors } from "@/hooks/useColors";
 import { useSettings } from "@/context/SettingsContext";
@@ -47,6 +47,7 @@ export function WebBudgetModal({ visible, onClose, budgetToEdit }: WebBudgetModa
   const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [focusedField, setFocusedField] = useState<"allocated" | "period" | "notes" | null>(null);
 
   useEffect(() => {
     if (budgetToEdit) {
@@ -179,7 +180,7 @@ export function WebBudgetModal({ visible, onClose, budgetToEdit }: WebBudgetModa
                       style={[
                         styles.chip,
                         {
-                          backgroundColor: category === cat ? colors.foreground : colors.background,
+                          backgroundColor: category === cat ? colors.primary : colors.background,
                           borderColor: category === cat ? "transparent" : colors.border,
                         },
                       ]}
@@ -188,7 +189,7 @@ export function WebBudgetModal({ visible, onClose, budgetToEdit }: WebBudgetModa
                       <Text
                         style={[
                           styles.chipText,
-                          { color: category === cat ? colors.background : colors.foreground },
+                          { color: category === cat ? "#FFFFFF" : colors.foreground },
                         ]}
                       >
                         {cat}
@@ -203,8 +204,18 @@ export function WebBudgetModal({ visible, onClose, budgetToEdit }: WebBudgetModa
             <View style={[styles.row, isMobile && { flexDirection: "column" }]}>
               <View style={[styles.formGroup, { flex: 1 }]}>
                 <Text style={[styles.label, { color: colors.mutedForeground }]}>ALLOCATED CEILING ({settings.currency}) *</Text>
-                <View style={[styles.inputWrap, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                <View
+                  style={[
+                    styles.inputWrap,
+                    {
+                      backgroundColor: colors.background,
+                      borderColor: focusedField === "allocated" ? colors.primary : colors.border,
+                      borderWidth: focusedField === "allocated" ? 1.5 : 1,
+                    },
+                  ]}
+                >
                   <Text style={[styles.currencyPrefix, { color: colors.mutedForeground }]}>{settings.currency}</Text>
+                  <View style={{ width: 1, height: 16, backgroundColor: colors.border, marginHorizontal: 2 }} />
                   <TextInput
                     style={[styles.input, { color: colors.foreground }]}
                     placeholder="0.00"
@@ -212,6 +223,8 @@ export function WebBudgetModal({ visible, onClose, budgetToEdit }: WebBudgetModa
                     keyboardType="numeric"
                     value={allocated}
                     onChangeText={setAllocated}
+                    onFocus={() => setFocusedField("allocated")}
+                    onBlur={() => setFocusedField(null)}
                     autoFocus={!isEditing}
                   />
                 </View>
@@ -219,13 +232,24 @@ export function WebBudgetModal({ visible, onClose, budgetToEdit }: WebBudgetModa
 
               <View style={[styles.formGroup, { flex: 1 }]}>
                 <Text style={[styles.label, { color: colors.mutedForeground }]}>FISCAL PERIOD (YYYY-MM) *</Text>
-                <View style={[styles.inputWrap, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                <View
+                  style={[
+                    styles.inputWrap,
+                    {
+                      backgroundColor: colors.background,
+                      borderColor: focusedField === "period" ? colors.primary : colors.border,
+                      borderWidth: focusedField === "period" ? 1.5 : 1,
+                    },
+                  ]}
+                >
                   <TextInput
                     style={[styles.input, { color: colors.foreground }]}
                     placeholder="2026-05"
                     placeholderTextColor={colors.mutedForeground + "80"}
                     value={period}
                     onChangeText={setPeriod}
+                    onFocus={() => setFocusedField("period")}
+                    onBlur={() => setFocusedField(null)}
                   />
                 </View>
               </View>
@@ -265,13 +289,24 @@ export function WebBudgetModal({ visible, onClose, budgetToEdit }: WebBudgetModa
             {/* Notes */}
             <View style={styles.formGroup}>
               <Text style={[styles.label, { color: colors.mutedForeground }]}>NOTES & CONSTRAINTS</Text>
-              <View style={[styles.textAreaWrap, { backgroundColor: colors.background, borderColor: colors.border }]}>
+              <View
+                style={[
+                  styles.textAreaWrap,
+                  {
+                    backgroundColor: colors.background,
+                    borderColor: focusedField === "notes" ? colors.primary : colors.border,
+                    borderWidth: focusedField === "notes" ? 1.5 : 1,
+                  },
+                ]}
+              >
                 <TextInput
                   style={[styles.textArea, { color: colors.foreground }]}
                   placeholder="e.g. Annual HEC faculty salary ceiling..."
                   placeholderTextColor={colors.mutedForeground + "80"}
                   value={notes}
                   onChangeText={setNotes}
+                  onFocus={() => setFocusedField("notes")}
+                  onBlur={() => setFocusedField(null)}
                   multiline
                   numberOfLines={2}
                 />
@@ -400,6 +435,7 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     fontFamily: "Inter_500Medium",
     height: "100%",
+    ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as any) : {}),
   },
   textAreaWrap: {
     borderRadius: 10,
@@ -411,6 +447,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     minHeight: 50,
     textAlignVertical: "top",
+    ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as any) : {}),
   },
   chip: {
     paddingHorizontal: 12,

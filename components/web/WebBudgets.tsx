@@ -209,8 +209,8 @@ export function WebBudgets() {
         <View style={{ paddingVertical: 10 }}>
           <DonutChart
             segments={deptBudgetData}
-            size={isMobile ? 140 : 180}
-            strokeWidth={isMobile ? 14 : 18}
+            size={isMobile ? 134 : 164}
+            strokeWidth={isMobile ? 11 : 13}
             centerLabel={`${settings.currency} ${totalAllocated.toLocaleString()}`}
             centerSub="Total Budget"
             currency={settings.currency}

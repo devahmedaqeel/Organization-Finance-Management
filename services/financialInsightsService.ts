@@ -273,7 +273,7 @@ export function generateFinancialInsights(
         summary: `${topCat} represents ${topPct.toFixed(1)}% of all period disbursements (${currency} ${topData.amount.toLocaleString()}).`,
         whyItMatters: "High concentration in a single expense line item reduces overall budgetary flexibility.",
         recommendedAction: `Inspect individual vendor transactions within ${topCat} to evaluate recurring service contracts.`,
-        severity: topPct >= 55 ? "WARNING" : "INFO",
+        severity: net < 0 && topPct >= 55 ? "WARNING" : "INFO",
         category: "expense",
         metric: `${topPct.toFixed(1)}% of Total Outflows`,
         currentValue: topData.amount,
@@ -364,7 +364,7 @@ export function generateFinancialInsights(
         summary: `Staff compensation represents ${payrollPct.toFixed(1)}% of total period disbursements (${currency} ${totalPayroll.toLocaleString()}).`,
         whyItMatters: "Fixed remuneration obligations require stable recurring cash receipts.",
         recommendedAction: "Align inflow payment milestones prior to monthly payroll disbursement dates.",
-        severity: payrollPct >= 65 ? "WARNING" : "INFO",
+        severity: net < 0 && payrollPct >= 65 ? "WARNING" : "INFO",
         category: "payroll",
         metric: `${payrollPct.toFixed(1)}% of Total Outflows`,
         currentValue: totalPayroll,
@@ -383,7 +383,8 @@ export function generateFinancialInsights(
   // 6. ANOMALY DETECTION (STATISTICAL OUTLIER DETECTION)
   // ──────────────────────────────────────────────────────────────────────────
   const expenseTxs = currentTxs.filter((t) => t.type === "expense");
-  if (expenseTxs.length >= 4) {
+  // Outlier detection requires sufficient sample size (>= 6 transactions) for statistical validity
+  if (expenseTxs.length >= 6) {
     const amounts = expenseTxs.map((t) => safeNumber(t.amount, 0));
     const avg = amounts.reduce((a, b) => a + b, 0) / amounts.length;
     const maxTx = expenseTxs.reduce((prev, curr) => (curr.amount > prev.amount ? curr : prev));

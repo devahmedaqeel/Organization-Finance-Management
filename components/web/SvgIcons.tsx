@@ -127,8 +127,8 @@ export function SvgChart({ size = 16, color = "#94A3B8" }: IconProps) {
 export function SvgPieChart({ size = 16, color = "#94A3B8" }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <Path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
-      <Path d="M22 12A10 10 0 0 0 12 2v10z" />
+      <Circle cx="12" cy="12" r="10" />
+      <Path d="M12 2v10h10" />
     </Svg>
   );
 }

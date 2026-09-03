@@ -75,7 +75,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
   const { transactions, budgets, payroll, departments } = useFinance();
   const [allTxModal, setAllTxModal] = useState(false);
   const [txModalFilter, setTxModalFilter] = useState<"all" | "income" | "expense">("all");
-  const [insightFilter, setInsightFilter] = useState<"all" | "positive" | "alerts">("all");
+  const [insightFilter, setInsightFilter] = useState<"all" | "positive" | "critical" | "advisories">("all");
 
   // Active dynamic timeline period
   const [activePeriod, setActivePeriod] = useState<NormalizedPeriod>(() =>
@@ -287,7 +287,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
   }, [chartPoints, selectedPoint]);
 
   // Dynamic MoM growth computed from active sorted monthly ledger
-  const { incomeGrowth } = useMemo(() => {
+  const { incomeGrowth, hasMoMComparison } = useMemo(() => {
     const monthlyNet: Record<string, { inc: number; exp: number; net: number }> = {};
     transactions.forEach(t => {
       const m = t.date?.substring(0, 7);
@@ -305,23 +305,28 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
       const lastVal = monthlyNet[latestKey].inc;
       const prevVal = monthlyNet[prevKey].inc;
       const growth = prevVal > 0 ? ((lastVal - prevVal) / prevVal) * 100 : lastVal > 0 ? 100 : 0;
-      return { incomeGrowth: growth };
+      return { incomeGrowth: growth, hasMoMComparison: true };
     }
-    return { incomeGrowth: 0 };
+    return { incomeGrowth: 0, hasMoMComparison: false };
   }, [transactions]);
 
   const positiveCount = useMemo(
     () => actionableInsights.filter(i => i.severity === "SUCCESS").length,
     [actionableInsights]
   );
-  const warningCount = useMemo(
-    () => actionableInsights.filter(i => i.severity === "CRITICAL" || i.severity === "WARNING").length,
+  const criticalCount = useMemo(
+    () => actionableInsights.filter(i => i.severity === "CRITICAL").length,
+    [actionableInsights]
+  );
+  const advisoryCount = useMemo(
+    () => actionableInsights.filter(i => i.severity === "WARNING" || i.severity === "INFO").length,
     [actionableInsights]
   );
 
   const displayedInsights = useMemo(() => {
     if (insightFilter === "positive") return actionableInsights.filter(i => i.severity === "SUCCESS");
-    if (insightFilter === "alerts") return actionableInsights.filter(i => i.severity === "CRITICAL" || i.severity === "WARNING");
+    if (insightFilter === "critical") return actionableInsights.filter(i => i.severity === "CRITICAL");
+    if (insightFilter === "advisories") return actionableInsights.filter(i => i.severity === "WARNING" || i.severity === "INFO");
     return actionableInsights;
   }, [actionableInsights, insightFilter]);
 
@@ -387,11 +392,17 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
                   value: `${displayedBudgetUtil.toFixed(0)}%`,
                   color: displayedBudgetUtil <= 75 ? "#10B981" : displayedBudgetUtil <= 100 ? "#F59E0B" : "#F43F5E",
                 },
-                {
-                  label: "MoM Growth",
-                  value: `${incomeGrowth >= 0 ? "+" : ""}${incomeGrowth.toFixed(1)}%`,
-                  color: incomeGrowth >= 0 ? "#10B981" : "#F43F5E",
-                },
+                hasMoMComparison
+                  ? {
+                      label: "MoM Growth",
+                      value: `${incomeGrowth >= 0 ? "+" : ""}${incomeGrowth.toFixed(1)}%`,
+                      color: incomeGrowth >= 0 ? "#10B981" : "#F43F5E",
+                    }
+                  : {
+                      label: "Burn Rate",
+                      value: `${expenseRatio.toFixed(1)}%`,
+                      color: expenseRatio <= 65 ? "#10B981" : expenseRatio <= 85 ? "#F59E0B" : "#F43F5E",
+                    },
               ].map((s, i) => (
                 <View key={i} style={[styles.healthStat, { backgroundColor: colors.background, borderColor: colors.border }]}>
                   <Text style={[styles.healthStatValue, { color: s.color }]}>{s.value}</Text>
@@ -421,23 +432,45 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
               {positiveCount} Positive
             </Text>
           </TouchableOpacity>
+
+          {criticalCount > 0 && (
+            <TouchableOpacity
+              style={[
+                styles.badge,
+                {
+                  backgroundColor: "#F43F5E22",
+                  borderColor: insightFilter === "critical" ? "#F43F5E" : "#F43F5E44",
+                  borderWidth: insightFilter === "critical" ? 1.5 : 1,
+                },
+              ]}
+              onPress={() => setInsightFilter(f => f === "critical" ? "all" : "critical")}
+              activeOpacity={0.7}
+            >
+              <SvgAlertTriangle size={12} color="#F43F5E" />
+              <Text style={[styles.badgeText, { color: "#F43F5E", fontFamily: insightFilter === "critical" ? "Inter_700Bold" : "Inter_600SemiBold" }]}>
+                {criticalCount} Critical
+              </Text>
+            </TouchableOpacity>
+          )}
+
           <TouchableOpacity
             style={[
               styles.badge,
               {
-                backgroundColor: "#F43F5E22",
-                borderColor: insightFilter === "alerts" ? "#F43F5E" : "#F43F5E44",
-                borderWidth: insightFilter === "alerts" ? 1.5 : 1,
+                backgroundColor: "#F59E0B22",
+                borderColor: insightFilter === "advisories" ? "#F59E0B" : "#F59E0B44",
+                borderWidth: insightFilter === "advisories" ? 1.5 : 1,
               },
             ]}
-            onPress={() => setInsightFilter(f => f === "alerts" ? "all" : "alerts")}
+            onPress={() => setInsightFilter(f => f === "advisories" ? "all" : "advisories")}
             activeOpacity={0.7}
           >
-            <SvgAlertTriangle size={12} color="#F43F5E" />
-            <Text style={[styles.badgeText, { color: "#F43F5E", fontFamily: insightFilter === "alerts" ? "Inter_700Bold" : "Inter_600SemiBold" }]}>
-              {warningCount} Alerts
+            <SvgZap size={12} color="#F59E0B" />
+            <Text style={[styles.badgeText, { color: "#F59E0B", fontFamily: insightFilter === "advisories" ? "Inter_700Bold" : "Inter_600SemiBold" }]}>
+              {advisoryCount} Advisories
             </Text>
           </TouchableOpacity>
+
           <TouchableOpacity
             style={[
               styles.badge,
@@ -677,8 +710,8 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
           {displayedExpense > 0 && expenseByCategory.length > 0 ? (
             <DonutChart
               segments={expenseByCategory}
-              size={146}
-              strokeWidth={14}
+              size={134}
+              strokeWidth={11}
               currency={settings.currency}
               centerLabel={`${settings.currency} ${fmt(displayedExpense)}`}
               centerSub="total spent"

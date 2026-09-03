@@ -1043,8 +1043,8 @@ export function NetBalanceBreakdownModal({
                     <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>Proportional distribution of earned income</Text>
                     <DonutChart
                       segments={incomeDonutSegments}
-                      size={140}
-                      strokeWidth={14}
+                      size={132}
+                      strokeWidth={11}
                       centerLabel={`${settings.currency} ${fmtShort(totalIncome)}`}
                       centerSub="Total Revenue"
                     />
@@ -1107,8 +1107,8 @@ export function NetBalanceBreakdownModal({
                     <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>Where operating funds are consumed</Text>
                     <DonutChart
                       segments={expenseDonutSegments}
-                      size={140}
-                      strokeWidth={14}
+                      size={132}
+                      strokeWidth={11}
                       centerLabel={`${settings.currency} ${fmtShort(totalExpenses)}`}
                       centerSub="Total Spent"
                     />
