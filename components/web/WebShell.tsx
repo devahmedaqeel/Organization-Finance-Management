@@ -762,7 +762,7 @@ export function WebShell() {
             )}
             {activeTab === "ai-insights" && (
               <Suspense fallback={<TabLoadingSkeleton />}>
-                <WebAIInsights />
+                <WebAIInsights onNavigate={(route) => navigateToTab(route as WebTabKey)} />
               </Suspense>
             )}
             {activeTab === "settings" && (
