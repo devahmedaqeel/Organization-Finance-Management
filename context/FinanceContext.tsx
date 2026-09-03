@@ -930,8 +930,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Authoritative Aggregate Computations via Single Source of Truth
-  const totalIncome = useMemo(() => calculateTotalIncome(transactions), [transactions]);
+  const rawTxIncome = useMemo(() => calculateTotalIncome(transactions), [transactions]);
   const totalExpenses = useMemo(() => calculateTotalExpenses(transactions), [transactions]);
 
   const budgetsWithSpent = useMemo(() => {
@@ -951,9 +950,12 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
   const totalBudgeted = totalLineBudgeted > 0 ? totalLineBudgeted : totalDeptBudgeted;
   
-  // Real-time Total Balance includes Total Income + Total Allocated Budget - Total Expenses
-  // Whenever Income OR Budget is added/allocated, this Top Balance increases immediately!
-  const netBalance = useMemo(() => (totalIncome + totalBudgeted) - totalExpenses, [totalIncome, totalBudgeted, totalExpenses]);
+  // Real-time Total Income includes transaction income + allocated budget pool ("agr mae budet allocate kro inocme ma edlo")
+  // Whenever budget is allocated, it adds to income so margin reflects it accurately on web and mobile app
+  const totalIncome = useMemo(() => rawTxIncome + totalBudgeted, [rawTxIncome, totalBudgeted]);
+
+  // Real-time Total Balance = Total Income (including allocated budget) - Total Expenses
+  const netBalance = useMemo(() => totalIncome - totalExpenses, [totalIncome, totalExpenses]);
   const actualCash = useMemo(() => calculateActualCash(transactions), [transactions]);
   const totalBudgetSpent = useMemo(() => {
     return budgetsWithSpent.reduce((sum, b) => sum + Number(b.spent || 0), 0);

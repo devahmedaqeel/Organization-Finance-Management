@@ -120,23 +120,29 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
     return periodTxs;
   }, [selectedPoint, transactions, periodTxs]);
 
+  // Budget allocations & displayed spend
+  const totalAllocatedBudget = useMemo(() => budgets.reduce((s, b) => s + Number(b.allocated || 0), 0), [budgets]);
+
   // Authoritative real calculation for the displayed scope
-  const displayedIncome = useMemo(() => calculateTotalIncome(displayedTxs), [displayedTxs]);
+  // Total Income includes transaction inflows + allocated budget pool ("agr mae budet allocate kro inocme ma edlo")
+  const displayedTxIncome = useMemo(() => calculateTotalIncome(displayedTxs), [displayedTxs]);
+  const displayedIncome = useMemo(() => {
+    if (selectedPoint && displayedTxs.length === 0) return 0;
+    return displayedTxIncome + totalAllocatedBudget;
+  }, [selectedPoint, displayedTxs, displayedTxIncome, totalAllocatedBudget]);
+
   const displayedExpense = useMemo(() => calculateTotalExpenses(displayedTxs), [displayedTxs]);
   const displayedNet = displayedIncome - displayedExpense;
 
-  // Real profit margin (strictly real Inflows minus real Outflows, never inflated)
+  // Real profit margin (reflects income + allocated budget pool)
   const profitMargin = displayedIncome > 0
     ? (displayedNet / displayedIncome) * 100
     : (displayedExpense > 0 ? -100 : 0);
 
-  // Real expense ratio (Outflows as percentage of Inflows)
+  // Real expense ratio (Outflows as percentage of total funding)
   const expenseRatio = displayedIncome > 0
     ? (displayedExpense / displayedIncome) * 100
     : (displayedExpense > 0 ? 100 : 0);
-
-  // Budget allocations & displayed spend
-  const totalAllocatedBudget = useMemo(() => budgets.reduce((s, b) => s + Number(b.allocated || 0), 0), [budgets]);
   const displayedBudgetSpent = useMemo(() => {
     return budgets.reduce((sum, b) => {
       const catSpent = displayedTxs
