@@ -508,4 +508,214 @@ export function SvgArrowDownRight({ size = 16, color = "#F43F5E" }: IconProps) {
   );
 }
 
+export function SvgAlertTriangle({ size = 16, color = "#F59E0B" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+      <Line x1="12" y1="9" x2="12" y2="13" />
+      <Line x1="12" y1="17" x2="12.01" y2="17" />
+    </Svg>
+  );
+}
 
+export function SvgAlertOctagon({ size = 16, color = "#F43F5E" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2" />
+      <Line x1="12" y1="8" x2="12" y2="12" />
+      <Line x1="12" y1="16" x2="12.01" y2="16" />
+    </Svg>
+  );
+}
+
+export function SvgInfo({ size = 16, color = "#38BDF8" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Circle cx="12" cy="12" r="10" />
+      <Line x1="12" y1="16" x2="12" y2="12" />
+      <Line x1="12" y1="8" x2="12.01" y2="8" />
+    </Svg>
+  );
+}
+
+export function SvgChevronUp({ size = 16, color = "#94A3B8" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Polyline points="18 15 12 9 6 15" />
+    </Svg>
+  );
+}
+
+export function SvgPrinter({ size = 16, color = "#94A3B8" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Polyline points="6 9 6 2 18 2 18 9" />
+      <Path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+      <Rect x="6" y="14" width="12" height="8" rx="1" />
+    </Svg>
+  );
+}
+
+export function SvgShare2({ size = 16, color = "#94A3B8" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Circle cx="18" cy="5" r="3" />
+      <Circle cx="6" cy="12" r="3" />
+      <Circle cx="18" cy="19" r="3" />
+      <Line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+      <Line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+    </Svg>
+  );
+}
+
+export function SvgBellOff({ size = 16, color = "#94A3B8" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M13.73 21a2 2 0 0 1-3.46 0" />
+      <Path d="M18.63 13A17.89 17.89 0 0 1 18 8" />
+      <Path d="M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14" />
+      <Path d="M18 8a6 6 0 0 0-9.33-5" />
+      <Line x1="1" y1="1" x2="23" y2="23" />
+    </Svg>
+  );
+}
+
+export function SvgArrowLeft({ size = 16, color = "#94A3B8" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Line x1="19" y1="12" x2="5" y2="12" />
+      <Polyline points="12 19 5 12 12 5" />
+    </Svg>
+  );
+}
+
+export function SvgArrowRight({ size = 16, color = "#94A3B8" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Line x1="5" y1="12" x2="19" y2="12" />
+      <Polyline points="12 5 19 12 12 19" />
+    </Svg>
+  );
+}
+
+export function SvgCamera({ size = 16, color = "#94A3B8" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+      <Circle cx="12" cy="13" r="4" />
+    </Svg>
+  );
+}
+
+export function SvgImage({ size = 16, color = "#94A3B8" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+      <Circle cx="8.5" cy="8.5" r="1.5" />
+      <Polyline points="21 15 16 10 5 21" />
+    </Svg>
+  );
+}
+
+export function SvgRotateCcw({ size = 16, color = "#94A3B8" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Polyline points="1 4 1 10 7 10" />
+      <Path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+    </Svg>
+  );
+}
+
+export function SvgRefreshCw({ size = 16, color = "#94A3B8" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Polyline points="23 4 23 10 17 10" />
+      <Polyline points="1 20 1 14 7 14" />
+      <Path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+    </Svg>
+  );
+}
+
+export function SvgXCircle({ size = 16, color = "#94A3B8" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Circle cx="12" cy="12" r="10" />
+      <Line x1="15" y1="9" x2="9" y2="15" />
+      <Line x1="9" y1="9" x2="15" y2="15" />
+    </Svg>
+  );
+}
+
+export function SvgFilter({ size = 16, color = "#94A3B8" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+    </Svg>
+  );
+}
+
+export function SvgHelpCircle({ size = 16, color = "#94A3B8" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Circle cx="12" cy="12" r="10" />
+      <Path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+      <Line x1="12" y1="17" x2="12.01" y2="17" />
+    </Svg>
+  );
+}
+
+export function SvgCopy({ size = 16, color = "#94A3B8" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+      <Path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </Svg>
+  );
+}
+
+export function SvgHome({ size = 16, color = "#94A3B8" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      <Polyline points="9 22 9 12 15 12 15 22" />
+    </Svg>
+  );
+}
+
+export function SvgMoreVertical({ size = 16, color = "#94A3B8" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Circle cx="12" cy="12" r="1.5" />
+      <Circle cx="12" cy="5" r="1.5" />
+      <Circle cx="12" cy="19" r="1.5" />
+    </Svg>
+  );
+}
+
+export function SvgMoreHorizontal({ size = 16, color = "#94A3B8" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Circle cx="12" cy="12" r="1.5" />
+      <Circle cx="19" cy="12" r="1.5" />
+      <Circle cx="5" cy="12" r="1.5" />
+    </Svg>
+  );
+}
+
+export function SvgDownload({ size = 16, color = "#94A3B8" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <Polyline points="7 10 12 15 17 10" />
+      <Line x1="12" y1="15" x2="12" y2="3" />
+    </Svg>
+  );
+}
+
+export function SvgMinus({ size = 16, color = "#94A3B8" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Line x1="5" y1="12" x2="19" y2="12" />
+    </Svg>
+  );
+}

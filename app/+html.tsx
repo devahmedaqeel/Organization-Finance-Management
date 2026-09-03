@@ -42,18 +42,21 @@ export default function RootHtml({ children }: PropsWithChildren) {
             margin: 0;
             padding: 0;
             background-color: #060D1F;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
             -webkit-text-size-adjust: 100%;
             overflow-x: hidden;
           }
 
-          /* Force modern sans-serif across all native & web text elements */
-          *, html, body, div, span, p, h1, h2, h3, h4, h5, h6, [class*="css-text"], [dir="auto"] {
+          /* Modern box sizing & base defaults without clobbering icon fonts */
+          *, ::before, ::after {
             box-sizing: border-box;
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
             -webkit-tap-highlight-color: transparent;
+          }
+
+          button, input, select, textarea {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
           }
 
           /* React Native Web Font Style Overrides (Guarantees no serif/Times New Roman fallback) */
@@ -76,6 +79,32 @@ export default function RootHtml({ children }: PropsWithChildren) {
           [style*="Inter_800ExtraBold"], [style*="Inter_800"] {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
             font-weight: 800 !important;
+          }
+          [style*="Inter_900Black"], [style*="Inter_900"] {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+            font-weight: 900 !important;
+          }
+
+          /* Explicit Icon Font Protections - Ensures vector icon glyphs NEVER get overwritten by text fonts */
+          [style*="font-family: Feather"], [style*="font-family: feather"], [style*="font-family:Feather"], [style*="font-family:feather"],
+          [style*="fontFamily: Feather"], [style*="fontFamily: feather"] {
+            font-family: 'Feather', 'feather' !important;
+          }
+          [style*="font-family: Ionicons"], [style*="font-family: ionicons"], [style*="font-family:Ionicons"], [style*="font-family:ionicons"],
+          [style*="fontFamily: Ionicons"], [style*="fontFamily: ionicons"] {
+            font-family: 'Ionicons', 'ionicons' !important;
+          }
+          [style*="font-family: MaterialIcons"], [style*="font-family: Material Icons"], [style*="font-family: material"], [style*="font-family:MaterialIcons"],
+          [style*="fontFamily: MaterialIcons"], [style*="fontFamily: material"] {
+            font-family: 'MaterialIcons', 'Material Icons', 'material' !important;
+          }
+          [style*="font-family: MaterialCommunityIcons"], [style*="font-family: material-community"], [style*="font-family:MaterialCommunityIcons"],
+          [style*="fontFamily: MaterialCommunityIcons"], [style*="fontFamily: material-community"] {
+            font-family: 'MaterialCommunityIcons', 'material-community' !important;
+          }
+          [style*="font-family: FontAwesome"], [style*="font-family: fontawesome"], [style*="font-family:FontAwesome"],
+          [style*="fontFamily: FontAwesome"], [style*="fontFamily: fontawesome"] {
+            font-family: 'FontAwesome', 'fontawesome' !important;
           }
 
           /* Smooth Momentum Touch Scrolling for All Scrollable Panes */
@@ -110,8 +139,53 @@ export default function RootHtml({ children }: PropsWithChildren) {
 
           /* Icon Fonts */
           @font-face {
+            font-family: 'feather';
+            src: url('https://cdn.jsdelivr.net/npm/@expo/vector-icons@14.0.0/build/vendor/react-native-vector-icons/Fonts/Feather.ttf') format('truetype');
+            font-display: swap;
+          }
+          @font-face {
             font-family: 'Feather';
             src: url('https://cdn.jsdelivr.net/npm/@expo/vector-icons@14.0.0/build/vendor/react-native-vector-icons/Fonts/Feather.ttf') format('truetype');
+            font-display: swap;
+          }
+          @font-face {
+            font-family: 'Ionicons';
+            src: url('https://cdn.jsdelivr.net/npm/@expo/vector-icons@14.0.0/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf') format('truetype');
+            font-display: swap;
+          }
+          @font-face {
+            font-family: 'ionicons';
+            src: url('https://cdn.jsdelivr.net/npm/@expo/vector-icons@14.0.0/build/vendor/react-native-vector-icons/Fonts/Ionicons.ttf') format('truetype');
+            font-display: swap;
+          }
+          @font-face {
+            font-family: 'MaterialCommunityIcons';
+            src: url('https://cdn.jsdelivr.net/npm/@expo/vector-icons@14.0.0/build/vendor/react-native-vector-icons/Fonts/MaterialCommunityIcons.ttf') format('truetype');
+            font-display: swap;
+          }
+          @font-face {
+            font-family: 'material-community';
+            src: url('https://cdn.jsdelivr.net/npm/@expo/vector-icons@14.0.0/build/vendor/react-native-vector-icons/Fonts/MaterialCommunityIcons.ttf') format('truetype');
+            font-display: swap;
+          }
+          @font-face {
+            font-family: 'MaterialIcons';
+            src: url('https://cdn.jsdelivr.net/npm/@expo/vector-icons@14.0.0/build/vendor/react-native-vector-icons/Fonts/MaterialIcons.ttf') format('truetype');
+            font-display: swap;
+          }
+          @font-face {
+            font-family: 'material';
+            src: url('https://cdn.jsdelivr.net/npm/@expo/vector-icons@14.0.0/build/vendor/react-native-vector-icons/Fonts/MaterialIcons.ttf') format('truetype');
+            font-display: swap;
+          }
+          @font-face {
+            font-family: 'FontAwesome';
+            src: url('https://cdn.jsdelivr.net/npm/@expo/vector-icons@14.0.0/build/vendor/react-native-vector-icons/Fonts/FontAwesome.ttf') format('truetype');
+            font-display: swap;
+          }
+          @font-face {
+            font-family: 'fontawesome';
+            src: url('https://cdn.jsdelivr.net/npm/@expo/vector-icons@14.0.0/build/vendor/react-native-vector-icons/Fonts/FontAwesome.ttf') format('truetype');
             font-display: swap;
           }
 

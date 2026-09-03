@@ -92,6 +92,7 @@ export function WebDashboard({
   const [growthMode, setGrowthMode] = useState<number>(0);
   const [activePeriod, setActivePeriod] = useState<NormalizedPeriod>(() => getPresetPeriod("last_6m"));
   const [drillDownType, setDrillDownType] = useState<DrillDownType | null>(null);
+  const [chartContainerWidth, setChartContainerWidth] = useState<number>(0);
 
   // Authoritative Single Source of Truth Financial Calculation Pipeline
   const authFinancialModel = useMemo(() => {
@@ -596,7 +597,10 @@ export function WebDashboard({
       </View>
 
       {/* ─── 1. FULL FINANCIAL TREND ANALYTICS GRAPH (AreaLineChart) ─── */}
-      <View style={[styles.panelCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View
+        style={[styles.panelCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+        onLayout={(e) => setChartContainerWidth(e.nativeEvent.layout.width)}
+      >
         <View style={styles.panelHeader}>
           <View>
             <Text style={[styles.panelTitle, { color: colors.foreground }]}>Financial Trend Analysis</Text>
@@ -611,7 +615,13 @@ export function WebDashboard({
 
         <AreaLineChart
           data={chartPoints}
-          width={isMobile ? width - 40 : 880}
+          width={
+            chartContainerWidth > 40
+              ? chartContainerWidth - 36
+              : isMobile
+              ? width - 40
+              : Math.min(width - (width >= 1024 ? 320 : 64), 960)
+          }
           height={185}
           currency={settings.currency}
           activePeriod={activePeriod}
@@ -796,11 +806,17 @@ export function WebDashboard({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    minWidth: 0,
+    width: "100%",
+    maxWidth: "100%",
   },
   content: {
     padding: 20,
     gap: 20,
     paddingBottom: 60,
+    minWidth: 0,
+    width: "100%",
+    maxWidth: "100%",
   },
   topActionRow: {
     flexDirection: "row",
@@ -1109,6 +1125,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 18,
     gap: 14,
+    width: "100%",
+    maxWidth: "100%",
+    overflow: "hidden",
   },
   titleIconBadge: {
     width: 34,

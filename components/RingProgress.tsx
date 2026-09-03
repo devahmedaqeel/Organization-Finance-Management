@@ -228,6 +228,7 @@ const styles = StyleSheet.create({
   pct: {
     fontFamily: "Inter_800ExtraBold",
     letterSpacing: -0.5,
+    textAlign: "center",
   },
   label: {
     fontFamily: "Inter_600SemiBold",
@@ -247,6 +248,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     textTransform: "uppercase",
     letterSpacing: 0.4,
+    textAlign: "center",
   },
 });
 

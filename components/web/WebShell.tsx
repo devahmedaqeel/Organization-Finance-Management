@@ -926,6 +926,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     height: "100%",
     width: "100%",
+    maxWidth: "100vw" as any,
     overflow: "hidden",
   },
   sidebar: {
@@ -1065,7 +1066,10 @@ const styles = StyleSheet.create({
     display: "flex",
     flexDirection: "column",
     minHeight: 0,
+    minWidth: 0,
     width: "100%",
+    maxWidth: "100%",
+    overflow: "hidden",
   },
   topBar: {
     height: 60,
@@ -1075,6 +1079,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     flexShrink: 0,
+    minWidth: 0,
   },
   breadcrumbRoot: {
     fontSize: 13,
@@ -1094,6 +1099,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
+    flexShrink: 0,
   },
   quickAddBtn: {
     flexDirection: "row",
@@ -1117,7 +1123,10 @@ const styles = StyleSheet.create({
   tabContentArea: {
     flex: 1,
     minHeight: 0,
+    minWidth: 0,
     width: "100%",
+    maxWidth: "100%",
+    overflow: "hidden",
   },
   mobileBottomNav: {
     position: "absolute",

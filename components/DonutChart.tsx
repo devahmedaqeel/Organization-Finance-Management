@@ -172,24 +172,65 @@ export function DonutChart({
     }[]
   >([]);
 
+  // Proportional arc calculation with guaranteed minimum visual span for small categories
+  const MIN_SLICE_DEGREES = 22;
+  const nonZeroSegments = segments.filter((s) => (s.value || 0) > 0);
+  const numNonZero = nonZeroSegments.length;
+  const gap = numNonZero > 1 ? 2.5 : 0;
+  const totalGap = gap * numNonZero;
+  const totalAvail = Math.max(0, 360 - totalGap);
+
+  // Compute visual spans ensuring small categories (< MIN_SLICE_DEGREES) are clearly visible
+  let smallDegreesNeeded = 0;
+  let largeDegreesSum = 0;
+
+  const rawSpans = segments.map((seg) => {
+    const val = seg.value || 0;
+    return total > 0 && val > 0 ? (val / safeTotal) * totalAvail : 0;
+  });
+
+  const isSmall = rawSpans.map((span, i) => {
+    const val = segments[i].value || 0;
+    if (val <= 0) return false;
+    if (numNonZero > 1 && span < MIN_SLICE_DEGREES) {
+      smallDegreesNeeded += MIN_SLICE_DEGREES;
+      return true;
+    }
+    largeDegreesSum += span;
+    return false;
+  });
+
+  const remainingForLarge = Math.max(0, totalAvail - smallDegreesNeeded);
+  const visualSpans = rawSpans.map((span, i) => {
+    const val = segments[i].value || 0;
+    if (val <= 0) return 0;
+    if (numNonZero === 1) return 359.99;
+    if (isSmall[i]) return MIN_SLICE_DEGREES;
+    return largeDegreesSum > 0 ? (span / largeDegreesSum) * remainingForLarge : span;
+  });
+
   let currentAngle = 0;
-  const gap = segments.length > 1 ? 2.5 : 0; // 2.5 degree clean gap
   const sliceList: typeof computedSlices.current = [];
 
   segments.forEach((seg, i) => {
-    const pct = total > 0 ? seg.value / safeTotal : 0;
-    if (pct <= 0.001) return;
+    const val = seg.value || 0;
+    if (val <= 0) return;
+    const span = visualSpans[i];
+    if (span <= 0) return;
 
-    const span = pct * 360;
-    const startA = currentAngle + (segments.length > 1 ? gap / 2 : 0);
-    const endA = currentAngle + span - (segments.length > 1 ? gap / 2 : 0);
+    const startA = currentAngle;
+    const endA = currentAngle + (numNonZero === 1 ? 359.99 : span);
     const midA = (startA + endA) / 2;
+
+    const isSelected = effectiveIndex === i;
+    const sliceOuterRadius = isSelected ? outerRadius + 3.5 : outerRadius;
+    const sliceInnerRadius = isSelected ? innerRadius - 2 : innerRadius;
 
     const path = describeArcSector(
       center,
       center,
-      innerRadius,
-      outerRadius,
+      sliceInnerRadius,
+      sliceOuterRadius,
       startA,
       endA
     );
@@ -199,14 +240,14 @@ export function DonutChart({
       label: seg.label,
       value: seg.value,
       color: seg.color,
-      pct,
-      startAngle: currentAngle,
-      endAngle: currentAngle + span,
+      pct: total > 0 ? seg.value / safeTotal : 0,
+      startAngle: startA,
+      endAngle: endA + gap,
       midAngle: midA,
       path,
     });
 
-    currentAngle += span;
+    currentAngle += span + gap;
   });
 
   computedSlices.current = sliceList;
@@ -273,30 +314,32 @@ export function DonutChart({
               opacity={0.25}
             />
 
-            {/* Clean Concentric SVG Arc Sectors */}
+            {/* Clean Concentric SVG Arc Sectors with Selected Slice on Top */}
             <G>
-              {sliceList.map((slice) => {
-                const isSelected = effectiveIndex === slice.index;
-                const isAnySelected = effectiveIndex !== null;
+              {[...sliceList]
+                .sort((a, b) => (effectiveIndex === a.index ? 1 : effectiveIndex === b.index ? -1 : 0))
+                .map((slice) => {
+                  const isSelected = effectiveIndex === slice.index;
+                  const isAnySelected = effectiveIndex !== null;
 
-                return (
-                  <Path
-                    key={`slice-${slice.index}`}
-                    d={slice.path}
-                    fill={slice.color}
-                    opacity={isAnySelected ? (isSelected ? 1.0 : 0.18) : 1.0}
-                    stroke={isSelected ? "#FFFFFF" : "transparent"}
-                    strokeWidth={isSelected ? 1.5 : 0}
-                    onPress={() => {
-                      setEffectiveIndex(
-                        effectiveIndex === slice.index ? null : slice.index
-                      );
-                      if (Platform.OS !== "web")
-                        Haptics.selectionAsync().catch(() => {});
-                    }}
-                  />
-                );
-              })}
+                  return (
+                    <Path
+                      key={`slice-${slice.index}`}
+                      d={slice.path}
+                      fill={slice.color}
+                      opacity={isAnySelected ? (isSelected ? 1.0 : 0.35) : 1.0}
+                      stroke={isSelected ? "#FFFFFF" : "transparent"}
+                      strokeWidth={isSelected ? 2.5 : 0}
+                      onPress={() => {
+                        setEffectiveIndex(
+                          effectiveIndex === slice.index ? null : slice.index
+                        );
+                        if (Platform.OS !== "web")
+                          Haptics.selectionAsync().catch(() => {});
+                      }}
+                    />
+                  );
+                })}
             </G>
           </Svg>
 
@@ -359,7 +402,11 @@ export function DonutChart({
                     ]}
                     numberOfLines={1}
                   >
-                    {total > 0 ? ((activeSegment.value / safeTotal) * 100).toFixed(1) : "0.0"}% of total
+                    {total > 0
+                      ? (activeSegment.value / safeTotal) * 100 < 0.1 && activeSegment.value > 0
+                        ? "< 0.1% of total"
+                        : `${((activeSegment.value / safeTotal) * 100).toFixed(1)}% of total`
+                      : "0.0% of total"}
                   </Text>
                 </View>
               </Animated.View>
@@ -394,7 +441,8 @@ export function DonutChart({
           <View style={styles.legend}>
             {segments.map((seg, i) => {
               const isSelected = effectiveIndex === i;
-              const pct = ((seg.value / total) * 100).toFixed(0);
+              const rawPct = total > 0 ? (seg.value / total) * 100 : 0;
+              const pct = rawPct > 0 && rawPct < 1 ? "< 1%" : `${rawPct.toFixed(0)}%`;
               return (
                 <TouchableOpacity
                   key={seg.label}

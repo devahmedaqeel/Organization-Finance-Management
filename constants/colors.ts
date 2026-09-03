@@ -37,7 +37,7 @@ const colors = {
     secondary: "#1E2D3D",
     secondaryForeground: "#CBD5E1",
     muted: "#1A2438",
-    mutedForeground: "#64748B",
+    mutedForeground: "#94A3B8",
     accent: "#F59E0B",
     accentForeground: "#0B1120",
     destructive: "#F43F5E",

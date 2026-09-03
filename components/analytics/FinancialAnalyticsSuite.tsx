@@ -51,6 +51,7 @@ export function FinancialAnalyticsSuite({
   // Active interaction mode states
   const [budgetMode, setBudgetMode] = useState<"used" | "spent" | "remaining">("used");
   const [marginMode, setMarginMode] = useState<"margin" | "outflow" | "net">("margin");
+  const [distributionMode, setDistributionMode] = useState<"drivers" | "share" | "all">("drivers");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [showTooltip, setShowTooltip] = useState<"budget" | "margin" | "distribution" | null>(null);
   const [showAllCategories, setShowAllCategories] = useState(false);
@@ -85,9 +86,11 @@ export function FinancialAnalyticsSuite({
               <View style={[styles.iconBadge, { backgroundColor: colors.primary + "16" }]}>
                 <SvgTarget size={18} color={colors.primary} />
               </View>
-              <View>
+              <View style={{ flex: 1, minWidth: 0 }}>
                 <View style={styles.titleWithHelpRow}>
-                  <Text style={[styles.cardTitle, { color: colors.foreground }]}>Budget Utilization</Text>
+                  <Text style={[styles.cardTitle, { color: colors.foreground }]} numberOfLines={1}>
+                    Budget Utilization
+                  </Text>
                   <TouchableOpacity
                     onPress={() => setShowTooltip(showTooltip === "budget" ? null : "budget")}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -95,7 +98,7 @@ export function FinancialAnalyticsSuite({
                     <Text style={[styles.helpIcon, { color: colors.mutedForeground }]}>ⓘ</Text>
                   </TouchableOpacity>
                 </View>
-                <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
+                <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>
                   {budget.isValid
                     ? `Cap: ${formatCompactCurrency(budget.totalAllocated, currency)}`
                     : "No Budget Cap Configured"}
@@ -108,6 +111,7 @@ export function FinancialAnalyticsSuite({
                 if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 onOpenDrillDown("budget");
               }}
+              style={{ flexShrink: 0 }}
             >
               <Text style={[styles.linkText, { color: colors.primary }]}>View Details →</Text>
             </TouchableOpacity>
@@ -123,10 +127,10 @@ export function FinancialAnalyticsSuite({
             </View>
           )}
 
-          {/* Contextual Status Strip */}
+          {/* Contextual Status Strip (Uniform 46px minHeight across all cards) */}
           <View style={[styles.statusStrip, { backgroundColor: budget.statusColor + "14", borderColor: budget.statusColor + "30" }]}>
             <View style={[styles.statusDot, { backgroundColor: budget.statusColor }]} />
-            <Text style={[styles.statusStripText, { color: budget.statusColor }]}>
+            <Text style={[styles.statusStripText, { color: budget.statusColor }]} numberOfLines={2}>
               {budget.statusLabel} · {budget.remainingText}
             </Text>
           </View>
@@ -183,7 +187,7 @@ export function FinancialAnalyticsSuite({
               return (
                 <RingProgress
                   percentage={activePct}
-                  size={145}
+                  size={142}
                   strokeWidth={12}
                   color={budgetMode === "remaining" ? colors.income : budget.statusColor}
                   centerLabel={centerLabel}
@@ -193,6 +197,54 @@ export function FinancialAnalyticsSuite({
               );
             })()}
           </View>
+
+          {/* Dual-Track Visual Budget Allocation Bar */}
+          {budget.isValid && budget.totalAllocated > 0 && (
+            <View style={styles.flowBarSection}>
+              <View style={[styles.flowBarTrack, { backgroundColor: (colors.cardAlt ?? colors.muted) + "50" }]}>
+                {/* Spent Segment: Red / Expense */}
+                <View
+                  style={[
+                    styles.flowBarFill,
+                    {
+                      width: `${Math.max(3, Math.min(97, budget.rawUtilizationPct))}%`,
+                      backgroundColor: colors.expense,
+                    },
+                  ]}
+                />
+                {/* Remaining Segment: Green / Income */}
+                <View
+                  style={[
+                    styles.flowBarFill,
+                    {
+                      width: `${Math.max(3, Math.min(97, Math.max(0, 100 - budget.rawUtilizationPct)))}%`,
+                      backgroundColor: colors.income,
+                    },
+                  ]}
+                />
+              </View>
+              <View style={styles.flowBarLegend}>
+                <View style={styles.flowLegendItem}>
+                  <View style={[styles.flowDot, { backgroundColor: colors.expense }]} />
+                  <Text style={[styles.flowLegendText, { color: colors.mutedForeground }]} numberOfLines={1}>
+                    Spent:{" "}
+                    <Text style={{ color: colors.expense, fontFamily: "Inter_700Bold" }}>
+                      {formatCompactCurrency(budget.actualSpending, currency)} ({budget.rawUtilizationPct.toFixed(0)}%)
+                    </Text>
+                  </Text>
+                </View>
+                <View style={[styles.flowLegendItem, { justifyContent: "flex-end" }]}>
+                  <View style={[styles.flowDot, { backgroundColor: colors.income }]} />
+                  <Text style={[styles.flowLegendText, { color: colors.mutedForeground, textAlign: "right" }]} numberOfLines={1}>
+                    Left:{" "}
+                    <Text style={{ color: colors.income, fontFamily: "Inter_700Bold" }}>
+                      {formatCompactCurrency(budget.remainingAmount, currency)} ({Math.max(0, 100 - budget.rawUtilizationPct).toFixed(0)}%)
+                    </Text>
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
 
           {/* Segmented Option Controls */}
           <View style={styles.chipsRow}>
@@ -232,18 +284,28 @@ export function FinancialAnalyticsSuite({
             })}
           </View>
 
-          {/* 3-Metric Structured Bento Box */}
+          {/* 3-Metric Structured Bento Box (Pinned to bottom) */}
           <View style={[styles.bentoRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
             <View style={styles.bentoCol}>
               <Text style={[styles.bentoLabel, { color: colors.mutedForeground }]}>DISBURSED</Text>
-              <Text style={[styles.bentoVal, { color: colors.expense }]} numberOfLines={1}>
+              <Text
+                style={[styles.bentoVal, { color: colors.expense }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.75}
+              >
                 {formatCompactCurrency(budget.actualSpending, currency)}
               </Text>
             </View>
             <View style={[styles.bentoDivider, { backgroundColor: colors.border }]} />
             <View style={styles.bentoCol}>
               <Text style={[styles.bentoLabel, { color: colors.mutedForeground }]}>ALLOCATED</Text>
-              <Text style={[styles.bentoVal, { color: budget.isValid ? colors.foreground : colors.mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+              <Text
+                style={[styles.bentoVal, { color: budget.isValid ? colors.foreground : colors.mutedForeground }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.75}
+              >
                 {budget.isValid ? formatCompactCurrency(budget.totalAllocated, currency) : "Not Set"}
               </Text>
             </View>
@@ -287,9 +349,11 @@ export function FinancialAnalyticsSuite({
               <View style={[styles.iconBadge, { backgroundColor: margin.statusColor + "16" }]}>
                 <SvgTrendingUp size={18} color={margin.statusColor} />
               </View>
-              <View>
+              <View style={{ flex: 1, minWidth: 0 }}>
                 <View style={styles.titleWithHelpRow}>
-                  <Text style={[styles.cardTitle, { color: colors.foreground }]}>Net Operating Margin</Text>
+                  <Text style={[styles.cardTitle, { color: colors.foreground }]} numberOfLines={1}>
+                    Net Operating Margin
+                  </Text>
                   <TouchableOpacity
                     onPress={() => setShowTooltip(showTooltip === "margin" ? null : "margin")}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -297,7 +361,7 @@ export function FinancialAnalyticsSuite({
                     <Text style={[styles.helpIcon, { color: colors.mutedForeground }]}>ⓘ</Text>
                   </TouchableOpacity>
                 </View>
-                <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
+                <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>
                   {margin.statusLabel}
                 </Text>
               </View>
@@ -308,6 +372,7 @@ export function FinancialAnalyticsSuite({
                 if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 onOpenDrillDown("nob");
               }}
+              style={{ flexShrink: 0 }}
             >
               <Text style={[styles.linkText, { color: colors.primary }]}>View Details →</Text>
             </TouchableOpacity>
@@ -325,10 +390,10 @@ export function FinancialAnalyticsSuite({
             </View>
           )}
 
-          {/* Contextual Status Strip with Trend */}
+          {/* Contextual Status Strip with Trend (Uniform 46px minHeight across all cards) */}
           <View style={[styles.statusStrip, { backgroundColor: margin.statusColor + "14", borderColor: margin.statusColor + "30" }]}>
             <View style={[styles.statusDot, { backgroundColor: margin.statusColor }]} />
-            <Text style={[styles.statusStripText, { color: margin.statusColor, flex: 1 }]}>
+            <Text style={[styles.statusStripText, { color: margin.statusColor, flex: 1 }]} numberOfLines={2}>
               {margin.explanationText}
             </Text>
             {margin.marginChangeVsPrevious !== null && margin.marginChangeVsPrevious !== undefined && (
@@ -343,6 +408,7 @@ export function FinancialAnalyticsSuite({
                     styles.trendText,
                     { color: margin.trendDirection === "up" ? colors.income : colors.expense },
                   ]}
+                  numberOfLines={1}
                 >
                   {Math.abs(margin.marginChangeVsPrevious).toFixed(1)}% vs prev
                 </Text>
@@ -411,7 +477,7 @@ export function FinancialAnalyticsSuite({
               return (
                 <RingProgress
                   percentage={activePct}
-                  size={145}
+                  size={142}
                   strokeWidth={12}
                   color={ringColor}
                   centerLabel={centerLabel}
@@ -422,7 +488,7 @@ export function FinancialAnalyticsSuite({
             })()}
           </View>
 
-          {/* Dual-Tone Cash Income vs Expenses Comparison Bar */}
+          {/* Dual-Tone Cash Income vs Expenses Comparison Bar (Guaranteed Gap & Non-Overlapping Alignment) */}
           {(() => {
             const rev = margin.operatingRevenue;
             const exp = margin.operatingExpenses;
@@ -461,14 +527,20 @@ export function FinancialAnalyticsSuite({
                 <View style={styles.flowBarLegend}>
                   <View style={styles.flowLegendItem}>
                     <View style={[styles.flowDot, { backgroundColor: colors.income }]} />
-                    <Text style={[styles.flowLegendText, { color: colors.mutedForeground }]}>
-                      Income: <Text style={{ color: colors.income, fontFamily: "Inter_600SemiBold" }}>+{formatCompactCurrency(rev, currency)} ({inflowPct.toFixed(0)}%)</Text>
+                    <Text style={[styles.flowLegendText, { color: colors.mutedForeground }]} numberOfLines={1}>
+                      Income:{" "}
+                      <Text style={{ color: colors.income, fontFamily: "Inter_700Bold" }}>
+                        +{formatCompactCurrency(rev, currency)} ({inflowPct.toFixed(0)}%)
+                      </Text>
                     </Text>
                   </View>
-                  <View style={styles.flowLegendItem}>
+                  <View style={[styles.flowLegendItem, { justifyContent: "flex-end" }]}>
                     <View style={[styles.flowDot, { backgroundColor: colors.expense }]} />
-                    <Text style={[styles.flowLegendText, { color: colors.mutedForeground }]}>
-                      Expenses: <Text style={{ color: colors.expense, fontFamily: "Inter_600SemiBold" }}>-{formatCompactCurrency(exp, currency)} ({outflowPct.toFixed(0)}%)</Text>
+                    <Text style={[styles.flowLegendText, { color: colors.mutedForeground, textAlign: "right" }]} numberOfLines={1}>
+                      Expenses:{" "}
+                      <Text style={{ color: colors.expense, fontFamily: "Inter_700Bold" }}>
+                        -{formatCompactCurrency(exp, currency)} ({outflowPct.toFixed(0)}%)
+                      </Text>
                     </Text>
                   </View>
                 </View>
@@ -476,7 +548,7 @@ export function FinancialAnalyticsSuite({
             );
           })()}
 
-          {/* Segmented Option Controls with Easy Matching Words */}
+          {/* Segmented Option Controls */}
           <View style={styles.chipsRow}>
             {[
               { id: "margin", label: "Profit / Loss" },
@@ -523,18 +595,28 @@ export function FinancialAnalyticsSuite({
             })}
           </View>
 
-          {/* 3-Metric Structured Bento Box with Easy Top-Card Matching Titles */}
+          {/* 3-Metric Structured Bento Box (Pinned to bottom) */}
           <View style={[styles.bentoRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
             <View style={styles.bentoCol}>
               <Text style={[styles.bentoLabel, { color: colors.mutedForeground }]}>INCOME</Text>
-              <Text style={[styles.bentoVal, { color: colors.income }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+              <Text
+                style={[styles.bentoVal, { color: colors.income }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.75}
+              >
                 +{formatCompactCurrency(margin.operatingRevenue, currency)}
               </Text>
             </View>
             <View style={[styles.bentoDivider, { backgroundColor: colors.border }]} />
             <View style={styles.bentoCol}>
               <Text style={[styles.bentoLabel, { color: colors.mutedForeground }]}>EXPENSES</Text>
-              <Text style={[styles.bentoVal, { color: colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+              <Text
+                style={[styles.bentoVal, { color: colors.expense }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.75}
+              >
                 -{formatCompactCurrency(margin.operatingExpenses, currency)}
               </Text>
             </View>
@@ -562,16 +644,18 @@ export function FinancialAnalyticsSuite({
         {/* ========================================================================= */}
         {/* CARD 3: EXPENSE DISTRIBUTION DONUT & RANKED LIST CARD                     */}
         {/* ========================================================================= */}
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, flex: 1.1, minWidth: isMobile ? "100%" : 320 }]}>
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 300 }]}>
           {/* Header */}
           <View style={styles.cardHeader}>
             <View style={styles.headerTitleRow}>
               <View style={[styles.iconBadge, { backgroundColor: "#8B5CF616" }]}>
                 <SvgPieChart size={18} color="#8B5CF6" />
               </View>
-              <View>
+              <View style={{ flex: 1, minWidth: 0 }}>
                 <View style={styles.titleWithHelpRow}>
-                  <Text style={[styles.cardTitle, { color: colors.foreground }]}>Expense Distribution</Text>
+                  <Text style={[styles.cardTitle, { color: colors.foreground }]} numberOfLines={1}>
+                    Expense Distribution
+                  </Text>
                   <TouchableOpacity
                     onPress={() => setShowTooltip(showTooltip === "distribution" ? null : "distribution")}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -579,7 +663,7 @@ export function FinancialAnalyticsSuite({
                     <Text style={[styles.helpIcon, { color: colors.mutedForeground }]}>ⓘ</Text>
                   </TouchableOpacity>
                 </View>
-                <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
+                <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>
                   {distribution.categories.length} Cost Drivers Categorized
                 </Text>
               </View>
@@ -590,6 +674,7 @@ export function FinancialAnalyticsSuite({
                 if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 onOpenDrillDown("expense");
               }}
+              style={{ flexShrink: 0 }}
             >
               <Text style={[styles.linkText, { color: colors.primary }]}>View Outflows →</Text>
             </TouchableOpacity>
@@ -607,7 +692,7 @@ export function FinancialAnalyticsSuite({
             </View>
           )}
 
-          {/* Contextual Status Strip */}
+          {/* Contextual Status Strip (Uniform 46px minHeight across all cards) */}
           <View style={[styles.statusStrip, { backgroundColor: "#8B5CF614", borderColor: "#8B5CF630" }]}>
             <View style={[styles.statusDot, { backgroundColor: "#8B5CF6" }]} />
             <Text style={[styles.statusStripText, { color: "#8B5CF6" }]} numberOfLines={2}>
@@ -620,7 +705,7 @@ export function FinancialAnalyticsSuite({
             <View style={styles.donutWrap}>
               <DonutChart
                 segments={donutSegments}
-                size={144}
+                size={142}
                 strokeWidth={14}
                 centerLabel={
                   activeCategoryData
@@ -643,91 +728,204 @@ export function FinancialAnalyticsSuite({
             </View>
           )}
 
-          {/* Ranked Category List with Mini Progress Bars */}
-          <View style={styles.categoryRankedList}>
-            {(showAllCategories ? distribution.categories : distribution.categories.slice(0, 3)).map((cat) => {
-              const isSelected = selectedCategory?.trim().toLowerCase() === cat.category.trim().toLowerCase();
-              const isAnySelected = selectedCategory !== null;
-
+          {/* Segmented Option Controls for Card 3 */}
+          <View style={styles.chipsRow}>
+            {[
+              { id: "drivers", label: "Top Drivers" },
+              { id: "share", label: "% Share" },
+              { id: "all", label: `All (${distribution.categories.length})` },
+            ].map((opt) => {
+              const isSelected = distributionMode === opt.id;
               return (
                 <TouchableOpacity
-                  key={cat.category}
+                  key={opt.id}
                   style={[
-                    styles.rankedRow,
+                    styles.chip,
                     {
-                      backgroundColor: isSelected ? cat.color + "16" : "transparent",
-                      borderColor: isSelected ? cat.color : colors.border + "40",
-                      borderWidth: isSelected ? 1.5 : 1,
-                      opacity: isAnySelected ? (isSelected ? 1.0 : 0.55) : 1.0,
+                      backgroundColor: isSelected ? "#8B5CF6" : (colors.cardAlt ?? colors.muted) + "30",
+                      borderColor: isSelected ? "#8B5CF6" : colors.border,
                     },
                   ]}
                   onPress={() => {
                     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setSelectedCategory(isSelected ? null : cat.category);
+                    setDistributionMode(opt.id as any);
+                    if (opt.id === "all") setShowAllCategories(true);
+                    else setShowAllCategories(false);
                   }}
-                  activeOpacity={0.7}
+                  activeOpacity={0.75}
                 >
-                  <View style={styles.rankedLeft}>
-                    <View
-                      style={[
-                        styles.catColorDot,
-                        {
-                          backgroundColor: cat.color,
-                          transform: [{ scale: isSelected ? 1.35 : 1.0 }],
-                        },
-                      ]}
-                    />
-                    <Text
-                      style={[
-                        styles.rankedCatName,
-                        {
-                          color: isSelected ? cat.color : colors.foreground,
-                          fontFamily: isSelected ? "Inter_700Bold" : "Inter_600SemiBold",
-                        },
-                      ]}
-                    >
-                      {cat.category}
-                    </Text>
-                  </View>
-
-                  <View style={styles.rankedRight}>
-                    <Text
-                      style={[
-                        styles.rankedAmount,
-                        {
-                          color: colors.foreground,
-                          fontFamily: isSelected ? "Inter_700Bold" : "Inter_600SemiBold",
-                        },
-                      ]}
-                    >
-                      {formatCompactCurrency(cat.amount, currency)}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.rankedPct,
-                        {
-                          color: isSelected ? cat.color : colors.mutedForeground,
-                          fontFamily: isSelected ? "Inter_700Bold" : "Inter_500Medium",
-                        },
-                      ]}
-                    >
-                      {cat.displayPct}
-                    </Text>
-                  </View>
+                  <Text
+                    style={[
+                      styles.chipText,
+                      { color: isSelected ? "#FFFFFF" : colors.mutedForeground },
+                      isSelected && { fontFamily: "Inter_700Bold" },
+                    ]}
+                  >
+                    {opt.label}
+                  </Text>
                 </TouchableOpacity>
               );
             })}
+          </View>
 
-            {distribution.categories.length > 3 && (
-              <TouchableOpacity
-                style={styles.expandRow}
-                onPress={() => setShowAllCategories(!showAllCategories)}
+          {/* Proportional Share Bars Mode */}
+          {distributionMode === "share" ? (
+            <View style={styles.shareBarsWrap}>
+              {(showAllCategories ? distribution.categories : distribution.categories.slice(0, 2)).map((cat) => (
+                <View key={cat.category} style={styles.shareBarRow}>
+                  <View style={styles.shareBarHeader}>
+                    <Text style={[styles.shareBarName, { color: colors.foreground }]} numberOfLines={1}>
+                      {cat.category}
+                    </Text>
+                    <Text style={[styles.shareBarPct, { color: cat.color }]}>
+                      {cat.displayPct} ({formatCompactCurrency(cat.amount, currency)})
+                    </Text>
+                  </View>
+                  <View style={[styles.shareBarTrack, { backgroundColor: (colors.cardAlt ?? colors.muted) + "50" }]}>
+                    <View style={[styles.shareBarFill, { width: `${Math.max(3, Math.min(100, cat.pct))}%`, backgroundColor: cat.color }]} />
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : (
+            /* Ranked Category List with Zero-Overlap Layout */
+            <View style={styles.categoryRankedList}>
+              {(distributionMode === "all" || showAllCategories
+                ? distribution.categories
+                : distribution.categories.slice(0, 2)
+              ).map((cat) => {
+                const isSelected = selectedCategory?.trim().toLowerCase() === cat.category.trim().toLowerCase();
+                const isAnySelected = selectedCategory !== null;
+
+                return (
+                  <TouchableOpacity
+                    key={cat.category}
+                    style={[
+                      styles.rankedRow,
+                      {
+                        backgroundColor: isSelected ? cat.color + "16" : (colors.cardAlt ?? colors.muted) + "18",
+                        borderColor: isSelected ? cat.color : colors.border,
+                        borderWidth: isSelected ? 1.5 : 1,
+                        opacity: isAnySelected ? (isSelected ? 1.0 : 0.6) : 1.0,
+                      },
+                    ]}
+                    onPress={() => {
+                      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setSelectedCategory(isSelected ? null : cat.category);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.rankedLeft}>
+                      <View
+                        style={[
+                          styles.catColorDot,
+                          {
+                            backgroundColor: cat.color,
+                            transform: [{ scale: isSelected ? 1.35 : 1.0 }],
+                          },
+                        ]}
+                      />
+                      <Text
+                        style={[
+                          styles.rankedCatName,
+                          {
+                            color: isSelected ? cat.color : colors.foreground,
+                            fontFamily: isSelected ? "Inter_700Bold" : "Inter_600SemiBold",
+                          },
+                        ]}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                      >
+                        {cat.category}
+                      </Text>
+                    </View>
+
+                    <View style={styles.rankedRight}>
+                      <Text
+                        style={[
+                          styles.rankedAmount,
+                          {
+                            color: colors.foreground,
+                            fontFamily: isSelected ? "Inter_700Bold" : "Inter_600SemiBold",
+                          },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {formatCompactCurrency(cat.amount, currency)}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.rankedPct,
+                          {
+                            color: isSelected ? cat.color : colors.mutedForeground,
+                            fontFamily: isSelected ? "Inter_700Bold" : "Inter_600SemiBold",
+                          },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {cat.displayPct}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+
+              {distribution.categories.length > 2 && distributionMode !== "all" && !showAllCategories && (
+                <TouchableOpacity
+                  style={styles.expandRow}
+                  onPress={() => {
+                    setDistributionMode("all");
+                    setShowAllCategories(true);
+                  }}
+                >
+                  <Text style={[styles.expandText, { color: colors.primary }]}>
+                    +{distribution.categories.length - 2} More Cost Drivers ▼
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
+          {/* Authoritative 3-Metric Bento Box for Card 3 (Completes Symmetry Across All Cards) */}
+          <View style={[styles.bentoRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <View style={styles.bentoCol}>
+              <Text style={[styles.bentoLabel, { color: colors.mutedForeground }]}>TOP DRIVER</Text>
+              <Text
+                style={[
+                  styles.bentoVal,
+                  { color: distribution.topCategory?.color || "#8B5CF6" },
+                ]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.75}
               >
-                <Text style={[styles.expandText, { color: colors.primary }]}>
-                  {showAllCategories ? "Show Top 3 Only ▲" : `+${distribution.categories.length - 3} More Categories ▼`}
-                </Text>
-              </TouchableOpacity>
-            )}
+                {distribution.topCategory?.category || "None"}
+              </Text>
+            </View>
+            <View style={[styles.bentoDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.bentoCol}>
+              <Text style={[styles.bentoLabel, { color: colors.mutedForeground }]}>TOTAL SPENT</Text>
+              <Text
+                style={[styles.bentoVal, { color: colors.expense }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.75}
+              >
+                -{formatCompactCurrency(distribution.totalExpenses, currency)}
+              </Text>
+            </View>
+            <View style={[styles.bentoDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.bentoCol}>
+              <Text style={[styles.bentoLabel, { color: colors.mutedForeground }]}>COST CENTERS</Text>
+              <Text
+                style={[styles.bentoVal, { color: colors.foreground }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.75}
+              >
+                {distribution.categories.length} Active
+              </Text>
+            </View>
           </View>
         </View>
       </View>
@@ -743,6 +941,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 16,
     flexWrap: "wrap",
+    alignItems: "stretch",
   },
   card: {
     flex: 1,
@@ -750,23 +949,28 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 18,
     gap: 12,
+    justifyContent: "space-between",
+    alignSelf: "stretch",
   },
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    flexWrap: "wrap",
-    gap: 6,
+    gap: 8,
+    minHeight: 38,
   },
   headerTitleRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
+    flex: 1,
+    minWidth: 0,
   },
   titleWithHelpRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
+    flexShrink: 1,
   },
   helpIcon: {
     fontSize: 13,
@@ -778,6 +982,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
+    flexShrink: 0,
   },
   cardTitle: {
     fontSize: 15,
@@ -794,6 +999,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Inter_600SemiBold",
     letterSpacing: 0.1,
+    flexShrink: 0,
   },
   tooltipBanner: {
     padding: 9,
@@ -812,26 +1018,31 @@ const styles = StyleSheet.create({
   statusStrip: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 8,
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 6,
     borderRadius: 8,
     borderWidth: 1,
+    minHeight: 46,
   },
   statusDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
+    flexShrink: 0,
   },
   statusStripText: {
     fontSize: 11,
+    lineHeight: 15,
     fontFamily: "Inter_600SemiBold",
     letterSpacing: -0.1,
+    flex: 1,
   },
   trendBadge: {
     flexDirection: "row",
     alignItems: "center",
     gap: 2,
+    flexShrink: 0,
   },
   trendText: {
     fontSize: 10,
@@ -840,12 +1051,19 @@ const styles = StyleSheet.create({
   ringCenterWrap: {
     alignItems: "center",
     justifyContent: "center",
+    minHeight: 150,
+    marginVertical: 4,
+  },
+  donutWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 150,
     marginVertical: 4,
   },
   flowBarSection: {
     gap: 5,
     marginVertical: 4,
-    paddingHorizontal: 4,
+    paddingHorizontal: 2,
   },
   flowBarTrack: {
     height: 6,
@@ -862,31 +1080,37 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    gap: 6,
     paddingHorizontal: 2,
+    marginTop: 4,
   },
   flowLegendItem: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
+    flexShrink: 0,
   },
   flowDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
+    flexShrink: 0,
   },
   flowLegendText: {
     fontSize: 9.5,
     fontFamily: "Inter_500Medium",
+    letterSpacing: -0.2,
   },
   chipsRow: {
     flexDirection: "row",
     gap: 6,
     justifyContent: "center",
-    marginVertical: 2,
+    alignItems: "center",
+    marginVertical: 4,
   },
   chip: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 4.5,
     borderRadius: 20,
     borderWidth: 1,
   },
@@ -901,40 +1125,40 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingVertical: 9,
     paddingHorizontal: 6,
+    marginTop: "auto",
   },
   bentoCol: {
     flex: 1,
     alignItems: "center",
+    justifyContent: "center",
     gap: 2,
+    minWidth: 0,
   },
   bentoDivider: {
     width: 1,
-    height: "80%",
+    height: "75%",
   },
   bentoLabel: {
     fontSize: 8.5,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.4,
+    textAlign: "center",
   },
   bentoVal: {
     fontSize: 12,
     fontFamily: "Inter_700Bold",
-  },
-  donutWrap: {
-    alignItems: "center",
-    justifyContent: "center",
-    marginVertical: 4,
+    textAlign: "center",
   },
   categoryRankedList: {
     gap: 5,
-    marginTop: 4,
+    marginVertical: 4,
   },
   rankedRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 5.5,
     borderRadius: 8,
     borderWidth: 1,
   },
@@ -943,14 +1167,16 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     flex: 1,
+    minWidth: 0,
   },
   catColorDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    flexShrink: 0,
   },
   rankedCatName: {
-    fontSize: 11.5,
+    fontSize: 11,
     fontFamily: "Inter_600SemiBold",
     flex: 1,
   },
@@ -958,14 +1184,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    flexShrink: 0,
   },
   rankedAmount: {
-    fontSize: 11.5,
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
   },
   rankedPct: {
-    fontSize: 11,
-    fontFamily: "Inter_500Medium",
+    fontSize: 10.5,
+    fontFamily: "Inter_600SemiBold",
     minWidth: 38,
     textAlign: "right",
   },
@@ -976,6 +1203,38 @@ const styles = StyleSheet.create({
   expandText: {
     fontSize: 11,
     fontFamily: "Inter_600SemiBold",
+  },
+  shareBarsWrap: {
+    gap: 6,
+    marginVertical: 4,
+  },
+  shareBarRow: {
+    gap: 3,
+  },
+  shareBarHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  shareBarName: {
+    fontSize: 10.5,
+    fontFamily: "Inter_600SemiBold",
+    flex: 1,
+    minWidth: 0,
+  },
+  shareBarPct: {
+    fontSize: 10,
+    fontFamily: "Inter_700Bold",
+    flexShrink: 0,
+  },
+  shareBarTrack: {
+    height: 5,
+    borderRadius: 2.5,
+    overflow: "hidden",
+  },
+  shareBarFill: {
+    height: "100%",
+    borderRadius: 2.5,
   },
   emptyContainer: {
     paddingVertical: 24,

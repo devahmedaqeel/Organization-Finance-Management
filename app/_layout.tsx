@@ -18,7 +18,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Feather } from "@expo/vector-icons";
-import { SvgBell } from "@/components/web/SvgIcons";
+import { SvgBell, SvgX } from "@/components/web/SvgIcons";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
@@ -138,7 +138,7 @@ function GlobalToast() {
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             style={toastStyles.closeBtn}
           >
-            <Feather name="x" size={16} color="#94a3b8" />
+            <SvgX size={16} color="#94a3b8" />
           </TouchableOpacity>
         </TouchableOpacity>
       </Animated.View>
@@ -279,6 +279,7 @@ function RootLayoutNav() {
 // ── Root Layout ────────────────────────────────────────────────────────────────
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
+    ...Feather.font,
     Inter_400Regular,
     Inter_500Medium,
     Inter_600SemiBold,
@@ -299,6 +300,27 @@ export default function RootLayout() {
         link.href = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap";
         document.head.appendChild(link);
       }
+
+      // Inject Feather icon font rules dynamically on Web
+      const iconStyleId = "expo-vector-icons-web";
+      if (!document.getElementById(iconStyleId)) {
+        const iconStyle = document.createElement("style");
+        iconStyle.id = iconStyleId;
+        iconStyle.textContent = `
+          @font-face {
+            font-family: 'feather';
+            src: url('https://cdn.jsdelivr.net/npm/@expo/vector-icons@14.0.0/build/vendor/react-native-vector-icons/Fonts/Feather.ttf') format('truetype');
+            font-display: swap;
+          }
+          @font-face {
+            font-family: 'Feather';
+            src: url('https://cdn.jsdelivr.net/npm/@expo/vector-icons@14.0.0/build/vendor/react-native-vector-icons/Fonts/Feather.ttf') format('truetype');
+            font-display: swap;
+          }
+        `;
+        document.head.appendChild(iconStyle);
+      }
+
       // Set global body font family without overriding vector icon fonts
       const styleId = "global-font-style";
       let style = document.getElementById(styleId) as HTMLStyleElement;

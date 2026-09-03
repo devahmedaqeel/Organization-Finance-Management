@@ -553,11 +553,17 @@ export function WebIncome({ onOpenReport }: WebIncomeProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    minWidth: 0,
+    width: "100%",
+    maxWidth: "100%",
   },
   content: {
     padding: 24,
     gap: 20,
     paddingBottom: 60,
+    minWidth: 0,
+    width: "100%",
+    maxWidth: "100%",
   },
   pageHeader: {
     flexDirection: "row",
@@ -743,6 +749,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     overflow: "hidden",
+    width: "100%",
+    maxWidth: "100%",
   },
   tableHeader: {
     flexDirection: "row",

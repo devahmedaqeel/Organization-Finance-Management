@@ -68,6 +68,7 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
   const [customStart, setCustomStart] = useState(() => activePeriod.startDate || "2026-01-01");
   const [customEnd, setCustomEnd] = useState(() => activePeriod.endDate || "2026-09-01");
   const [drillDownType, setDrillDownType] = useState<DrillDownType | null>(null);
+  const [chartContainerWidth, setChartContainerWidth] = useState<number>(0);
 
   const fmt = (n: number) => {
     return Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -501,7 +502,10 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
           />
 
           {/* Historical Trend Curve */}
-          <View style={[styles.panelCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View
+            style={[styles.panelCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onLayout={(e) => setChartContainerWidth(e.nativeEvent.layout.width)}
+          >
             <View style={styles.panelHeader}>
               <View>
                 <Text style={[styles.panelTitle, { color: colors.foreground }]}>Period Trend Timeline</Text>
@@ -513,7 +517,13 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
 
             <AreaLineChart
               data={chartPoints}
-              width={isMobile ? width - 40 : 880}
+              width={
+                chartContainerWidth > 40
+                  ? chartContainerWidth - 36
+                  : isMobile
+                  ? width - 40
+                  : Math.min(width - (width >= 1024 ? 320 : 64), 960)
+              }
               height={190}
               currency={settings.currency}
               activePeriod={activePeriod}
@@ -826,11 +836,17 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
+    minWidth: 0,
+    width: "100%",
+    maxWidth: "100%",
   },
   content: {
     padding: 24,
     gap: 20,
     paddingBottom: 60,
+    minWidth: 0,
+    width: "100%",
+    maxWidth: "100%",
   },
   pageHeader: {
     flexDirection: "row",
@@ -981,6 +997,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 18,
     gap: 14,
+    width: "100%",
+    maxWidth: "100%",
+    overflow: "hidden",
   },
   panelHeader: {
     flexDirection: "row",

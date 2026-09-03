@@ -8,7 +8,20 @@ import {
   useWindowDimensions,
   Platform,
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import {
+  SvgZap,
+  SvgCheckCircle,
+  SvgAlertTriangle,
+  SvgAlertOctagon,
+  SvgInfo,
+  SvgTrendingUp,
+  SvgTrendingDown,
+  SvgArrowDownLeft,
+  SvgArrowUpRight,
+  SvgActivity,
+  SvgAward,
+  SvgCpu,
+} from "@/components/web/SvgIcons";
 import { useFinance } from "@/context/FinanceContext";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
@@ -34,10 +47,10 @@ import { generateFinancialInsights } from "@/services/financialInsightsService";
 const CAT_COLORS = ["#F43F5E", "#F59E0B", "#8B5CF6", "#0EA5E9", "#10B981", "#EC4899"];
 
 const SEV_CONFIG = {
-  SUCCESS:  { color: "#10B981", bg: "#10B98122", border: "#10B98144", icon: "check-circle" as const },
-  WARNING:  { color: "#F59E0B", bg: "#F59E0B22", border: "#F59E0B44", icon: "alert-triangle" as const },
-  INFO:     { color: "#38BDF8", bg: "#38BDF822", border: "#38BDF844", icon: "info" as const },
-  CRITICAL: { color: "#F43F5E", bg: "#F43F5E22", border: "#F43F5E44", icon: "alert-octagon" as const },
+  SUCCESS:  { color: "#10B981", bg: "#10B98122", border: "#10B98144", Icon: SvgCheckCircle },
+  WARNING:  { color: "#F59E0B", bg: "#F59E0B22", border: "#F59E0B44", Icon: SvgAlertTriangle },
+  INFO:     { color: "#38BDF8", bg: "#38BDF822", border: "#38BDF844", Icon: SvgInfo },
+  CRITICAL: { color: "#F43F5E", bg: "#F43F5E22", border: "#F43F5E44", Icon: SvgAlertOctagon },
 };
 
 function fmt(n: number) {
@@ -321,7 +334,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
             <View style={[styles.titleIconBadge, { backgroundColor: "#10B98122" }]}>
-              <Feather name="zap" size={20} color="#10B981" />
+              <SvgZap size={20} color="#10B981" />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.pageTitle, { color: colors.foreground, fontSize: isMobile ? 20 : 23 }]}>
@@ -387,15 +400,15 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
         {/* Insight summary badges */}
         <View style={styles.badgeRow}>
           <View style={[styles.badge, { backgroundColor: "#10B98122", borderColor: "#10B98144" }]}>
-            <Feather name="check-circle" size={12} color="#10B981" />
+            <SvgCheckCircle size={12} color="#10B981" />
             <Text style={[styles.badgeText, { color: "#10B981" }]}>{positiveCount} Positive</Text>
           </View>
           <View style={[styles.badge, { backgroundColor: "#F43F5E22", borderColor: "#F43F5E44" }]}>
-            <Feather name="alert-triangle" size={12} color="#F43F5E" />
+            <SvgAlertTriangle size={12} color="#F43F5E" />
             <Text style={[styles.badgeText, { color: "#F43F5E" }]}>{warningCount} Alerts</Text>
           </View>
           <View style={[styles.badge, { backgroundColor: "#3B82F622", borderColor: "#3B82F644" }]}>
-            <Feather name="info" size={12} color="#3B82F6" />
+            <SvgInfo size={12} color="#3B82F6" />
             <Text style={[styles.badgeText, { color: "#3B82F6" }]}>{actionableInsights.length} Total</Text>
           </View>
         </View>
@@ -419,11 +432,11 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
               },
             ]}
           >
-            <Feather
-              name={periodGrowth >= 0 ? "trending-up" : "trending-down"}
-              size={12}
-              color={periodGrowth >= 0 ? "#10B981" : "#F43F5E"}
-            />
+            {periodGrowth >= 0 ? (
+              <SvgTrendingUp size={12} color="#10B981" />
+            ) : (
+              <SvgTrendingDown size={12} color="#F43F5E" />
+            )}
             <Text style={[styles.growthText, { color: periodGrowth >= 0 ? "#10B981" : "#F43F5E" }]}>
               {periodGrowthLabel}
             </Text>
@@ -617,7 +630,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
             />
           ) : (
             <View style={{ paddingVertical: 28, alignItems: "center", justifyContent: "center" }}>
-              <Feather name="check-circle" size={28} color="#10B981" />
+              <SvgCheckCircle size={28} color="#10B981" />
               <Text style={{ color: colors.mutedForeground, fontSize: 13, marginTop: 8 }}>
                 Zero expenditures recorded for this specific period.
               </Text>
@@ -713,7 +726,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
         <View style={styles.txStatsGrid}>
           <View style={[styles.txStatBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
             <View style={[styles.txStatIcon, { backgroundColor: colors.income + "18" }]}>
-              <Feather name="arrow-down-left" size={13} color={colors.income} />
+              <SvgArrowDownLeft size={13} color={colors.income} />
             </View>
             <Text style={[styles.txStatLabel, { color: colors.mutedForeground }]}>Inflows ({txStats.inflowCount})</Text>
             <Text style={[styles.txStatVal, { color: colors.income }]}>+{settings.currency} {fmt(txStats.inflowTotal)}</Text>
@@ -721,7 +734,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
 
           <View style={[styles.txStatBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
             <View style={[styles.txStatIcon, { backgroundColor: colors.expense + "18" }]}>
-              <Feather name="arrow-up-right" size={13} color={colors.expense} />
+              <SvgArrowUpRight size={13} color={colors.expense} />
             </View>
             <Text style={[styles.txStatLabel, { color: colors.mutedForeground }]}>Outflows ({txStats.outflowCount})</Text>
             <Text style={[styles.txStatVal, { color: colors.expense }]}>-{settings.currency} {fmt(txStats.outflowTotal)}</Text>
@@ -729,7 +742,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
 
           <View style={[styles.txStatBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
             <View style={[styles.txStatIcon, { backgroundColor: "#38BDF818" }]}>
-              <Feather name="activity" size={13} color="#38BDF8" />
+              <SvgActivity size={13} color="#38BDF8" />
             </View>
             <Text style={[styles.txStatLabel, { color: colors.mutedForeground }]}>Avg Ticket</Text>
             <Text style={[styles.txStatVal, { color: colors.foreground }]}>{settings.currency} {fmt(txStats.avgTx)}</Text>
@@ -737,7 +750,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
 
           <View style={[styles.txStatBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
             <View style={[styles.txStatIcon, { backgroundColor: "#F59E0B18" }]}>
-              <Feather name="award" size={13} color="#F59E0B" />
+              <SvgAward size={13} color="#F59E0B" />
             </View>
             <Text style={[styles.txStatLabel, { color: colors.mutedForeground }]}>Max Transaction</Text>
             <Text style={[styles.txStatVal, { color: "#F59E0B" }]} numberOfLines={1}>
@@ -754,7 +767,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
 
       {actionableInsights.length === 0 ? (
         <View style={[styles.disclaimerBox, { backgroundColor: colors.card, borderColor: colors.border, paddingVertical: 20 }]}>
-          <Feather name="check-circle" size={24} color="#10B981" />
+          <SvgCheckCircle size={24} color="#10B981" />
           <Text style={[styles.disclaimerText, { color: colors.foreground, fontSize: 13, marginTop: 6 }]}>
             No anomalies or critical alerts detected. All financial metrics are within standard operational limits.
           </Text>
@@ -781,7 +794,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
                   <View style={[styles.insightIcon, { backgroundColor: conf.bg }]}>
-                    <Feather name={conf.icon} size={15} color={conf.color} />
+                    <conf.Icon size={15} color={conf.color} />
                   </View>
                   <Text style={[styles.insightTitle, { color: colors.foreground, flex: 1 }]}>{insight.title}</Text>
                 </View>
@@ -827,7 +840,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
 
       {/* Disclaimer */}
       <View style={[styles.disclaimerBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Feather name="cpu" size={14} color={colors.mutedForeground} />
+        <SvgCpu size={14} color={colors.mutedForeground} />
         <Text style={[styles.disclaimerText, { color: colors.mutedForeground }]}>
           Insights are generated from your financial data using rule-based analytics. Data refreshes as you add records.
         </Text>
@@ -845,14 +858,18 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    minWidth: 0,
+    width: "100%",
+    maxWidth: "100%",
   },
   content: {
     padding: 24,
     gap: 16,
     paddingBottom: 60,
+    minWidth: 0,
+    width: "100%",
     maxWidth: 1200,
     alignSelf: "center",
-    width: "100%",
   },
   pageHeader: {
     flexDirection: "row",

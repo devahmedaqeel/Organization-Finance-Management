@@ -57,11 +57,11 @@ function AnimatedBarRow({
   return (
     <View style={styles.row}>
       <View style={[styles.labelCol, { width: labelWidth }]}>
-        <Text style={[styles.label, { color: colors.foreground }]}>
+        <Text style={[styles.label, { color: colors.foreground }]} numberOfLines={1} ellipsizeMode="tail">
           {item.label}
         </Text>
         {item.sublabel ? (
-          <Text style={[styles.sublabel, { color: colors.mutedForeground }]}>
+          <Text style={[styles.sublabel, { color: colors.mutedForeground }]} numberOfLines={1} ellipsizeMode="tail">
             {item.sublabel}
           </Text>
         ) : null}

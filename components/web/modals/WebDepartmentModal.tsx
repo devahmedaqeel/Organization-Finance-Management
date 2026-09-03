@@ -264,6 +264,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     overflow: "hidden",
+    display: "flex",
+    flexDirection: "column",
   },
   header: {
     flexDirection: "row",
@@ -295,7 +297,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   body: {
-    maxHeight: 500,
+    flex: 1,
+    flexShrink: 1,
   },
   bodyContent: {
     padding: 20,

@@ -380,116 +380,119 @@ export function WebPayroll() {
         </View>
       ) : (
         <View style={[styles.tableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={[styles.tableHeader, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-            <View style={[styles.thCol, { flex: 2.2 }]}>
-              <Text style={[styles.thText, { color: colors.mutedForeground }]}>EMPLOYEE</Text>
-            </View>
-            <View style={[styles.thCol, { flex: 1.8 }]}>
-              <Text style={[styles.thText, { color: colors.mutedForeground }]}>DEPARTMENT</Text>
-            </View>
-            <View style={[styles.thCol, { flex: 1.1, justifyContent: "flex-end" }]}>
-              <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>BASE</Text>
-            </View>
-            <View style={[styles.thCol, { flex: 1.0, justifyContent: "flex-end" }]}>
-              <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>BONUS</Text>
-            </View>
-            <View style={[styles.thCol, { flex: 1.0, justifyContent: "flex-end" }]}>
-              <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>DEDUCTIONS</Text>
-            </View>
-            <View style={[styles.thCol, { flex: 1.2, justifyContent: "flex-end" }]}>
-              <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>NET SALARY</Text>
-            </View>
-            <View style={[styles.thCol, { flex: 1.5, justifyContent: "center" }]}>
-              <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "center" }]}>ACTIONS</Text>
-            </View>
-          </View>
-
-          {filteredPayroll.length === 0 ? (
-            <View style={styles.emptyWrap}>
-              <SvgFileText size={36} color={colors.mutedForeground} />
-              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No payroll entries recorded</Text>
-              <Text style={[styles.emptySubtitle, { color: colors.mutedForeground }]}>
-                Click "Add Entry" to generate a staff payroll slip.
-              </Text>
-            </View>
-          ) : (
-            filteredPayroll.map((p) => {
-              const net = (p.baseSalary || 0) + (p.bonus || 0) - (p.deductions || 0);
-              return (
-                <View key={p.id} style={[styles.tableRow, { borderBottomColor: colors.border }]}>
-                  <View style={[styles.tdCol, { flex: 2.2 }]}>
-                    <Text style={[styles.empName, { color: colors.foreground }]}>
-                      {p.employeeName}
-                    </Text>
-                    <Text style={[styles.empMeta, { color: colors.mutedForeground }]}>
-                      {p.employeeId} · {p.designation || "Staff"}
-                    </Text>
-                  </View>
-
-                  <View style={[styles.tdCol, { flex: 1.8 }]}>
-                    <Text style={[styles.deptText, { color: colors.foreground }]}>
-                      {p.department}
-                    </Text>
-                  </View>
-
-                  <View style={[styles.tdCol, { flex: 1.1, alignItems: "flex-end" }]}>
-                    <Text style={[styles.amountCell, { color: colors.foreground }]}>
-                      {settings.currency} {p.baseSalary?.toLocaleString()}
-                    </Text>
-                  </View>
-
-                  <View style={[styles.tdCol, { flex: 1.0, alignItems: "flex-end" }]}>
-                    <Text style={[styles.amountCell, { color: colors.income }]}>
-                      +{settings.currency} {p.bonus?.toLocaleString() || "0"}
-                    </Text>
-                  </View>
-
-                  <View style={[styles.tdCol, { flex: 1.0, alignItems: "flex-end" }]}>
-                    <Text style={[styles.amountCell, { color: colors.expense }]}>
-                      -{settings.currency} {p.deductions?.toLocaleString() || "0"}
-                    </Text>
-                  </View>
-
-                  <View style={[styles.tdCol, { flex: 1.2, alignItems: "flex-end" }]}>
-                    <Text style={[styles.netAmountText, { color: "#8B5CF6" }]}>
-                      {settings.currency} {net.toLocaleString()}
-                    </Text>
-                  </View>
-
-                  <View style={[styles.tdCol, { flex: 1.5, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 6 }]}>
-                    <TouchableOpacity
-                      style={[styles.actionIconBtn, { borderColor: "#8B5CF640", backgroundColor: "#8B5CF615", paddingHorizontal: 9, width: "auto" }]}
-                      onPress={() => handleExportEmployeeSlip(p)}
-                    >
-                      <SvgFileText size={12} color="#8B5CF6" />
-                      <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: "#8B5CF6", marginLeft: 4 }}>Slip</Text>
-                    </TouchableOpacity>
-
-                    {canEdit && (
-                      <>
-                        <TouchableOpacity
-                          style={[styles.actionIconBtn, { borderColor: "#3B82F630", backgroundColor: "#3B82F612" }]}
-                          onPress={() => {
-                            setEditingEntry(p);
-                            setModalVisible(true);
-                          }}
-                        >
-                          <SvgEdit size={14} color="#3B82F6" />
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          style={[styles.actionIconBtn, { borderColor: "#F43F5E30", backgroundColor: "#F43F5E12" }]}
-                          onPress={() => setDeletingPayroll(p)}
-                        >
-                          <SvgTrash size={14} color="#F43F5E" />
-                        </TouchableOpacity>
-                      </>
-                    )}
-                  </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={true}>
+            <View style={{ minWidth: 860 }}>
+              <View style={[styles.tableHeader, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+                <View style={[styles.thCol, { flex: 2.2 }]}>
+                  <Text style={[styles.thText, { color: colors.mutedForeground }]}>EMPLOYEE</Text>
                 </View>
-              );
-            })
-          )}
+                <View style={[styles.thCol, { flex: 1.8 }]}>
+                  <Text style={[styles.thText, { color: colors.mutedForeground }]}>DEPARTMENT</Text>
+                </View>
+                <View style={[styles.thCol, { flex: 1.1, justifyContent: "flex-end" }]}>
+                  <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>BASE</Text>
+                </View>
+                <View style={[styles.thCol, { flex: 1.0, justifyContent: "flex-end" }]}>
+                  <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>BONUS</Text>
+                </View>
+                <View style={[styles.thCol, { flex: 1.0, justifyContent: "flex-end" }]}>
+                  <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>DEDUCTIONS</Text>
+                </View>
+                <View style={[styles.thCol, { flex: 1.2, justifyContent: "flex-end" }]}>
+                  <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>NET SALARY</Text>
+                </View>
+                <View style={[styles.thCol, { flex: 1.5, justifyContent: "center" }]}>
+                  <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "center" }]}>ACTIONS</Text>
+                </View>
+              </View>
+
+              {filteredPayroll.length === 0 ? (
+                <View style={styles.emptyWrap}>
+                  <SvgFileText size={36} color={colors.mutedForeground} />
+                  <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No payroll entries recorded</Text>
+                  <Text style={[styles.emptySubtitle, { color: colors.mutedForeground }]}>
+                    Click "Add Entry" to generate a staff payroll slip.
+                  </Text>
+                </View>
+              ) : (
+                filteredPayroll.map((p) => {
+                  const net = (p.baseSalary || 0) + (p.bonus || 0) - (p.deductions || 0);
+                  return (
+                    <View key={p.id} style={[styles.tableRow, { borderBottomColor: colors.border }]}>
+                      <View style={[styles.tdCol, { flex: 2.2 }]}>
+                        <Text style={[styles.empName, { color: colors.foreground }]}>
+                          {p.employeeName}
+                        </Text>
+                        <Text style={[styles.empMeta, { color: colors.mutedForeground }]}>
+                          {p.employeeId} · {p.designation || "Staff"}
+                        </Text>
+                      </View>
+
+                      <View style={[styles.tdCol, { flex: 1.8 }]}>
+                        <Text style={[styles.deptText, { color: colors.foreground }]}>
+                          {p.department}
+                        </Text>
+                      </View>
+
+                      <View style={[styles.tdCol, { flex: 1.1, alignItems: "flex-end" }]}>
+                        <Text style={[styles.amountCell, { color: colors.foreground }]}>
+                          {settings.currency} {p.baseSalary?.toLocaleString()}
+                        </Text>
+                      </View>
+
+                      <View style={[styles.tdCol, { flex: 1.0, alignItems: "flex-end" }]}>
+                        <Text style={[styles.amountCell, { color: colors.income }]}>
+                          +{settings.currency} {p.bonus?.toLocaleString() || "0"}
+                        </Text>
+                      </View>
+
+                      <View style={[styles.tdCol, { flex: 1.0, alignItems: "flex-end" }]}>
+                        <Text style={[styles.amountCell, { color: colors.expense }]}>
+                          -{settings.currency} {p.deductions?.toLocaleString() || "0"}
+                        </Text>
+                      </View>
+
+                      <View style={[styles.tdCol, { flex: 1.2, alignItems: "flex-end" }]}>
+                        <Text style={[styles.netAmountText, { color: "#8B5CF6" }]}>
+                          {settings.currency} {net.toLocaleString()}
+                        </Text>
+                      </View>
+
+                      <View style={[styles.tdCol, { flex: 1.5, justifyContent: "center", flexDirection: "row", gap: 6 }]}>
+                        <TouchableOpacity
+                          style={[styles.actionIconBtn, { borderColor: "#8B5CF640", backgroundColor: "#8B5CF612" }]}
+                          onPress={() => handleExportEmployeeSlip(p)}
+                        >
+                          <SvgFileText size={14} color="#8B5CF6" />
+                        </TouchableOpacity>
+
+                        {canEdit && (
+                          <>
+                            <TouchableOpacity
+                              style={[styles.actionIconBtn, { borderColor: colors.border }]}
+                              onPress={() => {
+                                setEditingEntry(p);
+                                setModalVisible(true);
+                              }}
+                            >
+                              <SvgEdit size={14} color={colors.primary} />
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              style={[styles.actionIconBtn, { borderColor: "#F43F5E30", backgroundColor: "#F43F5E12" }]}
+                              onPress={() => setDeletingPayroll(p)}
+                            >
+                              <SvgTrash size={14} color="#F43F5E" />
+                            </TouchableOpacity>
+                          </>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+            </View>
+          </ScrollView>
         </View>
       )}
 
@@ -523,11 +526,17 @@ export function WebPayroll() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    minWidth: 0,
+    width: "100%",
+    maxWidth: "100%",
   },
   content: {
     padding: 24,
     gap: 20,
     paddingBottom: 60,
+    minWidth: 0,
+    width: "100%",
+    maxWidth: "100%",
   },
   pageHeader: {
     flexDirection: "row",
@@ -720,6 +729,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     overflow: "hidden",
+    width: "100%",
+    maxWidth: "100%",
   },
   tableHeader: {
     flexDirection: "row",

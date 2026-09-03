@@ -113,9 +113,9 @@ export function injectWebMicroAnimations() {
       background: rgba(148, 163, 184, 0.55);
     }
 
-    /* Universal Modern Sans-Serif Typography Enforcement (Prevents Times New Roman on Mobile Web) */
-    *, html, body, div, span, p, h1, h2, h3, h4, h5, h6, [class*="css-text"], [dir="auto"] {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+    /* Universal Modern Sans-Serif Typography Enforcement (Preserves vector icon fonts) */
+    html, body, #root, button, input, select, textarea {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
 
     [style*="Inter_400Regular"], [style*="Inter_400"] {
@@ -137,6 +137,28 @@ export function injectWebMicroAnimations() {
     [style*="Inter_800ExtraBold"], [style*="Inter_800"] {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
       font-weight: 800 !important;
+    }
+
+    /* Icon Font Protections */
+    [style*="font-family: Feather"], [style*="font-family: feather"], [style*="font-family:Feather"], [style*="font-family:feather"],
+    [style*="fontFamily: Feather"], [style*="fontFamily: feather"] {
+      font-family: 'Feather', 'feather' !important;
+    }
+    [style*="font-family: Ionicons"], [style*="font-family: ionicons"], [style*="font-family:Ionicons"], [style*="font-family:ionicons"],
+    [style*="fontFamily: Ionicons"], [style*="fontFamily: ionicons"] {
+      font-family: 'Ionicons', 'ionicons' !important;
+    }
+    [style*="font-family: MaterialIcons"], [style*="font-family: Material Icons"], [style*="font-family: material"],
+    [style*="fontFamily: MaterialIcons"], [style*="fontFamily: material"] {
+      font-family: 'MaterialIcons', 'Material Icons', 'material' !important;
+    }
+    [style*="font-family: MaterialCommunityIcons"], [style*="font-family: material-community"],
+    [style*="fontFamily: MaterialCommunityIcons"], [style*="fontFamily: material-community"] {
+      font-family: 'MaterialCommunityIcons', 'material-community' !important;
+    }
+    [style*="font-family: FontAwesome"], [style*="font-family: fontawesome"],
+    [style*="fontFamily: FontAwesome"], [style*="fontFamily: fontawesome"] {
+      font-family: 'FontAwesome', 'fontawesome' !important;
     }
 
     /* Smooth Luxury Ambient Blue Glows for Corporate Cards (Prevents harsh circular discs) */
