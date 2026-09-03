@@ -106,17 +106,19 @@ export function WebDashboard({
   }, [transactions, budgets, departments, activePeriod, settings.currency]);
 
   const [balanceViewMode, setBalanceViewMode] = useState<"cashflow" | "expenses" | "budget">("cashflow");
-  const isDeficit = netBalance < 0;
-  const netMargin = totalIncome > 0 ? ((netBalance / totalIncome) * 100) : (totalExpenses > 0 ? -100 : 0);
+  const realNetOperatingResult = totalIncome - totalExpenses;
+  const isDeficit = realNetOperatingResult < 0;
+  const netMargin = totalIncome > 0 ? ((realNetOperatingResult / totalIncome) * 100) : (totalExpenses > 0 ? -100 : 0);
   const rawSpendRatio = totalIncome > 0 ? (totalExpenses / totalIncome) * 100 : (totalExpenses > 0 ? 100 : 0);
   const clampedSpendRatio = Math.min(Math.round(rawSpendRatio), 100);
   const retainedSurplusPct = Math.max(0, Math.round(100 - rawSpendRatio));
 
   const totalLineBudgeted = calculateBudgetAllocation(budgets);
   const totalDeptBudgeted = calculateBudgetAllocation([], departments);
-  const totalBudgeted = totalLineBudgeted;
-  const netBudgetRemaining = calculateBudgetRemaining(totalBudgeted, totalExpenses);
-  const netBudgetUtilization = totalBudgeted > 0 ? (totalExpenses / totalBudgeted) * 100 : 0;
+  const totalBudgeted = totalLineBudgeted > 0 ? totalLineBudgeted : totalDeptBudgeted;
+  const totalBudgetSpent = (budgets || []).reduce((sum, b) => sum + Number(b.spent || 0), 0);
+  const netBudgetRemaining = calculateBudgetRemaining(totalBudgeted, totalBudgetSpent);
+  const netBudgetUtilization = totalBudgeted > 0 ? (totalBudgetSpent / totalBudgeted) * 100 : 0;
   
   // Real-time authoritative display balance (Net Surplus vs Total Outflows vs Allocated Budget)
   const currentHeroBalance =

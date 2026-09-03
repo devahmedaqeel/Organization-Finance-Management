@@ -335,6 +335,104 @@ function buildDepartmentBudgetSvg(
 }
 
 /**
+ * Builds SVG Executive Rings Visual Suite for PDF (Budget Ring, Margin Ring, Retention Ring)
+ * Matches the in-app Executive Radial Progress Rings with 100% data fidelity.
+ */
+function buildExecutiveRingsSuiteSvg(
+  budgetUtilPct: number,
+  totalAllocated: number,
+  totalSpent: number,
+  netMarginPct: number,
+  isDeficit: boolean,
+  totalRevenue: number,
+  totalExpenses: number,
+  retainedSurplusPct: number,
+  currency: string
+): string {
+  const r = 36;
+  const strokeWidth = 8;
+  const circumference = 2 * Math.PI * r; // ~226.195
+
+  // 1. Budget Ring calculation
+  const clampedBudgetPct = Math.min(Math.max(budgetUtilPct || 0, 0), 100);
+  const budgetOffset = circumference * (1 - clampedBudgetPct / 100);
+  const budgetColor = budgetUtilPct > 100 ? "#F43F5E" : budgetUtilPct > 80 ? "#F59E0B" : "#3B82F6";
+  const budgetStatus = budgetUtilPct > 100 ? "Cap Overrun" : budgetUtilPct > 80 ? "Warning Zone" : "Under Ceiling";
+
+  // 2. Net Margin Ring calculation
+  const absMargin = Math.abs(netMarginPct || 0);
+  const clampedMarginPct = Math.min(Math.max(absMargin, 0), 100);
+  const marginOffset = circumference * (1 - clampedMarginPct / 100);
+  const marginColor = isDeficit ? "#F43F5E" : "#10B981";
+  const marginLabel = `${netMarginPct >= 0 ? "+" : ""}${netMarginPct.toFixed(1)}%`;
+  const marginStatus = isDeficit ? "Operating Deficit" : "Healthy Surplus";
+
+  // 3. Capital Retention Ring calculation
+  const clampedRetainPct = Math.min(Math.max(retainedSurplusPct || 0, 0), 100);
+  const retainOffset = circumference * (1 - clampedRetainPct / 100);
+  const retainColor = retainedSurplusPct >= 30 ? "#0EA5E9" : retainedSurplusPct > 0 ? "#F59E0B" : "#F43F5E";
+  const retainStatus = retainedSurplusPct >= 30 ? "Strong Retention" : retainedSurplusPct > 0 ? "Lean Buffer" : "Zero Surplus";
+
+  return `
+    <div class="avoid-break" style="margin-bottom: 14px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <span style="font-weight:800; font-size:11px; color:#0F172A; text-transform:uppercase; letter-spacing:0.5px;">Executive Analytics & Radial Indicator Gauges</span>
+        <span style="font-size:9px; font-weight:600; color:#64748B;">App Synchronized Metric Rings</span>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:10px;">
+        <!-- Ring 1: Budget Utilization -->
+        <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:12px 10px; display:flex; flex-direction:column; align-items:center; text-align:center;">
+          <div style="font-size:8.5px; font-weight:700; color:#64748B; text-transform:uppercase; margin-bottom:6px;">Budget Utilization</div>
+          <svg width="90" height="90" viewBox="0 0 90 90" style="margin-bottom:6px;">
+            <circle cx="45" cy="45" r="${r}" fill="none" stroke="#E2E8F0" stroke-width="${strokeWidth}"/>
+            <circle cx="45" cy="45" r="${r}" fill="none" stroke="${budgetColor}" stroke-width="${strokeWidth}"
+              stroke-dasharray="${circumference.toFixed(1)}" stroke-dashoffset="${budgetOffset.toFixed(1)}"
+              stroke-linecap="round" transform="rotate(-90 45 45)"/>
+            <text x="45" y="44" text-anchor="middle" font-size="12" font-weight="800" fill="#0F172A">${budgetUtilPct.toFixed(0)}%</text>
+            <text x="45" y="55" text-anchor="middle" font-size="7.5" font-weight="700" fill="#64748B">USED</text>
+          </svg>
+          <div style="font-size:9.5px; font-weight:800; color:${budgetColor}; margin-bottom:2px;">${budgetStatus}</div>
+          <div style="font-size:8.5px; color:#475569;">Spent: ${currency} ${fmtShort(totalSpent)}</div>
+          <div style="font-size:8px; color:#64748B;">Cap: ${currency} ${fmtShort(totalAllocated)}</div>
+        </div>
+
+        <!-- Ring 2: Net Operating Margin -->
+        <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:12px 10px; display:flex; flex-direction:column; align-items:center; text-align:center;">
+          <div style="font-size:8.5px; font-weight:700; color:#64748B; text-transform:uppercase; margin-bottom:6px;">Operating Margin</div>
+          <svg width="90" height="90" viewBox="0 0 90 90" style="margin-bottom:6px;">
+            <circle cx="45" cy="45" r="${r}" fill="none" stroke="#E2E8F0" stroke-width="${strokeWidth}"/>
+            <circle cx="45" cy="45" r="${r}" fill="none" stroke="${marginColor}" stroke-width="${strokeWidth}"
+              stroke-dasharray="${circumference.toFixed(1)}" stroke-dashoffset="${marginOffset.toFixed(1)}"
+              stroke-linecap="round" transform="rotate(-90 45 45)"/>
+            <text x="45" y="44" text-anchor="middle" font-size="12" font-weight="800" fill="${marginColor}">${marginLabel}</text>
+            <text x="45" y="55" text-anchor="middle" font-size="7.5" font-weight="700" fill="#64748B">${isDeficit ? "DEFICIT" : "MARGIN"}</text>
+          </svg>
+          <div style="font-size:9.5px; font-weight:800; color:${marginColor}; margin-bottom:2px;">${marginStatus}</div>
+          <div style="font-size:8.5px; color:#475569;">Inflows: +${currency} ${fmtShort(totalRevenue)}</div>
+          <div style="font-size:8px; color:#64748B;">Outflows: -${currency} ${fmtShort(totalExpenses)}</div>
+        </div>
+
+        <!-- Ring 3: Retained Surplus -->
+        <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:12px 10px; display:flex; flex-direction:column; align-items:center; text-align:center;">
+          <div style="font-size:8.5px; font-weight:700; color:#64748B; text-transform:uppercase; margin-bottom:6px;">Retained Inflow Ratio</div>
+          <svg width="90" height="90" viewBox="0 0 90 90" style="margin-bottom:6px;">
+            <circle cx="45" cy="45" r="${r}" fill="none" stroke="#E2E8F0" stroke-width="${strokeWidth}"/>
+            <circle cx="45" cy="45" r="${r}" fill="none" stroke="${retainColor}" stroke-width="${strokeWidth}"
+              stroke-dasharray="${circumference.toFixed(1)}" stroke-dashoffset="${retainOffset.toFixed(1)}"
+              stroke-linecap="round" transform="rotate(-90 45 45)"/>
+            <text x="45" y="44" text-anchor="middle" font-size="12" font-weight="800" fill="#0F172A">${retainedSurplusPct.toFixed(0)}%</text>
+            <text x="45" y="55" text-anchor="middle" font-size="7.5" font-weight="700" fill="#64748B">RETAINED</text>
+          </svg>
+          <div style="font-size:9.5px; font-weight:800; color:${retainColor}; margin-bottom:2px;">${retainStatus}</div>
+          <div style="font-size:8.5px; color:#475569;">Net: ${totalRevenue >= totalExpenses ? "+" : "-"}${currency} ${fmtShort(Math.abs(totalRevenue - totalExpenses))}</div>
+          <div style="font-size:8px; color:#64748B;">Burn Rate: ${totalRevenue > 0 ? ((totalExpenses / totalRevenue) * 100).toFixed(0) : 100}%</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/**
  * Builds HTML Payslip for individual employee
  */
 export function buildPayslipHtml(
@@ -860,6 +958,19 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
     </div>
   </div>
   ` : ""}
+
+  <!-- Executive Analytics & Radial Indicator Gauges (App Circular Progress Rings) -->
+  ${(isExecutive || isBudget || isConsolidated) ? buildExecutiveRingsSuiteSvg(
+    budgetPerformance.overallUtilizationPct,
+    budgetPerformance.totalAllocated,
+    budgetPerformance.totalSpent,
+    executiveSummary.netProfitMarginPct,
+    !executiveSummary.isNetPositive,
+    executiveSummary.totalRevenue,
+    executiveSummary.totalExpenses,
+    Math.max(0, 100 - (financialHealth.expenseRatioPct || 0)),
+    currency
+  ) : ""}
 
   <!-- Inflow vs Outflow Historical Trend Area Line Chart -->
   ${(isExecutive || isRevenue || isExpense) && monthlyTrends.chartPoints.length > 0 ? `

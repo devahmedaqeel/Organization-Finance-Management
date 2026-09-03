@@ -111,9 +111,14 @@ export function FinancialDrillDownModal({
     if (line > 0) return line;
     return (departments || []).reduce((s, d) => s + (d.budgetAllocated || 0), 0);
   }, [budgets, departments]);
-  const budgetRatio = totalAllocated > 0 ? (totalSpent / totalAllocated) * 100 : 0;
-  const remainingBudget = totalAllocated - totalSpent;
-  const isOverBudget = totalAllocated > 0 && totalSpent > totalAllocated;
+  const actualBudgetSpent = useMemo(() => {
+    const bSpent = (budgets || []).reduce((s, b) => s + (b.spent || 0), 0);
+    if (bSpent > 0 || (budgets && budgets.length > 0)) return bSpent;
+    return totalSpent;
+  }, [budgets, totalSpent]);
+  const budgetRatio = totalAllocated > 0 ? (actualBudgetSpent / totalAllocated) * 100 : 0;
+  const remainingBudget = Math.max(0, totalAllocated - actualBudgetSpent);
+  const isOverBudget = totalAllocated > 0 && actualBudgetSpent > totalAllocated;
 
   // Filtered period transactions for ledger
   const periodTxs = useMemo(() => {

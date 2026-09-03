@@ -134,7 +134,7 @@ export default function BudgetScreen() {
 
   // Overall totals
   const totalAllocated = budgets.reduce((s, b) => s + (b.allocated || 0), 0);
-  const totalSpent = transactions.filter((t) => t.type === "expense").reduce((s, t) => s + (t.amount || 0), 0);
+  const totalSpent = budgetWithSpend.reduce((s, b) => s + (b.spent || 0), 0);
   const totalRemaining = Math.max(totalAllocated - totalSpent, 0);
   const overallUtilization = totalAllocated > 0 ? (totalSpent / totalAllocated) * 100 : 0;
 

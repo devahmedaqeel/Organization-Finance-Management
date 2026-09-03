@@ -626,8 +626,11 @@ export function buildAuthoritativeFinancialModel(
   const totalExpenses = calculateTotalExpenses(filteredTxs);
   const netBalance = calculateNetOperatingResult(filteredTxs);
   const totalBudgetCap = calculateBudgetAllocation(budgets, departments);
+  const actualBudgetSpending = (budgets && budgets.length > 0)
+    ? budgets.reduce((sum, b) => sum + calculateBudgetSpentForCategory(b, filteredTxs, period), 0)
+    : (totalBudgetCap > 0 ? totalExpenses : 0);
 
-  const budget = calculateBudgetUtilization(totalExpenses, totalBudgetCap, currency);
+  const budget = calculateBudgetUtilization(actualBudgetSpending, totalBudgetCap, currency);
   const margin = calculateNetOperatingMargin(totalIncome, totalExpenses, currency);
   const distribution = calculateExpenseDistribution(filteredTxs, previousPeriodTransactions);
 

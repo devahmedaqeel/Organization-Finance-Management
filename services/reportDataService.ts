@@ -359,7 +359,14 @@ export function buildEnterpriseReportData(
   });
 
   const budgetTotal = calculateBudgetAllocation(scopedBudgets, allDepartments);
-  const budgetSpent = totalExpenses;
+  const budgetSpent = scopedBudgets.length > 0
+    ? scopedBudgets.reduce((sum, b) => {
+        const spent = scopedTransactions
+          .filter((t) => t.type === "expense" && t.category === b.category && (!b.department || b.department === "all" || t.department === b.department))
+          .reduce((s, t) => s + safeNumber(t.amount, 0), 0);
+        return sum + spent;
+      }, 0)
+    : (budgetTotal > 0 ? totalExpenses : 0);
   const budgetRemaining = Math.max(0, budgetTotal - budgetSpent);
   const budgetUtilizationPct = budgetTotal > 0 ? (budgetSpent / budgetTotal) * 100 : 0;
 

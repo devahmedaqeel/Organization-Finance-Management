@@ -62,6 +62,7 @@ interface Props {
   transactions?: Transaction[];
   onGranularityChange?: (g: Granularity) => void;
   userId?: string;
+  onPointSelect?: (point: ChartPoint) => void;
 }
 
 function fmtAmount(n: number) {
@@ -93,6 +94,7 @@ export function AreaLineChart({
   transactions = [],
   onGranularityChange,
   userId = "default",
+  onPointSelect,
 }: Props) {
   const colors = useColors();
   const [selectedIndex, setSelectedIndex] = useState<number | null>(
@@ -180,6 +182,9 @@ export function AreaLineChart({
       setSelectedIndex(newIdx);
       if (Platform.OS !== "web") {
         Haptics.selectionAsync().catch(() => {});
+      }
+      if (onPointSelect && data[newIdx]) {
+        onPointSelect(data[newIdx]);
       }
     }
   };

@@ -18,7 +18,13 @@ import {
   NormalizedPeriod,
   aggregateTransactionsByGranularity,
   getPresetPeriod,
+  filterTransactionsByPeriod,
 } from "@/services/DatePeriodService";
+import {
+  calculateTotalIncome,
+  calculateTotalExpenses,
+  calculateNetOperatingResult,
+} from "@/services/FinancialCalculationEngine";
 import { calculateFinancialHealth } from "@/services/financialHealthService";
 import { generateFinancialInsights, ActionableInsight } from "@/services/financialInsightsService";
 
@@ -42,7 +48,7 @@ export default function AIInsightsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { chartW, hPad } = useResponsive();
-  const { transactions, budgets, payroll, departments, totalIncome, totalExpenses, netBalance, budgetUtilization } = useFinance();
+  const { transactions, budgets, payroll, departments } = useFinance();
   const { user } = useAuth();
   const { settings } = useSettings();
   const [allTxModal, setAllTxModal] = useState(false);
@@ -56,9 +62,7 @@ export default function AIInsightsScreen() {
   const [trendRange, setTrendRange] = useState("6M");
   const [customPeriodName, setCustomPeriodName] = useState<string | null>(null);
   const [customSelection, setCustomSelection] = useState<any>(null);
-
-  const profitMargin = totalIncome > 0 ? (netBalance / totalIncome) * 100 : 0;
-  const expenseRatio = totalIncome > 0 ? (totalExpenses / totalIncome) * 100 : 0;
+  const [selectedPoint, setSelectedPoint] = useState<any | null>(null);
 
   // 1. Authoritative Financial Health Calculation
   const healthReport = useMemo(() => {
@@ -85,17 +89,72 @@ export default function AIInsightsScreen() {
     return aggregateTransactionsByGranularity(transactions, activePeriod);
   }, [transactions, activePeriod]);
 
-  // Transaction Metrics
+  // Filter transactions by active period
+  const periodTxs = useMemo(() => {
+    return filterTransactionsByPeriod(transactions, activePeriod);
+  }, [transactions, activePeriod]);
+
+  // If a specific point/month on the chart is touched, isolate transactions to that point
+  const displayedTxs = useMemo(() => {
+    if (selectedPoint) {
+      const key = selectedPoint.key;
+      if (key) {
+        return transactions.filter((t) => (t.date || "").startsWith(key));
+      }
+      if (selectedPoint.fullDate) {
+        return periodTxs.filter((t) => {
+          const tDate = new Date(t.date);
+          const tMonthStr = tDate.toLocaleDateString("en-US", { month: "short" });
+          return selectedPoint.label === tMonthStr;
+        });
+      }
+    }
+    return periodTxs;
+  }, [selectedPoint, transactions, periodTxs]);
+
+  // Authoritative real calculation for the displayed scope
+  const displayedIncome = useMemo(() => calculateTotalIncome(displayedTxs), [displayedTxs]);
+  const displayedExpense = useMemo(() => calculateTotalExpenses(displayedTxs), [displayedTxs]);
+  const displayedNet = displayedIncome - displayedExpense;
+
+  // Real profit margin (strictly real Inflows minus real Outflows, never inflated)
+  const profitMargin = displayedIncome > 0
+    ? (displayedNet / displayedIncome) * 100
+    : (displayedExpense > 0 ? -100 : 0);
+
+  // Real expense ratio (Outflows as percentage of Inflows)
+  const expenseRatio = displayedIncome > 0
+    ? (displayedExpense / displayedIncome) * 100
+    : (displayedExpense > 0 ? 100 : 0);
+
+  // Budget allocations & displayed spend
+  const totalAllocatedBudget = useMemo(() => budgets.reduce((s, b) => s + Number(b.allocated || 0), 0), [budgets]);
+  const displayedBudgetSpent = useMemo(() => {
+    return budgets.reduce((sum, b) => {
+      const catSpent = displayedTxs
+        .filter(
+          (t) =>
+            t.type === "expense" &&
+            t.category?.toLowerCase() === b.category?.toLowerCase() &&
+            (!b.department || b.department === "All" || b.department === "General" || t.department?.toLowerCase() === b.department.toLowerCase())
+        )
+        .reduce((s, t) => s + Number(t.amount || 0), 0);
+      return sum + catSpent;
+    }, 0);
+  }, [budgets, displayedTxs]);
+  const displayedBudgetUtil = totalAllocatedBudget > 0 ? (displayedBudgetSpent / totalAllocatedBudget) * 100 : 0;
+
+  // Transaction Metrics computed strictly from displayed transactions
   const txStats = useMemo(() => {
-    const totalCount = transactions.length;
-    const inflows = transactions.filter(t => t.type === "income");
-    const outflows = transactions.filter(t => t.type === "expense");
+    const totalCount = displayedTxs.length;
+    const inflows = displayedTxs.filter(t => t.type === "income");
+    const outflows = displayedTxs.filter(t => t.type === "expense");
     const inflowTotal = inflows.reduce((s, t) => s + t.amount, 0);
     const outflowTotal = outflows.reduce((s, t) => s + t.amount, 0);
     const avgTx = totalCount > 0 ? (inflowTotal + outflowTotal) / totalCount : 0;
     
     let maxTx: any = null;
-    transactions.forEach(t => {
+    displayedTxs.forEach(t => {
       if (!maxTx || t.amount > maxTx.amount) maxTx = t;
     });
 
@@ -108,33 +167,40 @@ export default function AIInsightsScreen() {
       avgTx,
       maxTx,
     };
-  }, [transactions]);
+  }, [displayedTxs]);
 
-  // Expense by category
+  // Expense by category computed from displayed transactions
   const expenseByCategory = useMemo(() => {
     const map: Record<string, number> = {};
-    transactions.filter(t => t.type === "expense").forEach(t => {
+    displayedTxs.filter(t => t.type === "expense").forEach(t => {
       map[t.category] = (map[t.category] ?? 0) + t.amount;
     });
     return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 5)
       .map(([label, value], i) => ({ label, value, color: CAT_COLORS[i] }));
-  }, [transactions]);
+  }, [displayedTxs]);
 
-  // Department spending
+  // Department spending computed from displayed transactions
   const deptSpend = useMemo(() => {
     const map: Record<string, number> = {};
-    transactions.filter(t => t.type === "expense").forEach(t => {
+    displayedTxs.filter(t => t.type === "expense").forEach(t => {
       const dept = t.department || "General";
       map[dept] = (map[dept] ?? 0) + t.amount;
     });
     return Object.entries(map).sort((a, b) => b[1] - a[1])
       .map(([label, value], i) => ({ label, value, color: CAT_COLORS[i % CAT_COLORS.length] }));
-  }, [transactions]);
+  }, [displayedTxs]);
 
-  // Budget bar items
+  // Budget bar items computed from displayed transactions
   const budgetItems = useMemo(() =>
     budgets.map((b) => {
-      const spent = b.spent ?? 0;
+      const spent = displayedTxs
+        .filter(
+          (t) =>
+            t.type === "expense" &&
+            t.category?.toLowerCase() === b.category?.toLowerCase() &&
+            (!b.department || b.department === "All" || b.department === "General" || t.department?.toLowerCase() === b.department.toLowerCase())
+        )
+        .reduce((s, t) => s + Number(t.amount || 0), 0);
       const label = b.department && b.department !== "All" && b.department !== "General"
         ? `${b.category} · ${b.department}`
         : b.category;
@@ -149,7 +215,7 @@ export default function AIInsightsScreen() {
         sublabel: `Budget: ${settings.currency} ${fmt(b.allocated)}`,
       };
     }),
-  [budgets, settings.currency]);
+  [budgets, displayedTxs, settings.currency]);
 
   // Real-time period growth and margin computed directly from active chart timeline data
   const { periodGrowth, periodGrowthLabel } = useMemo(() => {
@@ -235,52 +301,14 @@ export default function AIInsightsScreen() {
   const totalPayroll = payroll.reduce((s, p) => s + p.baseSalary + p.bonus - p.deductions, 0);
   const avgSalary = payroll.length > 0 ? payroll.reduce((s, p) => s + p.baseSalary, 0) / payroll.length : 0;
 
-  // Insights list
-  const insights = useMemo((): Insight[] => {
-    const list: Insight[] = [];
-    if (netBalance > 0) {
-      list.push({ title: "Positive Net Balance", detail: `Surplus of ${settings.currency} ${fmt(netBalance)} — healthy financial position.`, type: "positive", icon: "trending-up", value: `+${settings.currency} ${fmt(netBalance)}` });
-    } else {
-      list.push({ title: "Deficit Detected", detail: `Expenses exceed income by ${settings.currency} ${fmt(Math.abs(netBalance))}. Review non-essential spending.`, type: "alert", icon: "alert-triangle", value: `-${settings.currency} ${fmt(Math.abs(netBalance))}` });
-    }
-    if (profitMargin > 20) {
-      list.push({ title: "Strong Profit Margin", detail: `${profitMargin.toFixed(1)}% margin indicates efficient financial management.`, type: "positive", icon: "award", value: `${profitMargin.toFixed(1)}%` });
-    } else if (profitMargin < 10) {
-      list.push({ title: "Low Profit Margin", detail: `${profitMargin.toFixed(1)}% margin is below healthy levels. Consider revenue diversification.`, type: "warning", icon: "bar-chart-2", value: `${profitMargin.toFixed(1)}%` });
-    }
-    if (budgetUtilization > 85) {
-      list.push({ title: "Budget Overrun Risk", detail: `${budgetUtilization.toFixed(0)}% of budget consumed. Immediate review recommended.`, type: "alert", icon: "alert-circle", value: `${budgetUtilization.toFixed(0)}%` });
-    } else if (budgetUtilization > 60) {
-      list.push({ title: "Budget Progressing Normally", detail: `${budgetUtilization.toFixed(0)}% of budget used — on track for current period.`, type: "info", icon: "pie-chart", value: `${budgetUtilization.toFixed(0)}%` });
-    } else {
-      list.push({ title: "Budget Well Within Limits", detail: `Only ${budgetUtilization.toFixed(0)}% of budget spent. Excellent fiscal discipline.`, type: "positive", icon: "check-circle", value: `${budgetUtilization.toFixed(0)}%` });
-    }
-    const salaryTotal = transactions.filter(t => t.type === "expense" && t.category === "Salaries").reduce((s, t) => s + t.amount, 0);
-    const salaryPct = totalExpenses > 0 ? (salaryTotal / totalExpenses) * 100 : 0;
-    list.push(salaryPct > 60
-      ? { title: "High Salary Ratio", detail: `Salaries = ${salaryPct.toFixed(0)}% of expenses. Consider staffing cost optimization.`, type: "warning", icon: "users", value: `${salaryPct.toFixed(0)}%` }
-      : { title: "Balanced Expense Distribution", detail: `Salary expenses at ${salaryPct.toFixed(0)}% — within recommended range.`, type: "positive", icon: "check-circle", value: `${salaryPct.toFixed(0)}%` });
-    const topDept = deptSpend[0];
-    if (topDept) {
-      list.push({ title: "Highest Spending Department", detail: `${topDept.label} has the highest expense: ${settings.currency} ${fmt(topDept.value)}. Review optimization opportunities.`, type: "info", icon: "layers", value: `${settings.currency} ${fmt(topDept.value)}` });
-    }
-    list.push({ title: "Payroll Summary", detail: `${payroll.length} employees · avg base salary ${settings.currency} ${fmt(avgSalary)}/month · total ${settings.currency} ${fmt(totalPayroll)}.`, type: "info", icon: "dollar-sign", value: `${settings.currency} ${fmt(totalPayroll)}` });
-    
-    if (lastMonthLabel && prevMonthLabel) {
-      list.push({
-        title: "MoM Revenue Growth",
-        detail: `Revenue shifted ${incomeGrowth >= 0 ? "+" : ""}${incomeGrowth.toFixed(1)}% between ${prevMonthLabel} and ${lastMonthLabel}.`,
-        type: incomeGrowth >= 0 ? "positive" : "warning",
-        icon: incomeGrowth >= 0 ? "trending-up" : "trending-down",
-        value: `${incomeGrowth >= 0 ? "+" : ""}${incomeGrowth.toFixed(1)}%`,
-      });
-    }
-
-    return list;
-  }, [netBalance, profitMargin, budgetUtilization, totalExpenses, transactions, deptSpend, payroll, avgSalary, totalPayroll, settings.currency, lastMonthLabel, prevMonthLabel, incomeGrowth]);
-
-  const positiveCount = insights.filter(i => i.type === "positive").length;
-  const warningCount = insights.filter(i => i.type === "warning" || i.type === "alert").length;
+  const positiveCount = useMemo(
+    () => actionableInsights.filter(i => i.severity === "SUCCESS").length,
+    [actionableInsights]
+  );
+  const warningCount = useMemo(
+    () => actionableInsights.filter(i => i.severity === "CRITICAL" || i.severity === "WARNING").length,
+    [actionableInsights]
+  );
 
   useEffect(() => {
     const onBackPress = () => {
@@ -362,10 +390,26 @@ export default function AIInsightsScreen() {
               <Text style={[styles.healthLabel, { color: healthColor }]}>{healthLabel}</Text>
             <View style={styles.healthStats}>
               {[
-                { label: "Net Balance", value: `${netBalance >= 0 ? "+" : ""}${settings.currency} ${fmt(netBalance)}`, color: netBalance >= 0 ? "#10B981" : "#F43F5E" },
-                { label: "Profit Margin", value: `${profitMargin.toFixed(1)}%`, color: profitMargin > 10 ? "#10B981" : "#F59E0B" },
-                { label: "Budget Used", value: `${budgetUtilization.toFixed(0)}%`, color: budgetUtilization < 75 ? "#10B981" : "#F43F5E" },
-                { label: "MoM Growth", value: `${incomeGrowth >= 0 ? "+" : ""}${incomeGrowth.toFixed(1)}%`, color: incomeGrowth >= 0 ? "#10B981" : "#F43F5E" },
+                {
+                  label: "Net Balance",
+                  value: `${displayedNet >= 0 ? "+" : "-"}${settings.currency} ${fmt(Math.abs(displayedNet))}`,
+                  color: displayedNet >= 0 ? "#10B981" : "#F43F5E",
+                },
+                {
+                  label: "Profit Margin",
+                  value: `${profitMargin >= 0 ? "+" : ""}${profitMargin.toFixed(1)}%`,
+                  color: profitMargin > 10 ? "#10B981" : profitMargin >= 0 ? "#38BDF8" : "#F43F5E",
+                },
+                {
+                  label: "Budget Used",
+                  value: `${displayedBudgetUtil.toFixed(0)}%`,
+                  color: displayedBudgetUtil <= 75 ? "#10B981" : displayedBudgetUtil <= 100 ? "#F59E0B" : "#F43F5E",
+                },
+                {
+                  label: "MoM Growth",
+                  value: `${incomeGrowth >= 0 ? "+" : ""}${incomeGrowth.toFixed(1)}%`,
+                  color: incomeGrowth >= 0 ? "#10B981" : "#F43F5E",
+                },
               ].map((s, i) => (
                 <View key={i} style={styles.healthStat}>
                   <Text style={[styles.healthStatValue, { color: s.color }]}>{s.value}</Text>
@@ -388,7 +432,7 @@ export default function AIInsightsScreen() {
           </View>
           <View style={[styles.badge, { backgroundColor: "#3B82F622", borderColor: "#3B82F644" }]}>
             <Feather name="info" size={12} color="#3B82F6" />
-            <Text style={[styles.badgeText, { color: "#3B82F6" }]}>{insights.length} Total</Text>
+            <Text style={[styles.badgeText, { color: "#3B82F6" }]}>{actionableInsights.length} Total</Text>
           </View>
         </View>
       </View>
@@ -416,18 +460,24 @@ export default function AIInsightsScreen() {
           currency={settings.currency}
           activeRange={customSelection ? undefined : trendRange}
           activePeriod={activePeriod}
+          onPointSelect={(pt) => {
+            setSelectedPoint(pt);
+          }}
           onPeriodSelect={(p) => {
             setActivePeriod(p);
             setCustomPeriodName(p.label);
+            setSelectedPoint(null);
           }}
           onRangeSelect={(range) => {
             setTrendRange(range);
             setCustomPeriodName(null);
             setCustomSelection(null);
+            setSelectedPoint(null);
           }}
           onCustomDateSelect={(selection) => {
             setCustomSelection(selection);
             if (selection.presetName) setCustomPeriodName(selection.presetName);
+            setSelectedPoint(null);
           }}
           ranges={["1W", "2W", "1M", "3M", "6M", "1Y"]}
           transactions={transactions}
@@ -438,20 +488,30 @@ export default function AIInsightsScreen() {
       {/* 3 Key Rings */}
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.cardHeaderRow}>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={[styles.cardTitle, { color: colors.foreground }]}>Key Metrics</Text>
-            <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>Financial performance indicators</Text>
+            <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
+              {selectedPoint ? `Inspecting ${selectedPoint.fullDate || selectedPoint.label}` : `Financial performance indicators · ${activePeriod.label}`}
+            </Text>
           </View>
+          {selectedPoint && (
+            <TouchableOpacity
+              style={[styles.smBtn, { borderColor: colors.primary + "44", backgroundColor: colors.primary + "15" }]}
+              onPress={() => setSelectedPoint(null)}
+            >
+              <Text style={[styles.smBtnText, { color: colors.primary }]}>Reset Focus ✕</Text>
+            </TouchableOpacity>
+          )}
         </View>
         <View style={styles.ringsRow}>
           {/* Ring 1: Profit Margin */}
           <View style={styles.ringItem}>
             <RingProgress
-              percentage={Math.min(Math.max(profitMargin, 0), 100)}
-              centerLabel={`${profitMargin.toFixed(0)}%`}
+              percentage={displayedIncome === 0 && displayedExpense === 0 ? 0 : Math.min(Math.max(profitMargin, 0), 100)}
+              centerLabel={`${profitMargin >= 0 ? "+" : ""}${profitMargin.toFixed(0)}%`}
               size={98}
               strokeWidth={9}
-              color={profitMargin > 15 ? "#10B981" : profitMargin > 5 ? "#F59E0B" : "#F43F5E"}
+              color={displayedIncome === 0 && displayedExpense === 0 ? "#64748B" : profitMargin > 15 ? "#10B981" : profitMargin >= 0 ? "#38BDF8" : "#F43F5E"}
               label="Profit"
               sublabel="MARGIN"
             />
@@ -459,18 +519,26 @@ export default function AIInsightsScreen() {
               style={[
                 styles.ringStatusPill,
                 {
-                  backgroundColor: (profitMargin > 15 ? "#10B981" : profitMargin > 5 ? "#F59E0B" : "#F43F5E") + "18",
-                  borderColor: (profitMargin > 15 ? "#10B981" : profitMargin > 5 ? "#F59E0B" : "#F43F5E") + "44",
+                  backgroundColor: (displayedIncome === 0 && displayedExpense === 0 ? "#64748B" : profitMargin > 15 ? "#10B981" : profitMargin >= 0 ? "#38BDF8" : "#F43F5E") + "18",
+                  borderColor: (displayedIncome === 0 && displayedExpense === 0 ? "#64748B" : profitMargin > 15 ? "#10B981" : profitMargin >= 0 ? "#38BDF8" : "#F43F5E") + "44",
                 },
               ]}
             >
               <Text
                 style={[
                   styles.ringStatusText,
-                  { color: profitMargin > 15 ? "#10B981" : profitMargin > 5 ? "#F59E0B" : "#F43F5E" },
+                  { color: displayedIncome === 0 && displayedExpense === 0 ? "#64748B" : profitMargin > 15 ? "#10B981" : profitMargin >= 0 ? "#38BDF8" : "#F43F5E" },
                 ]}
               >
-                {profitMargin > 20 ? "High Surplus" : profitMargin > 10 ? "Moderate" : "Low Margin"}
+                {displayedIncome === 0 && displayedExpense === 0
+                  ? "No Activity"
+                  : profitMargin > 20
+                  ? "High Surplus"
+                  : profitMargin > 0
+                  ? "Surplus"
+                  : profitMargin === 0
+                  ? "Balanced"
+                  : "Operating Deficit"}
               </Text>
             </View>
           </View>
@@ -478,11 +546,11 @@ export default function AIInsightsScreen() {
           {/* Ring 2: Budget Utilization */}
           <View style={styles.ringItem}>
             <RingProgress
-              percentage={budgetUtilization}
-              centerLabel={`${budgetUtilization.toFixed(0)}%`}
+              percentage={Math.min(displayedBudgetUtil, 100)}
+              centerLabel={`${displayedBudgetUtil.toFixed(0)}%`}
               size={98}
               strokeWidth={9}
-              color={budgetUtilization <= 75 ? "#10B981" : budgetUtilization <= 95 ? "#F59E0B" : "#F43F5E"}
+              color={displayedBudgetUtil === 0 ? "#64748B" : displayedBudgetUtil <= 75 ? "#10B981" : displayedBudgetUtil <= 95 ? "#F59E0B" : "#F43F5E"}
               label="Budget"
               sublabel="USED"
             />
@@ -490,18 +558,24 @@ export default function AIInsightsScreen() {
               style={[
                 styles.ringStatusPill,
                 {
-                  backgroundColor: (budgetUtilization <= 75 ? "#10B981" : budgetUtilization <= 95 ? "#F59E0B" : "#F43F5E") + "18",
-                  borderColor: (budgetUtilization <= 75 ? "#10B981" : budgetUtilization <= 95 ? "#F59E0B" : "#F43F5E") + "44",
+                  backgroundColor: (displayedBudgetUtil === 0 ? "#64748B" : displayedBudgetUtil <= 75 ? "#10B981" : displayedBudgetUtil <= 95 ? "#F59E0B" : "#F43F5E") + "18",
+                  borderColor: (displayedBudgetUtil === 0 ? "#64748B" : displayedBudgetUtil <= 75 ? "#10B981" : displayedBudgetUtil <= 95 ? "#F59E0B" : "#F43F5E") + "44",
                 },
               ]}
             >
               <Text
                 style={[
                   styles.ringStatusText,
-                  { color: budgetUtilization <= 75 ? "#10B981" : budgetUtilization <= 95 ? "#F59E0B" : "#F43F5E" },
+                  { color: displayedBudgetUtil === 0 ? "#64748B" : displayedBudgetUtil <= 75 ? "#10B981" : displayedBudgetUtil <= 95 ? "#F59E0B" : "#F43F5E" },
                 ]}
               >
-                {budgetUtilization <= 75 ? "On Track" : budgetUtilization <= 95 ? "Near Limit" : "Over Budget"}
+                {displayedBudgetUtil === 0
+                  ? "No Spend"
+                  : displayedBudgetUtil <= 75
+                  ? "On Track"
+                  : displayedBudgetUtil <= 100
+                  ? "Near Limit"
+                  : "Over Budget"}
               </Text>
             </View>
           </View>
@@ -513,7 +587,7 @@ export default function AIInsightsScreen() {
               centerLabel={`${expenseRatio.toFixed(0)}%`}
               size={98}
               strokeWidth={9}
-              color={expenseRatio < 70 ? "#10B981" : "#F43F5E"}
+              color={expenseRatio === 0 ? "#64748B" : expenseRatio <= 60 ? "#10B981" : expenseRatio <= 85 ? "#F59E0B" : "#F43F5E"}
               label="Expense"
               sublabel="RATIO"
             />
@@ -521,18 +595,24 @@ export default function AIInsightsScreen() {
               style={[
                 styles.ringStatusPill,
                 {
-                  backgroundColor: (expenseRatio < 70 ? "#10B981" : "#F43F5E") + "18",
-                  borderColor: (expenseRatio < 70 ? "#10B981" : "#F43F5E") + "44",
+                  backgroundColor: (expenseRatio === 0 ? "#64748B" : expenseRatio <= 60 ? "#10B981" : expenseRatio <= 85 ? "#F59E0B" : "#F43F5E") + "18",
+                  borderColor: (expenseRatio === 0 ? "#64748B" : expenseRatio <= 60 ? "#10B981" : expenseRatio <= 85 ? "#F59E0B" : "#F43F5E") + "44",
                 },
               ]}
             >
               <Text
                 style={[
                   styles.ringStatusText,
-                  { color: expenseRatio < 70 ? "#10B981" : "#F43F5E" },
+                  { color: expenseRatio === 0 ? "#64748B" : expenseRatio <= 60 ? "#10B981" : expenseRatio <= 85 ? "#F59E0B" : "#F43F5E" },
                 ]}
               >
-                {expenseRatio < 60 ? "Low Burn" : expenseRatio < 80 ? "Moderate" : "High Outflow"}
+                {expenseRatio === 0
+                  ? "Zero Outflow"
+                  : expenseRatio <= 60
+                  ? "Low Burn"
+                  : expenseRatio <= 85
+                  ? "Moderate"
+                  : "High Outflow"}
               </Text>
             </View>
           </View>
@@ -540,20 +620,35 @@ export default function AIInsightsScreen() {
       </View>
 
       {/* Expense Category Donut */}
-      {expenseByCategory.length > 0 && (
+      {displayedExpense > 0 && expenseByCategory.length > 0 ? (
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.cardTitle, { color: colors.foreground }]}>Expense Breakdown</Text>
-          <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>Where your money is going</Text>
+          <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
+            {selectedPoint ? `Disbursements in ${selectedPoint.fullDate || selectedPoint.label}` : `Where your money is going · ${activePeriod.label}`}
+          </Text>
           <DonutChart
             segments={expenseByCategory}
             size={146}
             strokeWidth={14}
             currency={settings.currency}
-            centerLabel={`${settings.currency} ${fmt(totalExpenses)}`}
+            centerLabel={`${settings.currency} ${fmt(displayedExpense)}`}
             centerSub="total spent"
           />
         </View>
-      )}
+      ) : selectedPoint ? (
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.cardTitle, { color: colors.foreground }]}>Expense Breakdown</Text>
+          <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
+            Disbursements in {selectedPoint.fullDate || selectedPoint.label}
+          </Text>
+          <View style={{ paddingVertical: 18, alignItems: "center" }}>
+            <Feather name="check-circle" size={24} color="#10B981" />
+            <Text style={{ color: colors.mutedForeground, fontSize: 12, marginTop: 6 }}>
+              Zero expenditures recorded for this specific period.
+            </Text>
+          </View>
+        </View>
+      ) : null}
 
       {/* Department Spending Bars */}
       {deptSpend.length > 0 && (
@@ -561,7 +656,9 @@ export default function AIInsightsScreen() {
           <View style={styles.cardHeaderRow}>
             <View>
               <Text style={[styles.cardTitle, { color: colors.foreground }]}>Department Spending</Text>
-              <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>Expense allocation by unit</Text>
+              <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
+                {selectedPoint ? `Allocations in ${selectedPoint.fullDate || selectedPoint.label}` : "Expense allocation by unit"}
+              </Text>
             </View>
             <TouchableOpacity
               style={[styles.smBtn, { borderColor: colors.border }]}
@@ -580,7 +677,9 @@ export default function AIInsightsScreen() {
           <View style={styles.cardHeaderRow}>
             <View>
               <Text style={[styles.cardTitle, { color: colors.foreground }]}>Budget vs Actual</Text>
-              <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>Spending per budget category</Text>
+              <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
+                {selectedPoint ? `Spending during ${selectedPoint.fullDate || selectedPoint.label}` : "Spending per budget category"}
+              </Text>
             </View>
             <TouchableOpacity
               style={[styles.smBtn, { borderColor: colors.border }]}
@@ -593,9 +692,9 @@ export default function AIInsightsScreen() {
           {/* Budget progress summary */}
           <View style={styles.budgetSummaryRow}>
             {[
-              { label: "Total Allocated", value: `${settings.currency} ${fmt(budgets.reduce((s, b) => s + b.allocated, 0))}`, color: colors.primary },
-              { label: "Total Spent", value: `${settings.currency} ${fmt(budgets.reduce((s, b) => s + (b.spent ?? 0), 0))}`, color: colors.expense },
-              { label: "Remaining", value: `${settings.currency} ${fmt(Math.max(budgets.reduce((s, b) => s + b.allocated - (b.spent ?? 0), 0), 0))}`, color: colors.income },
+              { label: "Total Allocated", value: `${settings.currency} ${fmt(totalAllocatedBudget)}`, color: colors.primary },
+              { label: "Total Spent", value: `${settings.currency} ${fmt(displayedBudgetSpent)}`, color: colors.expense },
+              { label: "Remaining", value: `${settings.currency} ${fmt(Math.max(totalAllocatedBudget - displayedBudgetSpent, 0))}`, color: colors.income },
             ].map((s, i) => (
               <View key={i} style={[styles.budgetSumCard, { backgroundColor: s.color + "15", borderColor: s.color + "33" }]}>
                 <Text style={[styles.budgetSumValue, { color: s.color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{s.value}</Text>

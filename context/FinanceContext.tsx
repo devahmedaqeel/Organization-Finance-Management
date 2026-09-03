@@ -955,7 +955,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   // Whenever Income OR Budget is added/allocated, this Top Balance increases immediately!
   const netBalance = useMemo(() => (totalIncome + totalBudgeted) - totalExpenses, [totalIncome, totalBudgeted, totalExpenses]);
   const actualCash = useMemo(() => calculateActualCash(transactions), [transactions]);
-  const totalBudgetSpent = useMemo(() => calculateBudgetUsed(transactions, budgets), [transactions, budgets]);
+  const totalBudgetSpent = useMemo(() => {
+    return budgetsWithSpent.reduce((sum, b) => sum + Number(b.spent || 0), 0);
+  }, [budgetsWithSpent]);
   const totalBudgetRemaining = useMemo(() => calculateBudgetRemaining(totalBudgeted, totalBudgetSpent), [totalBudgeted, totalBudgetSpent]);
   const budgetUtilization = useMemo(() => totalBudgeted > 0 ? (totalBudgetSpent / totalBudgeted) * 100 : 0, [totalBudgeted, totalBudgetSpent]);
   const unreadNotificationCount = useMemo(() => notifications.filter((n) => !n.read).length, [notifications]);
