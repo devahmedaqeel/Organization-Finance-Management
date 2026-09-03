@@ -188,15 +188,6 @@ export function WebPayroll() {
         </View>
 
         <View style={[styles.headerRightActions, isMobile && { width: "100%", justifyContent: "flex-start" }]}>
-          <TouchableOpacity
-            style={[styles.outlineBtn, { borderColor: colors.border, backgroundColor: colors.card }, isMobile && { flex: 1 }]}
-            onPress={handleExportPDF}
-            activeOpacity={0.8}
-          >
-            <SvgFileText size={14} color="#8B5CF6" />
-            <Text style={[styles.outlineBtnText, { color: colors.foreground }]}>Export (PDF)</Text>
-          </TouchableOpacity>
-
           {canEdit && (
             <TouchableOpacity
               style={[styles.primaryBtn, { backgroundColor: "#8B5CF6" }, isMobile && { flex: 1 }]}

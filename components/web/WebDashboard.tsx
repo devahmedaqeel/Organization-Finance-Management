@@ -270,51 +270,6 @@ export function WebDashboard({
           )}
 
           <TouchableOpacity
-            style={[styles.outlineActionBtn, { borderColor: colors.border, backgroundColor: colors.card, flexShrink: 0 }]}
-            onPress={() => {
-              const totalAlloc = budgets.reduce((s, b) => s + b.allocated, 0) || departments.reduce((s, d) => s + (d.budgetAllocated || 0), 0);
-              const utilPct = totalAlloc > 0 ? (totalExpenses / totalAlloc) * 100 : 0;
-              const opts: ReportOptions = {
-                organizationName: settings.organizationName || "Organization Finance Management",
-                organizationAddress: settings.organizationAddress || "Enterprise Financial Center",
-                organizationEmail: settings.organizationEmail || "finance@ofm-cloud.com",
-                organizationPhone: settings.organizationPhone || "+1 (800) 555-0199",
-                organizationLogo: settings.organizationLogo || "",
-                currency: settings.currency || "PKR",
-                fiscalYear: settings.fiscalYear || "2025-2026",
-                periodLabel: activePeriod?.label || "Consolidated Fiscal Ledger",
-                generatedBy: user?.name || user?.email || "Chief Financial Officer",
-                totalIncome,
-                totalExpenses,
-                netBalance: totalIncome - totalExpenses,
-                budgetUtilization: utilPct,
-                transactions,
-                departments,
-                payroll,
-                budgets,
-                chartPoints: chartPoints.map((p) => ({
-                  label: p.label,
-                  income: p.income,
-                  expense: p.expense,
-                })),
-                includeSummary: true,
-                includeCharts: true,
-                includeCategories: true,
-                includeDepartments: true,
-                includePayroll: true,
-                includeTransactions: true,
-                includeReconciliation: true,
-              };
-              setStatementReportOpts(opts);
-              setStatementModalVisible(true);
-            }}
-            activeOpacity={0.8}
-          >
-            <SvgFileText size={14} color={colors.primary} />
-            <Text style={[styles.outlineBtnText, { color: colors.foreground }]}>Export Statement (PDF)</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
             style={[
               styles.outlineActionBtn,
               {
