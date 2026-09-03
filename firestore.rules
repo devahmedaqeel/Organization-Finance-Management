@@ -2,49 +2,83 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Allow full real-time reading and writing for organization financial records and users across Web and Mobile
-    match /users/{userId} {
-      allow read, write: if true;
+    // Helper functions for institutional security
+    function isAuthenticated() {
+      return request.auth != null;
     }
 
+    // 1. User Profiles
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // 2. Organizations & Members
     match /organizations/{orgId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAuthenticated();
+
       match /members/{memberId} {
-        allow read, write: if true;
+        allow read, write: if isAuthenticated();
       }
     }
 
+    // 3. Financial Transactions & Ledger
     match /transactions/{transactionId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
 
+    // 4. Budget Allocations
     match /budgets/{budgetId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
 
+    // 5. Staff Payroll & Remuneration
     match /payroll/{payrollId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
 
+    // 6. Departments & Cost Centers
     match /departments/{departmentId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
 
+    // 7. Team Invitations
     match /invitations/{invitationId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
 
-    match /settings/{settingsId} {
-      allow read, write: if true;
+    // 8. Organization Settings & Logo Customization
+    match /orgSettings/{settingsId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
 
+    // 9. Real-time Notifications
+    match /notifications/{notifId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // 10. Device Push Tokens
+    match /push_tokens/{tokenId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // 11. Immutable Audit Trail (Tamper-Proof)
     match /auditLogs/{logId} {
-      allow read, write: if true;
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if false; // Strict fraud protection
     }
 
-    // Default fallback
+    // 12. Default Fallback
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if isAuthenticated();
     }
   }
 }

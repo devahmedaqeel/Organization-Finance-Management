@@ -2,14 +2,16 @@
 
 # dependencies
 node_modules/
+.pnpm-store/
 
-# Expo
+# Expo & Build Artifacts
 .expo/
 dist/
 web-build/
 expo-env.d.ts
+.eas/
 
-# Native
+# Native & Signing Keys (Secrets)
 ios/
 android/
 *.orig.*
@@ -18,24 +20,33 @@ android/
 *.p12
 *.key
 *.mobileprovision
+*.keystore
+*.pem
+google-services.json
+GoogleService-Info.plist
 
 # Metro
 .metro-health-check*
 
-# debug
+# debug & logs
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+*.log
 
-# macOS
+# macOS / Windows OS files
 .DS_Store
-*.pem
+Thumbs.db
 
-# local env files
-.env*.local
+# Local environment files & secrets (PROTECTED - NEVER COMMIT TO GITHUB)
+.env
+.env*
+!.env.example
+*.env
+credentials.json
+serviceAccountKey*.json
+firebase-adminsdk*.json
 
 # typescript
 *.tsbuildinfo
 .vercel
-
-.env

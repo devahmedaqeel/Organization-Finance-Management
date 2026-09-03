@@ -78,14 +78,14 @@ export function TransactionItem(props: TransactionItemProps) {
 
       {/* Info */}
       <View style={styles.info}>
-        <Text style={[styles.category, { color: colors.foreground }]} numberOfLines={1}>
+        <Text style={[styles.category, { color: colors.foreground }]}>
           {tx.title || tx.category}
         </Text>
-        <Text style={[styles.dept, { color: colors.mutedForeground }]} numberOfLines={1}>
+        <Text style={[styles.dept, { color: colors.mutedForeground }]}>
           {tx.department || "General"} · {formatDate(tx.date)}
         </Text>
         {tx.description ? (
-          <Text style={[styles.desc, { color: colors.mutedForeground }]} numberOfLines={1}>
+          <Text style={[styles.desc, { color: colors.mutedForeground }]}>
             {tx.description}
           </Text>
         ) : null}
@@ -184,6 +184,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     gap: 6,
     flexShrink: 0,
+    minWidth: 70,
   },
   amount: {
     fontSize: 14,

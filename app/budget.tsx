@@ -247,21 +247,21 @@ export default function BudgetScreen() {
         <View style={[styles.summaryCardRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.summaryColItem}>
             <Text style={[styles.summaryColLabel, { color: colors.mutedForeground }]}>ALLOCATED</Text>
-            <Text style={[styles.summaryColValue, { color: colors.warning }]} numberOfLines={1}>
+            <Text style={[styles.summaryColValue, { color: colors.warning }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
               {settings.currency} {fmtNum(totalAllocated)}
             </Text>
           </View>
           <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
           <View style={styles.summaryColItem}>
             <Text style={[styles.summaryColLabel, { color: colors.mutedForeground }]}>TOTAL SPENT</Text>
-            <Text style={[styles.summaryColValue, { color: colors.expense }]} numberOfLines={1}>
+            <Text style={[styles.summaryColValue, { color: colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
               {settings.currency} {fmtNum(totalSpent)}
             </Text>
           </View>
           <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
           <View style={styles.summaryColItem}>
             <Text style={[styles.summaryColLabel, { color: colors.mutedForeground }]}>REMAINING</Text>
-            <Text style={[styles.summaryColValue, { color: colors.income }]} numberOfLines={1}>
+            <Text style={[styles.summaryColValue, { color: colors.income }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
               {settings.currency} {fmtNum(totalRemaining)}
             </Text>
           </View>
@@ -786,6 +786,8 @@ const styles = StyleSheet.create({
   cardAmountsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
+    flexWrap: "wrap",
+    gap: 6,
   },
   cardAmtText: {
     fontSize: 10.5,

@@ -517,8 +517,8 @@ ${orgName}`;
                       <Text style={[styles.statVal, { color: stat.color }]}>{stat.value}</Text>
                     </View>
                     <View style={styles.statBottomWrap}>
-                      <Text style={[styles.statLabel, { color: colors.foreground }]} numberOfLines={1}>{stat.label}</Text>
-                      <Text style={[styles.statSub, { color: colors.mutedForeground }]} numberOfLines={1}>{stat.sub}</Text>
+                      <Text style={[styles.statLabel, { color: colors.foreground }]}>{stat.label}</Text>
+                      <Text style={[styles.statSub, { color: colors.mutedForeground }]}>{stat.sub}</Text>
                     </View>
                   </TouchableOpacity>
                 );
@@ -612,7 +612,7 @@ ${orgName}`;
               {/* Information */}
               <View style={styles.memberInfo}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  <Text style={[styles.memberName, { color: colors.foreground }]} numberOfLines={1}>
+                  <Text style={[styles.memberName, { color: colors.foreground }]}>
                     {item.name}
                   </Text>
                   {isCurrentUser && (
@@ -621,7 +621,7 @@ ${orgName}`;
                     </View>
                   )}
                 </View>
-                <Text style={[styles.memberEmail, { color: colors.mutedForeground }]} numberOfLines={1}>
+                <Text style={[styles.memberEmail, { color: colors.mutedForeground }]}>
                   {item.email}
                 </Text>
               </View>

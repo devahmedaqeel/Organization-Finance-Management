@@ -696,7 +696,7 @@ export default function SettingsScreen() {
                             <Text style={[styles.symbolMiniPillText, { color: colors.mutedForeground }]}>{c.symbol}</Text>
                           </View>
                         </View>
-                        <Text style={[styles.currencyRowName, { color: colors.mutedForeground }]} numberOfLines={1}>
+                        <Text style={[styles.currencyRowName, { color: colors.mutedForeground }]}>
                           {c.name} · {c.country}
                         </Text>
                       </View>

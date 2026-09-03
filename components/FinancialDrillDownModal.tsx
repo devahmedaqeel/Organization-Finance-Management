@@ -20,6 +20,7 @@ import {
   getNobInsight,
   getExpenseDistributionInsight,
   computeNetOperatingBalanceHealth,
+  filterTransactionsByPeriod,
 } from "@/services/DatePeriodService";
 import { Transaction, Department } from "@/context/FinanceContext";
 import { Budget } from "@/services/BudgetService";
@@ -116,16 +117,9 @@ export function FinancialDrillDownModal({
 
   // Filtered period transactions for ledger
   const periodTxs = useMemo(() => {
-    const start = new Date(period?.startDate || "2020-01-01");
-    const end = new Date(period?.endDate || "2030-12-31");
-    end.setHours(23, 59, 59, 999);
-
-    return transactions
-      .filter((t) => {
-        const d = new Date(t.date);
-        return d >= start && d <= end;
-      })
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return filterTransactionsByPeriod(transactions, period).sort(
+      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
   }, [transactions, period]);
 
   const expenseTxs = useMemo(() => periodTxs.filter((t) => t.type === "expense"), [periodTxs]);
@@ -223,7 +217,6 @@ export function FinancialDrillDownModal({
                           fontFamily: isSelected ? "Inter_700Bold" : "Inter_600SemiBold",
                         },
                       ]}
-                      numberOfLines={1}
                     >
                       {tab.label}
                     </Text>
@@ -343,7 +336,7 @@ export function FinancialDrillDownModal({
                       </View>
                       <View style={[styles.kpiCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border }]}>
                         <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>TOP COST DRIVER</Text>
-                        <Text style={[styles.kpiVal, { color: colors.primary }]} numberOfLines={1}>
+                        <Text style={[styles.kpiVal, { color: colors.primary }]}>
                           {expenseBreakdown[0]?.category || "None"}
                         </Text>
                       </View>

@@ -52,7 +52,7 @@ export function AllTransactionsModal({ visible, onClose, transactions, onSelectT
     return transactions.filter((t) => {
       const matchSearch =
         !q ||
-        t.title.toLowerCase().includes(q) ||
+        ((t as any).title && (t as any).title.toLowerCase().includes(q)) ||
         (t.category && t.category.toLowerCase().includes(q)) ||
         (t.department && t.department.toLowerCase().includes(q)) ||
         (t.description && t.description.toLowerCase().includes(q)) ||
@@ -108,21 +108,21 @@ export function AllTransactionsModal({ visible, onClose, transactions, onSelectT
           <View style={styles.metricRow}>
             <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>Total Inflows</Text>
-              <Text style={[styles.metricVal, { color: colors.income }]}>+{fmt(totalInflows)}</Text>
+              <Text style={[styles.metricVal, { color: colors.income }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>+{fmt(totalInflows)}</Text>
               <Text style={[styles.metricCount, { color: colors.mutedForeground }]}>
                 {transactions.filter((t) => t.type === "income").length} Records
               </Text>
             </View>
             <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>Total Outflows</Text>
-              <Text style={[styles.metricVal, { color: colors.expense }]}>-{fmt(totalOutflows)}</Text>
+              <Text style={[styles.metricVal, { color: colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>-{fmt(totalOutflows)}</Text>
               <Text style={[styles.metricCount, { color: colors.mutedForeground }]}>
                 {transactions.filter((t) => t.type === "expense").length} Records
               </Text>
             </View>
             <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>Net Ledger</Text>
-              <Text style={[styles.metricVal, { color: netTotal >= 0 ? colors.income : colors.expense }]}>
+              <Text style={[styles.metricVal, { color: netTotal >= 0 ? colors.income : colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                 {netTotal >= 0 ? "+" : ""}{fmt(netTotal)}
               </Text>
               <Text style={[styles.metricCount, { color: colors.mutedForeground }]}>Balance</Text>

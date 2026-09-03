@@ -45,7 +45,12 @@ export function NetOperatingBalanceHealthCard({ data, currency, periodLabel }: P
     setExpanded((prev) => !prev);
   };
 
-  const clampedProgress = Math.max(0, Math.min(100, Math.round(data.operatingMargin)));
+  // Separate financial calculation from 0-100 visual arc representation:
+  // For deficits, represent the deficit severity magnitude (0-100%) in deficit color;
+  // For surplus, represent the operating margin percentage (0-100%) in surplus color.
+  const visualProgress = data.isDeficit
+    ? Math.min(100, Math.max(0, Math.abs(data.operatingMargin)))
+    : Math.min(100, Math.max(0, data.operatingMargin));
 
   return (
     <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -80,7 +85,7 @@ export function NetOperatingBalanceHealthCard({ data, currency, periodLabel }: P
       <View style={styles.mainRow}>
         <View style={styles.ringWrap}>
           <RingProgress
-            percentage={clampedProgress}
+            percentage={visualProgress}
             size={120}
             strokeWidth={10}
             color={data.statusColor}
@@ -139,22 +144,22 @@ export function NetOperatingBalanceHealthCard({ data, currency, periodLabel }: P
       {/* ─── Compact Metrics Bar ─── */}
       <View style={[styles.kpiBar, { backgroundColor: colors.background, borderColor: colors.border }]}>
         <View style={styles.kpiCol}>
-          <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>Operating Margin</Text>
-          <Text style={[styles.kpiNum, { color: data.isDeficit ? colors.expense : colors.income }]}>
+          <Text style={[styles.kpiLabel, { color: colors.mutedForeground, textAlign: "center" }]}>Operating Margin</Text>
+          <Text style={[styles.kpiNum, { color: data.isDeficit ? colors.expense : colors.income }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
             {data.operatingMargin.toFixed(1)}%
           </Text>
         </View>
         <View style={[styles.kpiDivider, { backgroundColor: colors.border }]} />
         <View style={styles.kpiCol}>
-          <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>Expense Ratio</Text>
-          <Text style={[styles.kpiNum, { color: colors.foreground }]}>
+          <Text style={[styles.kpiLabel, { color: colors.mutedForeground, textAlign: "center" }]}>Expense Ratio</Text>
+          <Text style={[styles.kpiNum, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
             {data.expenseRatio.toFixed(1)}%
           </Text>
         </View>
         <View style={[styles.kpiDivider, { backgroundColor: colors.border }]} />
         <View style={styles.kpiCol}>
-          <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>Transactions</Text>
-          <Text style={[styles.kpiNum, { color: colors.foreground }]}>
+          <Text style={[styles.kpiLabel, { color: colors.mutedForeground, textAlign: "center" }]}>Transactions</Text>
+          <Text style={[styles.kpiNum, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
             {data.transactionCount}
           </Text>
         </View>

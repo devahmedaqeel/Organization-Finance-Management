@@ -2,7 +2,7 @@ import { BlurView } from "expo-blur";
 import { Tabs } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import React from "react";
-import { Platform, StyleSheet, View, useColorScheme } from "react-native";
+import { Platform, StyleSheet, Text, View, useColorScheme } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useColors } from "@/hooks/useColors";
@@ -38,11 +38,27 @@ export default function TabLayout() {
           paddingTop: 6,
           paddingBottom: Math.max(safeAreaInsets.bottom, isIOS ? 16 : 8),
         },
-        tabBarLabelStyle: {
-          fontSize: 10.5,
-          fontFamily: "Inter_600SemiBold",
-          marginTop: 2,
+        tabBarItemStyle: {
+          paddingHorizontal: 0,
+          marginHorizontal: 0,
         },
+        tabBarLabel: ({ color, children }) => (
+          <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+            style={{
+              fontSize: 10.5,
+              fontFamily: "Inter_600SemiBold",
+              color,
+              textAlign: "center",
+              marginTop: 2,
+              letterSpacing: -0.2,
+            }}
+          >
+            {children}
+          </Text>
+        ),
         tabBarBackground: () =>
           isIOS ? (
             <BlurView
@@ -61,7 +77,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: isEmployee ? "Portal" : "Dashboard",
-          tabBarIcon: ({ color }) => <Feather name="home" size={22} color={color} />,
+          tabBarIcon: ({ color }) => <Feather name="home" size={20} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -69,14 +85,14 @@ export default function TabLayout() {
         options={{
           title: "Income",
           href: isEmployee ? null : "/income",
-          tabBarIcon: ({ color }) => <Feather name="arrow-up-circle" size={22} color={color} />,
+          tabBarIcon: ({ color }) => <Feather name="arrow-up-circle" size={20} color={color} />,
         }}
       />
       <Tabs.Screen
         name="expenses"
         options={{
           title: isEmployee ? "Claims" : "Expenses",
-          tabBarIcon: ({ color }) => <Feather name="arrow-down-circle" size={22} color={color} />,
+          tabBarIcon: ({ color }) => <Feather name="arrow-down-circle" size={20} color={color} />,
         }}
       />
       <Tabs.Screen
@@ -84,14 +100,14 @@ export default function TabLayout() {
         options={{
           title: "Reports",
           href: isEmployee ? null : "/reports",
-          tabBarIcon: ({ color }) => <Feather name="bar-chart-2" size={22} color={color} />,
+          tabBarIcon: ({ color }) => <Feather name="bar-chart-2" size={20} color={color} />,
         }}
       />
       <Tabs.Screen
         name="more"
         options={{
           title: isEmployee ? "My Slip" : "More",
-          tabBarIcon: ({ color }) => <Feather name={isEmployee ? "file-text" : "more-horizontal"} size={22} color={color} />,
+          tabBarIcon: ({ color }) => <Feather name={isEmployee ? "file-text" : "more-horizontal"} size={20} color={color} />,
         }}
       />
     </Tabs>

@@ -18,7 +18,7 @@ export interface CraftMyPdfResponse {
   error?: string;
 }
 
-const DEFAULT_API_KEY = "7832MjA6MTE6UjlkM3h4emxpTExzeFR0aQ=";
+const DEFAULT_API_KEY = process.env.EXPO_PUBLIC_CRAFTMYPDF_API_KEY || "";
 const API_ENDPOINT = "https://api.craftmypdf.com/v1/create";
 
 /**

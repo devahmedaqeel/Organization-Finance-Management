@@ -201,10 +201,9 @@ export default function ReportsScreen() {
           },
         ]}
       >
-        {/* Row 1: Title & PDF/CSV Export Button */}
         <View style={styles.headerRow}>
-          <View style={styles.headerTitleWrap}>
-            <Text style={[styles.title, { color: colors.foreground }]} numberOfLines={1}>Financial Analytics</Text>
+          <View style={[styles.headerTitleWrap, { flex: 1, marginRight: 8 }]}>
+            <Text style={[styles.title, { color: colors.foreground }]}>Financial Analytics</Text>
             <Text style={[styles.orgText, { color: colors.mutedForeground }]} numberOfLines={1}>
               {settings.organizationName}
             </Text>
@@ -222,13 +221,12 @@ export default function ReportsScreen() {
             activeOpacity={0.75}
           >
             <Feather name="download" size={13} color={colors.primary} />
-            <Text style={[styles.exportBtnText, { color: colors.primary }]} numberOfLines={1}>
+            <Text style={[styles.exportBtnText, { color: colors.primary }]}>
               Export PDF
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* Row 2: Date Period Selector Pill & Quick Preset Pills */}
         <View style={styles.periodRow}>
           <TouchableOpacity
             style={[
@@ -242,7 +240,7 @@ export default function ReportsScreen() {
             activeOpacity={0.75}
           >
             <Feather name="calendar" size={13} color={colors.primary} />
-            <Text style={[styles.periodBtnText, { color: colors.foreground }]} numberOfLines={1}>
+            <Text style={[styles.periodBtnText, { color: colors.foreground }]}>
               {activePeriod.label}
             </Text>
             <Feather name="chevron-down" size={12} color={colors.mutedForeground} />
@@ -288,11 +286,10 @@ export default function ReportsScreen() {
           </ScrollView>
         </View>
 
-        {/* Live Period Metrics KPI Bar */}
         <View style={styles.kpiRow}>
           <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>INCOME</Text>
-            <Text style={[styles.kpiVal, { color: colors.income }]}>
+            <Text style={[styles.kpiVal, { color: colors.income }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
               {settings.currency} {fmt(metrics.totalIncome)}
             </Text>
             <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
@@ -302,7 +299,7 @@ export default function ReportsScreen() {
 
           <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>EXPENSES</Text>
-            <Text style={[styles.kpiVal, { color: colors.expense }]}>
+            <Text style={[styles.kpiVal, { color: colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
               {settings.currency} {fmt(metrics.totalExpense)}
             </Text>
             <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
@@ -312,7 +309,7 @@ export default function ReportsScreen() {
 
           <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>NET SURPLUS</Text>
-            <Text style={[styles.kpiVal, { color: metrics.netBalance >= 0 ? colors.income : colors.expense }]}>
+            <Text style={[styles.kpiVal, { color: metrics.netBalance >= 0 ? colors.income : colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
               {metrics.netBalance >= 0 ? "+" : ""}
               {settings.currency} {fmt(metrics.netBalance)}
             </Text>

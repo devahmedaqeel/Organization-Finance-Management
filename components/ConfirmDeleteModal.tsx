@@ -90,12 +90,12 @@ export function ConfirmDeleteModal({
                 >
                   <View style={{ flex: 1, gap: 2 }}>
                     {itemName ? (
-                      <Text style={[styles.entityName, { color: colors.foreground }]} numberOfLines={1}>
+                      <Text style={[styles.entityName, { color: colors.foreground }]}>
                         {itemName}
                       </Text>
                     ) : null}
                     {itemDetails ? (
-                      <Text style={[styles.entityDetails, { color: colors.mutedForeground }]} numberOfLines={1}>
+                      <Text style={[styles.entityDetails, { color: colors.mutedForeground }]}>
                         {itemDetails}
                       </Text>
                     ) : null}

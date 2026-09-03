@@ -80,7 +80,7 @@ export default function IncomeScreen() {
           <View style={styles.headerRight}>
             <View style={[styles.totalBadge, { backgroundColor: colors.income + "22" }]}>
               <Feather name="trending-up" size={12} color={colors.income} />
-              <Text style={[styles.totalText, { color: colors.income }]}>{formatAmt(total)}</Text>
+              <Text style={[styles.totalText, { color: colors.income }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{formatAmt(total)}</Text>
             </View>
             {canEdit && (
               <TouchableOpacity

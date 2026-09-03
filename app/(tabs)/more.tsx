@@ -240,19 +240,19 @@ export default function MoreScreen() {
         </View>
         <View style={styles.profileInfo}>
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-            <Text style={[styles.profileName, { color: colors.foreground }]} numberOfLines={1}>
+            <Text style={[styles.profileName, { color: colors.foreground }]}>
               {user?.name || "Administrator"}
             </Text>
             <View style={[styles.rolePill, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "35" }]}>
               <Text style={[styles.roleText, { color: colors.primary }]}>{user?.role?.toUpperCase() || "ADMIN"}</Text>
             </View>
           </View>
-          <Text style={[styles.profileEmail, { color: colors.mutedForeground }]} numberOfLines={1}>
+          <Text style={[styles.profileEmail, { color: colors.mutedForeground }]}>
             {user?.email || "admin@ofm.com"}
           </Text>
           <View style={styles.orgRow}>
             <Text style={{ fontSize: 13 }}>{selectedCurrency?.flag ?? "🌐"}</Text>
-            <Text style={[styles.profileOrg, { color: colors.mutedForeground }]} numberOfLines={1}>
+            <Text style={[styles.profileOrg, { color: colors.mutedForeground }]}>
               {settings.organizationName || "Organization"}
             </Text>
           </View>
@@ -284,7 +284,7 @@ export default function MoreScreen() {
               <Feather name="arrow-up-right" size={14} color={colors.mutedForeground} style={{ opacity: 0.5 }} />
             </View>
             <Text style={[styles.featureLabel, { color: colors.foreground }]}>{f.label}</Text>
-            <Text style={[styles.featureDesc, { color: colors.mutedForeground }]} numberOfLines={1}>
+            <Text style={[styles.featureDesc, { color: colors.mutedForeground }]}>
               {f.desc}
             </Text>
           </TouchableOpacity>
@@ -318,7 +318,7 @@ export default function MoreScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.summaryLabel, { color: colors.foreground }]}>{stat.label}</Text>
-                  <Text style={[styles.summarySub, { color: colors.mutedForeground }]} numberOfLines={1}>
+                  <Text style={[styles.summarySub, { color: colors.mutedForeground }]}>
                     {stat.sub}
                   </Text>
                 </View>

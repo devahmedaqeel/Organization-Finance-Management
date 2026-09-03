@@ -55,12 +55,12 @@ export function calculateFinancialHealth(
   const currentMetrics = computePeriodMetrics(transactions, currentPeriod);
   const prevMetrics = previousPeriod ? computePeriodMetrics(transactions, previousPeriod) : null;
 
-  const income = currentMetrics.totalIncome;
-  const expense = currentMetrics.totalExpenses;
-  const net = currentMetrics.netBalance;
+  const income = currentMetrics.totalIncome || 0;
+  const expense = currentMetrics.totalExpense || 0;
+  const net = currentMetrics.netBalance || 0;
 
-  const prevIncome = prevMetrics ? prevMetrics.totalIncome : 0;
-  const prevExpense = prevMetrics ? prevMetrics.totalExpenses : 0;
+  const prevIncome = prevMetrics ? (prevMetrics.totalIncome || 0) : 0;
+  const prevExpense = prevMetrics ? (prevMetrics.totalExpense || 0) : 0;
 
   // 1. Operating Margin (30% weight)
   const marginPct = income > 0 ? (net / income) * 100 : (net >= 0 ? 0 : -100);

@@ -208,7 +208,7 @@ export default function DepartmentsScreen() {
           </TouchableOpacity>
           <View style={styles.headerTitleWrap}>
             <Text style={[styles.headerTitle, { color: colors.foreground }]}>Monitored Departments</Text>
-            <Text style={[styles.headerSub, { color: colors.mutedForeground }]} numberOfLines={1}>
+            <Text style={[styles.headerSub, { color: colors.mutedForeground }]}>
               {settings.organizationName || "Organization Finance Management"} · {departments.length} Units
             </Text>
           </View>
@@ -256,7 +256,7 @@ export default function DepartmentsScreen() {
                   <Feather name="pie-chart" size={15} color="#38BDF8" />
                 </View>
                 <View style={styles.statContentWrap}>
-                  <Text style={[styles.statVal, { color: colors.foreground }]} numberOfLines={1}>
+                  <Text style={[styles.statVal, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                     {fmt(totalAllocated)}
                   </Text>
                   <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Total Budget</Text>
@@ -269,7 +269,7 @@ export default function DepartmentsScreen() {
                   <Feather name="activity" size={15} color={overallBurnRate > 90 ? colors.expense : colors.income} />
                 </View>
                 <View style={styles.statContentWrap}>
-                  <Text style={[styles.statVal, { color: overallBurnRate > 90 ? colors.expense : colors.income }]} numberOfLines={1}>
+                  <Text style={[styles.statVal, { color: overallBurnRate > 90 ? colors.expense : colors.income }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                     {fmt(totalSpent)}
                   </Text>
                   <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>

@@ -74,8 +74,8 @@ export function RingProgress({
     };
   }, [clampedPct, showAnimation]);
 
-  // Ensure tiny percentages (e.g. 0.1%) have a clean visible arc, while 0% is completely empty
-  const visualPct = displayPct > 0 && displayPct < 1.2 ? 1.2 : displayPct;
+  // Exact mathematical percentage mapping: 0% is strictly empty, non-zero follows exact value
+  const visualPct = displayPct;
   const offset = circumference - (circumference * Math.min(Math.max(visualPct, 0), 100)) / 100;
 
   const ringColor =
@@ -167,7 +167,7 @@ export function RingProgress({
           numberOfLines={1}
           adjustsFontSizeToFit
         >
-          {centerLabel ? centerLabel : `${displayPct}%`}
+          {centerLabel ? centerLabel : `${rawPct < 0 ? rawPct : displayPct}%`}
         </Text>
         <Text
           style={[

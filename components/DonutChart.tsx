@@ -149,7 +149,8 @@ export function DonutChart({
   const center = size / 2;
   const outerRadius = size / 2 - 3;
   const innerRadius = outerRadius - strokeWidth;
-  const total = segments.reduce((s, seg) => s + seg.value, 0) || 1;
+  const total = segments.reduce((s, seg) => s + (seg.value || 0), 0);
+  const safeTotal = total > 0 ? total : 1;
 
   // Typography mathematically proportional to donut diameter
   const amountFontSize = Math.max(13, Math.min(16, Math.round(size * 0.105)));
@@ -176,7 +177,7 @@ export function DonutChart({
   const sliceList: typeof computedSlices.current = [];
 
   segments.forEach((seg, i) => {
-    const pct = seg.value / total;
+    const pct = total > 0 ? seg.value / safeTotal : 0;
     if (pct <= 0.001) return;
 
     const span = pct * 360;
@@ -358,7 +359,7 @@ export function DonutChart({
                     ]}
                     numberOfLines={1}
                   >
-                    {((activeSegment.value / total) * 100).toFixed(1)}% of total
+                    {total > 0 ? ((activeSegment.value / safeTotal) * 100).toFixed(1) : "0.0"}% of total
                   </Text>
                 </View>
               </Animated.View>
@@ -420,7 +421,6 @@ export function DonutChart({
                           fontFamily: isSelected ? "Inter_700Bold" : "Inter_500Medium",
                         },
                       ]}
-                      numberOfLines={1}
                     >
                       {seg.label}
                     </Text>
@@ -501,7 +501,6 @@ export function DonutChart({
                     { color: isSelected ? "#FFFFFF" : colors.foreground },
                     isSelected && { fontFamily: "Inter_700Bold" },
                   ]}
-                  numberOfLines={1}
                 >
                   {seg.label}
                 </Text>

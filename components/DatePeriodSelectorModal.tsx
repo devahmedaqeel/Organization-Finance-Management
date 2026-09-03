@@ -595,7 +595,7 @@ export function DatePeriodSelectorModal({
             <View style={[styles.summaryBanner, { backgroundColor: colors.cardAlt ?? colors.muted, borderColor: colors.border }]}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                 <SvgCheck size={15} color={colors.primary} />
-                <Text style={[styles.summaryLabelTitle, { color: colors.foreground }]} numberOfLines={1}>
+                <Text style={[styles.summaryLabelTitle, { color: colors.foreground }]}>
                   {draftPeriod.label}
                 </Text>
               </View>

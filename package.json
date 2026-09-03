@@ -10,6 +10,8 @@
     "web": "expo start --web",
     "build:apk": "eas build -p android --profile preview",
     "build:aab": "eas build -p android --profile production",
+    "build:web": "expo export -p web",
+    "deploy:hosting": "expo export -p web && firebase deploy --only hosting",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

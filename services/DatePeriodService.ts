@@ -21,6 +21,7 @@ export interface PeriodMetrics {
   recordCount: number;
   totalIncome: number;
   totalExpense: number;
+  totalExpenses: number;
   netBalance: number;
   savingsRate: number;
 }
@@ -268,8 +269,13 @@ export function filterTransactionsByPeriod(
   period: NormalizedPeriod
 ): Transaction[] {
   if (!transactions || transactions.length === 0) return [];
+  if (!period || !period.startDate || !period.endDate) return transactions;
   const { startDate, endDate } = period;
-  return transactions.filter((t) => t.date >= startDate && t.date <= endDate);
+  return transactions.filter((t) => {
+    if (!t || !t.date) return false;
+    const txDate = t.date.slice(0, 10);
+    return txDate >= startDate && txDate <= endDate;
+  });
 }
 
 export function computePeriodMetrics(
@@ -299,6 +305,7 @@ export function computePeriodMetrics(
     recordCount: filtered.length,
     totalIncome,
     totalExpense,
+    totalExpenses: totalExpense,
     netBalance,
     savingsRate,
   };
@@ -332,8 +339,12 @@ export function computeNetOperatingBalanceHealth(
   const operatingExpenses = expenseTxs.reduce((s, t) => s + t.amount, 0);
   const netOperatingBalance = totalIncome - operatingExpenses;
 
-  const operatingMargin = totalIncome > 0 ? (netOperatingBalance / totalIncome) * 100 : 0;
-  const expenseRatio = totalIncome > 0 ? (operatingExpenses / totalIncome) * 100 : (operatingExpenses > 0 ? 100 : 0);
+  const operatingMargin = totalIncome > 0
+    ? (netOperatingBalance / totalIncome) * 100
+    : (operatingExpenses > 0 ? -100 : 0);
+  const expenseRatio = totalIncome > 0
+    ? (operatingExpenses / totalIncome) * 100
+    : (operatingExpenses > 0 ? 100 : 0);
 
   const isDeficit = netOperatingBalance < 0;
   let status: "healthy" | "watch" | "critical" = "healthy";
@@ -370,7 +381,7 @@ export function computeNetOperatingBalanceHealth(
     .map(([category, data]) => ({
       category,
       amount: data.amount,
-      pct: totalIncome > 0 ? (data.amount / totalIncome) * 100 : 0,
+      pct: totalIncome > 0 ? Number(((data.amount / totalIncome) * 100).toFixed(1)) : 0,
       count: data.count,
     }))
     .sort((a, b) => b.amount - a.amount);
@@ -387,7 +398,7 @@ export function computeNetOperatingBalanceHealth(
     .map(([category, data]) => ({
       category,
       amount: data.amount,
-      pct: operatingExpenses > 0 ? (data.amount / operatingExpenses) * 100 : 0,
+      pct: operatingExpenses > 0 ? Number(((data.amount / operatingExpenses) * 100).toFixed(1)) : 0,
       count: data.count,
     }))
     .sort((a, b) => b.amount - a.amount);
@@ -523,10 +534,11 @@ export function aggregateTransactionsByGranularity(
 
     const dayMap: Record<string, { inc: number; exp: number; count: number }> = {};
     filtered.forEach((t) => {
-      if (!dayMap[t.date]) dayMap[t.date] = { inc: 0, exp: 0, count: 0 };
-      if (t.type === "income") dayMap[t.date].inc += t.amount;
-      else if (t.type === "expense") dayMap[t.date].exp += t.amount;
-      dayMap[t.date].count += 1;
+      const dKey = (t.date || "").slice(0, 10);
+      if (!dayMap[dKey]) dayMap[dKey] = { inc: 0, exp: 0, count: 0 };
+      if (t.type === "income") dayMap[dKey].inc += t.amount;
+      else if (t.type === "expense") dayMap[dKey].exp += t.amount;
+      dayMap[dKey].count += 1;
     });
 
     const points: AggregatedPoint[] = [];
@@ -576,7 +588,10 @@ export function aggregateTransactionsByGranularity(
       const sYMD = formatYMD(wStart);
       const eYMD = formatYMD(wEnd);
 
-      const weekTxs = filtered.filter((t) => t.date >= sYMD && t.date <= eYMD);
+      const weekTxs = filtered.filter((t) => {
+        const dKey = (t.date || "").slice(0, 10);
+        return dKey >= sYMD && dKey <= eYMD;
+      });
       const inc = weekTxs.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
       const exp = weekTxs.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
 
@@ -597,21 +612,14 @@ export function aggregateTransactionsByGranularity(
 
   // ─── 3. MONTH VIEW (Accurate monthly sum of real transactions) ───
   if (granularity === "month") {
-    let sYear = start.getFullYear();
-    let eYear = end.getFullYear();
-    let sMonth = start.getMonth();
-    let eMonth = end.getMonth();
-
-    const spanMonths = (eYear - sYear) * 12 + (eMonth - sMonth) + 1;
-    if (spanMonths < 6) {
-      const expandedStart = new Date(eYear, eMonth - 5, 1);
-      sYear = expandedStart.getFullYear();
-      sMonth = expandedStart.getMonth();
-    }
+    const sYear = start.getFullYear();
+    const eYear = end.getFullYear();
+    const sMonth = start.getMonth();
+    const eMonth = end.getMonth();
 
     const monthMap: Record<string, { inc: number; exp: number; count: number }> = {};
     filtered.forEach((t) => {
-      const ym = t.date.substring(0, 7);
+      const ym = (t.date || "").slice(0, 7);
       if (!monthMap[ym]) monthMap[ym] = { inc: 0, exp: 0, count: 0 };
       if (t.type === "income") monthMap[ym].inc += t.amount;
       else if (t.type === "expense") monthMap[ym].exp += t.amount;

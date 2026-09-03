@@ -21,8 +21,8 @@ export function StatCard({ label, value, icon, color, subtitle, flex = 1 }: Stat
       <View style={[styles.iconWrap, { backgroundColor: accentColor + "22" }]}>
         <Feather name={icon} size={18} color={accentColor} />
       </View>
-      <Text style={[styles.label, { color: colors.mutedForeground }]} numberOfLines={1}>{label}</Text>
-      <Text style={[styles.value, { color: colors.foreground }]} numberOfLines={1}>{value}</Text>
+      <Text style={[styles.label, { color: colors.mutedForeground }]}>{label}</Text>
+      <Text style={[styles.value, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{value}</Text>
       {subtitle ? <Text style={[styles.subtitle, { color: accentColor }]}>{subtitle}</Text> : null}
     </View>
   );

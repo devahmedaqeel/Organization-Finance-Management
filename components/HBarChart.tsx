@@ -57,11 +57,11 @@ function AnimatedBarRow({
   return (
     <View style={styles.row}>
       <View style={[styles.labelCol, { width: labelWidth }]}>
-        <Text style={[styles.label, { color: colors.foreground }]} numberOfLines={1}>
+        <Text style={[styles.label, { color: colors.foreground }]}>
           {item.label}
         </Text>
         {item.sublabel ? (
-          <Text style={[styles.sublabel, { color: colors.mutedForeground }]} numberOfLines={1}>
+          <Text style={[styles.sublabel, { color: colors.mutedForeground }]}>
             {item.sublabel}
           </Text>
         ) : null}
@@ -81,7 +81,7 @@ function AnimatedBarRow({
         </View>
       </View>
 
-      <Text style={[styles.value, { color: item.color }]} numberOfLines={1}>
+      <Text style={[styles.value, { color: item.color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
         {formatValue(item.value)}
       </Text>
     </View>

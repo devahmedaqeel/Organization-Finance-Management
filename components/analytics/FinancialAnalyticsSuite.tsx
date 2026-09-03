@@ -126,7 +126,7 @@ export function FinancialAnalyticsSuite({
           {/* Contextual Status Strip */}
           <View style={[styles.statusStrip, { backgroundColor: budget.statusColor + "14", borderColor: budget.statusColor + "30" }]}>
             <View style={[styles.statusDot, { backgroundColor: budget.statusColor }]} />
-            <Text style={[styles.statusStripText, { color: budget.statusColor }]} numberOfLines={1}>
+            <Text style={[styles.statusStripText, { color: budget.statusColor }]}>
               {budget.statusLabel} · {budget.remainingText}
             </Text>
           </View>
@@ -243,7 +243,7 @@ export function FinancialAnalyticsSuite({
             <View style={[styles.bentoDivider, { backgroundColor: colors.border }]} />
             <View style={styles.bentoCol}>
               <Text style={[styles.bentoLabel, { color: colors.mutedForeground }]}>ALLOCATED</Text>
-              <Text style={[styles.bentoVal, { color: budget.isValid ? colors.foreground : colors.mutedForeground }]} numberOfLines={1}>
+              <Text style={[styles.bentoVal, { color: budget.isValid ? colors.foreground : colors.mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                 {budget.isValid ? formatCompactCurrency(budget.totalAllocated, currency) : "Not Set"}
               </Text>
             </View>
@@ -264,6 +264,8 @@ export function FinancialAnalyticsSuite({
                   },
                 ]}
                 numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.75}
               >
                 {budget.isValid
                   ? budget.isOverBudget
@@ -326,7 +328,7 @@ export function FinancialAnalyticsSuite({
           {/* Contextual Status Strip with Trend */}
           <View style={[styles.statusStrip, { backgroundColor: margin.statusColor + "14", borderColor: margin.statusColor + "30" }]}>
             <View style={[styles.statusDot, { backgroundColor: margin.statusColor }]} />
-            <Text style={[styles.statusStripText, { color: margin.statusColor, flex: 1 }]} numberOfLines={1}>
+            <Text style={[styles.statusStripText, { color: margin.statusColor, flex: 1 }]}>
               {margin.explanationText}
             </Text>
             {margin.marginChangeVsPrevious !== null && margin.marginChangeVsPrevious !== undefined && (
@@ -376,7 +378,7 @@ export function FinancialAnalyticsSuite({
                 sublabel = `-${formatCompactCurrency(expenses, currency)}`;
               } else if (marginMode === "net") {
                 activePct = isLoss
-                  ? Math.min(98.5, Math.max(5, deficitSharePct))
+                  ? Math.min(100, Math.max(0, deficitSharePct))
                   : Math.min(100, Math.max(0, margin.rawMarginPct));
                 ringColor = isLoss ? colors.expense : colors.income;
                 centerLabel = `${isLoss ? "-" : "+"}${formatCompactCurrency(Math.abs(income), currency)}`;
@@ -391,12 +393,7 @@ export function FinancialAnalyticsSuite({
                   label = expenses > 0 ? "Zero Income" : "No Activity";
                   sublabel = expenses > 0 ? `-${formatCompactCurrency(expenses, currency)}` : "PKR 0";
                 } else if (isLoss) {
-                  // If moderate loss (within -100%), show proportional arc
-                  // If extreme deficit (e.g. -4920%), show 98% deficit arc so it is NOT a fake solid 100% circle
-                  activePct =
-                    Math.abs(margin.rawMarginPct) <= 100
-                      ? Math.min(100, Math.max(0, Math.abs(margin.rawMarginPct)))
-                      : Math.min(98.5, Math.max(5, deficitSharePct));
+                  activePct = Math.min(100, Math.max(0, Math.abs(margin.rawMarginPct)));
                   ringColor = colors.expense;
                   centerLabel = margin.displayMargin;
                   label = "Operating Loss";
@@ -530,14 +527,14 @@ export function FinancialAnalyticsSuite({
           <View style={[styles.bentoRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
             <View style={styles.bentoCol}>
               <Text style={[styles.bentoLabel, { color: colors.mutedForeground }]}>INCOME</Text>
-              <Text style={[styles.bentoVal, { color: colors.income }]} numberOfLines={1}>
+              <Text style={[styles.bentoVal, { color: colors.income }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                 +{formatCompactCurrency(margin.operatingRevenue, currency)}
               </Text>
             </View>
             <View style={[styles.bentoDivider, { backgroundColor: colors.border }]} />
             <View style={styles.bentoCol}>
               <Text style={[styles.bentoLabel, { color: colors.mutedForeground }]}>EXPENSES</Text>
-              <Text style={[styles.bentoVal, { color: colors.expense }]} numberOfLines={1}>
+              <Text style={[styles.bentoVal, { color: colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                 -{formatCompactCurrency(margin.operatingExpenses, currency)}
               </Text>
             </View>
@@ -552,6 +549,8 @@ export function FinancialAnalyticsSuite({
                   { color: margin.isLoss ? colors.expense : colors.income },
                 ]}
                 numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.75}
               >
                 {margin.isLoss ? "-" : "+"}
                 {formatCompactCurrency(Math.abs(margin.operatingIncome), currency)}
@@ -686,7 +685,6 @@ export function FinancialAnalyticsSuite({
                           fontFamily: isSelected ? "Inter_700Bold" : "Inter_600SemiBold",
                         },
                       ]}
-                      numberOfLines={1}
                     >
                       {cat.category}
                     </Text>
@@ -954,6 +952,7 @@ const styles = StyleSheet.create({
   rankedCatName: {
     fontSize: 11.5,
     fontFamily: "Inter_600SemiBold",
+    flex: 1,
   },
   rankedRight: {
     flexDirection: "row",

@@ -97,8 +97,8 @@ export function NetBalanceBreakdownModal({
 
   const isSurplus = netBalance >= 0;
   const statusColor = isSurplus ? colors.income : colors.expense;
-  const marginPct = totalIncome > 0 ? (netBalance / totalIncome) * 100 : 0;
-  const expenseRatio = totalIncome > 0 ? (totalExpenses / totalIncome) * 100 : 0;
+  const marginPct = totalIncome > 0 ? (netBalance / totalIncome) * 100 : (netBalance >= 0 ? 0 : -100);
+  const expenseRatio = totalIncome > 0 ? (totalExpenses / totalIncome) * 100 : (totalExpenses > 0 ? 100 : 0);
   const coverageRatio = totalExpenses > 0 ? totalIncome / totalExpenses : totalIncome > 0 ? 99 : 0;
 
   // Month-over-Month (MoM) Financial Data Aggregation & Chart Points

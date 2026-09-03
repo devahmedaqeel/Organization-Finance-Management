@@ -598,7 +598,7 @@ export default function AIInsightsScreen() {
               { label: "Remaining", value: `${settings.currency} ${fmt(Math.max(budgets.reduce((s, b) => s + b.allocated - (b.spent ?? 0), 0), 0))}`, color: colors.income },
             ].map((s, i) => (
               <View key={i} style={[styles.budgetSumCard, { backgroundColor: s.color + "15", borderColor: s.color + "33" }]}>
-                <Text style={[styles.budgetSumValue, { color: s.color }]} numberOfLines={1}>{s.value}</Text>
+                <Text style={[styles.budgetSumValue, { color: s.color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{s.value}</Text>
                 <Text style={[styles.budgetSumLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
               </View>
             ))}

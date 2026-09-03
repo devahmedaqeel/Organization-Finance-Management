@@ -14,6 +14,7 @@ import {
   AggregatedPoint,
   parseYMD,
   formatReadableDate,
+  calculateIntelligentGranularity,
 } from "./DatePeriodService";
 import {
   calculateTotalIncome,
@@ -285,7 +286,8 @@ export function buildEnterpriseReportData(
     if (t.status === "failed") return false;
 
     // Date range filter
-    if (t.date < startDate || t.date > endDate) return false;
+    const txDate = t.date.slice(0, 10);
+    if (txDate < startDate || txDate > endDate) return false;
 
     // Department filter
     if (filters.departmentFilter && filters.departmentFilter !== "all") {
@@ -429,7 +431,7 @@ export function buildEnterpriseReportData(
   const revenueByCategory: CategorySummaryItem[] = Object.entries(revCatMap).map(([category, v], idx) => ({
     category,
     amount: v.amount,
-    pct: totalRevenue > 0 ? Math.round((v.amount / totalRevenue) * 100) : 0,
+    pct: totalRevenue > 0 ? Number(((v.amount / totalRevenue) * 100).toFixed(1)) : 0,
     count: v.count,
     color: CATEGORY_COLORS[idx % CATEGORY_COLORS.length],
   })).sort((a, b) => b.amount - a.amount);
@@ -459,7 +461,7 @@ export function buildEnterpriseReportData(
   const expenseByCategory: CategorySummaryItem[] = Object.entries(expCatMap).map(([category, v], idx) => ({
     category,
     amount: v.amount,
-    pct: totalExpenses > 0 ? Math.round((v.amount / totalExpenses) * 100) : 0,
+    pct: totalExpenses > 0 ? Number(((v.amount / totalExpenses) * 100).toFixed(1)) : 0,
     count: v.count,
     color: CATEGORY_COLORS[idx % CATEGORY_COLORS.length],
   })).sort((a, b) => b.amount - a.amount);
@@ -614,20 +616,27 @@ export function buildEnterpriseReportData(
   });
 
   // 13. Monthly Trend Aggregation
+  const intelligentGranularity = filters.period?.userGranularityOverride ||
+    filters.period?.granularity ||
+    calculateIntelligentGranularity(startDate, endDate);
+
+  const effectivePeriod: NormalizedPeriod = filters.period || {
+    startDate,
+    endDate,
+    label: periodLabel,
+    mode: isAllTime ? "presets" : "days",
+    granularity: intelligentGranularity,
+  };
+
   const chartPoints = aggregateTransactionsByGranularity(
     scopedTransactions,
-    filters.period || {
-      startDate,
-      endDate,
-      label: periodLabel,
-      mode: "presets",
-      granularity: "month",
-    }
+    effectivePeriod,
+    intelligentGranularity
   );
 
   const monthlySummaries: MonthlyFinancialSummaryItem[] = chartPoints.map((cp) => {
     const nob = cp.income - cp.expense;
-    const margin = cp.income > 0 ? (nob / cp.income) * 100 : 0;
+    const margin = cp.income > 0 ? (nob / cp.income) * 100 : (cp.expense > 0 ? -100 : 0);
     return {
       monthKey: cp.key,
       monthLabel: cp.label,

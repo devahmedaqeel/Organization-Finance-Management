@@ -106,7 +106,7 @@ export function FinancialStatementViewerModal({
   const printDate = now.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
   const printTime = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
   const isNetPositive = netBalance >= 0;
-  const profitMargin = totalIncome > 0 ? (netBalance / totalIncome) * 100 : 0;
+  const profitMargin = totalIncome > 0 ? (netBalance / totalIncome) * 100 : (netBalance >= 0 ? 0 : -100);
   const coverageRatio = totalExpenses > 0 ? totalIncome / totalExpenses : totalIncome > 0 ? 99 : 0;
 
   // Category aggregation
@@ -299,9 +299,9 @@ export function FinancialStatementViewerModal({
                     />
                   ) : null}
                   <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={styles.formalOrgTitle} numberOfLines={1}>{organizationName}</Text>
-                    <Text style={styles.formalDocSubtitle} numberOfLines={1}>AUDITED COMPREHENSIVE FINANCIAL STATEMENT</Text>
-                    <Text style={styles.formalDocStandard} numberOfLines={1}>Standard Accounting Principles (GAAP/IFRS)</Text>
+                    <Text style={styles.formalOrgTitle}>{organizationName}</Text>
+                    <Text style={styles.formalDocSubtitle}>AUDITED COMPREHENSIVE FINANCIAL STATEMENT</Text>
+                    <Text style={styles.formalDocStandard}>Standard Accounting Principles (GAAP/IFRS)</Text>
                   </View>
                 </View>
                 <View style={styles.sealBadge}>
@@ -313,24 +313,24 @@ export function FinancialStatementViewerModal({
               {/* Meta Data Strip (Fixed 2-Column Responsive Layout) */}
               <View style={styles.metaDataStrip}>
                 <View style={styles.metaCol}>
-                  <Text style={styles.metaLabel} numberOfLines={1}>REF CODE</Text>
-                  <Text style={styles.metaVal} numberOfLines={1}>OFM-{fiscalYear.replace(/[^0-9]/g, "")}-{(transactions.length * 19).toString(16).toUpperCase()}</Text>
+                  <Text style={styles.metaLabel}>REF CODE</Text>
+                  <Text style={styles.metaVal}>OFM-{fiscalYear.replace(/[^0-9]/g, "")}-{(transactions.length * 19).toString(16).toUpperCase()}</Text>
                 </View>
                 <View style={styles.metaCol}>
-                  <Text style={styles.metaLabel} numberOfLines={1}>FISCAL SCOPE</Text>
-                  <Text style={styles.metaVal} numberOfLines={1}>{periodLabel} (FY {fiscalYear})</Text>
+                  <Text style={styles.metaLabel}>FISCAL SCOPE</Text>
+                  <Text style={styles.metaVal}>{periodLabel} (FY {fiscalYear})</Text>
                 </View>
                 <View style={styles.metaCol}>
-                  <Text style={styles.metaLabel} numberOfLines={1}>CURRENCY</Text>
-                  <Text style={styles.metaVal} numberOfLines={1}>{currency} (Standard)</Text>
+                  <Text style={styles.metaLabel}>CURRENCY</Text>
+                  <Text style={styles.metaVal}>{currency} (Standard)</Text>
                 </View>
                 <View style={styles.metaCol}>
-                  <Text style={styles.metaLabel} numberOfLines={1}>CONTROLLER</Text>
-                  <Text style={styles.metaVal} numberOfLines={1}>{generatedBy}</Text>
+                  <Text style={styles.metaLabel}>CONTROLLER</Text>
+                  <Text style={styles.metaVal}>{generatedBy}</Text>
                 </View>
                 <View style={[styles.metaCol, { width: "100%" }]}>
-                  <Text style={styles.metaLabel} numberOfLines={1}>AUDIT STAMP</Text>
-                  <Text style={styles.metaVal} numberOfLines={1}>{printDate} at {printTime}</Text>
+                  <Text style={styles.metaLabel}>AUDIT STAMP</Text>
+                  <Text style={styles.metaVal}>{printDate} at {printTime}</Text>
                 </View>
               </View>
             </View>
@@ -339,31 +339,31 @@ export function FinancialStatementViewerModal({
             {includeSummary && (
               <View style={styles.executiveMatrix}>
                 <View style={styles.matrixBox}>
-                  <Text style={styles.matrixLabel} numberOfLines={1}>GROSS REVENUES</Text>
-                  <Text style={[styles.matrixVal, { color: "#10B981" }]} numberOfLines={1}>+{currency} {fmtShort(totalIncome)}</Text>
-                  <Text style={styles.matrixSub} numberOfLines={1}>{transactions.filter(t => t.type === "income").length} Deposits</Text>
+                  <Text style={styles.matrixLabel}>GROSS REVENUES</Text>
+                  <Text style={[styles.matrixVal, { color: "#10B981" }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>+{currency} {fmtShort(totalIncome)}</Text>
+                  <Text style={styles.matrixSub}>{transactions.filter(t => t.type === "income").length} Deposits</Text>
                 </View>
 
                 <View style={styles.matrixBox}>
-                  <Text style={styles.matrixLabel} numberOfLines={1}>TOTAL EXPENSES</Text>
-                  <Text style={[styles.matrixVal, { color: "#E11D48" }]} numberOfLines={1}>-{currency} {fmtShort(totalExpenses)}</Text>
-                  <Text style={styles.matrixSub} numberOfLines={1}>{transactions.filter(t => t.type === "expense").length} Outflows</Text>
+                  <Text style={styles.matrixLabel}>TOTAL EXPENSES</Text>
+                  <Text style={[styles.matrixVal, { color: "#E11D48" }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>-{currency} {fmtShort(totalExpenses)}</Text>
+                  <Text style={styles.matrixSub}>{transactions.filter(t => t.type === "expense").length} Outflows</Text>
                 </View>
 
                 <View style={styles.matrixBox}>
-                  <Text style={styles.matrixLabel} numberOfLines={1}>NET POSITION</Text>
-                  <Text style={[styles.matrixVal, { color: isNetPositive ? "#10B981" : "#E11D48" }]} numberOfLines={1}>
+                  <Text style={styles.matrixLabel}>NET POSITION</Text>
+                  <Text style={[styles.matrixVal, { color: isNetPositive ? "#10B981" : "#E11D48" }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                     {isNetPositive ? "+" : "-"}{currency} {fmtShort(Math.abs(netBalance))}
                   </Text>
-                  <Text style={styles.matrixSub} numberOfLines={1}>{isNetPositive ? "Surplus Buffer" : "Deficit Drain"}</Text>
+                  <Text style={styles.matrixSub}>{isNetPositive ? "Surplus Buffer" : "Deficit Drain"}</Text>
                 </View>
 
                 <View style={styles.matrixBox}>
-                  <Text style={styles.matrixLabel} numberOfLines={1}>PROFIT MARGIN</Text>
-                  <Text style={[styles.matrixVal, { color: profitMargin >= 0 ? "#10B981" : "#E11D48" }]} numberOfLines={1}>
+                  <Text style={styles.matrixLabel}>PROFIT MARGIN</Text>
+                  <Text style={[styles.matrixVal, { color: profitMargin >= 0 ? "#10B981" : "#E11D48" }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                     {profitMargin.toFixed(1)}%
                   </Text>
-                  <Text style={styles.matrixSub} numberOfLines={1}>{coverageRatio >= 90 ? "99x" : `${coverageRatio.toFixed(1)}x`} Coverage</Text>
+                  <Text style={styles.matrixSub}>{coverageRatio >= 90 ? "99x" : `${coverageRatio.toFixed(1)}x`} Coverage</Text>
                 </View>
               </View>
             )}

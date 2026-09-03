@@ -197,15 +197,14 @@ export function filterTransactionsByPeriod(
   transactions: Transaction[],
   period?: NormalizedPeriod
 ): Transaction[] {
-  if (!period) return transactions;
-  const start = new Date(period.startDate);
-  const end = new Date(period.endDate);
-  end.setHours(23, 59, 59, 999);
+  if (!transactions || transactions.length === 0) return [];
+  if (!period || !period.startDate || !period.endDate) return transactions;
+  const { startDate, endDate } = period;
 
   return transactions.filter((t) => {
-    if (!t.date) return false;
-    const d = new Date(t.date);
-    return d >= start && d <= end;
+    if (!t || !t.date) return false;
+    const txDate = t.date.slice(0, 10);
+    return txDate >= startDate && txDate <= endDate;
   });
 }
 

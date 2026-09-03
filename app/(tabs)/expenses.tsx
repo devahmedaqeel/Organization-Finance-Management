@@ -172,7 +172,7 @@ export default function ExpensesScreen() {
                   return (
                     <View key={cat.name} style={styles.catBarItem}>
                       <View style={styles.catBarHeader}>
-                        <Text style={[styles.catBarName, { color: colors.foreground }]} numberOfLines={1}>
+                        <Text style={[styles.catBarName, { color: colors.foreground, flex: 1, marginRight: 8 }]}>
                           {cat.name}
                         </Text>
                         <Text style={[styles.catBarAmount, { color: colors.mutedForeground }]}>
@@ -184,7 +184,7 @@ export default function ExpensesScreen() {
                           style={[
                             styles.catBarFill,
                             {
-                              width: `${Math.min(Math.max(pct, 4), 100)}%`,
+                              width: `${pct > 0 ? Math.min(Math.max(pct, 2), 100) : 0}%`,
                               backgroundColor: EXPENSE_BAR_COLORS[i % EXPENSE_BAR_COLORS.length],
                             },
                           ]}

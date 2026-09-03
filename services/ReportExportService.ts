@@ -119,7 +119,17 @@ function normalizeToEnterpriseData(input: ReportOptions | EnterpriseReportData):
     opts.payroll || [],
     opts.departments || [],
     {
-      scope: "period",
+      scope: (opts.startDate && opts.endDate) ? "period" : "all",
+      period: (opts.startDate && opts.endDate)
+        ? {
+            id: "custom",
+            label: opts.periodLabel || "Selected Audit Scope",
+            startDate: opts.startDate,
+            endDate: opts.endDate,
+            mode: "custom",
+            granularity: "month",
+          }
+        : undefined,
       reportType,
     },
     {
@@ -1319,12 +1329,7 @@ export function buildFinancialPdfBinary(input: ReportOptions | EnterpriseReportD
     // Department Rows (Up to 4 Departments)
     ...((departmentFinancials.departments && departmentFinancials.departments.length > 0)
       ? departmentFinancials.departments.slice(0, 4)
-      : [
-          { name: "Software Engineering", headcount: 8, allocatedBudget: totalIncome * 0.4, actualSpent: totalExpenses * 0.45, utilizationPct: 92 },
-          { name: "Administration", headcount: 3, allocatedBudget: totalIncome * 0.2, actualSpent: totalExpenses * 0.25, utilizationPct: 85 },
-          { name: "Marketing & Growth", headcount: 2, allocatedBudget: totalIncome * 0.2, actualSpent: totalExpenses * 0.15, utilizationPct: 60 },
-          { name: "Quality Assurance", headcount: 2, allocatedBudget: totalIncome * 0.1, actualSpent: totalExpenses * 0.10, utilizationPct: 75 },
-        ]
+      : []
     ).flatMap((d, idx) => {
       const y = 482 - idx * 19;
       const utilPct = Math.min(100, Math.round(d.utilizationPct || 0));
@@ -1398,10 +1403,7 @@ export function buildFinancialPdfBinary(input: ReportOptions | EnterpriseReportD
     // Payroll Rows (Up to 5 Employees)
     ...((payrollSection?.employees && payrollSection.employees.length > 0)
       ? payrollSection.employees.slice(0, 5)
-      : [
-          { employeeName: "Ahmed Aqeel", employeeId: "EMP2855", department: "Software Engineering", baseSalary: 120000, netSalary: 125000 },
-          { employeeName: "Zainab Raza", employeeId: "EMP010", department: "Software Engineering", baseSalary: 68000, netSalary: 67200 },
-        ]
+      : []
     ).flatMap((p, idx) => {
       const y = 369 - idx * 18;
       return [

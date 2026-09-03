@@ -329,7 +329,6 @@ export function WebShell() {
                       fontFamily: isActive ? "Inter_700Bold" : "Inter_500Medium",
                     },
                   ]}
-                  numberOfLines={1}
                 >
                   {item.label}
                 </Text>
@@ -533,10 +532,10 @@ export function WebShell() {
                     )}
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.brandTitle, { color: colors.foreground }]} numberOfLines={1}>
+                    <Text style={[styles.brandTitle, { color: colors.foreground }]}>
                       Organization Finance Management
                     </Text>
-                    <Text style={[styles.brandSubtitle, { color: colors.mutedForeground }]} numberOfLines={1}>
+                    <Text style={[styles.brandSubtitle, { color: colors.mutedForeground }]}>
                       {settings.organizationName || "Enterprise Financial System"}
                     </Text>
                   </View>
@@ -558,7 +557,7 @@ export function WebShell() {
                     </Text>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.userName, { color: colors.foreground }]} numberOfLines={1}>
+                    <Text style={[styles.userName, { color: colors.foreground }]}>
                       {user?.name || "Admin"}
                     </Text>
                     <Text style={[styles.userRole, { color: colors.mutedForeground }]}>

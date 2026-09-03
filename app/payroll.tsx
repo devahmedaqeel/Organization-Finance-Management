@@ -369,7 +369,7 @@ export default function PayrollScreen() {
             <Text style={[styles.totalLabel, { color: colors.mutedForeground }]}>
               {isEmployee ? "My Net Take-Home Salary" : "Total Organization Net Pay"}
             </Text>
-            <Text style={[styles.totalValue, { color: "#8B5CF6" }]}>{fmt(totalNetPay)}</Text>
+            <Text style={[styles.totalValue, { color: "#8B5CF6" }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{fmt(totalNetPay)}</Text>
           </View>
           <View style={{ alignItems: "flex-end" }}>
             <Text style={[styles.empCount, { color: colors.mutedForeground }]}>
