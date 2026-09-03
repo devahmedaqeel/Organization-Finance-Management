@@ -321,20 +321,22 @@ export async function downloadFinancialReportPdf(
   try {
     const Print = require("expo-print");
 
-    // Inject print-optimized CSS to prevent overlapping and ensure proper page breaks
+    // Inject print-optimized CSS to prevent overlapping, eliminate extra space, and ensure proper page breaks
     const printCss = `
       <style>
         @media print {
-          body { font-size: 9px !important; line-height: 1.35 !important; }
-          .avoid-break { page-break-inside: avoid !important; break-inside: avoid !important; }
+          body { font-size: 8.5px !important; line-height: 1.35 !important; }
+          .avoid-break { page-break-inside: avoid !important; break-inside: avoid-page !important; }
           .section-title { page-break-after: avoid !important; }
           tr { page-break-inside: avoid !important; }
           table { page-break-inside: auto !important; }
+          thead { display: table-header-group !important; }
+          tfoot { display: table-footer-group !important; }
           .kpi-grid { page-break-inside: avoid !important; }
           .header-card { page-break-inside: avoid !important; }
           svg { max-width: 100% !important; height: auto !important; }
         }
-        body { max-width: none !important; margin: 0 !important; padding: 8px !important; background: #FFF !important; }
+        body { max-width: none !important; margin: 0 !important; padding: 0 !important; background: #FFF !important; }
         .sheet-wrap { box-shadow: none !important; padding: 0 !important; }
         * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
       </style>

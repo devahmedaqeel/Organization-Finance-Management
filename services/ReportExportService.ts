@@ -156,11 +156,11 @@ function normalizeToEnterpriseData(input: ReportOptions | EnterpriseReportData):
 function buildTrendSvg(points: any[] = [], currency: string): string {
   if (!points || points.length === 0) return "";
   const w = 740;
-  const h = 135;
-  const padL = 50;
-  const padR = 24;
-  const padT = 16;
-  const padB = 26;
+  const h = 100;
+  const padL = 48;
+  const padR = 20;
+  const padT = 12;
+  const padB = 20;
   const chartW = w - padL - padR;
   const chartH = h - padT - padB;
 
@@ -181,38 +181,38 @@ function buildTrendSvg(points: any[] = [], currency: string): string {
 
   const makeArea = (coords: { x: number; y: number }[]) => {
     const p = makePath(coords);
-    return `${p} L ${coords[coords.length - 1]?.x || 716},${padT + chartH} L ${coords[0]?.x || 50},${padT + chartH} Z`;
+    return `${p} L ${coords[coords.length - 1]?.x || 720},${padT + chartH} L ${coords[0]?.x || 48},${padT + chartH} Z`;
   };
 
   return `
-    <svg width="100%" height="135" viewBox="0 0 740 135" style="background:#F8FAFC; border-radius:8px; border:1px solid #E2E8F0; margin-bottom:12px;">
+    <svg width="100%" height="100" viewBox="0 0 740 100" style="background:#F8FAFC; border-radius:6px; border:1px solid #E2E8F0; margin-bottom:8px;">
       <defs>
         <linearGradient id="incFill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#10B981" stop-opacity="0.28"/>
+          <stop offset="0%" stop-color="#10B981" stop-opacity="0.25"/>
           <stop offset="100%" stop-color="#10B981" stop-opacity="0.0"/>
         </linearGradient>
         <linearGradient id="expFill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#F43F5E" stop-opacity="0.18"/>
+          <stop offset="0%" stop-color="#F43F5E" stop-opacity="0.15"/>
           <stop offset="100%" stop-color="#F43F5E" stop-opacity="0.0"/>
         </linearGradient>
       </defs>
       <!-- Gridlines -->
       <line x1="${padL}" y1="${padT}" x2="${w - padR}" y2="${padT}" stroke="#E2E8F0" stroke-dasharray="3,3"/>
-      <text x="${padL - 8}" y="${padT + 3}" fill="#64748B" font-size="8.5" text-anchor="end">${currency} ${fmtShort(maxVal)}</text>
+      <text x="${padL - 6}" y="${padT + 3}" fill="#64748B" font-size="8" text-anchor="end">${currency} ${fmtShort(maxVal)}</text>
 
       <line x1="${padL}" y1="${padT + chartH / 2}" x2="${w - padR}" y2="${padT + chartH / 2}" stroke="#E2E8F0" stroke-dasharray="3,3"/>
-      <text x="${padL - 8}" y="${padT + chartH / 2 + 3}" fill="#64748B" font-size="8.5" text-anchor="end">${currency} ${fmtShort(maxVal / 2)}</text>
+      <text x="${padL - 6}" y="${padT + chartH / 2 + 3}" fill="#64748B" font-size="8" text-anchor="end">${currency} ${fmtShort(maxVal / 2)}</text>
 
       <line x1="${padL}" y1="${padT + chartH}" x2="${w - padR}" y2="${padT + chartH}" stroke="#CBD5E1"/>
-      <text x="${padL - 8}" y="${padT + chartH + 3}" fill="#64748B" font-size="8.5" text-anchor="end">0</text>
+      <text x="${padL - 6}" y="${padT + chartH + 3}" fill="#64748B" font-size="8" text-anchor="end">0</text>
 
       <!-- Area Fills -->
       <path d="${makeArea(incCoords)}" fill="url(#incFill)"/>
       <path d="${makeArea(expCoords)}" fill="url(#expFill)"/>
 
       <!-- Lines -->
-      <path d="${makePath(incCoords)}" fill="none" stroke="#10B981" stroke-width="2"/>
-      <path d="${makePath(expCoords)}" fill="none" stroke="#F43F5E" stroke-width="2"/>
+      <path d="${makePath(incCoords)}" fill="none" stroke="#10B981" stroke-width="1.8"/>
+      <path d="${makePath(expCoords)}" fill="none" stroke="#F43F5E" stroke-width="1.8"/>
 
       <!-- Points & X Labels -->
       ${points.map((p, i) => {
@@ -224,11 +224,11 @@ function buildTrendSvg(points: any[] = [], currency: string): string {
         const anchor = isLast ? "end" : isFirst ? "start" : "middle";
         const xOffset = isLast ? -2 : isFirst ? 2 : 0;
         return `
-          ${(incVal > 0 || points.length <= 6) ? `<circle cx="${getX(i)}" cy="${getY(incVal)}" r="${incVal > 0 ? 3.5 : 2}" fill="#10B981" stroke="#FFFFFF" stroke-width="1"/>` : ""}
-          ${(expVal > 0 || points.length <= 6) ? `<circle cx="${getX(i)}" cy="${getY(expVal)}" r="${expVal > 0 ? 3.5 : 2}" fill="#F43F5E" stroke="#FFFFFF" stroke-width="1"/>` : ""}
-          ${incVal > 0 ? `<text x="${getX(i) + xOffset}" y="${Math.max(getY(incVal) - 5, 11)}" fill="#10B981" font-size="8" font-weight="700" text-anchor="${anchor}">+${fmtShort(incVal)}</text>` : ""}
-          ${expVal > 0 ? `<text x="${getX(i) + xOffset}" y="${Math.min(getY(expVal) + 11, 117)}" fill="#F43F5E" font-size="8" font-weight="700" text-anchor="${anchor}">-${fmtShort(expVal)}</text>` : ""}
-          <text x="${getX(i)}" y="129" fill="#475569" font-size="9" text-anchor="middle" font-weight="600">${lbl}</text>
+          ${(incVal > 0 || points.length <= 6) ? `<circle cx="${getX(i)}" cy="${getY(incVal)}" r="${incVal > 0 ? 3 : 1.5}" fill="#10B981" stroke="#FFFFFF" stroke-width="1"/>` : ""}
+          ${(expVal > 0 || points.length <= 6) ? `<circle cx="${getX(i)}" cy="${getY(expVal)}" r="${expVal > 0 ? 3 : 1.5}" fill="#F43F5E" stroke="#FFFFFF" stroke-width="1"/>` : ""}
+          ${incVal > 0 ? `<text x="${getX(i) + xOffset}" y="${Math.max(getY(incVal) - 4, 10)}" fill="#10B981" font-size="7.5" font-weight="700" text-anchor="${anchor}">+${fmtShort(incVal)}</text>` : ""}
+          ${expVal > 0 ? `<text x="${getX(i) + xOffset}" y="${Math.min(getY(expVal) + 9, 86)}" fill="#F43F5E" font-size="7.5" font-weight="700" text-anchor="${anchor}">-${fmtShort(expVal)}</text>` : ""}
+          <text x="${getX(i)}" y="96" fill="#475569" font-size="8" text-anchor="middle" font-weight="600">${lbl}</text>
         `;
       }).join("")}
     </svg>
@@ -244,11 +244,11 @@ function buildCategoryDonutSvg(
   currency: string
 ): string {
   if (!categories || categories.length === 0 || total <= 0) return "";
-  const size = 120;
+  const size = 90;
   const cx = size / 2;
   const cy = size / 2;
-  const r = 44;
-  const strokeWidth = 14;
+  const r = 34;
+  const strokeWidth = 10;
   const circumference = 2 * Math.PI * r;
 
   let offset = 0;
@@ -271,18 +271,18 @@ function buildCategoryDonutSvg(
   }).join("");
 
   return `
-    <div style="display:flex; align-items:center; gap:16px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:10px 14px; margin-bottom:12px;">
+    <div style="display:flex; align-items:center; gap:14px; background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:8px 12px; margin-bottom:8px;">
       <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" style="transform: rotate(-90deg); flex-shrink:0;">
         ${slices}
         <g style="transform: rotate(90deg); transform-origin: center;">
-          <text x="${cx}" y="${cy - 3}" text-anchor="middle" font-size="10" font-weight="bold" fill="#0F172A">${currency} ${fmtShort(total)}</text>
-          <text x="${cx}" y="${cy + 10}" text-anchor="middle" font-size="8" fill="#64748B">Volume</text>
+          <text x="${cx}" y="${cy - 2}" text-anchor="middle" font-size="9.5" font-weight="bold" fill="#0F172A">${currency} ${fmtShort(total)}</text>
+          <text x="${cx}" y="${cy + 9}" text-anchor="middle" font-size="7.5" fill="#64748B">Volume</text>
         </g>
       </svg>
-      <div style="flex:1; display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+      <div style="flex:1; display:grid; grid-template-columns:1fr 1fr; gap:4px 8px;">
         ${categories.slice(0, 8).map((c) => `
-          <div style="display:flex; align-items:center; gap:5px; font-size:9.5px;">
-            <span style="display:inline-block; width:7px; height:7px; border-radius:2px; background:${c.color || "#3B82F6"}; flex-shrink:0;"></span>
+          <div style="display:flex; align-items:center; gap:5px; font-size:8.5px;">
+            <span style="display:inline-block; width:6px; height:6px; border-radius:2px; background:${c.color || "#3B82F6"}; flex-shrink:0;"></span>
             <span style="font-weight:600; color:#334155; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${c.category}</span>
             <span style="color:#64748B; margin-left:auto; white-space:nowrap;">${c.pct}% (${currency} ${fmtShort(c.amount)})</span>
           </div>
@@ -303,15 +303,15 @@ function buildDepartmentBudgetSvg(
   const maxBudget = Math.max(...departments.map((d) => Math.max(d.allocatedBudget || 0, d.actualSpent || 0)), 1000);
 
   return `
-    <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:12px 16px; margin-bottom:12px;">
-      <div style="font-size:10.5px; font-weight:700; color:#1E293B; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center;">
+    <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:8px 12px; margin-bottom:8px;">
+      <div style="font-size:9.5px; font-weight:700; color:#1E293B; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
         <span>Department Budget Capacity vs Actual Spend Visualizer</span>
-        <div style="display:flex; gap:10px; font-size:9px; font-weight:600;">
+        <div style="display:flex; gap:10px; font-size:8.5px; font-weight:600;">
           <span style="color:#3B82F6;">■ Budget Ceiling</span>
           <span style="color:#F43F5E;">■ Actual Spend</span>
         </div>
       </div>
-      <div style="display:flex; flex-direction:column; gap:8px;">
+      <div style="display:flex; flex-direction:column; gap:5px;">
         ${departments.map((d) => {
           const budget = d.allocatedBudget || 0;
           const spent = d.actualSpent || 0;
@@ -322,13 +322,13 @@ function buildDepartmentBudgetSvg(
 
           return `
             <div>
-              <div style="display:flex; justify-content:space-between; font-size:9.5px; font-weight:600; color:#1E293B; margin-bottom:3px;">
+              <div style="display:flex; justify-content:space-between; font-size:8.5px; font-weight:600; color:#1E293B; margin-bottom:2px;">
                 <span><strong>${d.name}</strong> <span style="color:#64748B; font-weight:normal;">(${d.headcount || 0} Staff)</span></span>
                 <span>${currency} ${fmtShort(spent)} / ${currency} ${fmtShort(budget)} <strong style="color:${barColor};">(${utilPct}%)</strong></span>
               </div>
-              <div style="height:10px; background:#E2E8F0; border-radius:5px; overflow:hidden; position:relative;">
-                <div style="height:100%; width:${budgetPct}%; background:#93C5FD; border-radius:5px; position:absolute; left:0; top:0;"></div>
-                <div style="height:100%; width:${spentPct}%; background:${barColor}; border-radius:5px; position:absolute; left:0; top:0; opacity:0.9;"></div>
+              <div style="height:8px; background:#E2E8F0; border-radius:4px; overflow:hidden; position:relative;">
+                <div style="height:100%; width:${budgetPct}%; background:#93C5FD; border-radius:4px; position:absolute; left:0; top:0;"></div>
+                <div style="height:100%; width:${spentPct}%; background:${barColor}; border-radius:4px; position:absolute; left:0; top:0; opacity:0.9;"></div>
               </div>
             </div>
           `;
@@ -353,9 +353,9 @@ function buildExecutiveRingsSuiteSvg(
   retainedSurplusPct: number,
   currency: string
 ): string {
-  const r = 36;
-  const strokeWidth = 8;
-  const circumference = 2 * Math.PI * r; // ~226.195
+  const r = 28;
+  const strokeWidth = 6.5;
+  const circumference = 2 * Math.PI * r;
 
   function renderRingSvg(pct: number, color: string, centerText: string, centerSub: string): string {
     const clampedPct = Math.min(Math.max(pct || 0, 0), 100);
@@ -371,15 +371,15 @@ function buildExecutiveRingsSuiteSvg(
     const rotation = -90 + capAngularOffset;
 
     return `
-      <svg width="90" height="90" viewBox="0 0 90 90" style="margin-bottom:6px;">
-        <circle cx="45" cy="45" r="${r}" fill="none" stroke="#E2E8F0" stroke-width="${strokeWidth}" opacity="0.65"/>
+      <svg width="74" height="74" viewBox="0 0 74 74" style="margin-bottom:4px;">
+        <circle cx="37" cy="37" r="${r}" fill="none" stroke="#E2E8F0" stroke-width="${strokeWidth}" opacity="0.65"/>
         ${!isEmpty ? `
-          <circle cx="45" cy="45" r="${r}" fill="none" stroke="${color}" stroke-width="${strokeWidth}"
+          <circle cx="37" cy="37" r="${r}" fill="none" stroke="${color}" stroke-width="${strokeWidth}"
             stroke-dasharray="${circumference.toFixed(1)}" stroke-dashoffset="${dashOffset.toFixed(1)}"
-            stroke-linecap="${useRound ? "round" : "butt"}" transform="rotate(${rotation.toFixed(1)} 45 45)"/>
+            stroke-linecap="${useRound ? "round" : "butt"}" transform="rotate(${rotation.toFixed(1)} 37 37)"/>
         ` : ""}
-        <text x="45" y="44" text-anchor="middle" font-size="12" font-weight="800" fill="${color}">${centerText}</text>
-        <text x="45" y="55" text-anchor="middle" font-size="7.5" font-weight="700" fill="#64748B">${centerSub}</text>
+        <text x="37" y="36" text-anchor="middle" font-size="10" font-weight="800" fill="${color}">${centerText}</text>
+        <text x="37" y="46" text-anchor="middle" font-size="6.5" font-weight="700" fill="#64748B">${centerSub}</text>
       </svg>
     `;
   }
@@ -399,37 +399,37 @@ function buildExecutiveRingsSuiteSvg(
   const burnStatus = burnPct <= 30 ? "Low Burn (Safe)" : burnPct <= 60 ? "Optimal Burn" : "High Outflow";
 
   return `
-    <div class="avoid-break" style="margin-bottom: 14px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-        <span style="font-weight:800; font-size:11px; color:#0F172A; text-transform:uppercase; letter-spacing:0.5px;">Executive Analytics & Radial Indicator Gauges</span>
-        <span style="font-size:9px; font-weight:600; color:#64748B;">App Synchronized Metric Rings</span>
+    <div class="avoid-break" style="margin-bottom: 10px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <span style="font-weight:800; font-size:10.5px; color:#0F172A; text-transform:uppercase; letter-spacing:0.4px;">Executive Analytics & Radial Indicator Gauges</span>
+        <span style="font-size:8.5px; font-weight:600; color:#64748B;">App Synchronized Metric Rings</span>
       </div>
-      <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:10px;">
+      <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px;">
         <!-- Ring 1: Operating Surplus / Margin -->
-        <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:12px 10px; display:flex; flex-direction:column; align-items:center; text-align:center;">
-          <div style="font-size:8.5px; font-weight:700; color:#64748B; text-transform:uppercase; margin-bottom:6px;">Operating Surplus</div>
+        <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:8px 6px; display:flex; flex-direction:column; align-items:center; text-align:center;">
+          <div style="font-size:8px; font-weight:700; color:#64748B; text-transform:uppercase; margin-bottom:4px;">Operating Surplus</div>
           ${renderRingSvg(Math.abs(netMarginPct || 0), marginColor, marginLabel, isDeficit ? "DEFICIT" : "SURPLUS")}
-          <div style="font-size:9.5px; font-weight:800; color:${marginColor}; margin-bottom:2px;">${marginStatus}</div>
-          <div style="font-size:8.5px; color:#475569;">Inflows: +${currency} ${fmtShort(totalRevenue)}</div>
-          <div style="font-size:8px; color:#64748B;">Net: ${netMarginPct >= 0 ? "+" : "-"}${currency} ${fmtShort(Math.abs(totalRevenue - totalExpenses))}</div>
+          <div style="font-size:9px; font-weight:800; color:${marginColor}; margin-bottom:1px;">${marginStatus}</div>
+          <div style="font-size:8px; color:#475569;">Inflows: +${currency} ${fmtShort(totalRevenue)}</div>
+          <div style="font-size:7.5px; color:#64748B;">Net: ${netMarginPct >= 0 ? "+" : "-"}${currency} ${fmtShort(Math.abs(totalRevenue - totalExpenses))}</div>
         </div>
 
         <!-- Ring 2: Budget Utilized -->
-        <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:12px 10px; display:flex; flex-direction:column; align-items:center; text-align:center;">
-          <div style="font-size:8.5px; font-weight:700; color:#64748B; text-transform:uppercase; margin-bottom:6px;">Budget Utilized</div>
+        <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:8px 6px; display:flex; flex-direction:column; align-items:center; text-align:center;">
+          <div style="font-size:8px; font-weight:700; color:#64748B; text-transform:uppercase; margin-bottom:4px;">Budget Utilized</div>
           ${renderRingSvg(budgetUtilPct, budgetColor, `${budgetUtilPct.toFixed(0)}%`, "UTILIZED")}
-          <div style="font-size:9.5px; font-weight:800; color:${budgetColor}; margin-bottom:2px;">${budgetStatus}</div>
-          <div style="font-size:8.5px; color:#475569;">Spent: ${currency} ${fmtShort(totalSpent)}</div>
-          <div style="font-size:8px; color:#64748B;">Cap: ${currency} ${fmtShort(totalAllocated)}</div>
+          <div style="font-size:9px; font-weight:800; color:${budgetColor}; margin-bottom:1px;">${budgetStatus}</div>
+          <div style="font-size:8px; color:#475569;">Spent: ${currency} ${fmtShort(totalSpent)}</div>
+          <div style="font-size:7.5px; color:#64748B;">Cap: ${currency} ${fmtShort(totalAllocated)}</div>
         </div>
 
         <!-- Ring 3: Outflow Burn Rate -->
-        <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:8px; padding:12px 10px; display:flex; flex-direction:column; align-items:center; text-align:center;">
-          <div style="font-size:8.5px; font-weight:700; color:#64748B; text-transform:uppercase; margin-bottom:6px;">Outflow Burn Rate</div>
+        <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:8px 6px; display:flex; flex-direction:column; align-items:center; text-align:center;">
+          <div style="font-size:8px; font-weight:700; color:#64748B; text-transform:uppercase; margin-bottom:4px;">Outflow Burn Rate</div>
           ${renderRingSvg(burnPct, burnColor, `${burnPct.toFixed(0)}%`, "BURN RATE")}
-          <div style="font-size:9.5px; font-weight:800; color:${burnColor}; margin-bottom:2px;">${burnStatus}</div>
-          <div style="font-size:8.5px; color:#475569;">Outflows: -${currency} ${fmtShort(totalExpenses)}</div>
-          <div style="font-size:8px; color:#64748B;">Net: ${totalRevenue >= totalExpenses ? "+" : "-"}${currency} ${fmtShort(Math.abs(totalRevenue - totalExpenses))}</div>
+          <div style="font-size:9px; font-weight:800; color:${burnColor}; margin-bottom:1px;">${burnStatus}</div>
+          <div style="font-size:8px; color:#475569;">Outflows: -${currency} ${fmtShort(totalExpenses)}</div>
+          <div style="font-size:7.5px; color:#64748B;">Net: ${totalRevenue >= totalExpenses ? "+" : "-"}${currency} ${fmtShort(Math.abs(totalRevenue - totalExpenses))}</div>
         </div>
       </div>
     </div>
@@ -798,85 +798,94 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
   <title>${data.reportTitle} — ${metadata.organizationName}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    @page { size: A4 portrait; margin: 10mm 8mm 12mm 8mm; }
+    @page { size: A4 portrait; margin: 8mm 7mm 10mm 7mm; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      color: #0F172A; background: #FFFFFF; font-size: 9.5px; line-height: 1.35;
+      color: #0F172A; background: #FFFFFF; font-size: 8.5px; line-height: 1.35;
       -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
     }
     @media print {
-      body { background: #FFF !important; font-size: 9px !important; }
+      body { background: #FFF !important; font-size: 8.5px !important; margin: 0 !important; padding: 0 !important; }
+      .sheet-wrap { padding: 0 !important; box-shadow: none !important; border-radius: 0 !important; background: transparent !important; }
       .no-print { display: none !important; }
-      .avoid-break { page-break-inside: avoid !important; break-inside: avoid !important; }
+      .avoid-break { page-break-inside: avoid !important; break-inside: avoid-page !important; }
       tr { page-break-inside: avoid !important; break-inside: avoid !important; }
       table { page-break-inside: auto !important; }
+      thead { display: table-header-group !important; }
+      tfoot { display: table-footer-group !important; }
       .section-title { page-break-after: avoid !important; break-after: avoid !important; }
     }
     @media screen {
-      body { max-width: 900px; margin: 0 auto; padding: 18px 14px 40px 14px; background: #F1F5F9; }
-      .sheet-wrap { background: #FFF; padding: 24px; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+      body { max-width: 900px; margin: 0 auto; padding: 16px 12px 36px 12px; background: #F1F5F9; }
+      .sheet-wrap { background: #FFF; padding: 20px; border-radius: 10px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
     }
     
     /* Document Header Banner */
     .header-card {
       background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%) !important;
-      color: #FFFFFF !important; padding: 14px 18px; border-radius: 8px; margin-bottom: 10px;
+      color: #FFFFFF !important; padding: 12px 16px; border-radius: 6px; margin-bottom: 8px;
       display: flex; justify-content: space-between; align-items: center;
       -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
     }
-    .org-title { font-size: 16.5px; font-weight: 800; letter-spacing: -0.3px; margin-bottom: 2px; }
-    .org-sub { font-size: 10px; color: #94A3B8; }
-    .org-contact { font-size: 9px; color: #CBD5E1; margin-top: 2px; }
-    .meta-box { text-align: right; font-size: 9px; color: #CBD5E1; line-height: 1.45; }
-    .cert-badge { display: inline-block; background: #10B98122; color: #10B981; border: 1px solid #10B98144; padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 8.5px; margin-top: 2px; }
+    .org-title { font-size: 15px; font-weight: 800; letter-spacing: -0.3px; margin-bottom: 1px; }
+    .org-sub { font-size: 9.5px; color: #94A3B8; }
+    .org-contact { font-size: 8.5px; color: #CBD5E1; margin-top: 1px; }
+    .meta-box { text-align: right; font-size: 8.5px; color: #CBD5E1; line-height: 1.4; }
+    .cert-badge { display: inline-block; background: #10B98122; color: #10B981; border: 1px solid #10B98144; padding: 1.5px 5px; border-radius: 4px; font-weight: 700; font-size: 8px; margin-top: 2px; }
 
     /* Applied Filters Bar */
     .filters-bar {
       background: #F1F5F9; border: 1px solid #E2E8F0; border-radius: 6px;
-      padding: 6px 12px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 9.5px; color: #475569;
+      padding: 5px 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 4px; font-size: 8.5px; color: #475569;
     }
-    .filter-tag { font-weight: 700; color: #0F172A; background: #FFFFFF; border: 1px solid #CBD5E1; padding: 1.5px 6px; border-radius: 4px; }
+    .filter-tag { font-weight: 700; color: #0F172A; background: #FFFFFF; border: 1px solid #CBD5E1; padding: 1px 5px; border-radius: 3px; }
 
     /* KPI Grid */
-    .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
-    .kpi-card { border: 1px solid #E2E8F0; border-radius: 8px; padding: 8px 12px; background: #F8FAFC; }
-    .kpi-label { font-size: 8.5px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 2px; }
-    .kpi-val { font-size: 14.5px; font-weight: 800; white-space: nowrap; }
-    .kpi-sub { font-size: 9px; color: #64748B; margin-top: 1px; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 8px; }
+    .kpi-card { border: 1px solid #E2E8F0; border-radius: 6px; padding: 7px 10px; background: #F8FAFC; }
+    .kpi-label { font-size: 8px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 1px; }
+    .kpi-val { font-size: 13.5px; font-weight: 800; white-space: nowrap; }
+    .kpi-sub { font-size: 8px; color: #64748B; margin-top: 1px; }
 
     /* Financial Health Card */
     .health-card {
-      border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; background: #FFFFFF;
-      display: flex; justify-content: space-between; align-items: center; gap: 14px;
+      border: 1px solid #E2E8F0; border-radius: 6px; padding: 8px 12px; margin-bottom: 8px; background: #FFFFFF;
+      display: flex; justify-content: space-between; align-items: center; gap: 12px;
     }
     .health-badge {
-      display: inline-block; padding: 4px 10px; border-radius: 6px; font-weight: 800; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;
+      display: inline-block; padding: 3px 8px; border-radius: 5px; font-weight: 800; font-size: 9px; text-transform: uppercase; letter-spacing: 0.4px;
     }
 
     /* Section Headings */
     .section-title {
-      font-size: 11.5px; font-weight: 800; color: #0F172A; text-transform: uppercase; letter-spacing: 0.5px;
-      margin: 14px 0 6px 0; padding-bottom: 4px; border-bottom: 1.5px solid #0F172A;
+      font-size: 10.5px; font-weight: 800; color: #0F172A; text-transform: uppercase; letter-spacing: 0.4px;
+      margin: 10px 0 4px 0; padding-bottom: 3px; border-bottom: 1.5px solid #0F172A;
       display: flex; justify-content: space-between; align-items: center;
     }
-    .section-tag { font-size: 9px; font-weight: 600; color: #64748B; text-transform: none; }
+    .section-tag { font-size: 8.5px; font-weight: 600; color: #64748B; text-transform: none; }
 
     /* Tables */
-    .table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 12px; }
-    table { width: 100%; min-width: 500px; border-collapse: collapse; margin-bottom: 0; font-size: 9px; table-layout: fixed; word-break: break-word; }
+    .table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 8px; }
+    table { width: 100%; min-width: 500px; border-collapse: collapse; margin-bottom: 0; font-size: 8.5px; table-layout: fixed; word-break: break-word; }
     thead th {
-      background: #F1F5F9; font-weight: 700; color: #475569; text-transform: uppercase; font-size: 8.5px; letter-spacing: 0.4px;
-      padding: 6px 8px; border-bottom: 1.5px solid #CBD5E1; text-align: left; vertical-align: middle;
+      background: #F1F5F9; font-weight: 700; color: #475569; text-transform: uppercase; font-size: 8px; letter-spacing: 0.3px;
+      padding: 5px 7px; border-bottom: 1.5px solid #CBD5E1; vertical-align: middle;
     }
-    tbody tr td { padding: 6px 8px; border-bottom: 1px solid #F1F5F9; vertical-align: middle; }
+    tbody tr td { padding: 4.5px 7px; border-bottom: 1px solid #F1F5F9; vertical-align: middle; }
     tbody tr.even td { background: #FAFAFA; }
     .num { text-align: right !important; font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap !important; }
-    .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 8.5px; font-weight: 700; text-transform: uppercase; white-space: nowrap; }
-    .tfoot-row td { background: #F1F5F9; font-weight: 800; border-top: 1.5px solid #0F172A; padding: 7px 8px; }
+    .badge { display: inline-block; padding: 1.5px 5px; border-radius: 3px; font-size: 7.5px; font-weight: 700; text-transform: uppercase; white-space: nowrap; }
+    .tfoot-row td { background: #F1F5F9; font-weight: 800; border-top: 1.5px solid #0F172A; padding: 6px 7px; font-size: 8.5px; }
 
     /* Footer Signatures */
     .footer-sign {
-      display: flex; justify-content: space-between; margin-top: 24px; padding-top: 14px; border-top: 1px solid #E2E8F0;
+      display: flex; justify-content: space-between; align-items: flex-end;
+      margin-top: 14px; padding-top: 10px; border-top: 1px solid #E2E8F0;
+    }
+    .sign-box { width: 28%; text-align: center; font-size: 8.5px; color: #475569; }
+    .sign-line { border-top: 1px dashed #94A3B8; margin-bottom: 4px; width: 100%; }
+    .running-footer {
+      font-size: 8px; color: #94A3B8; text-align: center; margin-top: 10px; padding-top: 6px; border-top: 1px solid #F1F5F9;
     }
     .sign-box { width: 220px; text-align: center; font-size: 9.5px; color: #64748B; }
     .sign-line { border-top: 1px dashed #94A3B8; margin-bottom: 4px; width: 100%; }
@@ -992,8 +1001,7 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
 
   <!-- Section 1: Revenue Streams Analysis -->
   ${isRevenue && revenueAnalysis.hasData ? `
-  <div style="page-break-before: always; break-before: page; height: 1px;"></div>
-  <div class="section-title avoid-break" style="margin-top: 0;">
+  <div class="section-title avoid-break" style="margin-top: 8px;">
     <span>1. Institutional Inflows & Revenue Streams</span>
     <span class="section-tag">${revenueAnalysis.byCategory.length} Revenue Streams · Total: +${currency} ${fmt(revenueAnalysis.totalRevenue)}</span>
   </div>
@@ -1002,7 +1010,7 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
     <table style="table-layout: fixed; width: 100%;">
       <thead>
         <tr>
-          <th style="width: 40%;">Revenue Category / Source</th>
+          <th style="width: 40%; text-align: left;">Revenue Category / Source</th>
           <th style="width: 25%; text-align: right;">Total Realized (${currency})</th>
           <th style="width: 20%; text-align: center;">Share of Revenue</th>
           <th style="width: 15%; text-align: center;">Transactions</th>
@@ -1011,7 +1019,7 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
       <tbody>
         ${revenueAnalysis.byCategory.map((c, idx) => `
           <tr class="${idx % 2 === 0 ? "even" : ""}">
-            <td><strong>${c.category}</strong></td>
+            <td style="text-align: left;"><strong>${c.category}</strong></td>
             <td class="num" style="color: #10B981;">+${currency} ${fmt(c.amount)}</td>
             <td style="text-align: center;">${c.pct}%</td>
             <td style="text-align: center;">${c.count}</td>
@@ -1020,7 +1028,7 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
       </tbody>
       <tfoot>
         <tr class="tfoot-row">
-          <td>TOTAL INSTITUTIONAL REVENUE</td>
+          <td style="text-align: left;">TOTAL INSTITUTIONAL REVENUE</td>
           <td class="num" style="color: #10B981;">+${currency} ${fmt(revenueAnalysis.totalRevenue)}</td>
           <td style="text-align: center;">100%</td>
           <td style="text-align: center;">${revenueAnalysis.transactions.length}</td>
@@ -1032,7 +1040,7 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
 
   <!-- Section 2: Expenditure & Cost Centers Analysis -->
   ${isExpense && expenseAnalysis.hasData ? `
-  <div class="section-title avoid-break">
+  <div class="section-title avoid-break" style="margin-top: 8px;">
     <span>2. Operational Expenditures & Cost Outflows</span>
     <span class="section-tag">${expenseAnalysis.byCategory.length} Cost Categories · Total: -${currency} ${fmt(expenseAnalysis.totalExpenses)}</span>
   </div>
@@ -1041,7 +1049,7 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
     <table style="table-layout: fixed; width: 100%;">
       <thead>
         <tr>
-          <th style="width: 40%;">Expense Category / Division</th>
+          <th style="width: 40%; text-align: left;">Expense Category / Division</th>
           <th style="width: 25%; text-align: right;">Total Outflow (${currency})</th>
           <th style="width: 20%; text-align: center;">Share of Expenses</th>
           <th style="width: 15%; text-align: center;">Vouchers</th>
@@ -1050,7 +1058,7 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
       <tbody>
         ${expenseAnalysis.byCategory.map((c, idx) => `
           <tr class="${idx % 2 === 0 ? "even" : ""}">
-            <td><strong>${c.category}</strong></td>
+            <td style="text-align: left;"><strong>${c.category}</strong></td>
             <td class="num" style="color: #F43F5E;">-${currency} ${fmt(c.amount)}</td>
             <td style="text-align: center;">${c.pct}%</td>
             <td style="text-align: center;">${c.count}</td>
@@ -1059,7 +1067,7 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
       </tbody>
       <tfoot>
         <tr class="tfoot-row">
-          <td>TOTAL OPERATIONAL EXPENDITURES</td>
+          <td style="text-align: left;">TOTAL OPERATIONAL EXPENDITURES</td>
           <td class="num" style="color: #F43F5E;">-${currency} ${fmt(expenseAnalysis.totalExpenses)}</td>
           <td style="text-align: center;">100%</td>
           <td style="text-align: center;">${expenseAnalysis.transactions.length}</td>
@@ -1071,8 +1079,7 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
 
   <!-- Section 3: Department Financial Allocations & Budget Performance -->
   ${(isDepartment || isBudget) && departmentFinancials.hasData ? `
-  <div style="page-break-before: always; break-before: page; height: 1px;"></div>
-  <div class="section-title avoid-break" style="margin-top: 0;">
+  <div class="section-title avoid-break" style="margin-top: 8px;">
     <span>3. Department Cost Center Allocations & Profitability</span>
     <span class="section-tag">${departmentFinancials.departments.length} Cost Centers Monitored</span>
   </div>
@@ -1081,18 +1088,18 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
     <table style="table-layout: fixed; width: 100%;">
       <thead>
         <tr>
-          <th style="width: 28%;">Department Name</th>
+          <th style="width: 26%; text-align: left;">Department Name</th>
           <th style="width: 12%; text-align: center;">Headcount</th>
           <th style="width: 16%; text-align: right;">Allocated Budget</th>
           <th style="width: 16%; text-align: right;">Actual Spent</th>
           <th style="width: 16%; text-align: right;">Remaining</th>
-          <th style="width: 12%; text-align: center;">Utilization</th>
+          <th style="width: 14%; text-align: center;">Utilization</th>
         </tr>
       </thead>
       <tbody>
         ${departmentFinancials.departments.map((d, idx) => `
           <tr class="${idx % 2 === 0 ? "even" : ""}">
-            <td><strong>${d.name}</strong></td>
+            <td style="text-align: left;"><strong>${d.name}</strong></td>
             <td style="text-align: center;">${d.headcount} Staff</td>
             <td class="num">${currency} ${fmt(d.allocatedBudget)}</td>
             <td class="num" style="color: #F43F5E;">${currency} ${fmt(d.actualSpent)}</td>
@@ -1105,7 +1112,7 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
       </tbody>
       <tfoot>
         <tr class="tfoot-row">
-          <td>CONSOLIDATED TOTALS</td>
+          <td style="text-align: left;">CONSOLIDATED TOTALS</td>
           <td style="text-align: center;">${departmentFinancials.departments.reduce((s, d) => s + d.headcount, 0)} Staff</td>
           <td class="num">${currency} ${fmt(departmentFinancials.departments.reduce((s, d) => s + (d.allocatedBudget || 0), 0))}</td>
           <td class="num" style="color: #F43F5E;">${currency} ${fmt(departmentFinancials.departments.reduce((s, d) => s + (d.actualSpent || 0), 0))}</td>
@@ -1119,7 +1126,7 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
 
   <!-- Section 4: Staff Payroll & Remuneration Audit -->
   ${isPayroll && payrollSection.hasData ? `
-  <div class="section-title avoid-break">
+  <div class="section-title avoid-break" style="margin-top: 8px;">
     <span>4. Staff Payroll & Remuneration Audit</span>
     <span class="section-tag">${payrollSection.employeeCount} Employees · Total Disbursed: ${currency} ${fmt(payrollSection.netPayroll)}</span>
   </div>
@@ -1128,21 +1135,21 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
     <table style="table-layout: fixed; width: 100%;">
       <thead>
         <tr>
-          <th style="width: 23%;">Employee Name</th>
-          <th style="width: 11%;">Employee ID</th>
-          <th style="width: 16%;">Department</th>
+          <th style="width: 22%; text-align: left;">Employee Name</th>
+          <th style="width: 12%; text-align: center;">Employee ID</th>
+          <th style="width: 16%; text-align: left;">Department</th>
           <th style="width: 13%; text-align: right;">Base Salary</th>
-          <th style="width: 12%; text-align: right;">Bonus</th>
-          <th style="width: 12%; text-align: right;">Deductions</th>
-          <th style="width: 13%; text-align: right;">Net Disbursed</th>
+          <th style="width: 11%; text-align: right;">Bonus</th>
+          <th style="width: 11%; text-align: right;">Deductions</th>
+          <th style="width: 15%; text-align: right;">Net Disbursed</th>
         </tr>
       </thead>
       <tbody>
         ${payrollSection.employees.map((p, idx) => `
           <tr class="${idx % 2 === 0 ? "even" : ""}">
-            <td><strong>${p.employeeName}</strong><br><span style="font-size:8px; color:#64748B;">${p.designation || "Staff"}</span></td>
-            <td style="color: #64748B;">${p.employeeId}</td>
-            <td>${p.department}</td>
+            <td style="text-align: left;"><strong>${p.employeeName}</strong><br><span style="font-size:7.5px; color:#64748B;">${p.designation || "Staff"}</span></td>
+            <td style="text-align: center; color: #64748B;">${p.employeeId}</td>
+            <td style="text-align: left;">${p.department}</td>
             <td class="num">${currency} ${fmt(p.baseSalary)}</td>
             <td class="num" style="color: #10B981;">+${currency} ${fmt(p.bonus)}</td>
             <td class="num" style="color: #F43F5E;">-${currency} ${fmt(p.deductions)}</td>
@@ -1152,7 +1159,7 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
       </tbody>
       <tfoot>
         <tr class="tfoot-row">
-          <td colspan="3">TOTAL PAYROLL DISBURSEMENTS</td>
+          <td colspan="3" style="text-align: left;">TOTAL PAYROLL DISBURSEMENTS</td>
           <td class="num">${currency} ${fmt(payrollSection.grossPayroll - payrollSection.totalBonuses)}</td>
           <td class="num" style="color: #10B981;">+${currency} ${fmt(payrollSection.totalBonuses)}</td>
           <td class="num" style="color: #F43F5E;">-${currency} ${fmt(payrollSection.totalDeductions)}</td>
@@ -1162,7 +1169,7 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
     </table>
   </div>
   ` : `
-  <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:10px; font-size:9.5px; color:#64748B;">
+  <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:8px 10px; font-size:8.5px; color:#64748B; margin-bottom:8px;">
     Staff payroll summary aggregated across ${payrollSection.byDepartment.length} departments. Detailed individual salary breakdown is restricted based on access permissions.
   </div>
   `}
@@ -1170,7 +1177,7 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
 
   <!-- Section 5: Audited General Ledger & Double-Entry Transaction Trail -->
   ${isLedger && generalLedger.hasData ? `
-  <div class="section-title avoid-break">
+  <div class="section-title avoid-break" style="margin-top: 8px;">
     <span>5. Audited General Ledger Transaction Trail</span>
     <span class="section-tag">${generalLedger.transactions.length} Total Records · Total Volume: ${currency} ${fmt(generalLedger.totalVolume)}</span>
   </div>
@@ -1178,11 +1185,11 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
     <table style="table-layout: fixed; width: 100%;">
       <thead>
         <tr>
-          <th style="width: 12%;">Date</th>
+          <th style="width: 11%; text-align: center;">Date</th>
           <th style="width: 10%; text-align: center;">Type</th>
-          <th style="width: 22%;">Category</th>
-          <th style="width: 20%;">Department</th>
-          <th style="width: 18%;">Description</th>
+          <th style="width: 19%; text-align: left;">Category</th>
+          <th style="width: 18%; text-align: left;">Department</th>
+          <th style="width: 24%; text-align: left;">Description</th>
           <th style="width: 18%; text-align: right;">Amount (${currency})</th>
         </tr>
       </thead>
@@ -1191,15 +1198,15 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
           const isInc = t.type === "income";
           return `
             <tr class="${idx % 2 === 0 ? "even" : ""}">
-              <td style="white-space: nowrap; font-weight:600;">${t.date}</td>
+              <td style="text-align: center; white-space: nowrap; font-weight:600;">${t.date}</td>
               <td style="text-align: center;">
                 <span class="badge" style="background:${isInc ? "#10B98118" : "#F43F5E18"}; color:${isInc ? "#10B981" : "#F43F5E"}; border:1px solid ${isInc ? "#10B98135" : "#F43F5E35"};">
                   ${isInc ? "INFLOW" : "OUTFLOW"}
                 </span>
               </td>
-              <td><strong>${t.category}</strong></td>
-              <td>${t.department}</td>
-              <td style="color: #64748B; font-size: 8.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${t.description || "General Record"}</td>
+              <td style="text-align: left;"><strong>${t.category}</strong></td>
+              <td style="text-align: left;">${t.department}</td>
+              <td style="text-align: left; color: #64748B; font-size: 8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${t.description || "General Record"}</td>
               <td class="num" style="font-weight: bold; color:${isInc ? "#10B981" : "#F43F5E"};">
                 ${isInc ? "+" : "-"}${currency} ${fmt(t.amount)}
               </td>
@@ -1209,7 +1216,7 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
       </tbody>
       <tfoot>
         <tr class="tfoot-row">
-          <td colspan="5">NET AUDITED BALANCE RESULT</td>
+          <td colspan="5" style="text-align: left;">NET AUDITED BALANCE RESULT</td>
           <td class="num" style="font-weight: bold; color:${executiveSummary.isNetPositive ? "#10B981" : "#F43F5E"};">
             ${executiveSummary.isNetPositive ? "+" : "-"}${currency} ${fmt(Math.abs(executiveSummary.netOperatingBalance))}
           </td>
@@ -1224,17 +1231,17 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
     <div class="sign-box">
       <div class="sign-line"></div>
       <div><strong>${metadata.generatedBy}</strong></div>
-      <div>Prepared By (${metadata.userRole})</div>
+      <div style="font-size:7.5px; color:#94A3B8;">Prepared By (${metadata.userRole})</div>
     </div>
     <div class="sign-box">
       <div class="sign-line"></div>
-      <div><strong>Head of Finance</strong></div>
-      <div>Executive Authorization (${metadata.organizationName})</div>
+      <div><strong>Executive Management</strong></div>
+      <div style="font-size:7.5px; color:#94A3B8;">Financial Operations Authorization</div>
     </div>
     <div class="sign-box">
       <div class="sign-line"></div>
-      <div><strong>Financial Oversight Board</strong></div>
-      <div>Official Compliance Verification</div>
+      <div><strong>Auditing & Compliance Board</strong></div>
+      <div style="font-size:7.5px; color:#94A3B8;">Institutional Verification</div>
     </div>
   </div>
 
