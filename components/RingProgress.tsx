@@ -74,9 +74,25 @@ export function RingProgress({
     };
   }, [clampedPct, showAnimation]);
 
-  // Exact mathematical percentage mapping: 0% is strictly empty, non-zero follows exact value
-  const visualPct = displayPct;
-  const offset = circumference - (circumference * Math.min(Math.max(visualPct, 0), 100)) / 100;
+  // Exact mathematical percentage mapping:
+  const visualPct = Math.min(Math.max(displayPct, 0), 100);
+  const targetVisualLength = (visualPct / 100) * circumference;
+
+  // With round strokeLinecap, the caps add strokeWidth in visual length.
+  // We compensate so the visual arc subtends the EXACT percentage angle.
+  const isFull = visualPct >= 99.7;
+  const isEmpty = visualPct <= 0.2;
+  const useRoundCap = visualPct >= 3.0 && !isFull;
+  
+  const capLength = useRoundCap ? strokeWidth : 0;
+  const dashLength = isFull
+    ? circumference
+    : Math.max(targetVisualLength - capLength, 0.1);
+  const offset = isFull ? 0 : circumference - dashLength;
+  
+  // Angle compensation: rotate group so the start of round cap aligns exactly at 12 o'clock (-90°)
+  const capAngularOffset = useRoundCap ? ((strokeWidth / 2) / circumference) * 360 : 0;
+  const rotationAngle = -90 + capAngularOffset;
 
   const ringColor =
     color ??
@@ -109,7 +125,7 @@ export function RingProgress({
           </LinearGradient>
         </Defs>
 
-        {/* Background Inactive Track */}
+        {/* Background Inactive Track with Enhanced Contrast */}
         <Circle
           cx={size / 2}
           cy={size / 2}
@@ -117,24 +133,25 @@ export function RingProgress({
           fill="none"
           stroke={colors.border}
           strokeWidth={strokeWidth}
-          opacity={0.35}
+          opacity={0.65}
         />
 
         {/* Animated Progress Ring with Accurate Calculated Arc */}
-        <G rotation="-90" origin={`${size / 2}, ${size / 2}`}>
-          <Circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            fill="none"
-            stroke={`url(#${gradIdRef.current})`}
-            strokeWidth={strokeWidth}
-            strokeDasharray={`${circumference} ${circumference}`}
-            strokeDashoffset={offset}
-            strokeLinecap={displayPct > 0.4 ? "round" : "butt"}
-            opacity={displayPct > 0 ? 1 : 0}
-          />
-        </G>
+        {!isEmpty && (
+          <G rotation={rotationAngle} origin={`${size / 2}, ${size / 2}`}>
+            <Circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              fill="none"
+              stroke={`url(#${gradIdRef.current})`}
+              strokeWidth={strokeWidth}
+              strokeDasharray={`${circumference} ${circumference}`}
+              strokeDashoffset={offset}
+              strokeLinecap={useRoundCap ? "round" : "butt"}
+            />
+          </G>
+        )}
       </Svg>
 
       {/* Center Dynamic Label Contained Strictly Inside Inner Ring */}

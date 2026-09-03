@@ -349,7 +349,7 @@ export function WebPayroll() {
                       onPress={() => handleExportEmployeeSlip(p)}
                     >
                       <SvgFileText size={12} color="#8B5CF6" />
-                      <Text style={[styles.mobileActionText, { color: "#8B5CF6" }]}>PDF Slip</Text>
+                      <Text style={[styles.mobileActionText, { color: "#8B5CF6" }]}>Salary Slip</Text>
                     </TouchableOpacity>
 
                     {canEdit && (

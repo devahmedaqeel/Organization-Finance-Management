@@ -147,17 +147,19 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
   const displayedExpense = useMemo(() => calculateTotalExpenses(displayedTxs), [displayedTxs]);
   const displayedNet = displayedIncome - displayedExpense;
 
-  // Real profit margin (reflects income + allocated budget pool)
+  // Real operating surplus margin (reflects income + allocated budget pool)
   const profitMargin = displayedIncome > 0
     ? (displayedNet / displayedIncome) * 100
     : (displayedExpense > 0 ? -100 : 0);
 
-  // Real expense ratio (Outflows as percentage of total funding)
+  // Real expense burn ratio (Outflows as percentage of total funding)
   const expenseRatio = displayedIncome > 0
     ? (displayedExpense / displayedIncome) * 100
     : (displayedExpense > 0 ? 100 : 0);
+
   const displayedBudgetSpent = useMemo(() => {
-    return budgets.reduce((sum, b) => {
+    if (budgets.length === 0) return 0;
+    const totalSpentOnBudgets = budgets.reduce((sum, b) => {
       const catSpent = displayedTxs
         .filter(
           (t) =>
@@ -168,7 +170,9 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
         .reduce((s, t) => s + Number(t.amount || 0), 0);
       return sum + catSpent;
     }, 0);
-  }, [budgets, displayedTxs]);
+    return totalSpentOnBudgets > 0 ? totalSpentOnBudgets : Math.min(displayedExpense, totalAllocatedBudget);
+  }, [budgets, displayedTxs, displayedExpense, totalAllocatedBudget]);
+
   const displayedBudgetUtil = totalAllocatedBudget > 0 ? (displayedBudgetSpent / totalAllocatedBudget) * 100 : 0;
 
   // Transaction Metrics computed strictly from displayed transactions
@@ -497,117 +501,128 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
           </View>
 
           <View style={styles.ringsRow}>
-            {/* Ring 1: Profit Margin */}
+            {/* Ring 1: Operating Surplus / Margin */}
             <View style={styles.ringItem}>
               <RingProgress
-                percentage={displayedIncome === 0 && displayedExpense === 0 ? 0 : Math.min(Math.max(profitMargin, 0), 100)}
-                centerLabel={`${profitMargin >= 0 ? "+" : ""}${profitMargin.toFixed(0)}%`}
+                percentage={displayedIncome === 0 && displayedExpense === 0 ? 0 : Math.min(Math.max(profitMargin >= 0 ? profitMargin : Math.abs(profitMargin), 0), 100)}
+                centerLabel={`${profitMargin >= 0 ? "+" : "-"}${Math.abs(profitMargin).toFixed(0)}%`}
                 size={98}
                 strokeWidth={9}
-                color={displayedIncome === 0 && displayedExpense === 0 ? "#64748B" : profitMargin > 15 ? "#10B981" : profitMargin >= 0 ? "#38BDF8" : "#F43F5E"}
-                label="Profit"
-                sublabel="MARGIN"
+                color={displayedIncome === 0 && displayedExpense === 0 ? "#64748B" : profitMargin >= 20 ? "#10B981" : profitMargin >= 0 ? "#0EA5E9" : "#F43F5E"}
+                label="Operating"
+                sublabel={profitMargin >= 0 ? "SURPLUS" : "DEFICIT"}
               />
               <View
                 style={[
                   styles.ringStatusPill,
                   {
-                    backgroundColor: (displayedIncome === 0 && displayedExpense === 0 ? "#64748B" : profitMargin > 15 ? "#10B981" : profitMargin >= 0 ? "#38BDF8" : "#F43F5E") + "18",
-                    borderColor: (displayedIncome === 0 && displayedExpense === 0 ? "#64748B" : profitMargin > 15 ? "#10B981" : profitMargin >= 0 ? "#38BDF8" : "#F43F5E") + "44",
+                    backgroundColor: (displayedIncome === 0 && displayedExpense === 0 ? "#64748B" : profitMargin >= 20 ? "#10B981" : profitMargin >= 0 ? "#0EA5E9" : "#F43F5E") + "18",
+                    borderColor: (displayedIncome === 0 && displayedExpense === 0 ? "#64748B" : profitMargin >= 20 ? "#10B981" : profitMargin >= 0 ? "#0EA5E9" : "#F43F5E") + "44",
                   },
                 ]}
               >
                 <Text
                   style={[
                     styles.ringStatusText,
-                    { color: displayedIncome === 0 && displayedExpense === 0 ? "#64748B" : profitMargin > 15 ? "#10B981" : profitMargin >= 0 ? "#38BDF8" : "#F43F5E" },
+                    { color: displayedIncome === 0 && displayedExpense === 0 ? "#64748B" : profitMargin >= 20 ? "#10B981" : profitMargin >= 0 ? "#0EA5E9" : "#F43F5E" },
                   ]}
                 >
                   {displayedIncome === 0 && displayedExpense === 0
                     ? "No Activity"
-                    : profitMargin > 20
-                    ? "High Surplus"
+                    : profitMargin >= 25
+                    ? "Healthy Surplus"
                     : profitMargin > 0
-                    ? "Surplus"
+                    ? "Surplus Margin"
                     : profitMargin === 0
                     ? "Balanced"
                     : "Operating Deficit"}
                 </Text>
               </View>
+              <Text style={styles.ringValueSub}>
+                {profitMargin >= 0 ? "+" : "-"}{settings.currency} {fmt(Math.abs(displayedNet))}
+              </Text>
             </View>
 
-            {/* Ring 2: Budget Utilization */}
+            {/* Ring 2: Budget Execution / Utilization */}
             <View style={styles.ringItem}>
               <RingProgress
                 percentage={Math.min(displayedBudgetUtil, 100)}
                 centerLabel={`${displayedBudgetUtil.toFixed(0)}%`}
                 size={98}
                 strokeWidth={9}
-                color={displayedBudgetUtil === 0 ? "#64748B" : displayedBudgetUtil <= 75 ? "#10B981" : displayedBudgetUtil <= 95 ? "#F59E0B" : "#F43F5E"}
+                color={displayedBudgetUtil === 0 ? "#64748B" : displayedBudgetUtil <= 75 ? "#3B82F6" : displayedBudgetUtil <= 95 ? "#F59E0B" : "#F43F5E"}
                 label="Budget"
-                sublabel="USED"
+                sublabel="UTILIZED"
               />
               <View
                 style={[
                   styles.ringStatusPill,
                   {
-                    backgroundColor: (displayedBudgetUtil === 0 ? "#64748B" : displayedBudgetUtil <= 75 ? "#10B981" : displayedBudgetUtil <= 95 ? "#F59E0B" : "#F43F5E") + "18",
-                    borderColor: (displayedBudgetUtil === 0 ? "#64748B" : displayedBudgetUtil <= 75 ? "#10B981" : displayedBudgetUtil <= 95 ? "#F59E0B" : "#F43F5E") + "44",
+                    backgroundColor: (displayedBudgetUtil === 0 ? "#64748B" : displayedBudgetUtil <= 75 ? "#3B82F6" : displayedBudgetUtil <= 95 ? "#F59E0B" : "#F43F5E") + "18",
+                    borderColor: (displayedBudgetUtil === 0 ? "#64748B" : displayedBudgetUtil <= 75 ? "#3B82F6" : displayedBudgetUtil <= 95 ? "#F59E0B" : "#F43F5E") + "44",
                   },
                 ]}
               >
                 <Text
                   style={[
                     styles.ringStatusText,
-                    { color: displayedBudgetUtil === 0 ? "#64748B" : displayedBudgetUtil <= 75 ? "#10B981" : displayedBudgetUtil <= 95 ? "#F59E0B" : "#F43F5E" },
+                    { color: displayedBudgetUtil === 0 ? "#64748B" : displayedBudgetUtil <= 75 ? "#3B82F6" : displayedBudgetUtil <= 95 ? "#F59E0B" : "#F43F5E" },
                   ]}
                 >
                   {displayedBudgetUtil === 0
-                    ? "No Spend"
+                    ? "Unspent"
                     : displayedBudgetUtil <= 75
                     ? "On Track"
-                    : displayedBudgetUtil <= 100
+                    : displayedBudgetUtil <= 95
                     ? "Near Limit"
                     : "Over Budget"}
                 </Text>
               </View>
+              <Text style={styles.ringValueSub}>
+                {settings.currency} {fmt(displayedBudgetSpent)} of {fmt(totalAllocatedBudget)}
+              </Text>
             </View>
 
-            {/* Ring 3: Expense Ratio */}
+            {/* Ring 3: Operational Expense Burn Rate */}
             <View style={styles.ringItem}>
               <RingProgress
                 percentage={Math.min(expenseRatio, 100)}
                 centerLabel={`${expenseRatio.toFixed(0)}%`}
                 size={98}
                 strokeWidth={9}
-                color={expenseRatio === 0 ? "#64748B" : expenseRatio <= 60 ? "#10B981" : expenseRatio <= 85 ? "#F59E0B" : "#F43F5E"}
-                label="Expense"
-                sublabel="RATIO"
+                color={expenseRatio === 0 ? "#64748B" : expenseRatio <= 40 ? "#8B5CF6" : expenseRatio <= 75 ? "#F59E0B" : "#F43F5E"}
+                label="Outflow"
+                sublabel="BURN RATE"
               />
               <View
                 style={[
                   styles.ringStatusPill,
                   {
-                    backgroundColor: (expenseRatio === 0 ? "#64748B" : expenseRatio <= 60 ? "#10B981" : expenseRatio <= 85 ? "#F59E0B" : "#F43F5E") + "18",
-                    borderColor: (expenseRatio === 0 ? "#64748B" : expenseRatio <= 60 ? "#10B981" : expenseRatio <= 85 ? "#F59E0B" : "#F43F5E") + "44",
+                    backgroundColor: (expenseRatio === 0 ? "#64748B" : expenseRatio <= 40 ? "#8B5CF6" : expenseRatio <= 75 ? "#F59E0B" : "#F43F5E") + "18",
+                    borderColor: (expenseRatio === 0 ? "#64748B" : expenseRatio <= 40 ? "#8B5CF6" : expenseRatio <= 75 ? "#F59E0B" : "#F43F5E") + "44",
                   },
                 ]}
               >
                 <Text
                   style={[
                     styles.ringStatusText,
-                    { color: expenseRatio === 0 ? "#64748B" : expenseRatio <= 60 ? "#10B981" : expenseRatio <= 85 ? "#F59E0B" : "#F43F5E" },
+                    { color: expenseRatio === 0 ? "#64748B" : expenseRatio <= 40 ? "#8B5CF6" : expenseRatio <= 75 ? "#F59E0B" : "#F43F5E" },
                   ]}
                 >
                   {expenseRatio === 0
                     ? "Zero Outflow"
+                    : expenseRatio <= 25
+                    ? "Low Burn (Safe)"
                     : expenseRatio <= 60
-                    ? "Low Burn"
+                    ? "Optimal Burn"
                     : expenseRatio <= 85
-                    ? "Moderate"
-                    : "High Outflow"}
+                    ? "Moderate Outflow"
+                    : "High Burn Alert"}
                 </Text>
               </View>
+              <Text style={styles.ringValueSub}>
+                {settings.currency} {fmt(displayedExpense)} spent
+              </Text>
             </View>
           </View>
         </View>
@@ -1018,6 +1033,13 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.2,
+  },
+  ringValueSub: {
+    fontSize: 10.5,
+    fontFamily: "Inter_600SemiBold",
+    color: "#64748B",
+    textAlign: "center",
+    marginTop: 2,
   },
   smBtn: {
     paddingHorizontal: 10,

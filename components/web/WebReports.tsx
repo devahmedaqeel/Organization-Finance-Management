@@ -279,7 +279,7 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
             activeOpacity={0.8}
           >
             <SvgFileText size={14} color="#FFFFFF" />
-            <Text style={[styles.primaryBtnText, { fontSize: isMobile ? 11.5 : 13 }]} numberOfLines={1}>Full Dossier (PDF)</Text>
+            <Text style={[styles.primaryBtnText, { fontSize: isMobile ? 11.5 : 13 }]} numberOfLines={1}>Full Dossier</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -651,7 +651,7 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
               <View>
                 <Text style={[styles.customDateTitle, { color: colors.foreground }]}>Select Custom Date Period</Text>
                 <Text style={{ fontSize: 12, color: colors.mutedForeground, marginTop: 2 }}>
-                  Filter transactions, statement analytics & PDF reports by exact date range
+                  Filter transactions and statement analytics by exact date range
                 </Text>
               </View>
               <TouchableOpacity onPress={() => setCustomDateModalVisible(false)}>

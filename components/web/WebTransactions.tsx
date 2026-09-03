@@ -6,7 +6,6 @@ import { useSettings } from "@/context/SettingsContext";
 import { useColors } from "@/hooks/useColors";
 import { WebTransactionModal } from "./modals/WebTransactionModal";
 import { WebConfirmModal } from "./modals/WebConfirmModal";
-import { openPdfReport } from "@/services/ReportExportService";
 import {
   SvgList,
   SvgFileText,
@@ -73,38 +72,6 @@ export function WebTransactions() {
     return list;
   }, [transactions, typeFilter, selectedDepartment, search, sortField, sortAsc]);
 
-  const handleExportPDF = async () => {
-    const totalAlloc = budgets.reduce((s, b) => s + b.allocated, 0);
-    const utilPct = totalAlloc > 0 ? (totalExpenses / totalAlloc) * 100 : 0;
-    await openPdfReport({
-      organizationName: settings.organizationName || "Organization Finance Management",
-      organizationAddress: settings.organizationAddress || "Enterprise Financial Center",
-      organizationEmail: settings.organizationEmail || "finance@ofm-cloud.com",
-      organizationPhone: settings.organizationPhone || "+92-586-444111",
-      organizationLogo: settings.organizationLogo || "",
-      currency: settings.currency || "PKR",
-      fiscalYear: settings.fiscalYear || "2025-2026",
-      periodLabel: selectedDepartment !== "all" ? `General Ledger (${selectedDepartment})` : "General Ledger Complete Audit",
-      reportMode: "full",
-      generatedBy: user?.name || user?.email || "Chief Financial Officer",
-      totalIncome,
-      totalExpenses,
-      netBalance,
-      budgetUtilization: utilPct,
-      transactions: filteredTransactions,
-      departments,
-      payroll,
-      budgets,
-      includeSummary: true,
-      includeCharts: false,
-      includeCategories: true,
-      includeDepartments: true,
-      includePayroll: false,
-      includeTransactions: true,
-      includeReconciliation: true,
-    });
-  };
-
   return (
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, isMobile && { padding: 14, gap: 14 }]} showsVerticalScrollIndicator={false}>
       {/* ─── Page Title & Action Bar ─── */}
@@ -124,15 +91,6 @@ export function WebTransactions() {
         </View>
 
         <View style={[styles.headerRightActions, isMobile && { width: "100%", justifyContent: "flex-start" }]}>
-          <TouchableOpacity
-            style={[styles.outlineBtn, { borderColor: colors.border, backgroundColor: colors.card }, isMobile && { flex: 1 }]}
-            onPress={handleExportPDF}
-            activeOpacity={0.8}
-          >
-            <SvgFileText size={14} color={colors.primary} />
-            <Text style={[styles.outlineBtnText, { color: colors.foreground }]}>Export (PDF)</Text>
-          </TouchableOpacity>
-
           {canEdit && (
             <TouchableOpacity
               style={[styles.primaryBtn, { backgroundColor: colors.primary }, isMobile && { flex: 1 }]}
