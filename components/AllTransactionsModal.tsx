@@ -21,15 +21,32 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   transactions: Transaction[];
+  initialFilter?: "all" | "income" | "expense";
+  title?: string;
+  subtitle?: string;
   onSelectTransaction?: (tx: Transaction) => void;
 }
 
-export function AllTransactionsModal({ visible, onClose, transactions, onSelectTransaction }: Props) {
+export function AllTransactionsModal({
+  visible,
+  onClose,
+  transactions,
+  initialFilter = "all",
+  title,
+  subtitle,
+  onSelectTransaction,
+}: Props) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { settings } = useSettings();
   const [search, setSearch] = useState("");
-  const [filterType, setFilterType] = useState<"all" | "income" | "expense">("all");
+  const [filterType, setFilterType] = useState<"all" | "income" | "expense">(initialFilter);
+
+  React.useEffect(() => {
+    if (visible && initialFilter) {
+      setFilterType(initialFilter);
+    }
+  }, [visible, initialFilter]);
 
   const fmt = (n: number) => {
     if (n >= 1000000) return `${settings.currency} ${(n / 1000000).toFixed(2)}M`;
@@ -87,9 +104,9 @@ export function AllTransactionsModal({ visible, onClose, transactions, onSelectT
                 <Feather name="list" size={18} color={colors.primary} />
               </View>
               <View>
-                <Text style={[styles.title, { color: colors.foreground }]}>Total Transactions</Text>
+                <Text style={[styles.title, { color: colors.foreground }]}>{title || "Total Transactions"}</Text>
                 <Text style={[styles.sub, { color: colors.mutedForeground }]}>
-                  {transactions.length} Total Records · {settings.organizationName || "OFM Ledger"}
+                  {subtitle || `${transactions.length} Total Records · ${settings.organizationName || "OFM Ledger"}`}
                 </Text>
               </View>
             </View>

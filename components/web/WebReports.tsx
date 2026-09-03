@@ -169,6 +169,15 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
   const [exportModalVisible, setExportModalVisible] = useState(false);
 
   const handleExportPDF = async () => {
+    const reportType: ReportType =
+      activeTab === "payroll"
+        ? "payroll_audit"
+        : activeTab === "departments"
+        ? "department_analysis"
+        : activeTab === "analytics"
+        ? "executive_summary"
+        : "consolidated_statement";
+
     const enterpriseData = buildEnterpriseReportData(
       transactions,
       budgets,
@@ -177,7 +186,7 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
       {
         period: activePeriod,
         scope: "period",
-        reportType: "consolidated_statement",
+        reportType,
       },
       {
         organizationName: settings.organizationName || user?.organization || "Organization Finance Management",
@@ -279,7 +288,15 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
             activeOpacity={0.8}
           >
             <SvgFileText size={14} color="#FFFFFF" />
-            <Text style={[styles.primaryBtnText, { fontSize: isMobile ? 11.5 : 13 }]} numberOfLines={1}>Full Dossier</Text>
+            <Text style={[styles.primaryBtnText, { fontSize: isMobile ? 11.5 : 13 }]} numberOfLines={1}>
+              {activeTab === "payroll"
+                ? "Payroll Dossier"
+                : activeTab === "departments"
+                ? "Department Matrix"
+                : activeTab === "analytics"
+                ? "Financial Trends"
+                : "Full Dossier"}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>

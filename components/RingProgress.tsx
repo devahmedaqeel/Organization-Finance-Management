@@ -102,12 +102,10 @@ export function RingProgress({
       ? colors.warning
       : colors.income);
 
-  const statusLabel =
-    clampedPct >= 100
-      ? "Exceeded"
-      : clampedPct >= 80
-      ? "Near Limit"
-      : "Healthy";
+  const isPositiveMetric = color === colors.income || color === "#10B981" || (label && /health|excellent|surplus|growth/i.test(label));
+  const statusLabel = isPositiveMetric
+    ? (clampedPct >= 80 ? "Optimal" : clampedPct >= 50 ? "Stable" : "Caution")
+    : (clampedPct >= 100 ? "Exceeded" : clampedPct >= 80 ? "Near Limit" : "Healthy");
 
   return (
     <TouchableOpacity

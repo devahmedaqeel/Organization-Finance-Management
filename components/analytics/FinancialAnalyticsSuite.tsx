@@ -705,8 +705,8 @@ export function FinancialAnalyticsSuite({
             <View style={styles.donutWrap}>
               <DonutChart
                 segments={donutSegments}
-                size={142}
-                strokeWidth={14}
+                size={128}
+                strokeWidth={11}
                 centerLabel={
                   activeCategoryData
                     ? formatCompactCurrency(activeCategoryData.amount, currency)
@@ -1240,6 +1240,12 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
     alignItems: "center",
     justifyContent: "center",
+  },
+  donutWrap: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 6,
+    width: "100%",
   },
   emptyText: {
     fontSize: 12,

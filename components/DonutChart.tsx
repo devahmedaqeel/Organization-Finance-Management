@@ -147,7 +147,7 @@ export function DonutChart({
   };
 
   const center = size / 2;
-  const outerRadius = size / 2 - 3;
+  const outerRadius = size / 2 - 4;
   const innerRadius = outerRadius - strokeWidth;
   const total = segments.reduce((s, seg) => s + (seg.value || 0), 0);
   const safeTotal = total > 0 ? total : 1;
@@ -223,8 +223,9 @@ export function DonutChart({
     const midA = (startA + endA) / 2;
 
     const isSelected = effectiveIndex === i;
-    const sliceOuterRadius = isSelected ? outerRadius + 3.5 : outerRadius;
-    const sliceInnerRadius = isSelected ? innerRadius - 2 : innerRadius;
+    // Keep outer and inner radius uniform so the selected slice never protrudes outside the circle track
+    const sliceOuterRadius = outerRadius;
+    const sliceInnerRadius = innerRadius;
 
     const path = describeArcSector(
       center,
@@ -298,8 +299,8 @@ export function DonutChart({
       : null;
 
   return (
-    <View style={styles.container}>
-      <View style={styles.chartAndLegend}>
+    <View style={[styles.container, !showLegend && { alignItems: "center" }]}>
+      <View style={[styles.chartAndLegend, !showLegend && { justifyContent: "center" }]}>
         {/* SVG Donut Circle */}
         <View {...panResponder.panHandlers} style={{ width: size, height: size, position: "relative" }}>
           <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
@@ -329,7 +330,8 @@ export function DonutChart({
                       fill={slice.color}
                       opacity={isAnySelected ? (isSelected ? 1.0 : 0.35) : 1.0}
                       stroke={isSelected ? "#FFFFFF" : "transparent"}
-                      strokeWidth={isSelected ? 2.5 : 0}
+                      strokeWidth={isSelected ? 1.5 : 0}
+                      strokeLinejoin="round"
                       onPress={() => {
                         setEffectiveIndex(
                           effectiveIndex === slice.index ? null : slice.index
@@ -481,7 +483,7 @@ export function DonutChart({
                         },
                       ]}
                     >
-                      {pct}%
+                      {pct}
                     </Text>
                   </View>
                 </TouchableOpacity>

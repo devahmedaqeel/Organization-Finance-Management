@@ -74,6 +74,8 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
   const { settings } = useSettings();
   const { transactions, budgets, payroll, departments } = useFinance();
   const [allTxModal, setAllTxModal] = useState(false);
+  const [txModalFilter, setTxModalFilter] = useState<"all" | "income" | "expense">("all");
+  const [insightFilter, setInsightFilter] = useState<"all" | "positive" | "alerts">("all");
 
   // Active dynamic timeline period
   const [activePeriod, setActivePeriod] = useState<NormalizedPeriod>(() =>
@@ -137,17 +139,16 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
   const totalAllocatedBudget = useMemo(() => budgets.reduce((s, b) => s + Number(b.allocated || 0), 0), [budgets]);
 
   // Authoritative real calculation for the displayed scope
-  // Total Income includes transaction inflows + allocated budget pool ("agr mae budet allocate kro inocme ma edlo")
   const displayedTxIncome = useMemo(() => calculateTotalIncome(displayedTxs), [displayedTxs]);
   const displayedIncome = useMemo(() => {
     if (selectedPoint && displayedTxs.length === 0) return 0;
-    return displayedTxIncome + totalAllocatedBudget;
-  }, [selectedPoint, displayedTxs, displayedTxIncome, totalAllocatedBudget]);
+    return displayedTxIncome;
+  }, [selectedPoint, displayedTxs, displayedTxIncome]);
 
   const displayedExpense = useMemo(() => calculateTotalExpenses(displayedTxs), [displayedTxs]);
   const displayedNet = displayedIncome - displayedExpense;
 
-  // Real operating surplus margin (reflects income + allocated budget pool)
+  // Real operating surplus margin
   const profitMargin = displayedIncome > 0
     ? (displayedNet / displayedIncome) * 100
     : (displayedExpense > 0 ? -100 : 0);
@@ -180,13 +181,16 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
     const totalCount = displayedTxs.length;
     const inflows = displayedTxs.filter(t => t.type === "income");
     const outflows = displayedTxs.filter(t => t.type === "expense");
-    const inflowTotal = inflows.reduce((s, t) => s + t.amount, 0);
-    const outflowTotal = outflows.reduce((s, t) => s + t.amount, 0);
+    const inflowTotal = inflows.reduce((s, t) => s + Number(t.amount || 0), 0);
+    const outflowTotal = outflows.reduce((s, t) => s + Number(t.amount || 0), 0);
+    const netFlow = inflowTotal - outflowTotal;
     const avgTx = totalCount > 0 ? (inflowTotal + outflowTotal) / totalCount : 0;
+    const avgInflow = inflows.length > 0 ? inflowTotal / inflows.length : 0;
+    const avgOutflow = outflows.length > 0 ? outflowTotal / outflows.length : 0;
     
     let maxTx: any = null;
     displayedTxs.forEach(t => {
-      if (!maxTx || t.amount > maxTx.amount) maxTx = t;
+      if (!maxTx || Number(t.amount || 0) > Number(maxTx.amount || 0)) maxTx = t;
     });
 
     return {
@@ -195,7 +199,10 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
       outflowCount: outflows.length,
       inflowTotal,
       outflowTotal,
+      netFlow,
       avgTx,
+      avgInflow,
+      avgOutflow,
       maxTx,
     };
   }, [displayedTxs]);
@@ -248,49 +255,36 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
     }),
   [budgets, displayedTxs, settings.currency]);
 
-  // Real-time period growth and margin computed directly from active chart timeline data
+  // Authoritative real-time net surplus margin computed directly from active timeline scope
   const { periodGrowth, periodGrowthLabel } = useMemo(() => {
-    if (!chartPoints || chartPoints.length === 0) {
-      return { periodGrowth: 0, periodGrowthLabel: "0.0%" };
+    const activeInc = selectedPoint
+      ? Number(selectedPoint.income || 0)
+      : chartPoints.reduce((s, p) => s + Number(p.income || 0), 0);
+    const activeExp = selectedPoint
+      ? Number(selectedPoint.expense || 0)
+      : chartPoints.reduce((s, p) => s + Number(p.expense || 0), 0);
+    const activeNet = activeInc - activeExp;
+
+    if (activeInc === 0 && activeExp === 0) {
+      return { periodGrowth: 0, periodGrowthLabel: "0.0% Balanced" };
     }
 
-    if (chartPoints.length >= 2) {
-      const half = Math.floor(chartPoints.length / 2);
-      const firstHalf = chartPoints.slice(0, half);
-      const secondHalf = chartPoints.slice(half);
-
-      const firstInc = firstHalf.reduce((s, p) => s + (p.income || 0), 0);
-      const secondInc = secondHalf.reduce((s, p) => s + (p.income || 0), 0);
-
-      let growth = 0;
-      if (firstInc > 0) {
-        growth = ((secondInc - firstInc) / firstInc) * 100;
-      } else if (secondInc > 0) {
-        growth = 100;
-      } else {
-        const firstExp = firstHalf.reduce((s, p) => s + (p.expense || 0), 0);
-        const secondExp = secondHalf.reduce((s, p) => s + (p.expense || 0), 0);
-        if (firstExp > 0) {
-          growth = -(((secondExp - firstExp) / firstExp) * 100);
-        }
-      }
-
+    if (activeInc > 0) {
+      const margin = (activeNet / activeInc) * 100;
+      const label = margin >= 0
+        ? `+${margin.toFixed(1)}% Surplus`
+        : `${margin.toFixed(1)}% Deficit`;
       return {
-        periodGrowth: growth,
-        periodGrowthLabel: `${growth >= 0 ? "+" : ""}${growth.toFixed(1)}%`,
+        periodGrowth: margin,
+        periodGrowthLabel: label,
       };
     }
 
-    const totalInc = chartPoints.reduce((s, p) => s + (p.income || 0), 0);
-    const totalExp = chartPoints.reduce((s, p) => s + (p.expense || 0), 0);
-    const net = totalInc - totalExp;
-    const margin = totalInc > 0 ? (net / totalInc) * 100 : 0;
-
     return {
-      periodGrowth: margin,
-      periodGrowthLabel: `${margin >= 0 ? "+" : ""}${margin.toFixed(1)}%`,
+      periodGrowth: -100,
+      periodGrowthLabel: "-100% Deficit",
     };
-  }, [chartPoints]);
+  }, [chartPoints, selectedPoint]);
 
   // Dynamic MoM growth computed from active sorted monthly ledger
   const { incomeGrowth } = useMemo(() => {
@@ -324,6 +318,12 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
     () => actionableInsights.filter(i => i.severity === "CRITICAL" || i.severity === "WARNING").length,
     [actionableInsights]
   );
+
+  const displayedInsights = useMemo(() => {
+    if (insightFilter === "positive") return actionableInsights.filter(i => i.severity === "SUCCESS");
+    if (insightFilter === "alerts") return actionableInsights.filter(i => i.severity === "CRITICAL" || i.severity === "WARNING");
+    return actionableInsights;
+  }, [actionableInsights, insightFilter]);
 
   const chartCanvasWidth = isMobile ? width - 44 : isWide ? width - 340 : width - 100;
 
@@ -362,6 +362,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
             strokeWidth={12}
             color={healthColor}
             label={healthLabel}
+            sublabel={healthScore >= 80 ? "Optimal" : healthScore >= 60 ? "Stable" : "Watch"}
           />
           <View style={[styles.healthRight, isMobile && { alignItems: "center", width: "100%" }]}>
             <Text style={[styles.healthScore, { color: healthColor }]}>
@@ -403,18 +404,57 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
 
         {/* Insight summary badges */}
         <View style={styles.badgeRow}>
-          <View style={[styles.badge, { backgroundColor: "#10B98122", borderColor: "#10B98144" }]}>
+          <TouchableOpacity
+            style={[
+              styles.badge,
+              {
+                backgroundColor: "#10B98122",
+                borderColor: insightFilter === "positive" ? "#10B981" : "#10B98144",
+                borderWidth: insightFilter === "positive" ? 1.5 : 1,
+              },
+            ]}
+            onPress={() => setInsightFilter(f => f === "positive" ? "all" : "positive")}
+            activeOpacity={0.7}
+          >
             <SvgCheckCircle size={12} color="#10B981" />
-            <Text style={[styles.badgeText, { color: "#10B981" }]}>{positiveCount} Positive</Text>
-          </View>
-          <View style={[styles.badge, { backgroundColor: "#F43F5E22", borderColor: "#F43F5E44" }]}>
+            <Text style={[styles.badgeText, { color: "#10B981", fontFamily: insightFilter === "positive" ? "Inter_700Bold" : "Inter_600SemiBold" }]}>
+              {positiveCount} Positive
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.badge,
+              {
+                backgroundColor: "#F43F5E22",
+                borderColor: insightFilter === "alerts" ? "#F43F5E" : "#F43F5E44",
+                borderWidth: insightFilter === "alerts" ? 1.5 : 1,
+              },
+            ]}
+            onPress={() => setInsightFilter(f => f === "alerts" ? "all" : "alerts")}
+            activeOpacity={0.7}
+          >
             <SvgAlertTriangle size={12} color="#F43F5E" />
-            <Text style={[styles.badgeText, { color: "#F43F5E" }]}>{warningCount} Alerts</Text>
-          </View>
-          <View style={[styles.badge, { backgroundColor: "#3B82F622", borderColor: "#3B82F644" }]}>
+            <Text style={[styles.badgeText, { color: "#F43F5E", fontFamily: insightFilter === "alerts" ? "Inter_700Bold" : "Inter_600SemiBold" }]}>
+              {warningCount} Alerts
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.badge,
+              {
+                backgroundColor: "#3B82F622",
+                borderColor: insightFilter === "all" ? "#3B82F6" : "#3B82F644",
+                borderWidth: insightFilter === "all" ? 1.5 : 1,
+              },
+            ]}
+            onPress={() => setInsightFilter("all")}
+            activeOpacity={0.7}
+          >
             <SvgInfo size={12} color="#3B82F6" />
-            <Text style={[styles.badgeText, { color: "#3B82F6" }]}>{actionableInsights.length} Total</Text>
-          </View>
+            <Text style={[styles.badgeText, { color: "#3B82F6", fontFamily: insightFilter === "all" ? "Inter_700Bold" : "Inter_600SemiBold" }]}>
+              {actionableInsights.length} Total
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -727,68 +767,138 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
           <View>
             <Text style={[styles.cardTitle, { color: colors.foreground }]}>Total Transactions</Text>
             <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
-              {txStats.totalCount} Records · {txStats.inflowCount} Inflows · {txStats.outflowCount} Outflows
+              {txStats.totalCount} Records · {txStats.inflowCount} Inflows · {txStats.outflowCount} Outflows · Net: {txStats.netFlow >= 0 ? "+" : "-"}{settings.currency} {fmt(Math.abs(txStats.netFlow))}
             </Text>
           </View>
           <TouchableOpacity
             style={[styles.smBtn, { borderColor: colors.primary + "44", backgroundColor: colors.primary + "15" }]}
-            onPress={() => setAllTxModal(true)}
+            onPress={() => {
+              setTxModalFilter("all");
+              setAllTxModal(true);
+            }}
+            activeOpacity={0.7}
           >
-            <Text style={[styles.smBtnText, { color: colors.primary }]}>View All</Text>
+            <Text style={[styles.smBtnText, { color: colors.primary }]}>View All ({txStats.totalCount})</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.txStatsGrid}>
-          <View style={[styles.txStatBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
-            <View style={[styles.txStatIcon, { backgroundColor: colors.income + "18" }]}>
-              <SvgArrowDownLeft size={13} color={colors.income} />
+          {/* Box 1: Inflows */}
+          <TouchableOpacity
+            style={[styles.txStatBox, { backgroundColor: colors.background, borderColor: colors.border }]}
+            onPress={() => {
+              setTxModalFilter("income");
+              setAllTxModal(true);
+            }}
+            activeOpacity={0.7}
+          >
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <View style={[styles.txStatIcon, { backgroundColor: colors.income + "18" }]}>
+                <SvgArrowDownLeft size={13} color={colors.income} />
+              </View>
+              <Text style={{ fontSize: 9.5, color: colors.income, fontFamily: "Inter_600SemiBold" }}>View Inflows →</Text>
             </View>
             <Text style={[styles.txStatLabel, { color: colors.mutedForeground }]}>Inflows ({txStats.inflowCount})</Text>
             <Text style={[styles.txStatVal, { color: colors.income }]}>+{settings.currency} {fmt(txStats.inflowTotal)}</Text>
-          </View>
+            <Text style={{ fontSize: 9.5, color: colors.mutedForeground }}>
+              {txStats.inflowCount > 0 ? `${settings.currency} ${fmt(txStats.avgInflow)} avg` : "No inflows"}
+            </Text>
+          </TouchableOpacity>
 
-          <View style={[styles.txStatBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
-            <View style={[styles.txStatIcon, { backgroundColor: colors.expense + "18" }]}>
-              <SvgArrowUpRight size={13} color={colors.expense} />
+          {/* Box 2: Outflows */}
+          <TouchableOpacity
+            style={[styles.txStatBox, { backgroundColor: colors.background, borderColor: colors.border }]}
+            onPress={() => {
+              setTxModalFilter("expense");
+              setAllTxModal(true);
+            }}
+            activeOpacity={0.7}
+          >
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <View style={[styles.txStatIcon, { backgroundColor: colors.expense + "18" }]}>
+                <SvgArrowUpRight size={13} color={colors.expense} />
+              </View>
+              <Text style={{ fontSize: 9.5, color: colors.expense, fontFamily: "Inter_600SemiBold" }}>View Outflows →</Text>
             </View>
             <Text style={[styles.txStatLabel, { color: colors.mutedForeground }]}>Outflows ({txStats.outflowCount})</Text>
             <Text style={[styles.txStatVal, { color: colors.expense }]}>-{settings.currency} {fmt(txStats.outflowTotal)}</Text>
-          </View>
+            <Text style={{ fontSize: 9.5, color: colors.mutedForeground }}>
+              {txStats.outflowCount > 0 ? `${settings.currency} ${fmt(txStats.avgOutflow)} avg` : "No outflows"}
+            </Text>
+          </TouchableOpacity>
 
-          <View style={[styles.txStatBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
-            <View style={[styles.txStatIcon, { backgroundColor: "#38BDF818" }]}>
-              <SvgActivity size={13} color="#38BDF8" />
+          {/* Box 3: Net Cash Flow & Average Ticket */}
+          <TouchableOpacity
+            style={[styles.txStatBox, { backgroundColor: colors.background, borderColor: colors.border }]}
+            onPress={() => {
+              setTxModalFilter("all");
+              setAllTxModal(true);
+            }}
+            activeOpacity={0.7}
+          >
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <View style={[styles.txStatIcon, { backgroundColor: (txStats.netFlow >= 0 ? colors.income : colors.expense) + "18" }]}>
+                <SvgActivity size={13} color={txStats.netFlow >= 0 ? colors.income : colors.expense} />
+              </View>
+              <Text style={{ fontSize: 9.5, color: txStats.netFlow >= 0 ? colors.income : colors.expense, fontFamily: "Inter_600SemiBold" }}>
+                {txStats.netFlow >= 0 ? "Surplus" : "Deficit"}
+              </Text>
             </View>
-            <Text style={[styles.txStatLabel, { color: colors.mutedForeground }]}>Avg Ticket</Text>
-            <Text style={[styles.txStatVal, { color: colors.foreground }]}>{settings.currency} {fmt(txStats.avgTx)}</Text>
-          </View>
+            <Text style={[styles.txStatLabel, { color: colors.mutedForeground }]}>Net Cash Flow</Text>
+            <Text style={[styles.txStatVal, { color: txStats.netFlow >= 0 ? colors.income : colors.expense }]}>
+              {txStats.netFlow >= 0 ? "+" : "-"}{settings.currency} {fmt(Math.abs(txStats.netFlow))}
+            </Text>
+            <Text style={{ fontSize: 9.5, color: colors.mutedForeground }}>
+              Avg Ticket: {settings.currency} {fmt(txStats.avgTx)}
+            </Text>
+          </TouchableOpacity>
 
-          <View style={[styles.txStatBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
-            <View style={[styles.txStatIcon, { backgroundColor: "#F59E0B18" }]}>
-              <SvgAward size={13} color="#F59E0B" />
+          {/* Box 4: Max Transaction */}
+          <TouchableOpacity
+            style={[styles.txStatBox, { backgroundColor: colors.background, borderColor: colors.border }]}
+            onPress={() => {
+              setTxModalFilter(txStats.maxTx?.type === "expense" ? "expense" : "income");
+              setAllTxModal(true);
+            }}
+            activeOpacity={0.7}
+          >
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <View style={[styles.txStatIcon, { backgroundColor: "#F59E0B18" }]}>
+                <SvgAward size={13} color="#F59E0B" />
+              </View>
+              <Text style={{ fontSize: 9.5, color: "#F59E0B", fontFamily: "Inter_600SemiBold" }}>
+                {txStats.maxTx?.type === "expense" ? "Outflow" : "Inflow"}
+              </Text>
             </View>
             <Text style={[styles.txStatLabel, { color: colors.mutedForeground }]}>Max Transaction</Text>
             <Text style={[styles.txStatVal, { color: "#F59E0B" }]} numberOfLines={1}>
               {txStats.maxTx ? `${settings.currency} ${fmt(txStats.maxTx.amount)}` : "None"}
             </Text>
-          </View>
+            <Text style={{ fontSize: 9.5, color: colors.mutedForeground }} numberOfLines={1}>
+              {txStats.maxTx ? `${txStats.maxTx.category || txStats.maxTx.title || "Transaction"}` : "No records"}
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
 
       {/* ─── AI Insight Cards ─── */}
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-        {actionableInsights.length} Actionable Intelligence Insights
+        {displayedInsights.length} Actionable Intelligence Insights {insightFilter !== "all" ? `(${insightFilter === "positive" ? "Positive Only" : "Alerts Only"})` : ""}
       </Text>
 
-      {actionableInsights.length === 0 ? (
+      {displayedInsights.length === 0 ? (
         <View style={[styles.disclaimerBox, { backgroundColor: colors.card, borderColor: colors.border, paddingVertical: 20 }]}>
           <SvgCheckCircle size={24} color="#10B981" />
           <Text style={[styles.disclaimerText, { color: colors.foreground, fontSize: 13, marginTop: 6 }]}>
-            No anomalies or critical alerts detected. All financial metrics are within standard operational limits.
+            {insightFilter === "alerts"
+              ? "No critical alerts or warnings found in this period."
+              : insightFilter === "positive"
+              ? "No positive insights recorded in this period."
+              : "No anomalies or critical alerts detected. All financial metrics are within standard operational limits."}
           </Text>
         </View>
       ) : (
-        actionableInsights.map((insight) => {
+        displayedInsights.map((insight) => {
           const conf = SEV_CONFIG[insight.severity] || SEV_CONFIG.INFO;
           return (
             <View
@@ -864,7 +974,10 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
       <AllTransactionsModal
         visible={allTxModal}
         onClose={() => setAllTxModal(false)}
-        transactions={transactions}
+        transactions={displayedTxs}
+        initialFilter={txModalFilter}
+        title={selectedPoint ? `Transactions in ${selectedPoint.label}` : `Transactions · ${activePeriod.label}`}
+        subtitle={`${displayedTxs.length} Records (${txStats.inflowCount} Inflows, ${txStats.outflowCount} Outflows) · Net: ${txStats.netFlow >= 0 ? "+" : "-"}${settings.currency} ${fmt(Math.abs(txStats.netFlow))}`}
       />
     </ScrollView>
   );
