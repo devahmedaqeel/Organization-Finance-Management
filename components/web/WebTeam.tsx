@@ -338,22 +338,22 @@ export function WebTeam() {
       ) : (
         <View style={[styles.tableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <ScrollView horizontal contentContainerStyle={{ minWidth: "100%" }} showsHorizontalScrollIndicator={true}>
-            <View style={{ minWidth: 960, width: "100%" }}>
+            <View style={{ minWidth: 680, width: "100%" }}>
               <View style={[styles.tableHeader, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-                <View style={[styles.thCol, { flex: 1.3, minWidth: 260, paddingLeft: 16, paddingRight: 12, alignItems: "flex-start", justifyContent: "center" }]}>
+                <View style={[styles.thCol, { flex: 1.5, minWidth: 160, paddingLeft: 14, paddingRight: 8, alignItems: "flex-start", justifyContent: "center" }]}>
                   <Text style={[styles.thText, { color: colors.mutedForeground }]}>MEMBER</Text>
                 </View>
-                <View style={[styles.thCol, { flex: 1.4, minWidth: 250, paddingHorizontal: 12, alignItems: "flex-start", justifyContent: "center" }]}>
+                <View style={[styles.thCol, { flex: 1.8, minWidth: 170, paddingHorizontal: 8, alignItems: "flex-start", justifyContent: "center" }]}>
                   <Text style={[styles.thText, { color: colors.mutedForeground }]}>EMAIL</Text>
                 </View>
-                <View style={[styles.thCol, { flex: 0.8, minWidth: 140, paddingHorizontal: 12, alignItems: "flex-start", justifyContent: "center" }]}>
+                <View style={[styles.thCol, { flex: 1.0, minWidth: 100, paddingHorizontal: 8, alignItems: "flex-start", justifyContent: "center" }]}>
                   <Text style={[styles.thText, { color: colors.mutedForeground }]}>ROLE</Text>
                 </View>
-                <View style={[styles.thCol, { flex: 0.7, minWidth: 120, paddingHorizontal: 12, alignItems: "flex-start", justifyContent: "center" }]}>
+                <View style={[styles.thCol, { flex: 0.8, minWidth: 80, paddingHorizontal: 8, alignItems: "flex-start", justifyContent: "center" }]}>
                   <Text style={[styles.thText, { color: colors.mutedForeground }]}>STATUS</Text>
                 </View>
                 {canManage && (
-                  <View style={[styles.thCol, { flex: 0.8, minWidth: 130, paddingRight: 16, paddingLeft: 12, alignItems: "flex-end", justifyContent: "center" }]}>
+                  <View style={[styles.thCol, { flex: 0.9, minWidth: 90, paddingRight: 14, paddingLeft: 8, alignItems: "flex-end", justifyContent: "center" }]}>
                     <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>ACTIONS</Text>
                   </View>
                 )}
@@ -373,7 +373,7 @@ export function WebTeam() {
                       },
                     ]}
                   >
-                    <View style={[styles.tdCol, { flex: 1.3, minWidth: 260, paddingLeft: 16, paddingRight: 12, flexDirection: "row", alignItems: "center", justifyContent: "flex-start", gap: 12 }]}>
+                    <View style={[styles.tdCol, { flex: 1.5, minWidth: 160, paddingLeft: 14, paddingRight: 8, flexDirection: "row", alignItems: "center", justifyContent: "flex-start", gap: 10 }]}>
                       <View style={[styles.avatarBox, { backgroundColor: roleCfg.bg }]}>
                         <Text style={[styles.avatarText, { color: roleCfg.color }]}>
                           {(m.name || m.email || "U").charAt(0).toUpperCase()}
@@ -386,25 +386,25 @@ export function WebTeam() {
                       </View>
                     </View>
 
-                    <View style={[styles.tdCol, { flex: 1.4, minWidth: 250, paddingHorizontal: 12, alignItems: "flex-start", justifyContent: "center" }]}>
+                    <View style={[styles.tdCol, { flex: 1.8, minWidth: 170, paddingHorizontal: 8, alignItems: "flex-start", justifyContent: "center" }]}>
                       <Text style={[styles.memberEmail, { color: colors.mutedForeground }]} numberOfLines={1}>
                         {m.email}
                       </Text>
                     </View>
 
-                    <View style={[styles.tdCol, { flex: 0.8, minWidth: 140, paddingHorizontal: 12, alignItems: "flex-start", justifyContent: "center" }]}>
+                    <View style={[styles.tdCol, { flex: 1.0, minWidth: 100, paddingHorizontal: 8, alignItems: "flex-start", justifyContent: "center" }]}>
                       <View style={[styles.roleBadge, { backgroundColor: roleCfg.bg, borderColor: roleCfg.border, borderWidth: 1 }]}>
                         <Text style={[styles.roleBadgeText, { color: roleCfg.color }]}>{roleCfg.label}</Text>
                       </View>
                     </View>
 
-                    <View style={[styles.tdCol, { flex: 0.7, minWidth: 120, paddingHorizontal: 12, flexDirection: "row", alignItems: "center", justifyContent: "flex-start", gap: 7 }]}>
-                      <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: "#10B981" }} />
+                    <View style={[styles.tdCol, { flex: 0.8, minWidth: 80, paddingHorizontal: 8, flexDirection: "row", alignItems: "center", justifyContent: "flex-start", gap: 6 }]}>
+                      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#10B981" }} />
                       <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#10B981" }}>Active</Text>
                     </View>
 
                     {canManage && (
-                      <View style={[styles.tdCol, { flex: 0.8, minWidth: 130, paddingRight: 16, paddingLeft: 12, alignItems: "flex-end", justifyContent: "center" }]}>
+                      <View style={[styles.tdCol, { flex: 0.9, minWidth: 90, paddingRight: 14, paddingLeft: 8, alignItems: "flex-end", justifyContent: "center" }]}>
                         {!isCurrent ? (
                           <TouchableOpacity
                             style={[styles.actionBtn, { borderColor: "#6366F135", backgroundColor: "#6366F112" }]}

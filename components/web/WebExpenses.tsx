@@ -56,6 +56,20 @@ export function WebExpenses({ onOpenReport }: WebExpensesProps) {
     return Array.from(new Set([...defaultCats, ...dynamicCats]));
   }, [expenseTransactions]);
 
+  // Deduplicated Unique Departments list
+  const uniqueDepartments = useMemo(() => {
+    const seen = new Set<string>();
+    const list: string[] = [];
+    departments.forEach((d) => {
+      const name = d.name?.trim();
+      if (name && !seen.has(name.toLowerCase())) {
+        seen.add(name.toLowerCase());
+        list.push(name);
+      }
+    });
+    return list;
+  }, [departments]);
+
   // Filtered & Sorted
   const filteredTransactions = useMemo(() => {
     let list = expenseTransactions.filter((t) => {
@@ -222,9 +236,9 @@ export function WebExpenses({ onOpenReport }: WebExpensesProps) {
           </ScrollView>
         </View>
 
-        {/* Department Filter Pills */}
+        {/* Department Filter Pills (Deduplicated) */}
         <View style={styles.filterGroup}>
-          <Text style={[styles.filterLabel, { color: colors.mutedForeground }]}>Department:</Text>
+          <Text style={[styles.filterLabel, { color: colors.mutedForeground }]}>Cost Center:</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={{ flexDirection: "row", gap: 6 }}>
               <TouchableOpacity
@@ -246,25 +260,25 @@ export function WebExpenses({ onOpenReport }: WebExpensesProps) {
                   All Cost Centers
                 </Text>
               </TouchableOpacity>
-              {departments.map((d) => (
+              {uniqueDepartments.map((deptName) => (
                 <TouchableOpacity
-                  key={d.id}
+                  key={deptName}
                   style={[
                     styles.filterChip,
                     {
-                      backgroundColor: selectedDepartment === d.name ? colors.primary : colors.background,
-                      borderColor: selectedDepartment === d.name ? "transparent" : colors.border,
+                      backgroundColor: selectedDepartment === deptName ? colors.primary : colors.background,
+                      borderColor: selectedDepartment === deptName ? "transparent" : colors.border,
                     },
                   ]}
-                  onPress={() => setSelectedDepartment(d.name)}
+                  onPress={() => setSelectedDepartment(deptName)}
                 >
                   <Text
                     style={[
                       styles.filterChipText,
-                      { color: selectedDepartment === d.name ? "#FFFFFF" : colors.foreground },
+                      { color: selectedDepartment === deptName ? "#FFFFFF" : colors.foreground },
                     ]}
                   >
-                    {d.name}
+                    {deptName}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -344,11 +358,11 @@ export function WebExpenses({ onOpenReport }: WebExpensesProps) {
       ) : (
         <View style={[styles.tableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <ScrollView horizontal contentContainerStyle={{ minWidth: "100%" }} showsHorizontalScrollIndicator={true}>
-            <View style={{ minWidth: 920, width: "100%" }}>
+            <View style={{ minWidth: 690, width: "100%" }}>
               {/* Table Header */}
               <View style={[styles.tableHeader, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
                 <TouchableOpacity
-                  style={[styles.thCol, { flex: 1.1, minWidth: 105, paddingLeft: 16, paddingRight: 8 }]}
+                  style={[styles.thCol, { flex: 0.9, minWidth: 85, paddingLeft: 14, paddingRight: 6 }]}
                   onPress={() => {
                     if (sortField === "date") setSortAsc(!sortAsc);
                     else {
@@ -362,7 +376,7 @@ export function WebExpenses({ onOpenReport }: WebExpensesProps) {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.thCol, { flex: 1.4, minWidth: 130, paddingHorizontal: 8 }]}
+                  style={[styles.thCol, { flex: 1.1, minWidth: 95, paddingHorizontal: 6 }]}
                   onPress={() => {
                     if (sortField === "category") setSortAsc(!sortAsc);
                     else {
@@ -375,20 +389,20 @@ export function WebExpenses({ onOpenReport }: WebExpensesProps) {
                   {sortField === "category" && <SvgChevronDown size={11} color={colors.primary} />}
                 </TouchableOpacity>
 
-                <View style={[styles.thCol, { flex: 2.2, minWidth: 190, paddingHorizontal: 8 }]}>
-                  <Text style={[styles.thText, { color: colors.mutedForeground }]}>DESCRIPTION / REFERENCE</Text>
+                <View style={[styles.thCol, { flex: 2.0, minWidth: 140, paddingHorizontal: 6 }]}>
+                  <Text style={[styles.thText, { color: colors.mutedForeground }]}>DESCRIPTION / REF</Text>
                 </View>
 
-                <View style={[styles.thCol, { flex: 1.5, minWidth: 140, paddingHorizontal: 8 }]}>
+                <View style={[styles.thCol, { flex: 1.3, minWidth: 110, paddingHorizontal: 6 }]}>
                   <Text style={[styles.thText, { color: colors.mutedForeground }]}>DEPARTMENT</Text>
                 </View>
 
-                <View style={[styles.thCol, { flex: 1.1, minWidth: 100, paddingHorizontal: 8 }]}>
+                <View style={[styles.thCol, { flex: 0.9, minWidth: 80, paddingHorizontal: 6 }]}>
                   <Text style={[styles.thText, { color: colors.mutedForeground }]}>METHOD</Text>
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.thCol, { flex: 1.4, minWidth: 125, paddingHorizontal: 8, justifyContent: "flex-end" }]}
+                  style={[styles.thCol, { flex: 1.3, minWidth: 110, paddingHorizontal: 6, justifyContent: "flex-end" }]}
                   onPress={() => {
                     if (sortField === "amount") setSortAsc(!sortAsc);
                     else {
@@ -402,7 +416,7 @@ export function WebExpenses({ onOpenReport }: WebExpensesProps) {
                 </TouchableOpacity>
 
                 {canEdit && (
-                  <View style={[styles.thCol, { flex: 1.0, minWidth: 90, paddingRight: 16, paddingLeft: 8, justifyContent: "flex-end" }]}>
+                  <View style={[styles.thCol, { flex: 0.8, minWidth: 70, paddingRight: 14, paddingLeft: 6, justifyContent: "flex-end" }]}>
                     <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>ACTIONS</Text>
                   </View>
                 )}
@@ -420,17 +434,17 @@ export function WebExpenses({ onOpenReport }: WebExpensesProps) {
               ) : (
                 filteredTransactions.map((tx) => (
                   <View key={tx.id} style={[styles.tableRow, { borderBottomColor: colors.border }]}>
-                    <View style={[styles.tdCol, { flex: 1.1, minWidth: 105, paddingLeft: 16, paddingRight: 8 }]}>
+                    <View style={[styles.tdCol, { flex: 0.9, minWidth: 85, paddingLeft: 14, paddingRight: 6 }]}>
                       <Text style={[styles.dateText, { color: colors.foreground }]} numberOfLines={1}>{tx.date}</Text>
                     </View>
 
-                    <View style={[styles.tdCol, { flex: 1.4, minWidth: 130, paddingHorizontal: 8 }]}>
+                    <View style={[styles.tdCol, { flex: 1.1, minWidth: 95, paddingHorizontal: 6 }]}>
                       <View style={[styles.catBadge, { backgroundColor: colors.expense + "18" }]}>
                         <Text style={[styles.catBadgeText, { color: colors.expense }]} numberOfLines={1}>{tx.category}</Text>
                       </View>
                     </View>
 
-                    <View style={[styles.tdCol, { flex: 2.2, minWidth: 190, paddingHorizontal: 8 }]}>
+                    <View style={[styles.tdCol, { flex: 2.0, minWidth: 140, paddingHorizontal: 6 }]}>
                       <Text style={[styles.descText, { color: colors.foreground }]} numberOfLines={1}>
                         {tx.description || "No description provided"}
                       </Text>
@@ -439,26 +453,26 @@ export function WebExpenses({ onOpenReport }: WebExpensesProps) {
                       </Text>
                     </View>
 
-                    <View style={[styles.tdCol, { flex: 1.5, minWidth: 140, paddingHorizontal: 8 }]}>
+                    <View style={[styles.tdCol, { flex: 1.3, minWidth: 110, paddingHorizontal: 6 }]}>
                       <Text style={[styles.deptText, { color: colors.foreground }]} numberOfLines={1}>
                         {tx.department}
                       </Text>
                     </View>
 
-                    <View style={[styles.tdCol, { flex: 1.1, minWidth: 100, paddingHorizontal: 8 }]}>
+                    <View style={[styles.tdCol, { flex: 0.9, minWidth: 80, paddingHorizontal: 6 }]}>
                       <Text style={[styles.methodText, { color: colors.mutedForeground }]} numberOfLines={1}>
                         {tx.paymentMethod || "Electronic"}
                       </Text>
                     </View>
 
-                    <View style={[styles.tdCol, { flex: 1.4, minWidth: 125, paddingHorizontal: 8, alignItems: "flex-end" }]}>
-                      <Text style={[styles.amountText, { color: colors.expense }]} numberOfLines={1}>
+                    <View style={[styles.tdCol, { flex: 1.3, minWidth: 110, paddingHorizontal: 6, alignItems: "flex-end" }]}>
+                      <Text style={[styles.amountText, { color: colors.expense, textAlign: "right" }]} numberOfLines={1}>
                         -{settings.currency} {tx.amount.toLocaleString()}
                       </Text>
                     </View>
 
                     {canEdit && (
-                      <View style={[styles.tdCol, { flex: 1.0, minWidth: 90, paddingRight: 16, paddingLeft: 8, flexDirection: "row", justifyContent: "flex-end", gap: 6 }]}>
+                      <View style={[styles.tdCol, { flex: 0.8, minWidth: 70, paddingRight: 14, paddingLeft: 6, flexDirection: "row", justifyContent: "flex-end", gap: 4 }]}>
                         <TouchableOpacity
                           style={[styles.actionIconBtn, { borderColor: "#3B82F630", backgroundColor: "#3B82F612" }]}
                           onPress={() => {
@@ -466,14 +480,14 @@ export function WebExpenses({ onOpenReport }: WebExpensesProps) {
                             setModalVisible(true);
                           }}
                         >
-                          <SvgEdit size={14} color="#3B82F6" />
+                          <SvgEdit size={13} color="#3B82F6" />
                         </TouchableOpacity>
 
                         <TouchableOpacity
                           style={[styles.actionIconBtn, { borderColor: "#F43F5E30", backgroundColor: "#F43F5E12" }]}
                           onPress={() => setDeletingTx(tx)}
                         >
-                          <SvgTrash size={14} color="#F43F5E" />
+                          <SvgTrash size={13} color="#F43F5E" />
                         </TouchableOpacity>
                       </View>
                     )}
@@ -521,9 +535,9 @@ const styles = StyleSheet.create({
     maxWidth: "100%",
   },
   content: {
-    padding: 24,
-    gap: 20,
-    paddingBottom: 60,
+    padding: 18,
+    gap: 14,
+    paddingBottom: 40,
     minWidth: 0,
     width: "100%",
     maxWidth: "100%",
@@ -531,42 +545,42 @@ const styles = StyleSheet.create({
   pageHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
+    alignItems: "center",
     flexWrap: "wrap",
-    gap: 14,
+    gap: 12,
   },
   titleIconBadge: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
   },
   pageTitle: {
-    fontSize: 22,
+    fontSize: 19,
     fontFamily: "Inter_800ExtraBold",
-    letterSpacing: -0.6,
+    letterSpacing: -0.4,
   },
   pageSubtitle: {
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: "Inter_400Regular",
     letterSpacing: -0.1,
-    marginTop: 2,
+    marginTop: 1,
   },
   headerRightActions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
     flexWrap: "wrap",
   },
   primaryBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 7,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
@@ -574,90 +588,90 @@ const styles = StyleSheet.create({
   },
   primaryBtnText: {
     color: "#FFFFFF",
-    fontSize: 13,
+    fontSize: 12.5,
     fontFamily: "Inter_700Bold",
   },
   outlineBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 7,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
     borderWidth: 1,
   },
   outlineBtnText: {
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: "Inter_600SemiBold",
   },
   metricsGrid: {
     flexDirection: "row",
-    gap: 14,
+    gap: 10,
     flexWrap: "wrap",
   },
   metricCard: {
     flex: 1,
-    minWidth: 200,
-    borderRadius: 16,
+    minWidth: 180,
+    borderRadius: 12,
     borderWidth: 1,
-    padding: 16,
-    gap: 4,
+    padding: 12,
+    gap: 2,
   },
   metricLabel: {
-    fontSize: 10.5,
+    fontSize: 9.5,
     fontFamily: "Inter_700Bold",
-    letterSpacing: 0.6,
+    letterSpacing: 0.5,
   },
   metricValue: {
-    fontSize: 22,
+    fontSize: 18,
     fontFamily: "Inter_800ExtraBold",
-    letterSpacing: -0.6,
-    marginVertical: 2,
+    letterSpacing: -0.4,
+    marginVertical: 1,
   },
   metricSub: {
-    fontSize: 11.5,
+    fontSize: 10.5,
     fontFamily: "Inter_400Regular",
   },
   filterBarCard: {
-    borderRadius: 16,
+    borderRadius: 12,
     borderWidth: 1,
-    padding: 14,
-    gap: 12,
+    padding: 10,
+    gap: 8,
   },
   searchWrap: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 12,
-    height: 42,
-    borderRadius: 10,
+    gap: 8,
+    paddingHorizontal: 10,
+    height: 38,
+    borderRadius: 8,
     borderWidth: 1,
   },
   searchInput: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 12.5,
     fontFamily: "Inter_500Medium",
     outlineStyle: "none",
   } as any,
   filterGroup: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
   },
   filterLabel: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
-    width: 80,
+    width: 76,
   },
   filterChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
     borderWidth: 1,
   },
   filterChipText: {
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: "Inter_600SemiBold",
   },
   mobileCard: {
