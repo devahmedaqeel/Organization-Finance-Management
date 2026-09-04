@@ -158,9 +158,31 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
     ? (displayedExpense / displayedIncome) * 100
     : (displayedExpense > 0 ? 100 : 0);
 
+  // Consolidated unique budgets (aggregating multiple allocations for the same category & department)
+  const consolidatedBudgets = useMemo(() => {
+    const map = new Map<string, { id: string; category: string; department?: string; allocated: number }>();
+    budgets.forEach((b) => {
+      const cat = (b.category || "General").trim();
+      const dept = (b.department && b.department !== "All" && b.department !== "General") ? b.department.trim() : "All";
+      const key = `${cat.toLowerCase()}:::${dept.toLowerCase()}`;
+      const existing = map.get(key);
+      if (existing) {
+        existing.allocated += Number(b.allocated || 0);
+      } else {
+        map.set(key, {
+          id: key,
+          category: cat,
+          department: dept === "All" ? undefined : dept,
+          allocated: Number(b.allocated || 0),
+        });
+      }
+    });
+    return Array.from(map.values());
+  }, [budgets]);
+
   const displayedBudgetSpent = useMemo(() => {
-    if (budgets.length === 0) return 0;
-    const totalSpentOnBudgets = budgets.reduce((sum, b) => {
+    if (consolidatedBudgets.length === 0) return 0;
+    const totalSpentOnBudgets = consolidatedBudgets.reduce((sum, b) => {
       const catSpent = displayedTxs
         .filter(
           (t) =>
@@ -172,7 +194,8 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
       return sum + catSpent;
     }, 0);
     return totalSpentOnBudgets > 0 ? totalSpentOnBudgets : Math.min(displayedExpense, totalAllocatedBudget);
-  }, [budgets, displayedTxs, displayedExpense, totalAllocatedBudget]);
+  }, [consolidatedBudgets, displayedTxs, displayedExpense, totalAllocatedBudget]);
+
 
   const displayedBudgetUtil = totalAllocatedBudget > 0 ? (displayedBudgetSpent / totalAllocatedBudget) * 100 : 0;
 
@@ -228,9 +251,9 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
       .map(([label, value], i) => ({ label, value, color: CAT_COLORS[i % CAT_COLORS.length] }));
   }, [displayedTxs]);
 
-  // Budget bar items computed from displayed transactions
+  // Budget bar items computed from displayed transactions and consolidated budgets
   const budgetItems = useMemo(() =>
-    budgets.map((b) => {
+    consolidatedBudgets.map((b) => {
       const spent = displayedTxs
         .filter(
           (t) =>
@@ -253,7 +276,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
         sublabel: `Budget: ${settings.currency} ${fmt(b.allocated)}`,
       };
     }),
-  [budgets, displayedTxs, settings.currency]);
+  [consolidatedBudgets, displayedTxs, settings.currency]);
 
   // Authoritative real-time net surplus margin computed directly from active timeline scope
   const { periodGrowth, periodGrowthLabel } = useMemo(() => {
@@ -730,56 +753,78 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
       {/* ─── 2-Column Section: Department Spending & Budget vs Actual ─── */}
       <View style={[styles.twoColSection, isMobile && { flexDirection: "column" }]}>
         {/* Department Spending Bars */}
-        <View style={[styles.card, { flex: 1, backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={styles.cardHeaderRow}>
-            <View>
-              <Text style={[styles.cardTitle, { color: colors.foreground }]}>Department Spending</Text>
-              <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
-                {selectedPoint ? `Allocations in ${selectedPoint.fullDate || selectedPoint.label}` : "Expense allocation by unit"}
-              </Text>
+        <View style={[styles.card, { flex: 1, backgroundColor: colors.card, borderColor: colors.border, justifyContent: "space-between" }]}>
+          <View>
+            <View style={styles.cardHeaderRow}>
+              <View>
+                <Text style={[styles.cardTitle, { color: colors.foreground }]}>Department Spending</Text>
+                <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
+                  {selectedPoint ? `Allocations in ${selectedPoint.fullDate || selectedPoint.label}` : "Expense allocation by unit"}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.smBtn, { borderColor: colors.border }]}
+                onPress={() => onNavigate ? onNavigate("departments") : null}
+              >
+                <Text style={[styles.smBtnText, { color: colors.primary }]}>Details</Text>
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity
-              style={[styles.smBtn, { borderColor: colors.border }]}
-              onPress={() => onNavigate ? onNavigate("departments") : null}
-            >
-              <Text style={[styles.smBtnText, { color: colors.primary }]}>Details</Text>
-            </TouchableOpacity>
+            {deptSpend.length > 0 ? (
+              <ScrollView style={{ maxHeight: 330 }} showsVerticalScrollIndicator={true} nestedScrollEnabled={true}>
+                <HBarChart items={deptSpend} formatValue={v => `${settings.currency} ${fmt(v)}`} />
+              </ScrollView>
+            ) : (
+              <View style={{ paddingVertical: 20, alignItems: "center" }}>
+                <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>No departmental disbursements recorded.</Text>
+              </View>
+            )}
           </View>
-          {deptSpend.length > 0 ? (
-            <HBarChart items={deptSpend} formatValue={v => `${settings.currency} ${fmt(v)}`} />
-          ) : (
-            <View style={{ paddingVertical: 20, alignItems: "center" }}>
-              <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>No departmental disbursements recorded.</Text>
-            </View>
-          )}
+
+          {/* Department spending summary */}
+          <View style={[styles.budgetSummaryRow, { marginTop: 12 }]}>
+            {[
+              { label: "Total Disbursed", value: `${settings.currency} ${fmt(deptSpend.reduce((s, d) => s + d.value, 0))}`, color: colors.primary },
+              { label: "Active Units", value: `${deptSpend.length} Units`, color: colors.income },
+              { label: "Top Cost Center", value: deptSpend[0]?.label || "None", color: colors.expense },
+            ].map((s, i) => (
+              <View key={i} style={[styles.budgetSumCard, { backgroundColor: s.color + "15", borderColor: s.color + "33" }]}>
+                <Text style={[styles.budgetSumValue, { color: s.color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{s.value}</Text>
+                <Text style={[styles.budgetSumLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
+              </View>
+            ))}
+          </View>
         </View>
 
         {/* Budget Utilization Bars */}
-        <View style={[styles.card, { flex: 1, backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={styles.cardHeaderRow}>
-            <View>
-              <Text style={[styles.cardTitle, { color: colors.foreground }]}>Budget vs Actual</Text>
-              <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
-                {selectedPoint ? `Spending during ${selectedPoint.fullDate || selectedPoint.label}` : "Spending per budget category"}
-              </Text>
+        <View style={[styles.card, { flex: 1, backgroundColor: colors.card, borderColor: colors.border, justifyContent: "space-between" }]}>
+          <View>
+            <View style={styles.cardHeaderRow}>
+              <View>
+                <Text style={[styles.cardTitle, { color: colors.foreground }]}>Budget vs Actual</Text>
+                <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
+                  {selectedPoint ? `Spending during ${selectedPoint.fullDate || selectedPoint.label}` : "Spending per budget category"}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.smBtn, { borderColor: colors.border }]}
+                onPress={() => onNavigate ? onNavigate("budget") : null}
+              >
+                <Text style={[styles.smBtnText, { color: colors.primary }]}>Manage</Text>
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity
-              style={[styles.smBtn, { borderColor: colors.border }]}
-              onPress={() => onNavigate ? onNavigate("budget") : null}
-            >
-              <Text style={[styles.smBtnText, { color: colors.primary }]}>Manage</Text>
-            </TouchableOpacity>
+            {budgetItems.length > 0 ? (
+              <ScrollView style={{ maxHeight: 330 }} showsVerticalScrollIndicator={true} nestedScrollEnabled={true}>
+                <HBarChart items={budgetItems} formatValue={v => `${settings.currency} ${fmt(v)}`} />
+              </ScrollView>
+            ) : (
+              <View style={{ paddingVertical: 20, alignItems: "center" }}>
+                <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>No active budgets configured.</Text>
+              </View>
+            )}
           </View>
-          {budgetItems.length > 0 ? (
-            <HBarChart items={budgetItems} formatValue={v => `${settings.currency} ${fmt(v)}`} />
-          ) : (
-            <View style={{ paddingVertical: 20, alignItems: "center" }}>
-              <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>No active budgets configured.</Text>
-            </View>
-          )}
 
           {/* Budget progress summary */}
-          <View style={styles.budgetSummaryRow}>
+          <View style={[styles.budgetSummaryRow, { marginTop: 12 }]}>
             {[
               { label: "Total Allocated", value: `${settings.currency} ${fmt(totalAllocatedBudget)}`, color: colors.primary },
               { label: "Total Spent", value: `${settings.currency} ${fmt(displayedBudgetSpent)}`, color: colors.expense },

@@ -50,6 +50,8 @@ firebase-adminsdk*.json
 # typescript
 *.tsbuildinfo
 .vercel
+.firebase/
 powershell.cmd
 powershell.bat
+
 

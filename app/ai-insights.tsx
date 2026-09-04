@@ -136,9 +136,31 @@ export default function AIInsightsScreen() {
   const expenseRatio = displayedIncome > 0
     ? (displayedExpense / displayedIncome) * 100
     : (displayedExpense > 0 ? 100 : 0);
+  // Consolidated unique budgets (aggregating multiple allocations for the same category & department)
+  const consolidatedBudgets = useMemo(() => {
+    const map = new Map<string, { id: string; category: string; department?: string; allocated: number }>();
+    budgets.forEach((b) => {
+      const cat = (b.category || "General").trim();
+      const dept = (b.department && b.department !== "All" && b.department !== "General") ? b.department.trim() : "All";
+      const key = `${cat.toLowerCase()}:::${dept.toLowerCase()}`;
+      const existing = map.get(key);
+      if (existing) {
+        existing.allocated += Number(b.allocated || 0);
+      } else {
+        map.set(key, {
+          id: key,
+          category: cat,
+          department: dept === "All" ? undefined : dept,
+          allocated: Number(b.allocated || 0),
+        });
+      }
+    });
+    return Array.from(map.values());
+  }, [budgets]);
+
   const displayedBudgetSpent = useMemo(() => {
-    if (budgets.length === 0) return 0;
-    const totalSpentOnBudgets = budgets.reduce((sum, b) => {
+    if (consolidatedBudgets.length === 0) return 0;
+    const totalSpentOnBudgets = consolidatedBudgets.reduce((sum, b) => {
       const catSpent = displayedTxs
         .filter(
           (t) =>
@@ -150,7 +172,7 @@ export default function AIInsightsScreen() {
       return sum + catSpent;
     }, 0);
     return totalSpentOnBudgets > 0 ? totalSpentOnBudgets : Math.min(displayedExpense, totalAllocatedBudget);
-  }, [budgets, displayedTxs, displayedExpense, totalAllocatedBudget]);
+  }, [consolidatedBudgets, displayedTxs, displayedExpense, totalAllocatedBudget]);
   const displayedBudgetUtil = totalAllocatedBudget > 0 ? (displayedBudgetSpent / totalAllocatedBudget) * 100 : 0;
 
   // Transaction Metrics computed strictly from displayed transactions
@@ -205,9 +227,9 @@ export default function AIInsightsScreen() {
       .map(([label, value], i) => ({ label, value, color: CAT_COLORS[i % CAT_COLORS.length] }));
   }, [displayedTxs]);
 
-  // Budget bar items computed from displayed transactions
+  // Budget bar items computed from displayed transactions and consolidated budgets
   const budgetItems = useMemo(() =>
-    budgets.map((b) => {
+    consolidatedBudgets.map((b) => {
       const spent = displayedTxs
         .filter(
           (t) =>
@@ -230,7 +252,7 @@ export default function AIInsightsScreen() {
         sublabel: `Budget: ${settings.currency} ${fmt(b.allocated)}`,
       };
     }),
-  [budgets, displayedTxs, settings.currency]);
+  [consolidatedBudgets, displayedTxs, settings.currency]);
 
   // Real-time period growth and margin computed directly from active chart timeline data
   const { periodGrowth, periodGrowthLabel } = useMemo(() => {
