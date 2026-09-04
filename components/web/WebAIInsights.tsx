@@ -247,35 +247,46 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
       const dept = t.department || "General";
       map[dept] = (map[dept] ?? 0) + t.amount;
     });
+    const totalDept = Object.values(map).reduce((s, v) => s + v, 0);
     return Object.entries(map).sort((a, b) => b[1] - a[1])
-      .map(([label, value], i) => ({ label, value, color: CAT_COLORS[i % CAT_COLORS.length] }));
+      .map(([label, value], i) => {
+        const pct = totalDept > 0 ? ((value / totalDept) * 100).toFixed(1) : "0.0";
+        return {
+          label,
+          value,
+          color: CAT_COLORS[i % CAT_COLORS.length],
+          sublabel: `${pct}% of departmental outflows`,
+        };
+      });
   }, [displayedTxs]);
 
-  // Budget bar items computed from displayed transactions and consolidated budgets
+  // Budget bar items computed from displayed transactions and consolidated budgets, sorted with active spending first
   const budgetItems = useMemo(() =>
-    consolidatedBudgets.map((b) => {
-      const spent = displayedTxs
-        .filter(
-          (t) =>
-            t.type === "expense" &&
-            t.category?.toLowerCase() === b.category?.toLowerCase() &&
-            (!b.department || b.department === "All" || b.department === "General" || t.department?.toLowerCase() === b.department.toLowerCase())
-        )
-        .reduce((s, t) => s + Number(t.amount || 0), 0);
-      const label = b.department && b.department !== "All" && b.department !== "General"
-        ? `${b.category} · ${b.department}`
-        : b.category;
-      return {
-        label,
-        value: spent,
-        color: b.allocated > 0 && (spent / b.allocated) > 0.85
-          ? "#F43F5E"
-          : b.allocated > 0 && (spent / b.allocated) > 0.6
-          ? "#F59E0B"
-          : "#10B981",
-        sublabel: `Budget: ${settings.currency} ${fmt(b.allocated)}`,
-      };
-    }),
+    consolidatedBudgets
+      .map((b) => {
+        const spent = displayedTxs
+          .filter(
+            (t) =>
+              t.type === "expense" &&
+              t.category?.toLowerCase() === b.category?.toLowerCase() &&
+              (!b.department || b.department === "All" || b.department === "General" || t.department?.toLowerCase() === b.department.toLowerCase())
+          )
+          .reduce((s, t) => s + Number(t.amount || 0), 0);
+        const label = b.department && b.department !== "All" && b.department !== "General"
+          ? `${b.category} · ${b.department}`
+          : b.category;
+        return {
+          label,
+          value: spent,
+          color: b.allocated > 0 && (spent / b.allocated) > 0.85
+            ? "#F43F5E"
+            : b.allocated > 0 && (spent / b.allocated) > 0.6
+            ? "#F59E0B"
+            : "#10B981",
+          sublabel: `Budget: ${settings.currency} ${fmt(b.allocated)}`,
+        };
+      })
+      .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label)),
   [consolidatedBudgets, displayedTxs, settings.currency]);
 
   // Authoritative real-time net surplus margin computed directly from active timeline scope
@@ -769,19 +780,47 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
                 <Text style={[styles.smBtnText, { color: colors.primary }]}>Details</Text>
               </TouchableOpacity>
             </View>
+
             {deptSpend.length > 0 ? (
-              <ScrollView style={{ maxHeight: 330 }} showsVerticalScrollIndicator={true} nestedScrollEnabled={true}>
+              <View style={{ paddingVertical: 4 }}>
                 <HBarChart items={deptSpend} formatValue={v => `${settings.currency} ${fmt(v)}`} />
-              </ScrollView>
+              </View>
             ) : (
               <View style={{ paddingVertical: 20, alignItems: "center" }}>
-                <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>No departmental disbursements recorded.</Text>
+                <Text style={{ color: colors.mutedForeground, fontSize: 13, fontFamily: "Inter_500Medium" }}>No departmental disbursements recorded.</Text>
+              </View>
+            )}
+
+            {/* Department Allocation & Cost Concentration Highlights */}
+            {deptSpend.length > 0 && (
+              <View style={{ marginTop: 16, padding: 12, borderRadius: 12, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, gap: 8 }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <Text style={{ fontSize: 11.5, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>Cost Center Distribution</Text>
+                  <Text style={{ fontSize: 10.5, fontFamily: "Inter_500Medium", color: colors.primary }}>{deptSpend.length} Monitored Units</Text>
+                </View>
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  <View style={{ flex: 1, padding: 8, borderRadius: 8, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }}>
+                    <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>Primary Driver</Text>
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: colors.foreground, marginTop: 2 }} numberOfLines={1}>{deptSpend[0]?.label || "N/A"}</Text>
+                    <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: colors.expense, marginTop: 2 }}>{settings.currency} {fmt(deptSpend[0]?.value || 0)}</Text>
+                  </View>
+                  <View style={{ flex: 1, padding: 8, borderRadius: 8, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }}>
+                    <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>Secondary Driver</Text>
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: colors.foreground, marginTop: 2 }} numberOfLines={1}>{deptSpend[1]?.label || "N/A"}</Text>
+                    <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: colors.expense, marginTop: 2 }}>{settings.currency} {fmt(deptSpend[1]?.value || 0)}</Text>
+                  </View>
+                  <View style={{ flex: 1, padding: 8, borderRadius: 8, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }}>
+                    <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>Other Units ({Math.max(deptSpend.length - 2, 0)})</Text>
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: colors.foreground, marginTop: 2 }}>Combined</Text>
+                    <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: colors.income, marginTop: 2 }}>{settings.currency} {fmt(deptSpend.slice(2).reduce((s, d) => s + d.value, 0))}</Text>
+                  </View>
+                </View>
               </View>
             )}
           </View>
 
           {/* Department spending summary */}
-          <View style={[styles.budgetSummaryRow, { marginTop: 12 }]}>
+          <View style={[styles.budgetSummaryRow, { marginTop: 14 }]}>
             {[
               { label: "Total Disbursed", value: `${settings.currency} ${fmt(deptSpend.reduce((s, d) => s + d.value, 0))}`, color: colors.primary },
               { label: "Active Units", value: `${deptSpend.length} Units`, color: colors.income },
@@ -812,19 +851,20 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
                 <Text style={[styles.smBtnText, { color: colors.primary }]}>Manage</Text>
               </TouchableOpacity>
             </View>
+
             {budgetItems.length > 0 ? (
-              <ScrollView style={{ maxHeight: 330 }} showsVerticalScrollIndicator={true} nestedScrollEnabled={true}>
+              <View style={{ paddingVertical: 4 }}>
                 <HBarChart items={budgetItems} formatValue={v => `${settings.currency} ${fmt(v)}`} />
-              </ScrollView>
+              </View>
             ) : (
               <View style={{ paddingVertical: 20, alignItems: "center" }}>
-                <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>No active budgets configured.</Text>
+                <Text style={{ color: colors.mutedForeground, fontSize: 13, fontFamily: "Inter_500Medium" }}>No active budgets configured.</Text>
               </View>
             )}
           </View>
 
           {/* Budget progress summary */}
-          <View style={[styles.budgetSummaryRow, { marginTop: 12 }]}>
+          <View style={[styles.budgetSummaryRow, { marginTop: 14 }]}>
             {[
               { label: "Total Allocated", value: `${settings.currency} ${fmt(totalAllocatedBudget)}`, color: colors.primary },
               { label: "Total Spent", value: `${settings.currency} ${fmt(displayedBudgetSpent)}`, color: colors.expense },

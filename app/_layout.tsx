@@ -348,7 +348,7 @@ export default function RootLayout() {
         document.head.appendChild(iconStyle);
       }
 
-      // Set global body font family without overriding vector icon fonts
+      // Set global font definitions and aliases so React Native Web never falls back to Times New Roman
       const styleId = "global-font-style";
       let style = document.getElementById(styleId) as HTMLStyleElement;
       if (!style) {
@@ -357,8 +357,44 @@ export default function RootLayout() {
         document.head.appendChild(style);
       }
       style.textContent = `
+        @font-face {
+          font-family: 'Inter_400Regular';
+          src: local('Inter'), local('-apple-system'), local('BlinkMacSystemFont'), local('Segoe UI'), local('Roboto'), sans-serif;
+          font-weight: 400;
+        }
+        @font-face {
+          font-family: 'Inter_500Medium';
+          src: local('Inter'), local('-apple-system'), local('BlinkMacSystemFont'), local('Segoe UI'), local('Roboto'), sans-serif;
+          font-weight: 500;
+        }
+        @font-face {
+          font-family: 'Inter_600SemiBold';
+          src: local('Inter'), local('-apple-system'), local('BlinkMacSystemFont'), local('Segoe UI'), local('Roboto'), sans-serif;
+          font-weight: 600;
+        }
+        @font-face {
+          font-family: 'Inter_700Bold';
+          src: local('Inter'), local('-apple-system'), local('BlinkMacSystemFont'), local('Segoe UI'), local('Roboto'), sans-serif;
+          font-weight: 700;
+        }
+        @font-face {
+          font-family: 'Inter_800ExtraBold';
+          src: local('Inter'), local('-apple-system'), local('BlinkMacSystemFont'), local('Segoe UI'), local('Roboto'), sans-serif;
+          font-weight: 800;
+        }
+        @font-face {
+          font-family: 'Inter_900Black';
+          src: local('Inter'), local('-apple-system'), local('BlinkMacSystemFont'), local('Segoe UI'), local('Roboto'), sans-serif;
+          font-weight: 900;
+        }
         body, html, #root {
-          font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+        }
+        /* Map all Inter family text elements to crisp sans-serif without breaking icon fonts */
+        [style*="Inter_"], [style*="Inter-"] {
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
         }
       `;
     }

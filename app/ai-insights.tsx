@@ -223,35 +223,46 @@ export default function AIInsightsScreen() {
       const dept = t.department || "General";
       map[dept] = (map[dept] ?? 0) + t.amount;
     });
+    const totalDept = Object.values(map).reduce((s, v) => s + v, 0);
     return Object.entries(map).sort((a, b) => b[1] - a[1])
-      .map(([label, value], i) => ({ label, value, color: CAT_COLORS[i % CAT_COLORS.length] }));
+      .map(([label, value], i) => {
+        const pct = totalDept > 0 ? ((value / totalDept) * 100).toFixed(1) : "0.0";
+        return {
+          label,
+          value,
+          color: CAT_COLORS[i % CAT_COLORS.length],
+          sublabel: `${pct}% of departmental outflows`,
+        };
+      });
   }, [displayedTxs]);
 
-  // Budget bar items computed from displayed transactions and consolidated budgets
+  // Budget bar items computed from displayed transactions and consolidated budgets, sorted by active spend
   const budgetItems = useMemo(() =>
-    consolidatedBudgets.map((b) => {
-      const spent = displayedTxs
-        .filter(
-          (t) =>
-            t.type === "expense" &&
-            t.category?.toLowerCase() === b.category?.toLowerCase() &&
-            (!b.department || b.department === "All" || b.department === "General" || t.department?.toLowerCase() === b.department.toLowerCase())
-        )
-        .reduce((s, t) => s + Number(t.amount || 0), 0);
-      const label = b.department && b.department !== "All" && b.department !== "General"
-        ? `${b.category} · ${b.department}`
-        : b.category;
-      return {
-        label,
-        value: spent,
-        color: b.allocated > 0 && (spent / b.allocated) > 0.85
-          ? "#F43F5E"
-          : b.allocated > 0 && (spent / b.allocated) > 0.6
-          ? "#F59E0B"
-          : "#10B981",
-        sublabel: `Budget: ${settings.currency} ${fmt(b.allocated)}`,
-      };
-    }),
+    consolidatedBudgets
+      .map((b) => {
+        const spent = displayedTxs
+          .filter(
+            (t) =>
+              t.type === "expense" &&
+              t.category?.toLowerCase() === b.category?.toLowerCase() &&
+              (!b.department || b.department === "All" || b.department === "General" || t.department?.toLowerCase() === b.department.toLowerCase())
+          )
+          .reduce((s, t) => s + Number(t.amount || 0), 0);
+        const label = b.department && b.department !== "All" && b.department !== "General"
+          ? `${b.category} · ${b.department}`
+          : b.category;
+        return {
+          label,
+          value: spent,
+          color: b.allocated > 0 && (spent / b.allocated) > 0.85
+            ? "#F43F5E"
+            : b.allocated > 0 && (spent / b.allocated) > 0.6
+            ? "#F59E0B"
+            : "#10B981",
+          sublabel: `Budget: ${settings.currency} ${fmt(b.allocated)}`,
+        };
+      })
+      .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label)),
   [consolidatedBudgets, displayedTxs, settings.currency]);
 
   // Real-time period growth and margin computed directly from active chart timeline data

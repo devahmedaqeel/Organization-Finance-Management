@@ -92,12 +92,12 @@ export function HBarChart({
   items,
   formatValue = defaultFmt,
   maxConstraint,
-  labelWidth = Platform.OS === "web" ? 180 : 120,
+  labelWidth = Platform.OS === "web" ? 210 : 130,
 }: Props) {
   if (!items || items.length === 0) {
     return (
       <View style={{ paddingVertical: 14, alignItems: "center", justifyContent: "center" }}>
-        <Text style={{ color: "#94A3B8", fontSize: 12 }}>
+        <Text style={{ color: "#94A3B8", fontSize: 12.5, fontWeight: "500", fontFamily: "Inter_500Medium" }}>
           No records found for this period
         </Text>
       </View>
@@ -123,39 +123,46 @@ export function HBarChart({
 }
 
 const styles = StyleSheet.create({
-  container: { gap: 11 },
+  container: { gap: 14 },
   row: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 12,
   },
   labelCol: {
     width: 100,
     justifyContent: "center",
+    paddingRight: 6,
   },
   label: {
-    fontSize: 11.5,
+    fontSize: 13,
+    fontWeight: "600",
     fontFamily: "Inter_600SemiBold",
+    letterSpacing: -0.2,
   },
   sublabel: {
-    fontSize: 9.5,
-    fontFamily: "Inter_400Regular",
-    marginTop: 1,
+    fontSize: 11,
+    fontWeight: "500",
+    fontFamily: "Inter_500Medium",
+    marginTop: 2,
+    letterSpacing: -0.1,
   },
   barWrap: { flex: 1 },
   track: {
-    height: 9,
-    borderRadius: 5,
+    height: 10,
+    borderRadius: 6,
     overflow: "hidden",
   },
   fill: {
     height: "100%",
-    borderRadius: 5,
+    borderRadius: 6,
   },
   value: {
-    minWidth: 62,
-    fontSize: 11.5,
+    minWidth: 72,
+    fontSize: 13,
+    fontWeight: "700",
     fontFamily: "Inter_700Bold",
     textAlign: "right",
+    letterSpacing: -0.2,
   },
 });
