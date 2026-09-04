@@ -187,8 +187,8 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
         .filter(
           (t) =>
             t.type === "expense" &&
-            t.category?.toLowerCase() === b.category?.toLowerCase() &&
-            (!b.department || b.department === "All" || b.department === "General" || t.department?.toLowerCase() === b.department.toLowerCase())
+            (t.category || "").toLowerCase() === (b.category || "").toLowerCase() &&
+            (!b.department || b.department === "All" || b.department === "General" || (t.department || "").toLowerCase() === (b.department || "").toLowerCase())
         )
         .reduce((s, t) => s + Number(t.amount || 0), 0);
       return sum + catSpent;
@@ -268,8 +268,8 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
           .filter(
             (t) =>
               t.type === "expense" &&
-              t.category?.toLowerCase() === b.category?.toLowerCase() &&
-              (!b.department || b.department === "All" || b.department === "General" || t.department?.toLowerCase() === b.department.toLowerCase())
+              (t.category || "").toLowerCase() === (b.category || "").toLowerCase() &&
+              (!b.department || b.department === "All" || b.department === "General" || (t.department || "").toLowerCase() === (b.department || "").toLowerCase())
           )
           .reduce((s, t) => s + Number(t.amount || 0), 0);
         const label = b.department && b.department !== "All" && b.department !== "General"
@@ -286,7 +286,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
           sublabel: `Budget: ${settings.currency} ${fmt(b.allocated)}`,
         };
       })
-      .sort((a, b) => b.value - a.value || a.label.localeCompare(b.label)),
+      .sort((a, b) => b.value - a.value || (a.label || "").localeCompare(b.label || "")),
   [consolidatedBudgets, displayedTxs, settings.currency]);
 
   // Authoritative real-time net surplus margin computed directly from active timeline scope

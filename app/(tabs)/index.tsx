@@ -213,10 +213,10 @@ export default function DashboardScreen() {
       const q = txSearchQuery.toLowerCase().trim();
       const matchSearch =
         !q ||
-        t.category.toLowerCase().includes(q) ||
-        t.department.toLowerCase().includes(q) ||
-        (t.description && t.description.toLowerCase().includes(q)) ||
-        t.amount.toString().includes(q);
+        (t.category || "").toLowerCase().includes(q) ||
+        (t.department || "").toLowerCase().includes(q) ||
+        (t.description && (t.description || "").toLowerCase().includes(q)) ||
+        (t.amount !== undefined && t.amount !== null && t.amount.toString().includes(q));
       return matchType && matchSearch;
     });
   }, [transactions, txTypeFilter, txSearchQuery]);

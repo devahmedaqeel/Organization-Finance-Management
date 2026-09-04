@@ -113,7 +113,7 @@ export function WebTeam() {
           list.sort((a, b) => {
             if (a.role === "admin" && b.role !== "admin") return -1;
             if (a.role !== "admin" && b.role === "admin") return 1;
-            return a.name.localeCompare(b.name);
+            return (a.name || a.email || "").localeCompare(b.name || b.email || "");
           });
           setMembers(list);
         } else {
@@ -145,9 +145,9 @@ export function WebTeam() {
       const matchRole = roleFilter === "all" || m.role === roleFilter;
       const matchSearch =
         search.trim() === "" ||
-        m.name.toLowerCase().includes(search.toLowerCase()) ||
-        m.email.toLowerCase().includes(search.toLowerCase()) ||
-        m.role.toLowerCase().includes(search.toLowerCase());
+        (m.name || "").toLowerCase().includes(search.toLowerCase()) ||
+        (m.email || "").toLowerCase().includes(search.toLowerCase()) ||
+        (m.role || "").toLowerCase().includes(search.toLowerCase());
       return matchRole && matchSearch;
     });
 
@@ -157,11 +157,11 @@ export function WebTeam() {
       if (isCurrentA && !isCurrentB) return -1;
       if (!isCurrentA && isCurrentB) return 1;
 
-      const weightA = ROLE_WEIGHT[a.role?.toLowerCase()] ?? 99;
-      const weightB = ROLE_WEIGHT[b.role?.toLowerCase()] ?? 99;
+      const weightA = ROLE_WEIGHT[(a.role || "").toLowerCase()] ?? 99;
+      const weightB = ROLE_WEIGHT[(b.role || "").toLowerCase()] ?? 99;
       if (weightA !== weightB) return weightA - weightB;
 
-      return (a.name || "").localeCompare(b.name || "");
+      return (a.name || a.email || "").localeCompare(b.name || b.email || "");
     });
   }, [members, roleFilter, search, user?.email]);
 
@@ -303,11 +303,11 @@ export function WebTeam() {
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
                       <View style={[styles.avatarBox, { backgroundColor: roleCfg.bg }]}>
                         <Text style={[styles.avatarText, { color: roleCfg.color }]}>
-                          {m.name.charAt(0).toUpperCase()}
+                          {(m.name || m.email || "U").charAt(0).toUpperCase()}
                         </Text>
                       </View>
                       <View>
-                        <Text style={[styles.memberName, { color: colors.foreground }]}>{m.name}</Text>
+                        <Text style={[styles.memberName, { color: colors.foreground }]}>{m.name || m.email || "Member"}</Text>
                         <Text style={[styles.memberEmail, { color: colors.mutedForeground }]}>{m.email}</Text>
                       </View>
                     </View>

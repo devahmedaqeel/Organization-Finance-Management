@@ -94,7 +94,7 @@ export default function PayrollScreen() {
       return payroll.filter((p) => {
         const uName = (user?.name || "").toLowerCase().trim();
         const uEmailPrefix = (user?.email || "").split("@")[0].toLowerCase().trim();
-        const pName = p.employeeName.toLowerCase().trim();
+        const pName = (p.employeeName || "").toLowerCase().trim();
         return (uName && pName.includes(uName)) || (uEmailPrefix && pName.includes(uEmailPrefix));
       });
     }
@@ -109,9 +109,9 @@ export default function PayrollScreen() {
     if (!q) return userPayroll;
     return userPayroll.filter(
       (p) =>
-        p.employeeName.toLowerCase().includes(q) ||
-        p.employeeId.toLowerCase().includes(q) ||
-        p.department.toLowerCase().includes(q)
+        (p.employeeName || "").toLowerCase().includes(q) ||
+        (p.employeeId || "").toLowerCase().includes(q) ||
+        (p.department || "").toLowerCase().includes(q)
     );
   }, [userPayroll, search]);
 
@@ -410,7 +410,7 @@ export default function PayrollScreen() {
             <View style={[styles.payCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={styles.payTop}>
                 <View style={[styles.payAvatar, { backgroundColor: "#8B5CF622" }]}>
-                  <Text style={[styles.payAvatarText, { color: "#8B5CF6" }]}>{item.employeeName.charAt(0).toUpperCase()}</Text>
+                  <Text style={[styles.payAvatarText, { color: "#8B5CF6" }]}>{(item.employeeName || item.employeeId || "E").charAt(0).toUpperCase()}</Text>
                 </View>
                 <View style={styles.payInfo}>
                   <Text style={[styles.payName, { color: colors.foreground }]}>{item.employeeName}</Text>

@@ -121,7 +121,7 @@ export function NetBalanceBreakdownModal({
       map[monthKey].txCount += 1;
     });
 
-    const sorted = Object.values(map).sort((a, b) => a.monthKey.localeCompare(b.monthKey));
+    const sorted = Object.values(map).sort((a, b) => (a.monthKey || "").localeCompare(b.monthKey || ""));
 
     const processedMonthly = sorted.map((cur, idx) => {
       const net = cur.income - cur.expense;

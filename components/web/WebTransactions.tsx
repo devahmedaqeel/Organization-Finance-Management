@@ -49,11 +49,11 @@ export function WebTransactions() {
       const matchDept = selectedDepartment === "all" || t.department === selectedDepartment;
       const matchSearch =
         search.trim() === "" ||
-        t.category.toLowerCase().includes(search.toLowerCase()) ||
-        t.description.toLowerCase().includes(search.toLowerCase()) ||
-        (t.department && t.department.toLowerCase().includes(search.toLowerCase())) ||
-        (t.referenceNumber && t.referenceNumber.toLowerCase().includes(search.toLowerCase())) ||
-        (t.addedBy && t.addedBy.toLowerCase().includes(search.toLowerCase()));
+        (t.category || "").toLowerCase().includes(search.toLowerCase()) ||
+        (t.description || "").toLowerCase().includes(search.toLowerCase()) ||
+        (t.department && (t.department || "").toLowerCase().includes(search.toLowerCase())) ||
+        (t.referenceNumber && (t.referenceNumber || "").toLowerCase().includes(search.toLowerCase())) ||
+        (t.addedBy && (t.addedBy || "").toLowerCase().includes(search.toLowerCase()));
 
       return matchType && matchDept && matchSearch;
     });

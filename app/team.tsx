@@ -189,7 +189,7 @@ export default function TeamScreen() {
           fetched.sort((a, b) => {
             if (a.role === "admin" && b.role !== "admin") return -1;
             if (a.role !== "admin" && b.role === "admin") return 1;
-            return a.name.localeCompare(b.name);
+            return (a.name || a.email || "").localeCompare(b.name || b.email || "");
           });
 
           setMembers(fetched);
@@ -249,13 +249,13 @@ export default function TeamScreen() {
       if (isCurrentA && !isCurrentB) return -1;
       if (!isCurrentA && isCurrentB) return 1;
 
-      const weightA = ROLE_WEIGHT[a.role?.toLowerCase()] ?? 99;
-      const weightB = ROLE_WEIGHT[b.role?.toLowerCase()] ?? 99;
+      const weightA = ROLE_WEIGHT[(a.role || "").toLowerCase()] ?? 99;
+      const weightB = ROLE_WEIGHT[(b.role || "").toLowerCase()] ?? 99;
       if (weightA !== weightB) return weightA - weightB;
 
       const nameA = (a.name || a.email || "").toLowerCase();
       const nameB = (b.name || b.email || "").toLowerCase();
-      return nameA.localeCompare(nameB);
+      return (nameA || "").localeCompare(nameB || "");
     });
   }, [members, search, selectedRole, user?.email]);
 
@@ -272,7 +272,7 @@ export default function TeamScreen() {
 
   // Helper for generating dynamic avatar background colors consistently
   const getAvatarColor = (name: string) => {
-    const charCode = name.charCodeAt(0) || 0;
+    const charCode = (name || "U").charCodeAt(0) || 0;
     return AVATAR_PALETTE[charCode % AVATAR_PALETTE.length];
   };
 
@@ -400,9 +400,13 @@ ${orgName}`;
         organizationId: user?.organizationId || "",
       };
       setMembers((prev) => {
-        if (prev.some((p) => p.email.toLowerCase() === email)) return prev;
+        if (prev.some((p) => (p.email || "").toLowerCase() === (email || "").toLowerCase())) return prev;
         return [...prev, newMember];
       });
+      setPendingInvites((prev) => {
+      if (prev.some((p) => (p.email || "").toLowerCase() === (email || "").toLowerCase())) return prev;
+      return [{ email, role, addedAt: Date.now() }, ...prev];
+    });
     } catch (firestoreErr) {
       console.warn("Firestore invitation persist notice:", firestoreErr);
     }
@@ -628,8 +632,8 @@ ${orgName}`;
               }}
             >
               {/* Dynamic colored avatar bubble */}
-              <View style={[styles.avatar, { backgroundColor: getAvatarColor(item.name) }]}>
-                <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
+              <View style={[styles.avatar, { backgroundColor: getAvatarColor(item.name || item.email || "U") }]}>
+                <Text style={styles.avatarText}>{(item.name || item.email || "U").charAt(0).toUpperCase()}</Text>
               </View>
 
               {/* Information */}
@@ -812,9 +816,9 @@ ${orgName}`;
               <ScrollView contentContainerStyle={[styles.modalContent, { paddingBottom: 60 }]} showsVerticalScrollIndicator={false}>
                 {/* Member Profile Header */}
                 <View style={{ alignItems: "center", paddingVertical: 12, gap: 6 }}>
-                  <View style={[styles.avatar, { width: 56, height: 56, borderRadius: 18, backgroundColor: getAvatarColor(selectedMember.name) }]}>
+                  <View style={[styles.avatar, { width: 56, height: 56, borderRadius: 18, backgroundColor: getAvatarColor(selectedMember.name || selectedMember.email || "U") }]}>
                     <Text style={{ color: "#fff", fontSize: 22, fontFamily: "Inter_800ExtraBold" }}>
-                      {selectedMember.name.charAt(0).toUpperCase()}
+                      {(selectedMember.name || selectedMember.email || "U").charAt(0).toUpperCase()}
                     </Text>
                   </View>
                   <Text style={{ fontSize: 17, fontFamily: "Inter_700Bold", color: colors.foreground }}>

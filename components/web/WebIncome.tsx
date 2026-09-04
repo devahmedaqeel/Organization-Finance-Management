@@ -50,7 +50,9 @@ export function WebIncome({ onOpenReport }: WebIncomeProps) {
   // Filter categories
   const categories = useMemo(() => {
     const set = new Set<string>();
-    transactions.filter((t) => t.type === "income").forEach((t) => set.add(t.category));
+    transactions.filter((t) => t.type === "income").forEach((t) => {
+      if (t.category) set.add(t.category);
+    });
     return ["all", ...Array.from(set)];
   }, [transactions]);
 
@@ -62,11 +64,11 @@ export function WebIncome({ onOpenReport }: WebIncomeProps) {
       const matchDept = selectedDepartment === "all" || t.department === selectedDepartment;
       const matchSearch =
         search.trim() === "" ||
-        t.category.toLowerCase().includes(search.toLowerCase()) ||
-        t.description.toLowerCase().includes(search.toLowerCase()) ||
-        (t.department && t.department.toLowerCase().includes(search.toLowerCase())) ||
-        (t.referenceNumber && t.referenceNumber.toLowerCase().includes(search.toLowerCase())) ||
-        (t.addedBy && t.addedBy.toLowerCase().includes(search.toLowerCase()));
+        (t.category || "").toLowerCase().includes(search.toLowerCase()) ||
+        (t.description || "").toLowerCase().includes(search.toLowerCase()) ||
+        (t.department && (t.department || "").toLowerCase().includes(search.toLowerCase())) ||
+        (t.referenceNumber && (t.referenceNumber || "").toLowerCase().includes(search.toLowerCase())) ||
+        (t.addedBy && (t.addedBy || "").toLowerCase().includes(search.toLowerCase()));
 
       return matchCat && matchDept && matchSearch;
     });
@@ -80,7 +82,9 @@ export function WebIncome({ onOpenReport }: WebIncomeProps) {
         return sortAsc ? a.amount - b.amount : b.amount - a.amount;
       }
       if (sortField === "category") {
-        return sortAsc ? a.category.localeCompare(b.category) : b.category.localeCompare(a.category);
+        return sortAsc
+          ? (a.category || "").localeCompare(b.category || "")
+          : (b.category || "").localeCompare(a.category || "");
       }
       return 0;
     });

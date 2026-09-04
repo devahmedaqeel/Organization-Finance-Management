@@ -51,17 +51,17 @@ export function WebPayroll() {
       // If employee, only show their own record
       if (user?.role === "employee") {
         const isMatch =
-          p.employeeName.toLowerCase().includes((user.name || "").toLowerCase()) ||
-          (user.email && p.employeeName.toLowerCase().includes(user.email.split("@")[0].toLowerCase()));
+          (p.employeeName || "").toLowerCase().includes((user.name || "").toLowerCase()) ||
+          (user.email && (p.employeeName || "").toLowerCase().includes(user.email.split("@")[0].toLowerCase()));
         if (!isMatch) return false;
       }
 
       const matchSearch =
         search.trim() === "" ||
-        p.employeeName.toLowerCase().includes(search.toLowerCase()) ||
-        p.employeeId.toLowerCase().includes(search.toLowerCase()) ||
-        p.department.toLowerCase().includes(search.toLowerCase()) ||
-        (p.designation && p.designation.toLowerCase().includes(search.toLowerCase()));
+        (p.employeeName || "").toLowerCase().includes(search.toLowerCase()) ||
+        (p.employeeId || "").toLowerCase().includes(search.toLowerCase()) ||
+        (p.department || "").toLowerCase().includes(search.toLowerCase()) ||
+        (p.designation && (p.designation || "").toLowerCase().includes(search.toLowerCase()));
 
       const matchDept = selectedDept === "all" || p.department === selectedDept;
       const matchMonth = selectedMonth === "all" || p.month === selectedMonth;
@@ -153,7 +153,7 @@ export function WebPayroll() {
         const empId = params.get("empId") || params.get("employeeId");
         if (empId && payroll.length > 0) {
           const matchedEmp = payroll.find(
-            (p) => p.id === empId || p.employeeId === empId || p.employeeName.toLowerCase().includes(empId.toLowerCase())
+            (p) => p.id === empId || p.employeeId === empId || (p.employeeName || "").toLowerCase().includes(empId.toLowerCase())
           );
           if (matchedEmp) {
             setTimeout(() => {

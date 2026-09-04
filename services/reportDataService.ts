@@ -604,8 +604,8 @@ export function buildEnterpriseReportData(
           }
           if (isEmployee) {
             return (
-              p.employeeName.toLowerCase().includes((user.name || "").toLowerCase()) ||
-              (user.email && p.employeeName.toLowerCase().includes(user.email.split("@")[0].toLowerCase()))
+              (p.employeeName || "").toLowerCase().includes((user?.name || "").toLowerCase()) ||
+              (user?.email && (p.employeeName || "").toLowerCase().includes(user.email.split("@")[0].toLowerCase()))
             );
           }
           return true;

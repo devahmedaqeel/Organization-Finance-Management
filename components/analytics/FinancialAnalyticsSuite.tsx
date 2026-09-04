@@ -58,19 +58,19 @@ export function FinancialAnalyticsSuite({
 
   // Selected category data for interactive donut
   const activeCategoryData = useMemo(() => {
-    if (!selectedCategory || !distribution.categories.length) return null;
-    return distribution.categories.find((c) => c.category === selectedCategory) || null;
-  }, [selectedCategory, distribution.categories]);
+    if (!selectedCategory || !distribution?.categories?.length) return null;
+    return (distribution.categories || []).find((c) => c.category === selectedCategory) || null;
+  }, [selectedCategory, distribution?.categories]);
 
   // Donut chart segments formatted
   const donutSegments = useMemo(() => {
-    return distribution.chartSegments.map((seg) => ({
+    return (distribution?.chartSegments || []).map((seg) => ({
       label: seg.category,
       value: seg.amount,
       color: seg.color,
       pct: seg.pct,
     }));
-  }, [distribution.chartSegments]);
+  }, [distribution?.chartSegments]);
 
   return (
     <View style={styles.container}>
@@ -664,7 +664,7 @@ export function FinancialAnalyticsSuite({
                   </TouchableOpacity>
                 </View>
                 <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>
-                  {distribution.categories.length} Cost Drivers Categorized
+                  {distribution?.categories?.length || 0} Cost Drivers Categorized
                 </Text>
               </View>
             </View>
@@ -696,12 +696,12 @@ export function FinancialAnalyticsSuite({
           <View style={[styles.statusStrip, { backgroundColor: "#8B5CF614", borderColor: "#8B5CF630" }]}>
             <View style={[styles.statusDot, { backgroundColor: "#8B5CF6" }]} />
             <Text style={[styles.statusStripText, { color: "#8B5CF6" }]} numberOfLines={2}>
-              {distribution.explanation}
+              {distribution?.explanation || ""}
             </Text>
           </View>
 
           {/* Interactive Donut Chart */}
-          {distribution.hasExpenses ? (
+          {distribution?.hasExpenses ? (
             <View style={styles.donutWrap}>
               <DonutChart
                 segments={donutSegments}
@@ -710,7 +710,7 @@ export function FinancialAnalyticsSuite({
                 centerLabel={
                   activeCategoryData
                     ? formatCompactCurrency(activeCategoryData.amount, currency)
-                    : formatCompactCurrency(distribution.totalExpenses, currency)
+                    : formatCompactCurrency(distribution?.totalExpenses || 0, currency)
                 }
                 centerSub={activeCategoryData ? activeCategoryData.category.toUpperCase() : "TOTAL SPENT"}
                 currency={currency}
@@ -733,7 +733,7 @@ export function FinancialAnalyticsSuite({
             {[
               { id: "drivers", label: "Top Drivers" },
               { id: "share", label: "% Share" },
-              { id: "all", label: `All (${distribution.categories.length})` },
+              { id: "all", label: `All (${distribution?.categories?.length || 0})` },
             ].map((opt) => {
               const isSelected = distributionMode === opt.id;
               return (
@@ -771,7 +771,7 @@ export function FinancialAnalyticsSuite({
           {/* Proportional Share Bars Mode */}
           {distributionMode === "share" ? (
             <View style={styles.shareBarsWrap}>
-              {(showAllCategories ? distribution.categories : distribution.categories.slice(0, 2)).map((cat) => (
+              {(showAllCategories ? (distribution?.categories || []) : (distribution?.categories || []).slice(0, 2)).map((cat) => (
                 <View key={cat.category} style={styles.shareBarRow}>
                   <View style={styles.shareBarHeader}>
                     <Text style={[styles.shareBarName, { color: colors.foreground }]} numberOfLines={1}>
@@ -791,8 +791,8 @@ export function FinancialAnalyticsSuite({
             /* Ranked Category List with Zero-Overlap Layout */
             <View style={styles.categoryRankedList}>
               {(distributionMode === "all" || showAllCategories
-                ? distribution.categories
-                : distribution.categories.slice(0, 2)
+                ? (distribution?.categories || [])
+                : (distribution?.categories || []).slice(0, 2)
               ).map((cat) => {
                 const isSelected = selectedCategory?.trim().toLowerCase() === cat.category.trim().toLowerCase();
                 const isAnySelected = selectedCategory !== null;
@@ -870,7 +870,7 @@ export function FinancialAnalyticsSuite({
                 );
               })}
 
-              {distribution.categories.length > 2 && distributionMode !== "all" && !showAllCategories && (
+              {(distribution?.categories?.length || 0) > 2 && distributionMode !== "all" && !showAllCategories && (
                 <TouchableOpacity
                   style={styles.expandRow}
                   onPress={() => {
@@ -879,7 +879,7 @@ export function FinancialAnalyticsSuite({
                   }}
                 >
                   <Text style={[styles.expandText, { color: colors.primary }]}>
-                    +{distribution.categories.length - 2} More Cost Drivers ▼
+                    +{(distribution?.categories?.length || 0) - 2} More Cost Drivers ▼
                   </Text>
                 </TouchableOpacity>
               )}
@@ -893,13 +893,13 @@ export function FinancialAnalyticsSuite({
               <Text
                 style={[
                   styles.bentoVal,
-                  { color: distribution.topCategory?.color || "#8B5CF6" },
+                  { color: distribution?.topCategory?.color || "#8B5CF6" },
                 ]}
                 numberOfLines={1}
                 adjustsFontSizeToFit
                 minimumFontScale={0.75}
               >
-                {distribution.topCategory?.category || "None"}
+                {distribution?.topCategory?.category || "None"}
               </Text>
             </View>
             <View style={[styles.bentoDivider, { backgroundColor: colors.border }]} />
@@ -911,7 +911,7 @@ export function FinancialAnalyticsSuite({
                 adjustsFontSizeToFit
                 minimumFontScale={0.75}
               >
-                -{formatCompactCurrency(distribution.totalExpenses, currency)}
+                -{formatCompactCurrency(distribution?.totalExpenses || 0, currency)}
               </Text>
             </View>
             <View style={[styles.bentoDivider, { backgroundColor: colors.border }]} />
@@ -923,7 +923,7 @@ export function FinancialAnalyticsSuite({
                 adjustsFontSizeToFit
                 minimumFontScale={0.75}
               >
-                {distribution.categories.length} Active
+                {distribution?.categories?.length || 0} Active
               </Text>
             </View>
           </View>

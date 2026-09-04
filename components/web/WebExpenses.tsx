@@ -61,10 +61,10 @@ export function WebExpenses({ onOpenReport }: WebExpensesProps) {
     let list = expenseTransactions.filter((t) => {
       const matchSearch =
         search.trim() === "" ||
-        t.category.toLowerCase().includes(search.toLowerCase()) ||
-        t.description.toLowerCase().includes(search.toLowerCase()) ||
-        (t.department && t.department.toLowerCase().includes(search.toLowerCase())) ||
-        (t.referenceNumber && t.referenceNumber.toLowerCase().includes(search.toLowerCase()));
+        (t.category || "").toLowerCase().includes(search.toLowerCase()) ||
+        (t.description || "").toLowerCase().includes(search.toLowerCase()) ||
+        (t.department && (t.department || "").toLowerCase().includes(search.toLowerCase())) ||
+        (t.referenceNumber && (t.referenceNumber || "").toLowerCase().includes(search.toLowerCase()));
 
       const matchCat = selectedCategory === "All" || selectedCategory === "all" || t.category === selectedCategory;
       const matchDept = selectedDepartment === "All" || selectedDepartment === "all" || t.department === selectedDepartment;
@@ -81,7 +81,9 @@ export function WebExpenses({ onOpenReport }: WebExpensesProps) {
         return sortAsc ? a.amount - b.amount : b.amount - a.amount;
       }
       if (sortField === "category") {
-        return sortAsc ? a.category.localeCompare(b.category) : b.category.localeCompare(a.category);
+        return sortAsc
+          ? (a.category || "").localeCompare(b.category || "")
+          : (b.category || "").localeCompare(a.category || "");
       }
       return 0;
     });

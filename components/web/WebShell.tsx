@@ -55,6 +55,55 @@ function TabLoadingSkeleton() {
   );
 }
 
+class TabErrorBoundary extends React.Component<
+  { children: React.ReactNode; tabKey: string },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: any) {
+    console.error("Tab render error in [", this.props.tabKey, "]:", error, errorInfo);
+  }
+
+  componentDidUpdate(prevProps: any) {
+    if (prevProps.tabKey !== this.props.tabKey && this.state.hasError) {
+      this.setState({ hasError: false, error: null });
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={{ flex: 1, minHeight: 340, justifyContent: "center", alignItems: "center", padding: 24, gap: 14 }}>
+          <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: "#F43F5E18", alignItems: "center", justifyContent: "center" }}>
+            <SvgX size={24} color="#F43F5E" />
+          </View>
+          <Text style={{ fontSize: 18, fontFamily: "Inter_700Bold", color: "#F43F5E", textAlign: "center" }}>
+            Unable to display this tab
+          </Text>
+          <Text style={{ fontSize: 13, color: "#94A3B8", textAlign: "center", maxWidth: 460 }}>
+            {this.state.error?.message || "A temporary rendering issue occurred in this section."}
+          </Text>
+          <TouchableOpacity
+            onPress={() => this.setState({ hasError: false, error: null })}
+            style={{ backgroundColor: "#3B82F6", paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8, marginTop: 6 }}
+          >
+            <Text style={{ color: "#FFFFFF", fontFamily: "Inter_700Bold", fontSize: 13 }}>Reload Section</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 import { WebTransactionModal } from "./modals/WebTransactionModal";
 import { WebBudgetModal } from "./modals/WebBudgetModal";
 import { NotificationCenterModal } from "@/components/NotificationCenterModal";
@@ -751,70 +800,72 @@ export function WebShell() {
         {/* Dynamic Main Content Tab */}
         <View style={[styles.tabContentArea, isMobile && { paddingBottom: 84 }]}>
           <WebPageTransition pageKey={activeTab}>
-            {activeTab === "dashboard" && (
-              <WebDashboard
-                onNavigate={(route) => navigateToTab(route as WebTabKey)}
-                onOpenTransactionModal={handleOpenTx}
-                onOpenBudgetModal={() => setBudgetModalVisible(true)}
-              />
-            )}
-            {activeTab === "income" && (
-              <Suspense fallback={<TabLoadingSkeleton />}>
-                <WebIncome onOpenReport={() => navigateToTab("reports")} />
-              </Suspense>
-            )}
-            {activeTab === "expenses" && (
-              <Suspense fallback={<TabLoadingSkeleton />}>
-                <WebExpenses onOpenReport={() => navigateToTab("reports")} />
-              </Suspense>
-            )}
-            {activeTab === "transactions" && (
-              <Suspense fallback={<TabLoadingSkeleton />}>
-                <WebTransactions />
-              </Suspense>
-            )}
-            {activeTab === "budgets" && (
-              <Suspense fallback={<TabLoadingSkeleton />}>
-                <WebBudgets />
-              </Suspense>
-            )}
-            {activeTab === "departments" && (
-              <Suspense fallback={<TabLoadingSkeleton />}>
-                <WebDepartments />
-              </Suspense>
-            )}
-            {activeTab === "payroll" && (
-              <Suspense fallback={<TabLoadingSkeleton />}>
-                <WebPayroll />
-              </Suspense>
-            )}
-            {activeTab === "team" && (
-              <Suspense fallback={<TabLoadingSkeleton />}>
-                <WebTeam />
-              </Suspense>
-            )}
-            {activeTab === "reports" && (
-              <Suspense fallback={<TabLoadingSkeleton />}>
-                <WebReports onNavigate={(route) => navigateToTab(route as WebTabKey)} />
-              </Suspense>
-            )}
-            {activeTab === "ai-insights" && (
-              <Suspense fallback={<TabLoadingSkeleton />}>
-                <WebAIInsights onNavigate={(route) => navigateToTab(route as WebTabKey)} />
-              </Suspense>
-            )}
-            {activeTab === "settings" && (
-              <Suspense fallback={<TabLoadingSkeleton />}>
-                <WebSettings />
-              </Suspense>
-            )}
-            {!VALID_TABS.includes(activeTab) && (
-              <WebDashboard
-                onNavigate={(route) => navigateToTab(route as WebTabKey)}
-                onOpenTransactionModal={handleOpenTx}
-                onOpenBudgetModal={() => setBudgetModalVisible(true)}
-              />
-            )}
+            <TabErrorBoundary tabKey={activeTab}>
+              {activeTab === "dashboard" && (
+                <WebDashboard
+                  onNavigate={(route) => navigateToTab(route as WebTabKey)}
+                  onOpenTransactionModal={handleOpenTx}
+                  onOpenBudgetModal={() => setBudgetModalVisible(true)}
+                />
+              )}
+              {activeTab === "income" && (
+                <Suspense fallback={<TabLoadingSkeleton />}>
+                  <WebIncome onOpenReport={() => navigateToTab("reports")} />
+                </Suspense>
+              )}
+              {activeTab === "expenses" && (
+                <Suspense fallback={<TabLoadingSkeleton />}>
+                  <WebExpenses onOpenReport={() => navigateToTab("reports")} />
+                </Suspense>
+              )}
+              {activeTab === "transactions" && (
+                <Suspense fallback={<TabLoadingSkeleton />}>
+                  <WebTransactions />
+                </Suspense>
+              )}
+              {activeTab === "budgets" && (
+                <Suspense fallback={<TabLoadingSkeleton />}>
+                  <WebBudgets />
+                </Suspense>
+              )}
+              {activeTab === "departments" && (
+                <Suspense fallback={<TabLoadingSkeleton />}>
+                  <WebDepartments />
+                </Suspense>
+              )}
+              {activeTab === "payroll" && (
+                <Suspense fallback={<TabLoadingSkeleton />}>
+                  <WebPayroll />
+                </Suspense>
+              )}
+              {activeTab === "team" && (
+                <Suspense fallback={<TabLoadingSkeleton />}>
+                  <WebTeam />
+                </Suspense>
+              )}
+              {activeTab === "reports" && (
+                <Suspense fallback={<TabLoadingSkeleton />}>
+                  <WebReports onNavigate={(route) => navigateToTab(route as WebTabKey)} />
+                </Suspense>
+              )}
+              {activeTab === "ai-insights" && (
+                <Suspense fallback={<TabLoadingSkeleton />}>
+                  <WebAIInsights onNavigate={(route) => navigateToTab(route as WebTabKey)} />
+                </Suspense>
+              )}
+              {activeTab === "settings" && (
+                <Suspense fallback={<TabLoadingSkeleton />}>
+                  <WebSettings />
+                </Suspense>
+              )}
+              {!VALID_TABS.includes(activeTab) && (
+                <WebDashboard
+                  onNavigate={(route) => navigateToTab(route as WebTabKey)}
+                  onOpenTransactionModal={handleOpenTx}
+                  onOpenBudgetModal={() => setBudgetModalVisible(true)}
+                />
+              )}
+            </TabErrorBoundary>
           </WebPageTransition>
         </View>
 
