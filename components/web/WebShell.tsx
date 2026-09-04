@@ -32,17 +32,17 @@ import { WebDashboard } from "./WebDashboard";
 import { WebAuth } from "./WebAuth";
 import { OpenInAppBanner } from "./OpenInAppBanner";
 
-// Code-split secondary tabs so startup only parses the Dashboard shell
-const WebIncome = lazy(() => import("./WebIncome").then((m) => ({ default: m.WebIncome })));
-const WebExpenses = lazy(() => import("./WebExpenses").then((m) => ({ default: m.WebExpenses })));
-const WebTransactions = lazy(() => import("./WebTransactions").then((m) => ({ default: m.WebTransactions })));
-const WebBudgets = lazy(() => import("./WebBudgets").then((m) => ({ default: m.WebBudgets })));
-const WebDepartments = lazy(() => import("./WebDepartments").then((m) => ({ default: m.WebDepartments })));
-const WebPayroll = lazy(() => import("./WebPayroll").then((m) => ({ default: m.WebPayroll })));
-const WebTeam = lazy(() => import("./WebTeam").then((m) => ({ default: m.WebTeam })));
-const WebReports = lazy(() => import("./WebReports").then((m) => ({ default: m.WebReports })));
-const WebAIInsights = lazy(() => import("./WebAIInsights").then((m) => ({ default: m.WebAIInsights })));
-const WebSettings = lazy(() => import("./WebSettings").then((m) => ({ default: m.WebSettings })));
+// Direct static imports to eliminate Metro web code-splitting chunk mismatches and missing module errors in production
+import { WebIncome } from "./WebIncome";
+import { WebExpenses } from "./WebExpenses";
+import { WebTransactions } from "./WebTransactions";
+import { WebBudgets } from "./WebBudgets";
+import { WebDepartments } from "./WebDepartments";
+import { WebPayroll } from "./WebPayroll";
+import { WebTeam } from "./WebTeam";
+import { WebReports } from "./WebReports";
+import { WebAIInsights } from "./WebAIInsights";
+import { WebSettings } from "./WebSettings";
 
 function TabLoadingSkeleton() {
   return (
@@ -92,7 +92,13 @@ class TabErrorBoundary extends React.Component<
             {this.state.error?.message || "A temporary rendering issue occurred in this section."}
           </Text>
           <TouchableOpacity
-            onPress={() => this.setState({ hasError: false, error: null })}
+            onPress={() => {
+              if (typeof window !== "undefined") {
+                window.location.reload();
+              } else {
+                this.setState({ hasError: false, error: null });
+              }
+            }}
             style={{ backgroundColor: "#3B82F6", paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8, marginTop: 6 }}
           >
             <Text style={{ color: "#FFFFFF", fontFamily: "Inter_700Bold", fontSize: 13 }}>Reload Section</Text>
@@ -809,54 +815,34 @@ export function WebShell() {
                 />
               )}
               {activeTab === "income" && (
-                <Suspense fallback={<TabLoadingSkeleton />}>
-                  <WebIncome onOpenReport={() => navigateToTab("reports")} />
-                </Suspense>
+                <WebIncome onOpenReport={() => navigateToTab("reports")} />
               )}
               {activeTab === "expenses" && (
-                <Suspense fallback={<TabLoadingSkeleton />}>
-                  <WebExpenses onOpenReport={() => navigateToTab("reports")} />
-                </Suspense>
+                <WebExpenses onOpenReport={() => navigateToTab("reports")} />
               )}
               {activeTab === "transactions" && (
-                <Suspense fallback={<TabLoadingSkeleton />}>
-                  <WebTransactions />
-                </Suspense>
+                <WebTransactions />
               )}
               {activeTab === "budgets" && (
-                <Suspense fallback={<TabLoadingSkeleton />}>
-                  <WebBudgets />
-                </Suspense>
+                <WebBudgets />
               )}
               {activeTab === "departments" && (
-                <Suspense fallback={<TabLoadingSkeleton />}>
-                  <WebDepartments />
-                </Suspense>
+                <WebDepartments />
               )}
               {activeTab === "payroll" && (
-                <Suspense fallback={<TabLoadingSkeleton />}>
-                  <WebPayroll />
-                </Suspense>
+                <WebPayroll />
               )}
               {activeTab === "team" && (
-                <Suspense fallback={<TabLoadingSkeleton />}>
-                  <WebTeam />
-                </Suspense>
+                <WebTeam />
               )}
               {activeTab === "reports" && (
-                <Suspense fallback={<TabLoadingSkeleton />}>
-                  <WebReports onNavigate={(route) => navigateToTab(route as WebTabKey)} />
-                </Suspense>
+                <WebReports onNavigate={(route) => navigateToTab(route as WebTabKey)} />
               )}
               {activeTab === "ai-insights" && (
-                <Suspense fallback={<TabLoadingSkeleton />}>
-                  <WebAIInsights onNavigate={(route) => navigateToTab(route as WebTabKey)} />
-                </Suspense>
+                <WebAIInsights onNavigate={(route) => navigateToTab(route as WebTabKey)} />
               )}
               {activeTab === "settings" && (
-                <Suspense fallback={<TabLoadingSkeleton />}>
-                  <WebSettings />
-                </Suspense>
+                <WebSettings />
               )}
               {!VALID_TABS.includes(activeTab) && (
                 <WebDashboard
