@@ -340,12 +340,12 @@ export function WebIncome({ onOpenReport }: WebIncomeProps) {
         </View>
       ) : (
         <View style={[styles.tableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={true}>
-            <View style={{ minWidth: 840 }}>
+          <ScrollView horizontal contentContainerStyle={{ minWidth: "100%" }} showsHorizontalScrollIndicator={true}>
+            <View style={{ minWidth: 920, width: "100%" }}>
               {/* Table Header */}
               <View style={[styles.tableHeader, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
                 <TouchableOpacity
-                  style={[styles.thCol, { width: 110 }]}
+                  style={[styles.thCol, { flex: 1.1, minWidth: 105, paddingLeft: 16, paddingRight: 8 }]}
                   onPress={() => {
                     if (sortField === "date") setSortAsc(!sortAsc);
                     else {
@@ -359,7 +359,7 @@ export function WebIncome({ onOpenReport }: WebIncomeProps) {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.thCol, { width: 140 }]}
+                  style={[styles.thCol, { flex: 1.4, minWidth: 130, paddingHorizontal: 8 }]}
                   onPress={() => {
                     if (sortField === "category") setSortAsc(!sortAsc);
                     else {
@@ -372,20 +372,20 @@ export function WebIncome({ onOpenReport }: WebIncomeProps) {
                   {sortField === "category" && <SvgChevronDown size={11} color={colors.primary} />}
                 </TouchableOpacity>
 
-                <View style={[styles.thCol, { width: 220 }]}>
+                <View style={[styles.thCol, { flex: 2.2, minWidth: 190, paddingHorizontal: 8 }]}>
                   <Text style={[styles.thText, { color: colors.mutedForeground }]}>DESCRIPTION / REFERENCE</Text>
                 </View>
 
-                <View style={[styles.thCol, { width: 150 }]}>
+                <View style={[styles.thCol, { flex: 1.5, minWidth: 140, paddingHorizontal: 8 }]}>
                   <Text style={[styles.thText, { color: colors.mutedForeground }]}>DEPARTMENT</Text>
                 </View>
 
-                <View style={[styles.thCol, { width: 110 }]}>
+                <View style={[styles.thCol, { flex: 1.1, minWidth: 100, paddingHorizontal: 8 }]}>
                   <Text style={[styles.thText, { color: colors.mutedForeground }]}>METHOD</Text>
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.thCol, { width: 140, justifyContent: "flex-end" }]}
+                  style={[styles.thCol, { flex: 1.4, minWidth: 125, paddingHorizontal: 8, justifyContent: "flex-end" }]}
                   onPress={() => {
                     if (sortField === "amount") setSortAsc(!sortAsc);
                     else {
@@ -399,8 +399,8 @@ export function WebIncome({ onOpenReport }: WebIncomeProps) {
                 </TouchableOpacity>
 
                 {canEdit && (
-                  <View style={[styles.thCol, { width: 90, justifyContent: "center" }]}>
-                    <Text style={[styles.thText, { color: colors.mutedForeground }]}>ACTIONS</Text>
+                  <View style={[styles.thCol, { flex: 1.0, minWidth: 90, paddingRight: 16, paddingLeft: 8, justifyContent: "flex-end" }]}>
+                    <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>ACTIONS</Text>
                   </View>
                 )}
               </View>
@@ -417,17 +417,17 @@ export function WebIncome({ onOpenReport }: WebIncomeProps) {
               ) : (
                 filteredTransactions.map((tx) => (
                   <View key={tx.id} style={[styles.tableRow, { borderBottomColor: colors.border }]}>
-                    <View style={[styles.tdCol, { width: 110 }]}>
+                    <View style={[styles.tdCol, { flex: 1.1, minWidth: 105, paddingLeft: 16, paddingRight: 8 }]}>
                       <Text style={[styles.dateText, { color: colors.foreground }]} numberOfLines={1}>{tx.date}</Text>
                     </View>
 
-                    <View style={[styles.tdCol, { width: 140 }]}>
+                    <View style={[styles.tdCol, { flex: 1.4, minWidth: 130, paddingHorizontal: 8 }]}>
                       <View style={[styles.catBadge, { backgroundColor: colors.income + "18" }]}>
                         <Text style={[styles.catBadgeText, { color: colors.income }]} numberOfLines={1}>{tx.category}</Text>
                       </View>
                     </View>
 
-                    <View style={[styles.tdCol, { width: 220 }]}>
+                    <View style={[styles.tdCol, { flex: 2.2, minWidth: 190, paddingHorizontal: 8 }]}>
                       <Text style={[styles.descText, { color: colors.foreground }]} numberOfLines={1}>
                         {tx.description || "No description provided"}
                       </Text>
@@ -436,26 +436,26 @@ export function WebIncome({ onOpenReport }: WebIncomeProps) {
                       </Text>
                     </View>
 
-                    <View style={[styles.tdCol, { width: 150 }]}>
+                    <View style={[styles.tdCol, { flex: 1.5, minWidth: 140, paddingHorizontal: 8 }]}>
                       <Text style={[styles.deptText, { color: colors.foreground }]} numberOfLines={1}>
                         {tx.department}
                       </Text>
                     </View>
 
-                    <View style={[styles.tdCol, { width: 110 }]}>
+                    <View style={[styles.tdCol, { flex: 1.1, minWidth: 100, paddingHorizontal: 8 }]}>
                       <Text style={[styles.methodText, { color: colors.mutedForeground }]} numberOfLines={1}>
                         {tx.paymentMethod || "Electronic"}
                       </Text>
                     </View>
 
-                    <View style={[styles.tdCol, { width: 140, alignItems: "flex-end" }]}>
+                    <View style={[styles.tdCol, { flex: 1.4, minWidth: 125, paddingHorizontal: 8, alignItems: "flex-end" }]}>
                       <Text style={[styles.amountText, { color: colors.income }]} numberOfLines={1}>
                         +{settings.currency} {tx.amount.toLocaleString()}
                       </Text>
                     </View>
 
                     {canEdit && (
-                      <View style={[styles.tdCol, { width: 80, flexDirection: "row", justifyContent: "center", gap: 6 }]}>
+                      <View style={[styles.tdCol, { flex: 1.0, minWidth: 90, paddingRight: 16, paddingLeft: 8, flexDirection: "row", justifyContent: "flex-end", gap: 6 }]}>
                         <TouchableOpacity
                           style={[styles.actionIconBtn, { borderColor: "#3B82F630", backgroundColor: "#3B82F612" }]}
                           onPress={() => {
@@ -715,7 +715,6 @@ const styles = StyleSheet.create({
   tableHeader: {
     flexDirection: "row",
     paddingVertical: 12,
-    paddingHorizontal: 16,
     borderBottomWidth: 1,
   },
   thCol: {
@@ -732,7 +731,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 12,
-    paddingHorizontal: 16,
     borderBottomWidth: 1,
   },
   tdCol: {

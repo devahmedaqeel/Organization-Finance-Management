@@ -310,7 +310,7 @@ export function WebTransactions() {
                       style={[styles.mobileActionBtn, { borderColor: colors.expense + "40", backgroundColor: colors.expense + "10" }]}
                       onPress={() => setDeletingTx(tx)}
                     >
-                      <Text style={[styles.mobileActionText, { color: colors.expense }]}>Delete</Text>
+          <Text style={[styles.mobileActionText, { color: colors.expense }]}>Delete</Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -320,12 +320,12 @@ export function WebTransactions() {
         </View>
       ) : (
         <View style={[styles.tableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={true}>
-            <View style={{ minWidth: 980, paddingHorizontal: 12 }}>
+          <ScrollView horizontal contentContainerStyle={{ minWidth: "100%" }} showsHorizontalScrollIndicator={true}>
+            <View style={{ minWidth: 960, width: "100%" }}>
               {/* Table Header */}
               <View style={[styles.tableHeader, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
                 <TouchableOpacity
-                  style={[styles.thCol, { width: 120 }]}
+                  style={[styles.thCol, { flex: 1.1, minWidth: 105, paddingLeft: 16, paddingRight: 8 }]}
                   onPress={() => {
                     if (sortField === "date") setSortAsc(!sortAsc);
                     else {
@@ -338,24 +338,24 @@ export function WebTransactions() {
                   {sortField === "date" && <SvgChevronDown size={11} color={colors.primary} />}
                 </TouchableOpacity>
 
-                <View style={[styles.thCol, { width: 110 }]}>
+                <View style={[styles.thCol, { flex: 1.0, minWidth: 95, paddingHorizontal: 8 }]}>
                   <Text style={[styles.thText, { color: colors.mutedForeground }]}>TYPE</Text>
                 </View>
 
-                <View style={[styles.thCol, { width: 160, paddingLeft: 8 }]}>
+                <View style={[styles.thCol, { flex: 1.4, minWidth: 130, paddingHorizontal: 8 }]}>
                   <Text style={[styles.thText, { color: colors.mutedForeground }]}>CATEGORY</Text>
                 </View>
 
-                <View style={[styles.thCol, { width: 230 }]}>
+                <View style={[styles.thCol, { flex: 2.2, minWidth: 190, paddingHorizontal: 8 }]}>
                   <Text style={[styles.thText, { color: colors.mutedForeground }]}>MEMO / REF</Text>
                 </View>
 
-                <View style={[styles.thCol, { width: 170 }]}>
+                <View style={[styles.thCol, { flex: 1.5, minWidth: 140, paddingHorizontal: 8 }]}>
                   <Text style={[styles.thText, { color: colors.mutedForeground }]}>DEPARTMENT</Text>
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.thCol, { width: 130, justifyContent: "flex-end" }]}
+                  style={[styles.thCol, { flex: 1.3, minWidth: 120, paddingHorizontal: 8, justifyContent: "flex-end" }]}
                   onPress={() => {
                     if (sortField === "amount") setSortAsc(!sortAsc);
                     else {
@@ -369,8 +369,8 @@ export function WebTransactions() {
                 </TouchableOpacity>
 
                 {canEdit && (
-                  <View style={[styles.thCol, { width: 80, justifyContent: "center" }]}>
-                    <Text style={[styles.thText, { color: colors.mutedForeground }]}>ACTIONS</Text>
+                  <View style={[styles.thCol, { flex: 0.9, minWidth: 80, paddingRight: 16, paddingLeft: 8, justifyContent: "flex-end" }]}>
+                    <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>ACTIONS</Text>
                   </View>
                 )}
               </View>
@@ -387,11 +387,11 @@ export function WebTransactions() {
               ) : (
                 filteredTransactions.map((tx) => (
                   <View key={tx.id} style={[styles.tableRow, { borderBottomColor: colors.border }]}>
-                    <View style={[styles.tdCol, { width: 115 }]}>
+                    <View style={[styles.tdCol, { flex: 1.1, minWidth: 105, paddingLeft: 16, paddingRight: 8 }]}>
                       <Text style={[styles.dateText, { color: colors.foreground }]} numberOfLines={1}>{tx.date}</Text>
                     </View>
 
-                    <View style={[styles.tdCol, { width: 110, alignItems: "flex-start", justifyContent: "center" }]}>
+                    <View style={[styles.tdCol, { flex: 1.0, minWidth: 95, paddingHorizontal: 8, alignItems: "flex-start", justifyContent: "center" }]}>
                       <View
                         style={[
                           styles.catBadge,
@@ -412,13 +412,13 @@ export function WebTransactions() {
                       </View>
                     </View>
 
-                    <View style={[styles.tdCol, { width: 160, paddingLeft: 8 }]}>
+                    <View style={[styles.tdCol, { flex: 1.4, minWidth: 130, paddingHorizontal: 8 }]}>
                       <Text style={[styles.deptText, { color: colors.foreground }]} numberOfLines={1}>
                         {tx.category}
                       </Text>
                     </View>
 
-                    <View style={[styles.tdCol, { width: 220 }]}>
+                    <View style={[styles.tdCol, { flex: 2.2, minWidth: 190, paddingHorizontal: 8 }]}>
                       <Text style={[styles.descText, { color: colors.foreground }]} numberOfLines={1}>
                         {tx.description || "No description provided"}
                       </Text>
@@ -427,13 +427,13 @@ export function WebTransactions() {
                       </Text>
                     </View>
 
-                    <View style={[styles.tdCol, { width: 170 }]}>
+                    <View style={[styles.tdCol, { flex: 1.5, minWidth: 140, paddingHorizontal: 8 }]}>
                       <Text style={[styles.deptText, { color: colors.foreground }]} numberOfLines={1}>
                         {tx.department}
                       </Text>
                     </View>
 
-                    <View style={[styles.tdCol, { width: 130, alignItems: "flex-end" }]}>
+                    <View style={[styles.tdCol, { flex: 1.3, minWidth: 120, paddingHorizontal: 8, alignItems: "flex-end" }]}>
                       <Text
                         style={[
                           styles.amountText,
@@ -447,7 +447,7 @@ export function WebTransactions() {
                     </View>
 
                     {canEdit && (
-                      <View style={[styles.tdCol, { width: 80, flexDirection: "row", justifyContent: "center", gap: 6 }]}>
+                      <View style={[styles.tdCol, { flex: 0.9, minWidth: 80, paddingRight: 16, paddingLeft: 8, flexDirection: "row", justifyContent: "flex-end", gap: 6 }]}>
                         <TouchableOpacity
                           style={[styles.actionIconBtn, { borderColor: "#3B82F630", backgroundColor: "#3B82F612" }]}
                           onPress={() => {
@@ -714,7 +714,6 @@ const styles = StyleSheet.create({
   tableHeader: {
     flexDirection: "row",
     paddingVertical: 12,
-    paddingHorizontal: 16,
     borderBottomWidth: 1,
   },
   thCol: {
@@ -731,7 +730,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 12,
-    paddingHorizontal: 16,
     borderBottomWidth: 1,
   },
   tdCol: {

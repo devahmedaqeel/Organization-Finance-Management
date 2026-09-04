@@ -380,29 +380,29 @@ export function WebPayroll() {
         </View>
       ) : (
         <View style={[styles.tableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={true}>
-            <View style={{ minWidth: 860 }}>
+          <ScrollView horizontal contentContainerStyle={{ minWidth: "100%" }} showsHorizontalScrollIndicator={true}>
+            <View style={{ minWidth: 920, width: "100%" }}>
               <View style={[styles.tableHeader, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-                <View style={[styles.thCol, { flex: 2.2 }]}>
+                <View style={[styles.thCol, { flex: 2.2, minWidth: 200, paddingLeft: 16, paddingRight: 10, justifyContent: "flex-start" }]}>
                   <Text style={[styles.thText, { color: colors.mutedForeground }]}>EMPLOYEE</Text>
                 </View>
-                <View style={[styles.thCol, { flex: 1.8 }]}>
+                <View style={[styles.thCol, { flex: 1.8, minWidth: 160, paddingHorizontal: 10, justifyContent: "flex-start" }]}>
                   <Text style={[styles.thText, { color: colors.mutedForeground }]}>DEPARTMENT</Text>
                 </View>
-                <View style={[styles.thCol, { flex: 1.1, justifyContent: "flex-end" }]}>
+                <View style={[styles.thCol, { flex: 1.1, minWidth: 105, paddingHorizontal: 10, justifyContent: "flex-end" }]}>
                   <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>BASE</Text>
                 </View>
-                <View style={[styles.thCol, { flex: 1.0, justifyContent: "flex-end" }]}>
+                <View style={[styles.thCol, { flex: 1.0, minWidth: 95, paddingHorizontal: 10, justifyContent: "flex-end" }]}>
                   <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>BONUS</Text>
                 </View>
-                <View style={[styles.thCol, { flex: 1.0, justifyContent: "flex-end" }]}>
+                <View style={[styles.thCol, { flex: 1.0, minWidth: 105, paddingHorizontal: 10, justifyContent: "flex-end" }]}>
                   <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>DEDUCTIONS</Text>
                 </View>
-                <View style={[styles.thCol, { flex: 1.2, justifyContent: "flex-end" }]}>
+                <View style={[styles.thCol, { flex: 1.2, minWidth: 115, paddingHorizontal: 10, justifyContent: "flex-end" }]}>
                   <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>NET SALARY</Text>
                 </View>
-                <View style={[styles.thCol, { flex: 1.5, justifyContent: "center" }]}>
-                  <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "center" }]}>ACTIONS</Text>
+                <View style={[styles.thCol, { flex: 1.3, minWidth: 125, paddingRight: 16, paddingLeft: 10, justifyContent: "flex-end" }]}>
+                  <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>ACTIONS</Text>
                 </View>
               </View>
 
@@ -419,7 +419,7 @@ export function WebPayroll() {
                   const net = (p.baseSalary || 0) + (p.bonus || 0) - (p.deductions || 0);
                   return (
                     <View key={p.id} style={[styles.tableRow, { borderBottomColor: colors.border }]}>
-                      <View style={[styles.tdCol, { flex: 2.2 }]}>
+                      <View style={[styles.tdCol, { flex: 2.2, minWidth: 200, paddingLeft: 16, paddingRight: 10, justifyContent: "center" }]}>
                         <Text style={[styles.empName, { color: colors.foreground }]}>
                           {p.employeeName}
                         </Text>
@@ -428,40 +428,41 @@ export function WebPayroll() {
                         </Text>
                       </View>
 
-                      <View style={[styles.tdCol, { flex: 1.8 }]}>
+                      <View style={[styles.tdCol, { flex: 1.8, minWidth: 160, paddingHorizontal: 10, justifyContent: "center" }]}>
                         <Text style={[styles.deptText, { color: colors.foreground }]}>
                           {p.department}
                         </Text>
                       </View>
 
-                      <View style={[styles.tdCol, { flex: 1.1, alignItems: "flex-end" }]}>
+                      <View style={[styles.tdCol, { flex: 1.1, minWidth: 105, paddingHorizontal: 10, alignItems: "flex-end", justifyContent: "center" }]}>
                         <Text style={[styles.amountCell, { color: colors.foreground }]}>
                           {settings.currency} {p.baseSalary?.toLocaleString()}
                         </Text>
                       </View>
 
-                      <View style={[styles.tdCol, { flex: 1.0, alignItems: "flex-end" }]}>
+                      <View style={[styles.tdCol, { flex: 1.0, minWidth: 95, paddingHorizontal: 10, alignItems: "flex-end", justifyContent: "center" }]}>
                         <Text style={[styles.amountCell, { color: colors.income }]}>
                           +{settings.currency} {p.bonus?.toLocaleString() || "0"}
                         </Text>
                       </View>
 
-                      <View style={[styles.tdCol, { flex: 1.0, alignItems: "flex-end" }]}>
+                      <View style={[styles.tdCol, { flex: 1.0, minWidth: 105, paddingHorizontal: 10, alignItems: "flex-end", justifyContent: "center" }]}>
                         <Text style={[styles.amountCell, { color: colors.expense }]}>
                           -{settings.currency} {p.deductions?.toLocaleString() || "0"}
                         </Text>
                       </View>
 
-                      <View style={[styles.tdCol, { flex: 1.2, alignItems: "flex-end" }]}>
+                      <View style={[styles.tdCol, { flex: 1.2, minWidth: 115, paddingHorizontal: 10, alignItems: "flex-end", justifyContent: "center" }]}>
                         <Text style={[styles.netAmountText, { color: "#8B5CF6" }]}>
                           {settings.currency} {net.toLocaleString()}
                         </Text>
                       </View>
 
-                      <View style={[styles.tdCol, { flex: 1.5, justifyContent: "center", flexDirection: "row", gap: 6 }]}>
+                      <View style={[styles.tdCol, { flex: 1.3, minWidth: 125, paddingRight: 16, paddingLeft: 10, flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 6 }]}>
                         <TouchableOpacity
                           style={[styles.actionIconBtn, { borderColor: "#8B5CF640", backgroundColor: "#8B5CF612" }]}
                           onPress={() => handleExportEmployeeSlip(p)}
+                          title="Generate Salary Slip"
                         >
                           <SvgFileText size={14} color="#8B5CF6" />
                         </TouchableOpacity>
@@ -474,6 +475,7 @@ export function WebPayroll() {
                                 setEditingEntry(p);
                                 setModalVisible(true);
                               }}
+                              title="Edit Entry"
                             >
                               <SvgEdit size={14} color={colors.primary} />
                             </TouchableOpacity>
@@ -481,6 +483,7 @@ export function WebPayroll() {
                             <TouchableOpacity
                               style={[styles.actionIconBtn, { borderColor: "#F43F5E30", backgroundColor: "#F43F5E12" }]}
                               onPress={() => setDeletingPayroll(p)}
+                              title="Delete Record"
                             >
                               <SvgTrash size={14} color="#F43F5E" />
                             </TouchableOpacity>
@@ -735,7 +738,6 @@ const styles = StyleSheet.create({
   tableHeader: {
     flexDirection: "row",
     paddingVertical: 12,
-    paddingHorizontal: 16,
     borderBottomWidth: 1,
   },
   thCol: {
@@ -751,7 +753,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 12,
-    paddingHorizontal: 16,
     borderBottomWidth: 1,
   },
   tdCol: {
