@@ -22,7 +22,12 @@ import {
   limit,
 } from "firebase/firestore";
 import { db } from "@/config/firebase";
-import { EvaluatedNotificationEvent, NotificationType } from "./notificationRules";
+import {
+  EvaluatedNotificationEvent,
+  NotificationType,
+  evaluateBudgetEvent,
+  evaluateTransactionEvent,
+} from "./notificationRules";
 import { showFloatingToast } from "@/utils/toast";
 import { triggerLocalNotification } from "@/hooks/NotificationHelper";
 
@@ -46,9 +51,19 @@ export interface AppNotification {
 const STORAGE_NOTIF_KEY = "@ofm_cached_notifications";
 const PROCESSED_KEYS_KEY = "@ofm_processed_idempotency_keys";
 
-// In-memory processed cache
+// In-memory processed cache & active subscription listeners
 const processedKeysSet = new Set<string>();
+const activeListeners = new Set<(notifications: AppNotification[]) => void>();
+let currentNotificationsCache: AppNotification[] = [];
 
+function broadcastNotifications(notifs: AppNotification[]) {
+  currentNotificationsCache = notifs;
+  activeListeners.forEach((cb) => {
+    try {
+      cb(notifs);
+    } catch {}
+  });
+}
 
 /**
  * Registers device for Expo Push Notifications and returns the token.
@@ -78,14 +93,11 @@ export async function registerForPushNotificationsAsync(userId?: string, orgId?:
     console.log("[NOTIFICATIONS] Push token obtained:", pushToken);
 
     // Save token to Firestore if user is authenticated
-    if (userId && orgId && pushToken) {
+    if (userId && orgId) {
       try {
-        const tokenRef = doc(db, "push_tokens", `${userId}_${Platform.OS}`);
-        await setDoc(tokenRef, {
-          userId,
-          organizationId: orgId,
+        const userRef = doc(db, "users", userId);
+        await setDoc(userRef, {
           pushToken,
-          platform: Platform.OS,
           updatedAt: new Date().toISOString(),
         }, { merge: true });
       } catch (err) {
@@ -110,23 +122,14 @@ export async function dispatchNotification(
 ): Promise<boolean> {
   if (!orgId) return false;
 
-  // 1. Idempotency check: prevent duplicate notifications
+  // 1. Idempotency check: prevent duplicate notifications if already in notification list
   if (event.idempotencyKey) {
-    if (processedKeysSet.has(event.idempotencyKey)) {
-      return false;
-    }
-    // Check local storage for persistent idempotency
     try {
-      const rawStored = await AsyncStorage.getItem(PROCESSED_KEYS_KEY);
-      const storedKeys: string[] = rawStored ? JSON.parse(rawStored) : [];
-      if (storedKeys.includes(event.idempotencyKey)) {
-        processedKeysSet.add(event.idempotencyKey);
+      const rawStored = await AsyncStorage.getItem(STORAGE_NOTIF_KEY);
+      const list: AppNotification[] = rawStored ? JSON.parse(rawStored) : currentNotificationsCache;
+      if (list && list.some((n) => n.idempotencyKey === event.idempotencyKey)) {
         return false;
       }
-      storedKeys.push(event.idempotencyKey);
-      if (storedKeys.length > 200) storedKeys.shift(); // keep max 200 recent keys
-      await AsyncStorage.setItem(PROCESSED_KEYS_KEY, JSON.stringify(storedKeys));
-      processedKeysSet.add(event.idempotencyKey);
     } catch {}
   }
 
@@ -146,7 +149,19 @@ export async function dispatchNotification(
     idempotencyKey: event.idempotencyKey,
   };
 
-  // 2. Persist to Firestore
+  // 1.5 Update local cache immediately & broadcast to all active UI listeners (Mobile & Web)
+  try {
+    const rawStored = await AsyncStorage.getItem(STORAGE_NOTIF_KEY);
+    let list: AppNotification[] = rawStored ? JSON.parse(rawStored) : [];
+    if (!list.some((n) => n.id === notification.id || (n.idempotencyKey && n.idempotencyKey === notification.idempotencyKey))) {
+      list.unshift(notification);
+      if (list.length > 50) list = list.slice(0, 50);
+      await AsyncStorage.setItem(STORAGE_NOTIF_KEY, JSON.stringify(list));
+      broadcastNotifications(list);
+    }
+  } catch {}
+
+  // 2. Persist to Firestore asynchronously
   try {
     const notifRef = doc(db, "notifications", notifId);
     await setDoc(notifRef, notification);
@@ -183,58 +198,68 @@ export async function syncLedgerNotificationEvents(
   const currentMonth = new Date().toISOString().substring(0, 7);
 
   // 1. Evaluate Budget Utilization Alerts
-  budgets.forEach((b) => {
-    const event = evaluateBudgetEvent(b, orgId, currency);
-    if (event) {
-      dispatchNotification(event, orgId, userId).catch(() => {});
-    }
-  });
+  try {
+    (budgets || []).forEach((b) => {
+      try {
+        const event = evaluateBudgetEvent(b, orgId, currency);
+        if (event) {
+          dispatchNotification(event, orgId, userId).catch(() => {});
+        }
+      } catch {}
+    });
+  } catch {}
 
   // 2. Evaluate Payroll Disbursals
-  if (payroll.length > 0) {
-    const totalPayroll = payroll.reduce(
-      (s, p) => s + (p.baseSalary || 0) + (p.bonus || 0) - (p.deductions || 0),
-      0
-    );
-    const payrollKey = `payroll_summary_${orgId}_${currentMonth}`;
-    dispatchNotification(
-      {
-        type: "PAYROLL_PROCESSED",
-        title: "Staff Payroll Record Active",
-        message: `${payroll.length} staff records active for ${currentMonth}. Total disbursal: ${currency} ${totalPayroll.toLocaleString()}.`,
-        severity: "INFO",
-        actionRoute: "/payroll",
-        entityId: `payroll_${currentMonth}`,
-        idempotencyKey: payrollKey,
-      },
-      orgId,
-      userId
-    ).catch(() => {});
-  }
+  try {
+    if (payroll && payroll.length > 0) {
+      const totalPayroll = payroll.reduce(
+        (s, p) => s + (p.baseSalary || 0) + (p.bonus || 0) - (p.deductions || 0),
+        0
+      );
+      const payrollKey = `payroll_summary_${orgId}_${currentMonth}`;
+      dispatchNotification(
+        {
+          type: "PAYROLL_PROCESSED",
+          title: "Staff Payroll Record Active",
+          message: `${payroll.length} staff records active for ${currentMonth}. Total disbursal: ${currency} ${totalPayroll.toLocaleString()}.`,
+          severity: "INFO",
+          actionRoute: "/payroll",
+          entityId: `payroll_${currentMonth}`,
+          idempotencyKey: payrollKey,
+        },
+        orgId,
+        userId
+      ).catch(() => {});
+    }
+  } catch {}
 
   // 3. Evaluate Unusual Outflow Transactions
-  const expenseTxs = transactions.filter((t) => t.type === "expense");
-  if (expenseTxs.length > 0) {
-    const avgExpense =
-      expenseTxs.reduce((s, t) => s + t.amount, 0) / expenseTxs.length;
+  try {
+    const expenseTxs = (transactions || []).filter((t) => t.type === "expense");
+    if (expenseTxs.length > 0) {
+      const avgExpense =
+        expenseTxs.reduce((s, t) => s + t.amount, 0) / expenseTxs.length;
 
-    // Check top 3 largest expenses
-    expenseTxs
-      .slice(0, 3)
-      .forEach((tx) => {
-        const txEvent = evaluateTransactionEvent(tx, avgExpense, orgId, currency);
-        if (txEvent) {
-          dispatchNotification(txEvent, orgId, userId).catch(() => {});
-        }
-      });
-  }
+      // Check top 3 largest expenses
+      expenseTxs
+        .slice(0, 3)
+        .forEach((tx) => {
+          try {
+            const txEvent = evaluateTransactionEvent(tx, avgExpense, orgId, currency);
+            if (txEvent) {
+              dispatchNotification(txEvent, orgId, userId).catch(() => {});
+            }
+          } catch {}
+        });
+    }
+  } catch {}
 
   // 4. System Health & Reconciliation Milestone
-  const totalInc = transactions.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
-  const totalExp = transactions.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
-  const netBal = totalInc - totalExp;
+  try {
+    const totalInc = (transactions || []).filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
+    const totalExp = (transactions || []).filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+    const netBal = totalInc - totalExp;
 
-  if (transactions.length > 0) {
     const healthKey = `system_health_${orgId}_${currentMonth}`;
     dispatchNotification(
       {
@@ -242,7 +267,9 @@ export async function syncLedgerNotificationEvents(
         title: netBal < 0 ? "Operating Deficit Notice" : "Fiscal Reconciliation Active",
         message: netBal < 0
           ? `Operating expenses (${currency} ${totalExp.toLocaleString()}) exceed revenue (${currency} ${totalInc.toLocaleString()}) by ${currency} ${Math.abs(netBal).toLocaleString()}.`
-          : `Institutional ledger verified. Current net operating balance is +${currency} ${netBal.toLocaleString()}.`,
+          : (transactions && transactions.length > 0)
+          ? `Institutional ledger verified. Current net operating balance is +${currency} ${netBal.toLocaleString()}.`
+          : "Enterprise cloud ledger verified and active. All financial systems are operational.",
         severity: netBal < 0 ? "WARNING" : "SUCCESS",
         actionRoute: "/(tabs)",
         entityId: `health_${currentMonth}`,
@@ -251,7 +278,7 @@ export async function syncLedgerNotificationEvents(
       orgId,
       userId
     ).catch(() => {});
-  }
+  } catch {}
 }
 
 /**
@@ -266,6 +293,27 @@ export function subscribeToNotifications(
     return () => {};
   }
 
+  activeListeners.add(onUpdate);
+
+  // 1. Instantly push in-memory cache or local disk storage on frame 0
+  if (currentNotificationsCache.length > 0) {
+    onUpdate(currentNotificationsCache);
+  } else {
+    AsyncStorage.getItem(STORAGE_NOTIF_KEY)
+      .then((raw) => {
+        if (raw) {
+          try {
+            const cached: AppNotification[] = JSON.parse(raw);
+            if (cached && cached.length > 0) {
+              currentNotificationsCache = cached;
+              onUpdate(cached);
+            }
+          } catch {}
+        }
+      })
+      .catch(() => {});
+  }
+
   try {
     const q = query(
       collection(db, "notifications"),
@@ -278,11 +326,31 @@ export function subscribeToNotifications(
       (snapshot) => {
         const notifs: AppNotification[] = [];
         snapshot.forEach((d) => notifs.push(d.data() as AppNotification));
-        // Sort descending by creation date
         notifs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        
-        AsyncStorage.setItem(STORAGE_NOTIF_KEY, JSON.stringify(notifs)).catch(() => {});
-        onUpdate(notifs);
+
+        // Merge with local disk cache so locally generated notifications aren't overwritten
+        AsyncStorage.getItem(STORAGE_NOTIF_KEY)
+          .then((raw) => {
+            let merged = notifs;
+            if (raw) {
+              try {
+                const localNotifs: AppNotification[] = JSON.parse(raw);
+                const map = new Map<string, AppNotification>();
+                notifs.forEach((n) => map.set(n.id, n));
+                localNotifs.forEach((n) => {
+                  if (!map.has(n.id)) map.set(n.id, n);
+                });
+                merged = Array.from(map.values());
+                merged.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+              } catch {}
+            }
+            AsyncStorage.setItem(STORAGE_NOTIF_KEY, JSON.stringify(merged)).catch(() => {});
+            broadcastNotifications(merged);
+          })
+          .catch(() => {
+            AsyncStorage.setItem(STORAGE_NOTIF_KEY, JSON.stringify(notifs)).catch(() => {});
+            broadcastNotifications(notifs);
+          });
       },
       (error) => {
         console.warn("[NOTIFICATIONS] Real-time listener warning:", error);
@@ -292,17 +360,22 @@ export function subscribeToNotifications(
             if (raw) {
               const cached = JSON.parse(raw);
               cached.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-              onUpdate(cached);
+              broadcastNotifications(cached);
             }
           })
           .catch(() => {});
       }
     );
 
-    return unsubscribe;
+    return () => {
+      activeListeners.delete(onUpdate);
+      unsubscribe();
+    };
   } catch (err) {
     console.warn("[NOTIFICATIONS] Subscription failed:", err);
-    return () => {};
+    return () => {
+      activeListeners.delete(onUpdate);
+    };
   }
 }
 
@@ -310,6 +383,17 @@ export function subscribeToNotifications(
  * Marks a notification as read.
  */
 export async function markNotificationAsRead(id: string): Promise<void> {
+  // Optimistically update local storage & broadcast immediately
+  try {
+    const raw = await AsyncStorage.getItem(STORAGE_NOTIF_KEY);
+    if (raw) {
+      const list: AppNotification[] = JSON.parse(raw);
+      const updated = list.map((n) => (n.id === id ? { ...n, read: true } : n));
+      await AsyncStorage.setItem(STORAGE_NOTIF_KEY, JSON.stringify(updated));
+      broadcastNotifications(updated);
+    }
+  } catch {}
+
   try {
     const notifRef = doc(db, "notifications", id);
     await updateDoc(notifRef, { read: true, updatedAt: new Date().toISOString() });
@@ -322,6 +406,17 @@ export async function markNotificationAsRead(id: string): Promise<void> {
  * Marks all notifications as read for an organization.
  */
 export async function markAllNotificationsAsRead(notifications: AppNotification[]): Promise<void> {
+  // Optimistically update local storage & broadcast immediately
+  try {
+    const raw = await AsyncStorage.getItem(STORAGE_NOTIF_KEY);
+    if (raw) {
+      const list: AppNotification[] = JSON.parse(raw);
+      const updated = list.map((n) => ({ ...n, read: true }));
+      await AsyncStorage.setItem(STORAGE_NOTIF_KEY, JSON.stringify(updated));
+      broadcastNotifications(updated);
+    }
+  } catch {}
+
   const unread = notifications.filter((n) => !n.read);
   await Promise.all(
     unread.map((n) =>
@@ -334,6 +429,17 @@ export async function markAllNotificationsAsRead(notifications: AppNotification[
  * Deletes a notification.
  */
 export async function deleteNotificationRecord(id: string): Promise<void> {
+  // Optimistically update local storage & broadcast immediately
+  try {
+    const raw = await AsyncStorage.getItem(STORAGE_NOTIF_KEY);
+    if (raw) {
+      const list: AppNotification[] = JSON.parse(raw);
+      const updated = list.filter((n) => n.id !== id);
+      await AsyncStorage.setItem(STORAGE_NOTIF_KEY, JSON.stringify(updated));
+      broadcastNotifications(updated);
+    }
+  } catch {}
+
   try {
     await deleteDoc(doc(db, "notifications", id));
   } catch (err) {

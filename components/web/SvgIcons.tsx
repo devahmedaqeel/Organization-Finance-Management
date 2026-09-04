@@ -722,3 +722,113 @@ export function SvgMinus({ size = 16, color = "#94A3B8" }: IconProps) {
     </Svg>
   );
 }
+
+export function SvgArrowUpCircle({ size = 16, color = "#94A3B8" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Circle cx="12" cy="12" r="10" />
+      <Polyline points="16 12 12 8 8 12" />
+      <Line x1="12" y1="16" x2="12" y2="8" />
+    </Svg>
+  );
+}
+
+export function SvgArrowDownCircle({ size = 16, color = "#94A3B8" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Circle cx="12" cy="12" r="10" />
+      <Polyline points="8 12 12 16 16 12" />
+      <Line x1="12" y1="8" x2="12" y2="16" />
+    </Svg>
+  );
+}
+
+export function SvgSend({ size = 16, color = "#94A3B8" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Line x1="22" y1="2" x2="11" y2="13" />
+      <Polygon points="22 2 15 22 11 13 2 9 22 2" />
+    </Svg>
+  );
+}
+
+export function SvgUserCheck({ size = 16, color = "#94A3B8" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <Circle cx="9" cy="7" r="4" />
+      <Polyline points="16 11 18 13 22 9" />
+    </Svg>
+  );
+}
+
+export function SvgUserX({ size = 16, color = "#94A3B8" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <Circle cx="9" cy="7" r="4" />
+      <Line x1="17" y1="8" x2="22" y2="13" />
+      <Line x1="22" y1="8" x2="17" y2="13" />
+    </Svg>
+  );
+}
+
+export function SvgCornerDownRight({ size = 16, color = "#94A3B8" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Polyline points="15 10 20 15 15 20" />
+      <Path d="M4 4v7a4 4 0 0 0 4 4h12" />
+    </Svg>
+  );
+}
+
+export function SvgFolder({ size = 16, color = "#94A3B8" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+    </Svg>
+  );
+}
+
+export function SvgInbox({ size = 16, color = "#94A3B8" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Polyline points="22 12 16 12 14 15 10 15 8 12 2 12" />
+      <Path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+    </Svg>
+  );
+}
+
+export function SvgHeart({ size = 16, color = "#94A3B8" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+    </Svg>
+  );
+}
+
+export function SvgMonitor({ size = 16, color = "#94A3B8" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Rect width="20" height="14" x="2" y="3" rx="2" />
+      <Line x1="8" y1="21" x2="16" y2="21" />
+      <Line x1="12" y1="17" x2="12" y2="21" />
+    </Svg>
+  );
+}
+
+export function SvgTool({ size = 16, color = "#94A3B8" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+    </Svg>
+  );
+}
+
+export function SvgNavigation({ size = 16, color = "#94A3B8" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <Polygon points="3 11 22 2 13 21 11 13 3 11" />
+    </Svg>
+  );
+}

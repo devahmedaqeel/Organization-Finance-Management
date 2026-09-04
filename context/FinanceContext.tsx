@@ -265,19 +265,19 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     };
   }, [user?.id, activeOrgId]);
 
-  // Automated evaluation of ledger notification events
+  // Automated evaluation of ledger notification events (Mobile & Web)
   useEffect(() => {
-    if (loaded && user?.organizationId && (transactions.length > 0 || budgets.length > 0 || payroll.length > 0)) {
+    if (loaded && activeOrgId) {
       syncLedgerNotificationEvents(
         transactions,
         budgets,
         payroll,
         activeOrgId,
         settings.currency || "PKR",
-        user.id
+        user?.id || "current_user"
       ).catch(() => {});
     }
-  }, [loaded, user?.organizationId, transactions.length, budgets.length, payroll.length, activeOrgId, settings.currency]);
+  }, [loaded, activeOrgId, transactions.length, budgets.length, payroll.length, settings.currency, user?.id]);
 
   // 1. Organization-Scoped Initial Local Cache Load + Instant REST Cloud Sync
   useEffect(() => {

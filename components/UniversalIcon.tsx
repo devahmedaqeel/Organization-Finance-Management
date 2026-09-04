@@ -73,6 +73,18 @@ import {
   SvgHome,
   SvgMoreVertical,
   SvgMoreHorizontal,
+  SvgArrowUpCircle,
+  SvgArrowDownCircle,
+  SvgSend,
+  SvgUserCheck,
+  SvgUserX,
+  SvgCornerDownRight,
+  SvgFolder,
+  SvgInbox,
+  SvgHeart,
+  SvgMonitor,
+  SvgTool,
+  SvgNavigation,
 } from "./web/SvgIcons";
 
 export interface UniversalIconProps {
@@ -237,6 +249,30 @@ export function UniversalFeather({ name, size = 16, color = "#94A3B8" }: Univers
       return <SvgMoreVertical size={size} color={color} />;
     case "more-horizontal":
       return <SvgMoreHorizontal size={size} color={color} />;
+    case "arrow-up-circle":
+      return <SvgArrowUpCircle size={size} color={color} />;
+    case "arrow-down-circle":
+      return <SvgArrowDownCircle size={size} color={color} />;
+    case "send":
+      return <SvgSend size={size} color={color} />;
+    case "user-check":
+      return <SvgUserCheck size={size} color={color} />;
+    case "user-x":
+      return <SvgUserX size={size} color={color} />;
+    case "corner-down-right":
+      return <SvgCornerDownRight size={size} color={color} />;
+    case "folder":
+      return <SvgFolder size={size} color={color} />;
+    case "inbox":
+      return <SvgInbox size={size} color={color} />;
+    case "heart":
+      return <SvgHeart size={size} color={color} />;
+    case "monitor":
+      return <SvgMonitor size={size} color={color} />;
+    case "tool":
+      return <SvgTool size={size} color={color} />;
+    case "navigation":
+      return <SvgNavigation size={size} color={color} />;
     default:
       return <SvgBarChart2 size={size} color={color} />;
   }
