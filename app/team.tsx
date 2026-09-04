@@ -225,16 +225,39 @@ export default function TeamScreen() {
     setTimeout(() => setRefreshing(false), 600);
   };
 
+  const ROLE_WEIGHT: Record<string, number> = {
+    admin: 1,
+    accountant: 2,
+    manager: 3,
+    employee: 4,
+    viewer: 5,
+  };
+
   // Filtered members list
   const filteredMembers = useMemo(() => {
     const q = search.toLowerCase().trim();
-    return members.filter((m) => {
+    const list = members.filter((m) => {
       const matchSearch =
-        m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q);
+        (m.name || "").toLowerCase().includes(q) || (m.email || "").toLowerCase().includes(q);
       const matchRole = selectedRole === "all" || m.role === selectedRole;
       return matchSearch && matchRole;
     });
-  }, [members, search, selectedRole]);
+
+    return list.sort((a, b) => {
+      const isCurrentA = a.email?.toLowerCase() === user?.email?.toLowerCase();
+      const isCurrentB = b.email?.toLowerCase() === user?.email?.toLowerCase();
+      if (isCurrentA && !isCurrentB) return -1;
+      if (!isCurrentA && isCurrentB) return 1;
+
+      const weightA = ROLE_WEIGHT[a.role?.toLowerCase()] ?? 99;
+      const weightB = ROLE_WEIGHT[b.role?.toLowerCase()] ?? 99;
+      if (weightA !== weightB) return weightA - weightB;
+
+      const nameA = (a.name || a.email || "").toLowerCase();
+      const nameB = (b.name || b.email || "").toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+  }, [members, search, selectedRole, user?.email]);
 
   // Dynamic statistics
   const stats = useMemo(() => {
