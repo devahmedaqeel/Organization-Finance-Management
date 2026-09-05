@@ -303,6 +303,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
+        // Anonymous sessions are purely for Firestore transport authorization.
+        // Never overwrite or reset the active user profile or organization!
+        if (firebaseUser.isAnonymous) {
+          return;
+        }
+
         try {
           const formattedEmail = (firebaseUser.email || "").toLowerCase().trim();
 
@@ -328,7 +334,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             await AsyncStorage.setItem("ofm_user", JSON.stringify(remoteUser));
           } else {
             setUser((curr) => {
-              if (curr && (curr.id === firebaseUser.uid || curr.email === formattedEmail)) {
+              // If user already has an active session with valid organizationId, preserve it!
+              if (curr && (curr.id === firebaseUser.uid || curr.email === formattedEmail || curr.organizationId)) {
                 return curr;
               }
               const activeUser: User = {
@@ -724,13 +731,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     await AsyncStorage.removeItem("ofm_user");
 
-    // Purge all organization-scoped caches and tombstones from AsyncStorage
+    // Purge all organization-scoped caches from AsyncStorage (Preserve tombstones so deleted items NEVER resurrect)
     try {
       const allKeys = await AsyncStorage.getAllKeys();
       const cacheKeys = allKeys.filter(
         (k) =>
           k.startsWith("ofm_cache:") ||
-          k.startsWith("ofm_tombstones:") ||
           k.includes("transactions") ||
           k.includes("budgets") ||
           k.includes("payroll") ||
@@ -741,7 +747,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (e) {}
 
-    // Purge all web local/session caches
+    // Purge all web local/session caches (Preserve tombstones so deleted items NEVER resurrect)
     if (typeof window !== "undefined") {
       try {
         sessionStorage.clear();
@@ -749,8 +755,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const k = localStorage.key(i);
           if (
             k &&
+            !k.startsWith("ofm_tombstones:") &&
             (k.startsWith("ofm_cache:") ||
-             k.startsWith("ofm_tombstones:") ||
              k.includes("transactions") ||
              k.includes("budgets") ||
              k.includes("payroll") ||

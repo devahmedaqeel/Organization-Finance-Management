@@ -50,7 +50,6 @@ import {
   calculateBudgetAllocation,
   calculateBudgetUsed,
   calculateBudgetRemaining,
-  calculateTotalAvailableFunds,
 } from "@/services/FinancialCalculationEngine";
 import { FinancialAnalyticsSuite } from "@/components/analytics/FinancialAnalyticsSuite";
 
@@ -184,7 +183,7 @@ export default function DashboardScreen() {
   const selectedCurrency = useMemo(() => WORLD_CURRENCIES.find(c => c.code === settings.currency), [settings.currency]);
   const webTop = Platform.OS === "web" ? 67 : 0;
   const roleColor = ROLE_COLORS[user?.role ?? "admin"];
-  const [balanceViewMode, setBalanceViewMode] = useState<"total" | "cashflow" | "expenses" | "budget">("total");
+  const [balanceViewMode, setBalanceViewMode] = useState<"cashflow" | "expenses" | "budget">("cashflow");
   const realNetOperatingResult = totalIncome - totalExpenses;
   const isDeficit = realNetOperatingResult < 0;
   const netMargin = totalIncome > 0 ? (realNetOperatingResult / totalIncome) * 100 : (totalExpenses > 0 ? -100 : 0);
@@ -198,13 +197,10 @@ export default function DashboardScreen() {
   const totalBudgetSpent = calculateBudgetUsed(transactions, budgets);
   const netBudgetRemaining = calculateBudgetRemaining(totalBudgeted, totalBudgetSpent);
   const netBudgetUtilization = totalBudgeted > 0 ? (totalBudgetSpent / totalBudgeted) * 100 : 0;
-  const totalAvailableFunds = calculateTotalAvailableFunds(totalIncome, totalBudgeted, totalExpenses);
   
-  // Real-time authoritative display balance (Total Funds vs Net Surplus vs Total Outflows vs Allocated Budget)
+  // Real-time authoritative display balance (Net Surplus vs Total Outflows vs Allocated Budget)
   const currentHeroBalance =
-    balanceViewMode === "total"
-      ? totalAvailableFunds
-      : balanceViewMode === "cashflow"
+    balanceViewMode === "cashflow"
       ? netBalance
       : balanceViewMode === "budget"
       ? totalBudgeted
@@ -502,9 +498,7 @@ export default function DashboardScreen() {
               adjustsFontSizeToFit
               minimumFontScale={0.85}
             >
-              {balanceViewMode === "total"
-                ? "TOTAL AVAILABLE FUNDS"
-                : balanceViewMode === "cashflow"
+              {balanceViewMode === "cashflow"
                 ? "OPERATING RESULT"
                 : balanceViewMode === "budget"
                 ? "BUDGET CAP"
@@ -550,51 +544,16 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* View Mode Switcher Pills (Horizontal Scroll for 4 balanced pills) */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={{ maxWidth: "100%", width: "100%", flexGrow: 0, marginBottom: 10 }}
-          contentContainerStyle={{ flexDirection: "row", gap: 8, alignItems: "center" }}
-        >
-          {/* Pill 1: Total Available Funds */}
+        {/* View Mode Switcher Pills (Symmetrical Side-by-Side Flex, 10px Gap, Zero Touch) */}
+        <View style={{ flexDirection: "row", gap: 10, marginBottom: 14 }}>
           <TouchableOpacity
             style={{
+              flex: 1,
               flexDirection: "row",
               alignItems: "center",
+              justifyContent: "center",
               gap: 4.5,
-              paddingHorizontal: 9,
-              paddingVertical: 5.5,
-              borderRadius: 10,
-              backgroundColor: balanceViewMode === "total" ? "rgba(56, 189, 248, 0.35)" : "rgba(255, 255, 255, 0.08)",
-              borderWidth: 1.2,
-              borderColor: balanceViewMode === "total" ? "#38BDF8" : "rgba(255, 255, 255, 0.15)",
-            }}
-            onPress={() => {
-              setBalanceViewMode("total");
-              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            }}
-            activeOpacity={0.8}
-          >
-            <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: "#38BDF8", flexShrink: 0 }} />
-            <Text
-              style={{
-                color: balanceViewMode === "total" ? "#FFFFFF" : "rgba(255, 255, 255, 0.75)",
-                fontSize: 9.5,
-                fontFamily: "Inter_700Bold",
-              }}
-            >
-              Total Funds ({totalAvailableFunds >= 0 ? "+" : "-"}{fmt(Math.abs(totalAvailableFunds))})
-            </Text>
-          </TouchableOpacity>
-
-          {/* Pill 2: Net Surplus */}
-          <TouchableOpacity
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 4.5,
-              paddingHorizontal: 9,
+              paddingHorizontal: 6,
               paddingVertical: 5.5,
               borderRadius: 10,
               backgroundColor: balanceViewMode === "cashflow" ? "rgba(59, 130, 246, 0.30)" : "rgba(255, 255, 255, 0.08)",
@@ -614,49 +573,22 @@ export default function DashboardScreen() {
                 fontSize: 9.5,
                 fontFamily: "Inter_700Bold",
               }}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.75}
             >
-              Surplus ({netBalance >= 0 ? "+" : "-"}{fmt(Math.abs(netBalance))})
+              Surplus ({netBalance >= 0 ? "+" : "-"}{settings.currency} {fmt(Math.abs(netBalance))})
             </Text>
           </TouchableOpacity>
 
-          {/* Pill 3: Budget Pool */}
           <TouchableOpacity
             style={{
+              flex: 1,
               flexDirection: "row",
               alignItems: "center",
+              justifyContent: "center",
               gap: 4.5,
-              paddingHorizontal: 9,
-              paddingVertical: 5.5,
-              borderRadius: 10,
-              backgroundColor: balanceViewMode === "budget" ? "rgba(129, 140, 248, 0.30)" : "rgba(255, 255, 255, 0.08)",
-              borderWidth: 1.2,
-              borderColor: balanceViewMode === "budget" ? "#818CF8" : "rgba(255, 255, 255, 0.15)",
-            }}
-            onPress={() => {
-              setBalanceViewMode("budget");
-              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            }}
-            activeOpacity={0.8}
-          >
-            <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: "#818CF8", flexShrink: 0 }} />
-            <Text
-              style={{
-                color: balanceViewMode === "budget" ? "#FFFFFF" : "rgba(255, 255, 255, 0.75)",
-                fontSize: 9.5,
-                fontFamily: "Inter_700Bold",
-              }}
-            >
-              Budget ({fmt(totalBudgeted)})
-            </Text>
-          </TouchableOpacity>
-
-          {/* Pill 4: Outflows */}
-          <TouchableOpacity
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 4.5,
-              paddingHorizontal: 9,
+              paddingHorizontal: 6,
               paddingVertical: 5.5,
               borderRadius: 10,
               backgroundColor: balanceViewMode === "expenses" ? "rgba(244, 63, 94, 0.30)" : "rgba(255, 255, 255, 0.08)",
@@ -676,23 +608,13 @@ export default function DashboardScreen() {
                 fontSize: 9.5,
                 fontFamily: "Inter_700Bold",
               }}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.75}
             >
-              Outflows (-{fmt(totalExpenses)})
+              Outflows (-{settings.currency} {fmt(totalExpenses)})
             </Text>
           </TouchableOpacity>
-        </ScrollView>
-
-        {/* Dynamic Formula Breakdown Subtitle */}
-        <View style={{ marginBottom: 10 }}>
-          <Text style={{ color: "rgba(255, 255, 255, 0.75)", fontSize: 10.5, fontFamily: "Inter_500Medium" }}>
-            {balanceViewMode === "total"
-              ? `Inflows (+${fmt(totalIncome)}) · Budget (+${fmt(totalBudgeted)}) · Out (-${fmt(totalExpenses)})`
-              : balanceViewMode === "cashflow"
-              ? `Inflows (+${fmt(totalIncome)}) · Outflows (-${fmt(totalExpenses)})`
-              : balanceViewMode === "budget"
-              ? `Budget Limit (${fmt(totalBudgeted)}) · Budget Spent (${fmt(totalBudgetSpent)})`
-              : `Total Disbursed Outflows (${fmt(totalExpenses)})`}
-          </Text>
         </View>
 
         {/* Balance Hero Amount Display + Margin Pill (Matching Web Exactly) */}
@@ -757,8 +679,6 @@ export default function DashboardScreen() {
             <Text style={{ color: currentHeroIsDeficit ? "#FB7185" : "#34D399", fontSize: 12, fontFamily: "Inter_700Bold" }}>
               {balanceViewMode === "expenses"
                 ? `${clampedSpendRatio}% Outflow`
-                : balanceViewMode === "total"
-                ? `${totalIncome + totalBudgeted > 0 ? (((totalIncome + totalBudgeted - totalExpenses) / (totalIncome + totalBudgeted)) * 100).toFixed(1) : "0.0"}% Active`
                 : `${netMargin >= 0 ? "+" : ""}${netMargin.toFixed(1)}% Margin`}
             </Text>
           </TouchableOpacity>
@@ -768,16 +688,12 @@ export default function DashboardScreen() {
         <View style={{ gap: 7, marginTop: 2 }}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
             <Text style={{ color: "#CBD5E1", fontSize: 11, fontFamily: "Inter_500Medium" }}>
-              {balanceViewMode === "total"
-                ? `${settings.currency} ${fmt(totalExpenses)} Outflows (${(totalIncome + totalBudgeted) > 0 ? ((totalExpenses / (totalIncome + totalBudgeted)) * 100).toFixed(0) : 0}%)`
-                : isDeficit
+              {isDeficit
                 ? `${Math.round(rawSpendRatio)}% Overspent`
                 : `${clampedSpendRatio}% Total Spent`}
             </Text>
             <Text style={{ color: currentHeroIsDeficit ? "#FB7185" : "#34D399", fontSize: 11, fontFamily: "Inter_700Bold" }}>
-              {balanceViewMode === "total"
-                ? `${settings.currency} ${fmt(Math.max(0, totalAvailableFunds))} Available (${(totalIncome + totalBudgeted) > 0 ? (Math.max(0, totalAvailableFunds) / (totalIncome + totalBudgeted) * 100).toFixed(0) : 100}% Funds)`
-                : isDeficit
+              {isDeficit
                 ? "Operating Deficit"
                 : `${retainedSurplusPct}% Net Surplus`}
             </Text>
@@ -786,13 +702,7 @@ export default function DashboardScreen() {
             <View
               style={{
                 height: "100%",
-                width: `${
-                  balanceViewMode === "total"
-                    ? (totalIncome + totalBudgeted > 0 ? Math.min(100, Math.max(2, (totalExpenses / (totalIncome + totalBudgeted)) * 100)) : 2)
-                    : isDeficit
-                    ? 100
-                    : Math.min(Math.max(clampedSpendRatio, 2), 100)
-                }%`,
+                width: `${Math.min(Math.max(clampedSpendRatio, 2), 100)}%`,
                 backgroundColor: currentHeroIsDeficit ? "#FB7185" : "#38BDF8",
                 borderRadius: 3,
               }}

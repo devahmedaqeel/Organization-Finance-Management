@@ -27,7 +27,6 @@ import {
   calculateBudgetAllocation,
   calculateBudgetUsed,
   calculateBudgetRemaining,
-  calculateTotalAvailableFunds,
 } from "@/services/FinancialCalculationEngine";
 import { calculateFinancialHealth } from "@/services/financialHealthService";
 import { generateFinancialInsights, ActionableInsight } from "@/services/financialInsightsService";
@@ -171,9 +170,6 @@ export default function AIInsightsScreen() {
   }, [totalAllocatedBudget, displayedBudgetSpent]);
 
   const displayedBudgetUtil = totalAllocatedBudget > 0 ? (displayedBudgetSpent / totalAllocatedBudget) * 100 : 0;
-  const displayedTotalFunds = useMemo(() => {
-    return calculateTotalAvailableFunds(displayedIncome, totalAllocatedBudget, displayedExpense);
-  }, [displayedIncome, totalAllocatedBudget, displayedExpense]);
 
   // Transaction Metrics computed strictly from displayed transactions
   const txStats = useMemo(() => {
@@ -456,13 +452,6 @@ export default function AIInsightsScreen() {
               </Text>
             <View style={styles.healthStats}>
               {[
-                {
-                  label: "Total Funds",
-                  value: (displayedIncome > 0 || totalAllocatedBudget > 0 || displayedExpense > 0)
-                    ? `${displayedTotalFunds >= 0 ? "+" : "-"}${settings.currency} ${fmt(Math.abs(displayedTotalFunds))}`
-                    : `${settings.currency} 0`,
-                  color: displayedTotalFunds >= 0 ? "#10B981" : "#F43F5E",
-                },
                 {
                   label: "Net Balance",
                   value: displayedTxs.length > 0 || displayedNet !== 0

@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useState, useRef, useMemo, useCallback } from "react";
-import { collection, doc, setDoc, deleteDoc, onSnapshot, query, where } from "firebase/firestore";
+import { collection, doc, setDoc, deleteDoc, onSnapshot, query, where, getDocs } from "firebase/firestore";
 import { db } from "../config/firebase";
 import { useAuth } from "./AuthContext";
 import { useSettings } from "./SettingsContext";
@@ -156,14 +156,24 @@ function generateSafeId(collectionName: string = "transactions"): string {
 }
 
 async function loadPersistedTombstones(orgId: string): Promise<Set<string>> {
+  const result = new Set<string>();
   try {
     const raw = await AsyncStorage.getItem(`ofm_tombstones:${orgId}`);
     if (raw) {
       const arr = JSON.parse(raw);
-      if (Array.isArray(arr)) return new Set(arr);
+      if (Array.isArray(arr)) arr.forEach((id) => result.add(id));
     }
   } catch {}
-  return new Set();
+
+  // Also query Firestore tombstones collection for this organization for zero-resurrection guarantee
+  try {
+    const snap = await getDocs(query(collection(db, "tombstones"), where("organizationId", "==", orgId)));
+    snap.forEach((docSnap: any) => {
+      result.add(docSnap.id);
+    });
+  } catch {}
+
+  return result;
 }
 
 async function recordPersistedTombstones(orgId: string, ids: string[]): Promise<void> {
@@ -172,6 +182,19 @@ async function recordPersistedTombstones(orgId: string, ids: string[]): Promise<
     ids.forEach((id) => existing.add(id));
     const arr = Array.from(existing).slice(-500);
     await AsyncStorage.setItem(`ofm_tombstones:${orgId}`, JSON.stringify(arr));
+  } catch {}
+
+  // Also persist to Firestore cloud tombstones collection
+  try {
+    await Promise.all(
+      ids.map((id) =>
+        setDoc(doc(db, "tombstones", id), {
+          id,
+          organizationId: orgId,
+          deletedAt: new Date().toISOString(),
+        }).catch(() => {})
+      )
+    );
   } catch {}
 }
 
@@ -280,24 +303,34 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       fetchCollectionREST<Department>("departments", activeOrgId),
       fetchCollectionREST<PayrollEntry>("payroll", activeOrgId),
     ]).then(([restTxs, restBudgets, restDepts, restPayroll]) => {
-      const validTxs = (restTxs || []).filter((t) => !deletedIdsRef.current.has(t.id));
-      validTxs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      setTransactions(validTxs);
-      AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(validTxs)).catch(() => {});
+      if (restTxs !== null) {
+        const validTxs = restTxs.filter((t) => !deletedIdsRef.current.has(t.id));
+        validTxs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        setTransactions(validTxs);
+        AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(validTxs)).catch(() => {});
+      }
 
-      const validBudgets = (restBudgets || []).filter((b) => !deletedIdsRef.current.has(b.id));
-      setBudgets(validBudgets);
-      AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(validBudgets)).catch(() => {});
+      if (restBudgets !== null) {
+        const validBudgets = restBudgets.filter((b) => !deletedIdsRef.current.has(b.id));
+        setBudgets(validBudgets);
+        AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(validBudgets)).catch(() => {});
+      }
 
-      const validDepts = (restDepts || []).filter((d) => !deletedIdsRef.current.has(d.id));
-      setDepartments(validDepts);
-      AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(validDepts)).catch(() => {});
+      if (restDepts !== null) {
+        const validDepts = restDepts.filter((d) => !deletedIdsRef.current.has(d.id));
+        setDepartments(validDepts);
+        AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(validDepts)).catch(() => {});
+      }
 
-      const validPayroll = (restPayroll || []).filter((p) => !deletedIdsRef.current.has(p.id));
-      setPayroll(validPayroll);
-      AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(validPayroll)).catch(() => {});
+      if (restPayroll !== null) {
+        const validPayroll = restPayroll.filter((p) => !deletedIdsRef.current.has(p.id));
+        setPayroll(validPayroll);
+        AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(validPayroll)).catch(() => {});
+      }
 
-      setSyncStatus("synced");
+      if (restTxs !== null || restBudgets !== null || restDepts !== null || restPayroll !== null) {
+        setSyncStatus("synced");
+      }
     }).catch(() => {});
   }, [activeOrgId, user?.id]);
 
@@ -330,6 +363,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         snapshot.forEach((d) => {
           if (!deletedIdsRef.current.has(d.id)) {
             remoteItems.push({ id: d.id, ...d.data() } as Transaction);
+          } else {
+            deleteDoc(doc(db, "transactions", d.id)).catch(() => {});
           }
         });
 
@@ -358,6 +393,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         snapshot.forEach((d) => {
           if (!deletedIdsRef.current.has(d.id)) {
             remoteItems.push({ id: d.id, ...d.data() } as Budget);
+          } else {
+            deleteDoc(doc(db, "budgets", d.id)).catch(() => {});
           }
         });
 
@@ -384,6 +421,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         snapshot.forEach((d) => {
           if (!deletedIdsRef.current.has(d.id)) {
             remoteItems.push({ id: d.id, ...d.data() } as PayrollEntry);
+          } else {
+            deleteDoc(doc(db, "payroll", d.id)).catch(() => {});
           }
         });
 
@@ -410,6 +449,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         snapshot.forEach((d) => {
           if (!deletedIdsRef.current.has(d.id)) {
             remoteItems.push({ id: d.id, ...d.data() } as Department);
+          } else {
+            deleteDoc(doc(db, "departments", d.id)).catch(() => {});
           }
         });
 
@@ -431,30 +472,30 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     };
   }, [loaded, user?.id, user?.organizationId, activeOrgId]);
 
-  // 3. Organization-Scoped Local Cache Write
+  // 3. Organization-Scoped Local Cache Write (guarded against writing empty arrays over non-deleted cache on mount)
   useEffect(() => {
-    if (loaded && user) {
+    if (loaded && user && transactions.length > 0) {
       AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(transactions)).catch(() => {});
     }
-  }, [transactions, loaded, cachePrefix]);
+  }, [transactions, loaded, cachePrefix, user]);
 
   useEffect(() => {
-    if (loaded && user) {
+    if (loaded && user && budgets.length > 0) {
       AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(budgets)).catch(() => {});
     }
-  }, [budgets, loaded, cachePrefix]);
+  }, [budgets, loaded, cachePrefix, user]);
 
   useEffect(() => {
-    if (loaded && user) {
+    if (loaded && user && payroll.length > 0) {
       AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(payroll)).catch(() => {});
     }
-  }, [payroll, loaded, cachePrefix]);
+  }, [payroll, loaded, cachePrefix, user]);
 
   useEffect(() => {
-    if (loaded && user) {
+    if (loaded && user && departments.length > 0) {
       AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(departments)).catch(() => {});
     }
-  }, [departments, loaded, cachePrefix]);
+  }, [departments, loaded, cachePrefix, user]);
 
   // --- CRUD Operations ---
 
@@ -482,7 +523,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       status: t.status || "completed",
     };
 
-    setTransactions((prev) => [newTx, ...prev.filter((item) => item.id !== id)]);
+    setTransactions((prev) => {
+      const updated = [newTx, ...prev.filter((item) => item.id !== id)];
+      AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
 
     try {
       await setDoc(doc(db, "transactions", id), newTx);
@@ -563,7 +608,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     }
 
     const enrichedUpdates = { ...updates, updatedAt: new Date().toISOString() };
-    setTransactions((prev) => prev.map((t) => (t.id === id ? { ...t, ...enrichedUpdates } : t)));
+    setTransactions((prev) => {
+      const updated = prev.map((t) => (t.id === id ? { ...t, ...enrichedUpdates } : t));
+      AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
     try {
       await setDoc(doc(db, "transactions", id), enrichedUpdates, { merge: true });
       saveDocREST("transactions", id, enrichedUpdates).catch(() => {});
@@ -662,7 +711,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       alertThreshold: b.alertThreshold || 80,
     };
 
-    setBudgets((prev) => [{ ...newBudget, spent: 0 }, ...prev.filter((item) => item.id !== id)]);
+    setBudgets((prev) => {
+      const updated = [{ ...newBudget, spent: 0 }, ...prev.filter((item) => item.id !== id)];
+      AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
     try {
       await setDoc(doc(db, "budgets", id), newBudget);
       saveDocREST("budgets", id, newBudget).catch(() => {});
@@ -688,7 +741,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     }
 
     const enrichedUpdates = { ...updates, updatedAt: new Date().toISOString() };
-    setBudgets((prev) => prev.map((b) => (b.id === id ? { ...b, ...enrichedUpdates } : b)));
+    setBudgets((prev) => {
+      const updated = prev.map((b) => (b.id === id ? { ...b, ...enrichedUpdates } : b));
+      AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
     try {
       await setDoc(doc(db, "budgets", id), enrichedUpdates, { merge: true });
       saveDocREST("budgets", id, enrichedUpdates).catch(() => {});
@@ -782,7 +839,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       paymentStatus: p.paymentStatus || "paid",
     };
 
-    setPayroll((prev) => [newPayroll, ...prev.filter((item) => item.id !== id)]);
+    setPayroll((prev) => {
+      const updated = [newPayroll, ...prev.filter((item) => item.id !== id)];
+      AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
 
     // ─── Automatic Ledger Expense Transaction Sync ───
     const txId = `tx_pay_${id}`;
@@ -804,7 +865,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       status: "completed",
     };
 
-    setTransactions((prev) => [salaryTx, ...prev.filter((t) => t.id !== txId)]);
+    setTransactions((prev) => {
+      const updated = [salaryTx, ...prev.filter((t) => t.id !== txId)];
+      AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
 
     try {
       await setDoc(doc(db, "payroll", id), newPayroll);
@@ -849,8 +914,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     const enrichedUpdates = { ...updates, updatedAt: new Date().toISOString() };
     let updatedNetSalary: number | undefined;
 
-    setPayroll((prev) =>
-      prev.map((p) => {
+    setPayroll((prev) => {
+      const updated = prev.map((p) => {
         if (p.id === id) {
           const merged = { ...p, ...enrichedUpdates };
           const base = merged.baseSalary || 0;
@@ -861,13 +926,15 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           return merged;
         }
         return p;
-      })
-    );
+      });
+      AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
 
     // Also update linked transaction in transactions list
     const txId = `tx_pay_${id}`;
-    setTransactions((prev) =>
-      prev.map((t) => {
+    setTransactions((prev) => {
+      const updated = prev.map((t) => {
         if (t.id === txId) {
           return {
             ...t,
@@ -878,8 +945,10 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           };
         }
         return t;
-      })
-    );
+      });
+      AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
 
     try {
       await setDoc(doc(db, "payroll", id), enrichedUpdates, { merge: true });
@@ -991,7 +1060,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       code: d.code || `DEPT-${d.name.substring(0, 3).toUpperCase()}`,
     };
 
-    setDepartments((prev) => [...prev.filter((item) => item.id !== id), newDept]);
+    setDepartments((prev) => {
+      const updated = [...prev.filter((item) => item.id !== id), newDept];
+      AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
     try {
       await setDoc(doc(db, "departments", id), newDept);
       saveDocREST("departments", id, newDept).catch(() => {});
@@ -1017,7 +1090,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     }
 
     const enrichedUpdates = { ...updates, updatedAt: new Date().toISOString() };
-    setDepartments((prev) => prev.map((d) => (d.id === id ? { ...d, ...enrichedUpdates } : d)));
+    setDepartments((prev) => {
+      const updated = prev.map((d) => (d.id === id ? { ...d, ...enrichedUpdates } : d));
+      AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
     try {
       await setDoc(doc(db, "departments", id), enrichedUpdates, { merge: true });
       saveDocREST("departments", id, enrichedUpdates).catch(() => {});
@@ -1129,30 +1206,38 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         fetchCollectionREST<Department>("departments", activeOrgId),
         fetchCollectionREST<PayrollEntry>("payroll", activeOrgId),
       ]);
-      const timeoutPromise = new Promise<any[]>((resolve) =>
-        setTimeout(() => resolve([[], [], [], []]), 2500)
+      const timeoutPromise = new Promise<[null, null, null, null]>((resolve) =>
+        setTimeout(() => resolve([null, null, null, null]), 3500)
       );
       const [restTxs, restBudgets, restDepts, restPayroll] = await Promise.race([
         fetchPromise,
         timeoutPromise,
       ]);
 
-      const validTxs = (restTxs || []).filter((t: Transaction) => !deletedIdsRef.current.has(t.id));
-      validTxs.sort((a: Transaction, b: Transaction) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      setTransactions(validTxs);
-      AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(validTxs)).catch(() => {});
+      if (restTxs !== null) {
+        const validTxs = restTxs.filter((t: Transaction) => !deletedIdsRef.current.has(t.id));
+        validTxs.sort((a: Transaction, b: Transaction) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        setTransactions(validTxs);
+        AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(validTxs)).catch(() => {});
+      }
 
-      const validBudgets = (restBudgets || []).filter((b: Budget) => !deletedIdsRef.current.has(b.id));
-      setBudgets(validBudgets);
-      AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(validBudgets)).catch(() => {});
+      if (restBudgets !== null) {
+        const validBudgets = restBudgets.filter((b: Budget) => !deletedIdsRef.current.has(b.id));
+        setBudgets(validBudgets);
+        AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(validBudgets)).catch(() => {});
+      }
 
-      const validDepts = (restDepts || []).filter((d: Department) => !deletedIdsRef.current.has(d.id));
-      setDepartments(validDepts);
-      AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(validDepts)).catch(() => {});
+      if (restDepts !== null) {
+        const validDepts = restDepts.filter((d: Department) => !deletedIdsRef.current.has(d.id));
+        setDepartments(validDepts);
+        AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(validDepts)).catch(() => {});
+      }
 
-      const validPayroll = (restPayroll || []).filter((p: PayrollEntry) => !deletedIdsRef.current.has(p.id));
-      setPayroll(validPayroll);
-      AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(validPayroll)).catch(() => {});
+      if (restPayroll !== null) {
+        const validPayroll = restPayroll.filter((p: PayrollEntry) => !deletedIdsRef.current.has(p.id));
+        setPayroll(validPayroll);
+        AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(validPayroll)).catch(() => {});
+      }
     } catch (e) {
     } finally {
       setSyncStatus("synced");

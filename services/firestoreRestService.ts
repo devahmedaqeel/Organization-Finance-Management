@@ -81,14 +81,17 @@ export function fromFirestoreDoc<T>(doc: any): T {
   return result as T;
 }
 
-export async function fetchCollectionREST<T>(collectionName: string, organizationId?: string): Promise<T[]> {
+export async function fetchCollectionREST<T>(collectionName: string, organizationId?: string): Promise<T[] | null> {
   try {
     const authHeaders = await getAuthHeaders();
+    if (!authHeaders.Authorization) {
+      return null;
+    }
     const res = await fetch(`${BASE_URL}/${collectionName}?pageSize=300`, {
       method: "GET",
       headers: { "Content-Type": "application/json", ...authHeaders },
     });
-    if (!res.ok) return [];
+    if (!res.ok) return null;
     const data = await res.json();
     if (!data.documents || !Array.isArray(data.documents)) return [];
     const docs = data.documents.map((d: any) => fromFirestoreDoc<T>(d));
@@ -98,7 +101,7 @@ export async function fetchCollectionREST<T>(collectionName: string, organizatio
     return docs;
   } catch (err) {
     console.log(`REST fetch error for ${collectionName}:`, err);
-    return [];
+    return null;
   }
 }
 
