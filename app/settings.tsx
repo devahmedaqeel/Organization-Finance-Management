@@ -325,6 +325,59 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {/* ─── Logged In Account & Session ────────────────────────────── */}
+        <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>ACTIVE LOGGED IN ACCOUNT</Text>
+        <View style={[styles.userAccountCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.userAccountHeader}>
+            <View style={[styles.userAccountAvatar, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "35" }]}>
+              <Text style={[styles.userAccountAvatarText, { color: colors.primary }]}>
+                {(user?.name || user?.email || "U").charAt(0).toUpperCase()}
+              </Text>
+              <View style={[styles.activeDot, { backgroundColor: "#10B981" }]} />
+            </View>
+
+            <View style={styles.userAccountDetails}>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 6 }}>
+                <Text style={[styles.userAccountName, { color: colors.foreground }]} numberOfLines={1}>
+                  {user?.name || "Authenticated User"}
+                </Text>
+                <View style={[styles.roleBadgePill, { backgroundColor: colors.primary + "16", borderColor: colors.primary + "35" }]}>
+                  <Feather name="shield" size={10} color={colors.primary} />
+                  <Text style={[styles.roleBadgeText, { color: colors.primary }]}>
+                    {(user?.role || "admin").toUpperCase()}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Logged in Email Callout */}
+              <View style={[styles.emailCalloutRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                <Feather name="mail" size={13} color={colors.primary} />
+                <Text style={[styles.emailCalloutText, { color: colors.foreground }]} numberOfLines={1} selectable>
+                  {user?.email || "No email detected"}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Org and Session Meta Info */}
+          <View style={[styles.userMetaDivider, { backgroundColor: colors.border }]} />
+          <View style={styles.userMetaGrid}>
+            <View style={styles.userMetaItem}>
+              <Text style={[styles.userMetaLabel, { color: colors.mutedForeground }]}>ORGANIZATION</Text>
+              <Text style={[styles.userMetaValue, { color: colors.foreground }]} numberOfLines={1}>
+                {user?.organization || settings.organizationName || "Devorbit Tech"}
+              </Text>
+            </View>
+
+            <View style={styles.userMetaItem}>
+              <Text style={[styles.userMetaLabel, { color: colors.mutedForeground }]}>TENANT ID</Text>
+              <Text style={[styles.userMetaValue, { color: colors.mutedForeground, fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }]} numberOfLines={1}>
+                {user?.organizationId || "default_org"}
+              </Text>
+            </View>
+          </View>
+        </View>
+
         {/* ─── Appearance / Theme Toggle ──────────────────────────────── */}
         <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>APPEARANCE</Text>
         <View style={[styles.themeCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -1364,6 +1417,99 @@ const styles = StyleSheet.create({
   },
   logoModalCancelText: {
     fontSize: 13.5,
+    fontFamily: "Inter_600SemiBold",
+  },
+  userAccountCard: {
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 24,
+    gap: 12,
+  },
+  userAccountHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  userAccountAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
+  },
+  userAccountAvatarText: {
+    fontSize: 20,
+    fontFamily: "Inter_700Bold",
+  },
+  activeDot: {
+    width: 11,
+    height: 11,
+    borderRadius: 6,
+    position: "absolute",
+    bottom: -1,
+    right: -1,
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+  },
+  userAccountDetails: {
+    flex: 1,
+    gap: 6,
+  },
+  userAccountName: {
+    fontSize: 15,
+    fontFamily: "Inter_700Bold",
+  },
+  roleBadgePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  roleBadgeText: {
+    fontSize: 10,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.5,
+  },
+  emailCalloutRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  emailCalloutText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    flex: 1,
+  },
+  userMetaDivider: {
+    height: 1,
+    marginVertical: 2,
+  },
+  userMetaGrid: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  userMetaItem: {
+    flex: 1,
+    gap: 2,
+  },
+  userMetaLabel: {
+    fontSize: 10,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 0.6,
+  },
+  userMetaValue: {
+    fontSize: 12.5,
     fontFamily: "Inter_600SemiBold",
   },
 });

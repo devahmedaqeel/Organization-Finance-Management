@@ -30,6 +30,7 @@ import {
   SvgFileText,
   SvgUpload,
   SvgTrash,
+  SvgMail,
 } from "./SvgIcons";
 
 interface FieldConfig {
@@ -383,8 +384,76 @@ export function WebSettings() {
           </View>
         </View>
 
-        {/* Column 2: Appearance Theme & Automated Emails */}
+        {/* Column 2: Active User Account & Appearance */}
         <View style={{ flex: 1, minWidth: isMobile ? "100%" : 340, gap: 18 }}>
+          {/* Card: Active Authenticated Account & Session */}
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+              <Text style={[styles.cardHeading, { color: colors.foreground }]}>Active Logged In Account</Text>
+              <View style={[styles.activeStatusBadge, { backgroundColor: "#10B98118", borderColor: "#10B98135" }]}>
+                <View style={[styles.activeStatusDot, { backgroundColor: "#10B981" }]} />
+                <Text style={[styles.activeStatusBadgeText, { color: "#10B981" }]}>Active Session</Text>
+              </View>
+            </View>
+
+            <View style={[styles.userSessionBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
+              <View style={[styles.userSessionAvatar, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "35" }]}>
+                <Text style={[styles.userSessionAvatarText, { color: colors.primary }]}>
+                  {(user?.name || user?.email || "U").charAt(0).toUpperCase()}
+                </Text>
+              </View>
+
+              <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <Text style={[styles.userSessionName, { color: colors.foreground }]} numberOfLines={1}>
+                    {user?.name || "Authenticated User"}
+                  </Text>
+                  <View style={[styles.userSessionRolePill, { backgroundColor: colors.primary + "15", borderColor: colors.primary + "35" }]}>
+                    <SvgShield size={11} color={colors.primary} />
+                    <Text style={[styles.userSessionRoleText, { color: colors.primary }]}>
+                      {(user?.role || "admin").toUpperCase()}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Email Callout */}
+                <View style={[styles.userSessionEmailRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <SvgMail size={13} color={colors.primary} />
+                  <Text style={[styles.userSessionEmailText, { color: colors.foreground }]} numberOfLines={1} selectable>
+                    {user?.email || "admin@ofm.com"}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={{ gap: 8, marginTop: 4 }}>
+              <View style={styles.userSessionMetaRow}>
+                <Text style={[styles.userSessionMetaLabel, { color: colors.mutedForeground }]}>Organization</Text>
+                <Text style={[styles.userSessionMetaValue, { color: colors.foreground }]} numberOfLines={1}>
+                  {user?.organization || settings.organizationName || "Devorbit Tech"}
+                </Text>
+              </View>
+
+              <View style={styles.userSessionMetaRow}>
+                <Text style={[styles.userSessionMetaLabel, { color: colors.mutedForeground }]}>Tenant ID</Text>
+                <Text style={[styles.userSessionMetaValue, { color: colors.mutedForeground, fontFamily: "monospace" }]} numberOfLines={1}>
+                  {user?.organizationId || "default_org"}
+                </Text>
+              </View>
+
+              <View style={styles.userSessionMetaRow}>
+                <Text style={[styles.userSessionMetaLabel, { color: colors.mutedForeground }]}>Clearance</Text>
+                <Text style={[styles.userSessionMetaValue, { color: colors.income }]}>
+                  {user?.role === "admin" ? "Full Institutional Administrator" : "Scoped Role Clearance"}
+                </Text>
+              </View>
+            </View>
+
+            <Text style={[styles.userSessionDisclaimer, { color: colors.mutedForeground }]}>
+              You are signed into OFM with this email address. All financial transactions, budgets, and settings updates are audited under this authenticated session.
+            </Text>
+          </View>
+
           {/* Card: Theme Switcher */}
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.cardHeading, { color: colors.foreground }]}>Appearance & Theme</Text>
@@ -906,5 +975,95 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Inter_700Bold",
     color: "#FFFFFF",
+  },
+  activeStatusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  activeStatusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  activeStatusBadgeText: {
+    fontSize: 10.5,
+    fontFamily: "Inter_700Bold",
+  },
+  userSessionBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  userSessionAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  userSessionAvatarText: {
+    fontSize: 18,
+    fontFamily: "Inter_700Bold",
+  },
+  userSessionName: {
+    fontSize: 14.5,
+    fontFamily: "Inter_700Bold",
+  },
+  userSessionRolePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  userSessionRoleText: {
+    fontSize: 10,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.5,
+  },
+  userSessionEmailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 2,
+  },
+  userSessionEmailText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+  },
+  userSessionMetaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 4,
+  },
+  userSessionMetaLabel: {
+    fontSize: 11.5,
+    fontFamily: "Inter_500Medium",
+  },
+  userSessionMetaValue: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+  },
+  userSessionDisclaimer: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 15,
+    marginTop: 6,
   },
 });

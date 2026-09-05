@@ -536,6 +536,9 @@ export function WebShell() {
                     <Text style={[styles.userName, { color: colors.foreground }]} numberOfLines={1}>
                       {user?.name || "Admin"}
                     </Text>
+                    <Text style={[styles.userEmail, { color: colors.primary }]} numberOfLines={1}>
+                      {user?.email || "admin@ofm.com"}
+                    </Text>
                     <Text style={[styles.userRole, { color: colors.mutedForeground }]}>
                       {(user?.role || "admin").toUpperCase()}
                     </Text>
@@ -619,9 +622,12 @@ export function WebShell() {
                       {(user?.name || "User").charAt(0).toUpperCase()}
                     </Text>
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.userName, { color: colors.foreground }]}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={[styles.userName, { color: colors.foreground }]} numberOfLines={1}>
                       {user?.name || "Admin"}
+                    </Text>
+                    <Text style={[styles.userEmail, { color: colors.primary }]} numberOfLines={1}>
+                      {user?.email || "admin@ofm.com"}
                     </Text>
                     <Text style={[styles.userRole, { color: colors.mutedForeground }]}>
                       {(user?.role || "admin").toUpperCase()}
@@ -1133,6 +1139,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: "Inter_700Bold",
     letterSpacing: -0.2,
+  },
+  userEmail: {
+    fontSize: 10.5,
+    fontFamily: "Inter_500Medium",
+    marginTop: 1,
   },
   userRole: {
     fontSize: 9.5,
