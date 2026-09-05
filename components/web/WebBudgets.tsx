@@ -1,6 +1,12 @@
 import React, { useState, useMemo } from "react";
 import { StyleSheet, Text, TouchableOpacity, View, ScrollView, useWindowDimensions } from "react-native";
 import { useFinance, Budget } from "@/context/FinanceContext";
+import {
+  calculateBudgetAllocation,
+  calculateBudgetUsed,
+  calculateBudgetSpentForCategory,
+  calculateBudgetRemaining,
+} from "@/services/FinancialCalculationEngine";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
 import { useColors } from "@/hooks/useColors";
@@ -36,21 +42,7 @@ export function WebBudgets() {
   // Calculate actual spend for each budget item from live transactions
   const budgetsWithLiveSpend = useMemo(() => {
     return budgets.map((b) => {
-      const spent = transactions
-        .filter((t) => {
-          if (t.type !== "expense") return false;
-          const matchDept =
-            !b.department ||
-            b.department === "All" ||
-            t.department?.trim().toLowerCase() === b.department?.trim().toLowerCase();
-          const matchCat =
-            !b.category ||
-            b.category === "All" ||
-            t.category?.trim().toLowerCase() === b.category?.trim().toLowerCase();
-          return matchDept && matchCat;
-        })
-        .reduce((sum, t) => sum + t.amount, 0);
-
+      const spent = calculateBudgetSpentForCategory(b, transactions);
       const ratio = b.allocated > 0 ? (spent / b.allocated) * 100 : 0;
       return {
         ...b,
@@ -67,13 +59,13 @@ export function WebBudgets() {
     return budgetsWithLiveSpend.filter((b) => b.department === selectedDept);
   }, [budgetsWithLiveSpend, selectedDept]);
 
-  const totalAllocated = useMemo(() => budgets.reduce((s, b) => s + b.allocated, 0), [budgets]);
+  const totalAllocated = useMemo(() => calculateBudgetAllocation(budgets), [budgets]);
   const totalSpentAcrossBudgets = useMemo(
-    () => budgetsWithLiveSpend.reduce((s, b) => s + b.liveSpent, 0),
-    [budgetsWithLiveSpend]
+    () => calculateBudgetUsed(transactions, budgets),
+    [transactions, budgets]
   );
   const overallUtilization = totalAllocated > 0 ? (totalSpentAcrossBudgets / totalAllocated) * 100 : 0;
-  const totalRemaining = totalAllocated - totalSpentAcrossBudgets;
+  const totalRemaining = calculateBudgetRemaining(totalAllocated, totalSpentAcrossBudgets);
 
   // Donut chart breakdown by department
   const deptBudgetData = useMemo(() => {

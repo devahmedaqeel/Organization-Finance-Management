@@ -40,6 +40,9 @@ import {
 import {
   calculateTotalIncome,
   calculateTotalExpenses,
+  calculateBudgetAllocation,
+  calculateBudgetUsed,
+  calculateBudgetRemaining,
 } from "@/services/FinancialCalculationEngine";
 import { calculateFinancialHealth } from "@/services/financialHealthService";
 import { generateFinancialInsights } from "@/services/financialInsightsService";
@@ -136,7 +139,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
   }, [selectedPoint, transactions, periodTxs]);
 
   // Budget allocations & displayed spend
-  const totalAllocatedBudget = useMemo(() => budgets.reduce((s, b) => s + Number(b.allocated || 0), 0), [budgets]);
+  const totalAllocatedBudget = useMemo(() => calculateBudgetAllocation(budgets), [budgets]);
 
   // Authoritative real calculation for the displayed scope
   const displayedTxIncome = useMemo(() => calculateTotalIncome(displayedTxs), [displayedTxs]);
@@ -181,20 +184,12 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
   }, [budgets]);
 
   const displayedBudgetSpent = useMemo(() => {
-    if (consolidatedBudgets.length === 0) return 0;
-    const totalSpentOnBudgets = consolidatedBudgets.reduce((sum, b) => {
-      const catSpent = displayedTxs
-        .filter(
-          (t) =>
-            t.type === "expense" &&
-            (t.category || "").toLowerCase() === (b.category || "").toLowerCase() &&
-            (!b.department || b.department === "All" || b.department === "General" || (t.department || "").toLowerCase() === (b.department || "").toLowerCase())
-        )
-        .reduce((s, t) => s + Number(t.amount || 0), 0);
-      return sum + catSpent;
-    }, 0);
-    return totalSpentOnBudgets > 0 ? totalSpentOnBudgets : Math.min(displayedExpense, totalAllocatedBudget);
-  }, [consolidatedBudgets, displayedTxs, displayedExpense, totalAllocatedBudget]);
+    return calculateBudgetUsed(displayedTxs, budgets, activePeriod);
+  }, [displayedTxs, budgets, activePeriod]);
+
+  const displayedBudgetRemaining = useMemo(() => {
+    return calculateBudgetRemaining(totalAllocatedBudget, displayedBudgetSpent);
+  }, [totalAllocatedBudget, displayedBudgetSpent]);
 
   const displayedBudgetUtil = totalAllocatedBudget > 0 ? (displayedBudgetSpent / totalAllocatedBudget) * 100 : 0;
 

@@ -55,7 +55,7 @@ export function WebTransactionModal({
   const isMobile = width < 768;
 
   const { settings } = useSettings();
-  const { addTransaction, updateTransaction, departments } = useFinance();
+  const { addTransaction, updateTransaction, departments, budgets } = useFinance();
 
   const isEditing = Boolean(transactionToEdit);
 
@@ -63,6 +63,7 @@ export function WebTransactionModal({
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("");
   const [department, setDepartment] = useState("");
+  const [selectedBudgetId, setSelectedBudgetId] = useState<string>("");
   const [description, setDescription] = useState("");
   const [referenceNumber, setReferenceNumber] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("Electronic Transfer");
@@ -77,6 +78,7 @@ export function WebTransactionModal({
         setAmount(String(transactionToEdit.amount));
         setCategory(transactionToEdit.category);
         setDepartment(transactionToEdit.department || "Software Engineering");
+        setSelectedBudgetId(transactionToEdit.budgetId || "");
         setDescription(transactionToEdit.description || "");
         setReferenceNumber(transactionToEdit.referenceNumber || "");
         setPaymentMethod(transactionToEdit.paymentMethod || "Electronic Transfer");
@@ -86,6 +88,7 @@ export function WebTransactionModal({
         setAmount("");
         setCategory(initialType === "income" ? INCOME_CATEGORIES[0] : EXPENSE_CATEGORIES[0]);
         setDepartment(departments.length > 0 ? departments[0].name : "Software Engineering");
+        setSelectedBudgetId("");
         setDescription("");
         setReferenceNumber(`TXN-${Math.random().toString(36).substring(2, 8).toUpperCase()}`);
         setPaymentMethod("Electronic Transfer");
@@ -125,6 +128,7 @@ export function WebTransactionModal({
           referenceNumber: referenceNumber.trim(),
           paymentMethod,
           date,
+          budgetId: type === "expense" ? (selectedBudgetId.trim() || null) : null,
         });
       } else {
         addTransaction({
@@ -136,6 +140,7 @@ export function WebTransactionModal({
           referenceNumber: referenceNumber.trim(),
           paymentMethod,
           date,
+          budgetId: type === "expense" ? (selectedBudgetId.trim() || undefined) : undefined,
         });
       }
       onClose();
@@ -337,6 +342,70 @@ export function WebTransactionModal({
                 </View>
               </ScrollView>
             </View>
+
+            {/* Budget Allocation (Expenses only) */}
+            {type === "expense" && budgets && budgets.length > 0 && (
+              <View style={styles.formGroup}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <Text style={[styles.label, { color: colors.mutedForeground, marginBottom: 0 }]}>LINKED BUDGET (OPTIONAL)</Text>
+                  <Text style={{ fontSize: 11, color: selectedBudgetId ? colors.expense : colors.mutedForeground }}>
+                    {selectedBudgetId ? "Linked to Budget Ceiling" : "Unbudgeted (Discretionary)"}
+                  </Text>
+                </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={{ flexDirection: "row", gap: 6, paddingVertical: 4 }}>
+                    <TouchableOpacity
+                      style={[
+                        styles.chip,
+                        {
+                          backgroundColor: !selectedBudgetId ? colors.primary : colors.background,
+                          borderColor: !selectedBudgetId ? "transparent" : colors.border,
+                        },
+                      ]}
+                      onPress={() => setSelectedBudgetId("")}
+                    >
+                      <Text
+                        style={[
+                          styles.chipText,
+                          { color: !selectedBudgetId ? "#FFFFFF" : colors.foreground },
+                        ]}
+                      >
+                        None (Unbudgeted Expense)
+                      </Text>
+                    </TouchableOpacity>
+                    {budgets.map((b) => {
+                      const isSelected = selectedBudgetId === b.id;
+                      return (
+                        <TouchableOpacity
+                          key={b.id}
+                          style={[
+                            styles.chip,
+                            {
+                              backgroundColor: isSelected ? colors.expense : colors.background,
+                              borderColor: isSelected ? "transparent" : colors.border,
+                            },
+                          ]}
+                          onPress={() => {
+                            setSelectedBudgetId(b.id);
+                            if (b.category) setCategory(b.category);
+                            if (b.department && b.department !== "All") setDepartment(b.department);
+                          }}
+                        >
+                          <Text
+                            style={[
+                              styles.chipText,
+                              { color: isSelected ? "#FFFFFF" : colors.foreground },
+                            ]}
+                          >
+                            [{b.department || "General"}] {b.category || "All"} ({settings.currency} {Number(b.allocated || 0).toLocaleString()})
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </ScrollView>
+              </View>
+            )}
 
             {/* Reference Number */}
             <View style={styles.formGroup}>

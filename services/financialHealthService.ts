@@ -8,6 +8,7 @@
 
 import { Transaction, Budget, PayrollEntry } from "@/context/FinanceContext";
 import { NormalizedPeriod, filterTransactionsByPeriod, computePeriodMetrics } from "./DatePeriodService";
+import { calculateBudgetAllocation, calculateBudgetUsed } from "./FinancialCalculationEngine";
 
 export type HealthStatus = "Excellent" | "Healthy" | "Watch" | "At Risk" | "Critical" | "No Data";
 
@@ -74,8 +75,8 @@ export function calculateFinancialHealth(
   const prevIncome = prevMetrics ? (prevMetrics.totalIncome || 0) : 0;
   const prevExpense = prevMetrics ? (prevMetrics.totalExpense || 0) : 0;
 
-  const totalBudget = activeBudgets.reduce((s, b) => s + (b.allocated || 0), 0);
-  const totalBudgetSpent = activeBudgets.reduce((s, b) => s + (b.spent || 0), 0);
+  const totalBudget = calculateBudgetAllocation(activeBudgets);
+  const totalBudgetSpent = calculateBudgetUsed(currentTxs, activeBudgets, currentPeriod);
   const totalPayroll = activePayroll.reduce((s, p) => s + (p.baseSalary || 0) + (p.bonus || 0) - (p.deductions || 0), 0);
 
   // 1. Operating Margin (Dynamic Weight: 35 when applicable)

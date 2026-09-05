@@ -20,6 +20,12 @@ import { DonutChart } from "@/components/DonutChart";
 import { ConfirmDeleteModal } from "@/components/ConfirmDeleteModal";
 import { useAuth } from "@/context/AuthContext";
 import { useFinance, Budget } from "@/context/FinanceContext";
+import {
+  calculateBudgetAllocation,
+  calculateBudgetUsed,
+  calculateBudgetSpentForCategory,
+  calculateBudgetRemaining,
+} from "@/services/FinancialCalculationEngine";
 import { useColors } from "@/hooks/useColors";
 import { useSettings } from "@/context/SettingsContext";
 import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
@@ -86,29 +92,16 @@ export default function BudgetScreen() {
   const canEdit = user?.role === "admin";
   const webTop = Platform.OS === "web" ? 67 : 0;
 
-  // Compute spend per budget item (department + category matching with case-insensitive trim)
+  // Compute spend per budget item using central calculateBudgetSpentForCategory
   const budgetWithSpend = useMemo(() =>
     budgets.map((b) => {
-      const spent = transactions
-        .filter((t) => {
-          if (t.type !== "expense") return false;
-          const matchDept =
-            !b.department ||
-            b.department === "All" ||
-            t.department?.trim().toLowerCase() === b.department?.trim().toLowerCase();
-          const matchCat =
-            !b.category ||
-            b.category === "All" ||
-            t.category?.trim().toLowerCase() === b.category?.trim().toLowerCase();
-          return matchDept && matchCat;
-        })
-        .reduce((s, t) => s + (t.amount || 0), 0);
+      const spent = calculateBudgetSpentForCategory(b, transactions);
       return { ...b, spent };
     }),
     [budgets, transactions]
   );
 
-  // Group by department based on actual expenses
+  // Group by department based on actual budget-linked expenses
   const deptBudgetData = useMemo(() => {
     const map: Record<string, { allocated: number }> = {};
     budgets.forEach((b) => {
@@ -118,9 +111,10 @@ export default function BudgetScreen() {
     });
 
     return Object.entries(map).map(([deptName, stats], i) => {
-      const dSpent = transactions
-        .filter((t) => t.type === "expense" && (deptName === "All" || deptName === "General" || t.department?.trim().toLowerCase() === deptName.toLowerCase()))
-        .reduce((s, t) => s + (t.amount || 0), 0);
+      const dBudgets = budgets.filter(
+        (b) => deptName === "All" || deptName === "General" || (b.department || "").trim().toLowerCase() === deptName.toLowerCase()
+      );
+      const dSpent = calculateBudgetUsed(transactions, dBudgets);
       return {
         label: deptName,
         value: stats.allocated,
@@ -133,9 +127,9 @@ export default function BudgetScreen() {
   }, [budgets, transactions]);
 
   // Overall totals
-  const totalAllocated = budgets.reduce((s, b) => s + (b.allocated || 0), 0);
-  const totalSpent = budgetWithSpend.reduce((s, b) => s + (b.spent || 0), 0);
-  const totalRemaining = Math.max(totalAllocated - totalSpent, 0);
+  const totalAllocated = useMemo(() => calculateBudgetAllocation(budgets), [budgets]);
+  const totalSpent = useMemo(() => calculateBudgetUsed(transactions, budgets), [transactions, budgets]);
+  const totalRemaining = useMemo(() => calculateBudgetRemaining(totalAllocated, totalSpent), [totalAllocated, totalSpent]);
   const overallUtilization = totalAllocated > 0 ? (totalSpent / totalAllocated) * 100 : 0;
 
   // Filtered budget list

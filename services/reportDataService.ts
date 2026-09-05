@@ -22,6 +22,7 @@ import {
   calculateNetOperatingResult,
   calculateBudgetAllocation,
   calculateBudgetUsed,
+  calculateBudgetSpentForCategory,
   calculateBudgetRemaining,
   safeNumber,
   formatCurrencySafe,
@@ -407,15 +408,8 @@ export function buildEnterpriseReportData(
   });
 
   const budgetTotal = calculateBudgetAllocation(scopedBudgets, allDepartments);
-  const budgetSpent = scopedBudgets.length > 0
-    ? scopedBudgets.reduce((sum, b) => {
-        const spent = scopedTransactions
-          .filter((t) => t.type === "expense" && t.category === b.category && (!b.department || b.department === "all" || t.department === b.department))
-          .reduce((s, t) => s + safeNumber(t.amount, 0), 0);
-        return sum + spent;
-      }, 0)
-    : (budgetTotal > 0 ? totalExpenses : 0);
-  const budgetRemaining = Math.max(0, budgetTotal - budgetSpent);
+  const budgetSpent = calculateBudgetUsed(scopedTransactions, scopedBudgets);
+  const budgetRemaining = calculateBudgetRemaining(budgetTotal, budgetSpent);
   const budgetUtilizationPct = budgetTotal > 0 ? (budgetSpent / budgetTotal) * 100 : 0;
 
   // 7. Dynamic Financial Health Assessment
@@ -637,11 +631,9 @@ export function buildEnterpriseReportData(
   // 12. Budget Performance Items
   const budgetItems: BudgetPerformanceReportItem[] = scopedBudgets.map((b) => {
     const allocated = safeNumber(b.allocated, 0);
-    // Find matching spent transactions
-    const spent = scopedTransactions
-      .filter((t) => t.type === "expense" && t.category === b.category && (!b.department || b.department === "all" || t.department === b.department))
-      .reduce((s, t) => s + safeNumber(t.amount, 0), 0);
-    const remaining = allocated - spent;
+    // Find matching spent transactions via central calculateBudgetSpentForCategory
+    const spent = calculateBudgetSpentForCategory(b, scopedTransactions);
+    const remaining = calculateBudgetRemaining(allocated, spent);
     const utilPct = allocated > 0 ? (spent / allocated) * 100 : 0;
 
     let status: "Healthy" | "Warning" | "Near Limit" | "Over Budget" = "Healthy";

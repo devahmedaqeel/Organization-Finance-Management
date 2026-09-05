@@ -42,7 +42,7 @@ export function AddTransactionModal({
 }: Props) {
   const colors = useColors();
   const { settings } = useSettings();
-  const { departments, addDepartment, updateDepartment } = useFinance();
+  const { departments, addDepartment, updateDepartment, budgets } = useFinance();
   const keyboardHeight = useKeyboardHeight();
   const cats = type === "income" ? INCOME_CATS : EXPENSE_CATS;
 
@@ -60,6 +60,7 @@ export function AddTransactionModal({
   const [category, setCategory] = useState(cats[0]);
   const [amount, setAmount] = useState("");
   const [department, setDepartment] = useState("");
+  const [selectedBudgetId, setSelectedBudgetId] = useState("");
   const [description, setDescription] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [error, setError] = useState("");
@@ -76,6 +77,7 @@ export function AddTransactionModal({
       setCategory(editItem.category);
       setAmount(editItem.amount.toString());
       setDepartment(editItem.department);
+      setSelectedBudgetId(editItem.budgetId || "");
       setDescription(editItem.description || "");
       setDate(editItem.date);
       setError("");
@@ -83,6 +85,7 @@ export function AddTransactionModal({
       setCategory(cats[0]);
       setAmount("");
       setDepartment(defaultDept);
+      setSelectedBudgetId("");
       setDescription("");
       setDate(new Date().toISOString().split("T")[0]);
       setError("");
@@ -111,6 +114,7 @@ export function AddTransactionModal({
       department,
       description,
       addedBy,
+      budgetId: type === "expense" && selectedBudgetId.trim() ? selectedBudgetId.trim() : undefined,
     };
 
     if (isEditMode && editItem && onUpdate) {
@@ -330,6 +334,60 @@ export function AddTransactionModal({
                   >
                     <Feather name="x" size={14} color={colors.mutedForeground} />
                   </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {/* Linked Budget (Expenses only) */}
+            {!isIncome && budgets && budgets.length > 0 && (
+              <View style={{ marginTop: 12 }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <Text style={[styles.sectionLabel, { color: colors.mutedForeground, marginTop: 0 }]}>
+                    LINKED BUDGET (OPTIONAL)
+                  </Text>
+                  <Text style={{ fontSize: 11, color: selectedBudgetId ? colors.expense : colors.mutedForeground }}>
+                    {selectedBudgetId ? "Linked" : "Unbudgeted"}
+                  </Text>
+                </View>
+                <View style={styles.chips}>
+                  <TouchableOpacity
+                    style={[
+                      styles.chip,
+                      {
+                        backgroundColor: !selectedBudgetId ? accentColor : colors.muted,
+                        borderColor: !selectedBudgetId ? accentColor : colors.border,
+                      },
+                    ]}
+                    onPress={() => setSelectedBudgetId("")}
+                  >
+                    <Text style={[styles.chipText, { color: !selectedBudgetId ? "#fff" : colors.foreground }]}>
+                      None (Unbudgeted)
+                    </Text>
+                  </TouchableOpacity>
+                  {budgets.map((b) => {
+                    const isSelected = selectedBudgetId === b.id;
+                    return (
+                      <TouchableOpacity
+                        key={b.id}
+                        style={[
+                          styles.chip,
+                          {
+                            backgroundColor: isSelected ? accentColor : colors.muted,
+                            borderColor: isSelected ? accentColor : colors.border,
+                          },
+                        ]}
+                        onPress={() => {
+                          setSelectedBudgetId(b.id);
+                          if (b.category) setCategory(b.category);
+                          if (b.department && b.department !== "All") setDepartment(b.department);
+                        }}
+                      >
+                        <Text style={[styles.chipText, { color: isSelected ? "#fff" : colors.foreground }]}>
+                          [{b.department || "General"}] {b.category || "All"} ({settings.currency} {Number(b.allocated || 0).toLocaleString()})
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </View>
             )}

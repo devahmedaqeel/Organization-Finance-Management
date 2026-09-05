@@ -26,6 +26,7 @@ import {
 import {
   buildAuthoritativeFinancialModel,
   calculateBudgetAllocation,
+  calculateBudgetUsed,
   calculateBudgetRemaining,
 } from "@/services/FinancialCalculationEngine";
 import { FinancialAnalyticsSuite } from "@/components/analytics/FinancialAnalyticsSuite";
@@ -117,7 +118,7 @@ export function WebDashboard({
   const totalLineBudgeted = calculateBudgetAllocation(budgets);
   const totalDeptBudgeted = calculateBudgetAllocation([], departments);
   const totalBudgeted = totalLineBudgeted > 0 ? totalLineBudgeted : totalDeptBudgeted;
-  const totalBudgetSpent = (budgets || []).reduce((sum, b) => sum + Number(b.spent || 0), 0);
+  const totalBudgetSpent = calculateBudgetUsed(transactions, budgets);
   const netBudgetRemaining = calculateBudgetRemaining(totalBudgeted, totalBudgetSpent);
   const netBudgetUtilization = totalBudgeted > 0 ? (totalBudgetSpent / totalBudgeted) * 100 : 0;
   

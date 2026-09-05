@@ -31,6 +31,7 @@ export interface Transaction {
   organizationId?: string;
   addedBy?: string;
   createdAt?: string;
+  budgetId?: string | null;
 }
 
 export interface Budget {
@@ -264,62 +265,184 @@ export function calculateActualCash(
 }
 
 /**
+ * Check if an expense transaction is specifically linked to an active budget.
+ * Explicit budgetId takes precedence; if unspecified (legacy), matches active budget by category.
+ * Explicitly unbudgeted transactions ("none", "unbudgeted") are never linked.
+ */
+export function isExpenseBudgetLinked(
+  t: Transaction,
+  budgets: Budget[]
+): boolean {
+  if (!t || t.type !== "expense") return false;
+  if (!budgets || budgets.length === 0) return false;
+
+  // 1. Explicit budgetId specified
+  if (t.budgetId !== undefined && t.budgetId !== null) {
+    const bId = t.budgetId.trim();
+    if (bId === "" || bId === "none" || bId === "unbudgeted") {
+      return false;
+    }
+    return budgets.some((b) => b && b.id === bId);
+  }
+
+  // 2. Unspecified / legacy fallback: match active budget by category & department
+  const tCat = (t.category || "").trim().toLowerCase();
+  const tDept = (t.department || "").trim().toLowerCase();
+  if (!tCat) return false;
+
+  return budgets.some((b) => {
+    if (!b) return false;
+    const bDept = (b.department || "").trim().toLowerCase();
+    const bCat = (b.category || "").trim().toLowerCase();
+    const deptMatch = !bDept || bDept === "all" || !tDept || tDept === "all" || tDept === bDept;
+    const catMatch = bCat.length > 0 && tCat === bCat;
+    return deptMatch && catMatch;
+  });
+}
+
+/**
  * 5. BUDGET ALLOCATION: Total planned limits across line items or department caps.
+ * Deduplicates by budget ID to guarantee zero double-counting.
  */
 export function calculateBudgetAllocation(
   budgets: Budget[],
   departments?: Department[]
 ): number {
-  const lineTotal = (budgets || []).reduce((s, b) => s + safeNumber(b.allocated, 0), 0);
-  if (lineTotal > 0) return lineTotal;
-  return (departments || []).reduce((s, d) => s + safeNumber(d.budgetAllocated, 0), 0);
+  if (budgets && budgets.length > 0) {
+    const seenBudgetIds = new Set<string>();
+    return budgets.reduce((s, b) => {
+      if (!b || !b.id || seenBudgetIds.has(b.id)) return s;
+      seenBudgetIds.add(b.id);
+      return s + safeNumber(b.allocated, 0);
+    }, 0);
+  }
+  if (departments && departments.length > 0) {
+    const seenDeptIds = new Set<string>();
+    return departments.reduce((s, d) => {
+      if (!d || !d.id || seenDeptIds.has(d.id)) return s;
+      seenDeptIds.add(d.id);
+      return s + safeNumber(d.budgetAllocated, 0);
+    }, 0);
+  }
+  return 0;
 }
 
 /**
  * 6. BUDGET-LINKED SPENDING FOR A SPECIFIC BUDGET RECORD:
- * Matches strictly on department AND category.
+ * Matches strictly expenses linked directly to this budget via budgetId,
+ * or legacy transactions with matching category & department.
  */
 export function calculateBudgetSpentForCategory(
   budget: Budget,
   transactions: Transaction[],
   period?: NormalizedPeriod
 ): number {
+  if (!budget || !budget.id) return 0;
   const txs = filterTransactionsByPeriod(transactions, period);
+  const seenTxIds = new Set<string>();
+
   const bDept = (budget.department || "").trim().toLowerCase();
   const bCat = (budget.category || "").trim().toLowerCase();
 
   return txs
     .filter((t) => {
-      if (t.type !== "expense" || safeNumber(t.amount, 0) <= 0 || t.status === "failed") return false;
+      if (!t || t.type !== "expense" || safeNumber(t.amount, 0) <= 0) return false;
+      if (t.status === "failed" || (t as any).status === "deleted" || (t as any).status === "void" || (t as any).status === "cancelled") return false;
+      if (seenTxIds.has(t.id)) return false;
+
+      // Explicit budgetId link
+      if (t.budgetId !== undefined && t.budgetId !== null) {
+        if (t.budgetId === budget.id) {
+          seenTxIds.add(t.id);
+          return true;
+        }
+        return false;
+      }
+
+      // Legacy fallback: category & department matching
       const tDept = (t.department || "").trim().toLowerCase();
       const tCat = (t.category || "").trim().toLowerCase();
+      const deptMatch = !bDept || bDept === "all" || !tDept || tDept === "all" || tDept === bDept;
+      const catMatch = bCat.length > 0 && tCat === bCat;
 
-      const deptMatch = !bDept || bDept === "all" || tDept === bDept;
-      const catMatch = !bCat || bCat === "all" || tCat === bCat;
-      return deptMatch && catMatch;
+      if (deptMatch && catMatch) {
+        seenTxIds.add(t.id);
+        return true;
+      }
+      return false;
     })
     .reduce((sum, t) => sum + safeNumber(t.amount, 0), 0);
 }
 
 /**
- * 7. TOTAL BUDGET USED: Total actual expenses against configured budgets.
+ * 7. TOTAL BUDGET USED: Sum of ONLY expenses linked/assigned to active budgets.
+ * Unbudgeted expenses (no budgetId, or "unbudgeted"/"none") are strictly excluded from Budget Used.
+ * Deduplicates by transaction ID to ensure no double-counting.
  */
 export function calculateBudgetUsed(
   transactions: Transaction[],
   budgets: Budget[],
   period?: NormalizedPeriod
 ): number {
-  return calculateTotalExpenses(transactions, period);
+  if (!budgets || budgets.length === 0) return 0;
+  const validBudgetIds = new Set(budgets.map((b) => b && b.id).filter(Boolean));
+  if (validBudgetIds.size === 0) return 0;
+
+  const txs = filterTransactionsByPeriod(transactions, period);
+  const seenTxIds = new Set<string>();
+
+  return txs
+    .filter((t) => {
+      if (!t || t.type !== "expense" || safeNumber(t.amount, 0) <= 0) return false;
+      if (t.status === "failed" || (t as any).status === "deleted" || (t as any).status === "void" || (t as any).status === "cancelled") return false;
+      if (seenTxIds.has(t.id)) return false;
+
+      // 1. Explicit budgetId set
+      if (t.budgetId !== undefined && t.budgetId !== null) {
+        const bId = t.budgetId.trim();
+        if (bId !== "" && bId !== "none" && bId !== "unbudgeted" && validBudgetIds.has(bId)) {
+          seenTxIds.add(t.id);
+          return true;
+        }
+        return false;
+      }
+
+      // 2. Legacy / unspecified budgetId: check if any budget matches category & dept
+      const tCat = (t.category || "").trim().toLowerCase();
+      const tDept = (t.department || "").trim().toLowerCase();
+      if (!tCat) return false;
+
+      const matchesAnyBudget = budgets.some((b) => {
+        if (!b) return false;
+        const bDept = (b.department || "").trim().toLowerCase();
+        const bCat = (b.category || "").trim().toLowerCase();
+        const deptMatch = !bDept || bDept === "all" || !tDept || tDept === "all" || tDept === bDept;
+        const catMatch = bCat.length > 0 && tCat === bCat;
+        return deptMatch && catMatch;
+      });
+
+      if (matchesAnyBudget) {
+        seenTxIds.add(t.id);
+        return true;
+      }
+
+      return false;
+    })
+    .reduce((sum, t) => sum + safeNumber(t.amount, 0), 0);
 }
 
 /**
  * 8. REMAINING BUDGET: Math.max(0, Allocated - Used).
+ * Returns 0 if totalAllocated is 0.
  */
 export function calculateBudgetRemaining(
   totalAllocated: number,
   totalUsed: number
 ): number {
-  return Math.max(0, safeNumber(totalAllocated, 0) - safeNumber(totalUsed, 0));
+  const alloc = safeNumber(totalAllocated, 0);
+  const used = safeNumber(totalUsed, 0);
+  if (alloc <= 0) return 0;
+  return Math.max(0, alloc - used);
 }
 
 /**
@@ -662,9 +785,7 @@ export function buildAuthoritativeFinancialModel(
   const totalExpenses = calculateTotalExpenses(filteredTxs);
   const netBalance = calculateNetOperatingResult(filteredTxs);
   const totalBudgetCap = calculateBudgetAllocation(budgets, departments);
-  const actualBudgetSpending = (budgets && budgets.length > 0)
-    ? budgets.reduce((sum, b) => sum + calculateBudgetSpentForCategory(b, filteredTxs, period), 0)
-    : (totalBudgetCap > 0 ? totalExpenses : 0);
+  const actualBudgetSpending = calculateBudgetUsed(filteredTxs, budgets, period);
 
   const budget = calculateBudgetUtilization(actualBudgetSpending, totalBudgetCap, currency);
   const margin = calculateNetOperatingMargin(totalIncome, totalExpenses, currency);

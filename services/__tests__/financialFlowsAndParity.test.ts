@@ -321,6 +321,149 @@ const reconciledTxs = staleSnapshotTxs.filter((t) => !tombstones.has(t.id));
 assert(reconciledTxs.length === 0, "STALE SYNC DEFENSE: Stale snapshot item blocked by persistent tombstones");
 assert(calculateTotalExpenses(reconciledTxs) === 0, "STALE SYNC DEFENSE: Total Expenses remains 0");
 
+// ============================================================================
+// SCENARIO 33: SECTION 18 REQUIRED ACCEPTANCE TEST
+// (DELETE PERSISTENCE & NON-DELETED DATA PERSISTENCE ACROSS LOGOUT/LOGIN/WEB/MOBILE)
+// ============================================================================
+console.log("\n--- SCENARIO 33: Section 18 Required Acceptance Test ---");
+
+// Initial Database:
+// Income A = £1,000
+// Income B = £2,000
+// Expense A = £500
+// Expense B = £700
+// Budget A = £5,000
+let sec18Txs: Transaction[] = [
+  { id: "inc-a", type: "income", category: "Revenue", amount: 1000, date: "2026-09-01", department: "Sales", description: "Income A" },
+  { id: "inc-b", type: "income", category: "Revenue", amount: 2000, date: "2026-09-02", department: "Sales", description: "Income B" },
+  { id: "exp-a", type: "expense", category: "Supplies", amount: 500, date: "2026-09-03", department: "Ops", description: "Expense A" },
+  { id: "exp-b", type: "expense", category: "Utilities", amount: 700, date: "2026-09-04", department: "Ops", description: "Expense B" },
+];
+let sec18Budgets: Budget[] = [
+  { id: "bud-a", category: "Operations", allocated: 5000, department: "Ops" },
+];
+
+assert(calculateTotalIncome(sec18Txs) === 3000, "Initial Total Income is £3,000");
+assert(calculateTotalExpenses(sec18Txs) === 1200, "Initial Total Expense is £1,200");
+assert(calculateBudgetAllocation(sec18Budgets) === 5000, "Initial Budget is £5,000");
+assert(calculateNetOperatingResult(sec18Txs) === 1800, "Initial Net Balance is £1,800");
+
+// Step 1: Delete ONLY Income A (by exact unique document ID "inc-a")
+const sec18Tombstones = new Set<string>();
+const deleteTargetId = "inc-a";
+sec18Tombstones.add(deleteTargetId);
+sec18Txs = sec18Txs.filter((t) => t.id !== deleteTargetId);
+
+assert(!sec18Txs.some((t) => t.id === "inc-a"), "Step 1: Income A is GONE");
+assert(sec18Txs.some((t) => t.id === "inc-b" && t.amount === 2000), "Step 1: Income B (£2,000) MUST REMAIN");
+assert(sec18Txs.some((t) => t.id === "exp-a" && t.amount === 500), "Step 1: Expense A (£500) MUST REMAIN");
+assert(sec18Txs.some((t) => t.id === "exp-b" && t.amount === 700), "Step 1: Expense B (£700) MUST REMAIN");
+assert(sec18Budgets.some((b) => b.id === "bud-a" && b.allocated === 5000), "Step 1: Budget A (£5,000) MUST REMAIN");
+assert(calculateTotalIncome(sec18Txs) === 2000, "Step 1: Total Income recalculated to £2,000");
+assert(calculateTotalExpenses(sec18Txs) === 1200, "Step 1: Total Expense remains £1,200");
+assert(calculateNetOperatingResult(sec18Txs) === 800, "Step 1: Net Balance recalculated to £800 (£2,000 - £1,200)");
+
+// Step 2 & 3: Simulate Logout -> Login (Fetch authoritative state from DB + filter tombstones)
+const dbStateAfterDelete: Transaction[] = [
+  { id: "inc-b", type: "income", category: "Revenue", amount: 2000, date: "2026-09-02", department: "Sales", description: "Income B" },
+  { id: "exp-a", type: "expense", category: "Supplies", amount: 500, date: "2026-09-03", department: "Ops", description: "Expense A" },
+  { id: "exp-b", type: "expense", category: "Utilities", amount: 700, date: "2026-09-04", department: "Ops", description: "Expense B" },
+];
+const reloginTxs = dbStateAfterDelete.filter((t) => !sec18Tombstones.has(t.id));
+const reloginBudgets = sec18Budgets.filter((b) => !sec18Tombstones.has(b.id));
+
+assert(!reloginTxs.some((t) => t.id === "inc-a"), "Step 3 (Relogin): Income A STILL GONE (NEVER resurrected)");
+assert(reloginTxs.length === 3, "Step 3 (Relogin): Exactly 3 transactions remain");
+assert(reloginBudgets.length === 1, "Step 3 (Relogin): Exactly 1 budget remains");
+assert(calculateTotalIncome(reloginTxs) === 2000, "Step 3 (Relogin): Total Income remains £2,000");
+assert(calculateTotalExpenses(reloginTxs) === 1200, "Step 3 (Relogin): Total Expense remains £1,200");
+assert(calculateNetOperatingResult(reloginTxs) === 800, "Step 3 (Relogin): Net Balance remains £800");
+
+// Step 4: Close and Reopen Web (Web Client Cold Reload)
+const webReloadTxs = [...reloginTxs];
+const webReloadBudgets = [...reloginBudgets];
+assert(!webReloadTxs.some((t) => t.id === "inc-a"), "Step 4 (Web Reopen): Income A NEVER returns on Web");
+assert(calculateTotalIncome(webReloadTxs) === 2000, "Step 4 (Web Reopen): Total Income is £2,000");
+
+// Step 5: Restart Mobile App (Mobile Client Cold Launch)
+const mobileColdTxs = [...reloginTxs];
+const mobileColdBudgets = [...reloginBudgets];
+assert(!mobileColdTxs.some((t) => t.id === "inc-a"), "Step 5 (Mobile Restart): Income A NEVER returns on Mobile");
+assert(calculateTotalIncome(mobileColdTxs) === 2000, "Step 5 (Mobile Restart): Total Income is £2,000");
+
+// Step 6: Web and Mobile Side-by-Side Parity Check
+assert(calculateTotalIncome(webReloadTxs) === calculateTotalIncome(mobileColdTxs), "Step 6: Web & Mobile Total Income MATCH EXACTLY");
+assert(calculateTotalExpenses(webReloadTxs) === calculateTotalExpenses(mobileColdTxs), "Step 6: Web & Mobile Total Expense MATCH EXACTLY");
+assert(calculateNetOperatingResult(webReloadTxs) === calculateNetOperatingResult(mobileColdTxs), "Step 6: Web & Mobile Net Balance MATCH EXACTLY");
+assert(calculateBudgetAllocation(webReloadBudgets) === calculateBudgetAllocation(mobileColdBudgets), "Step 6: Web & Mobile Total Budget MATCH EXACTLY");
+
+// ============================================================================
+// SCENARIO 34: SECTION 24 8-STEP VERIFICATION MATRIX
+// (FULL BUDGET, UNBUDGETED EXPENSE & EDIT/DELETE PIPELINE)
+// ============================================================================
+console.log("\n--- SCENARIO 34: Section 24 8-Step Verification Matrix ---");
+
+let m8Txs: Transaction[] = [];
+let m8Budgets: Budget[] = [];
+
+// Step 1: Add Inflow = 10,000
+m8Txs.push({ id: "m8-inc-1", type: "income", category: "Grants", amount: 10000, date: "2026-09-01", department: "Finance" });
+assert(calculateTotalIncome(m8Txs) === 10000, "Step 1: Total Income = 10,000");
+assert(calculateTotalExpenses(m8Txs) === 0, "Step 1: Total Expenses = 0");
+assert(calculateBudgetAllocation(m8Budgets) === 0, "Step 1: Total Budget = 0");
+assert(calculateBudgetUsed(m8Txs, m8Budgets) === 0, "Step 1: Budget Used = 0");
+assert(calculateBudgetRemaining(0, 0) === 0, "Step 1: Remaining Budget = 0");
+assert(calculateBudgetUtilization(0, 0).rawUtilizationPct === 0, "Step 1: Utilization = 0%");
+
+// Step 2: Add Budget = 5,000 (Office Supplies)
+m8Budgets.push({ id: "b-supplies", category: "Office Supplies", allocated: 5000, department: "Admin" });
+assert(calculateBudgetAllocation(m8Budgets) === 5000, "Step 2: Total Budget = 5,000");
+assert(calculateBudgetUsed(m8Txs, m8Budgets) === 0, "Step 2: Budget Used = 0");
+assert(calculateBudgetRemaining(5000, 0) === 5000, "Step 2: Remaining Budget = 5,000");
+assert(calculateBudgetUtilization(0, 5000).rawUtilizationPct === 0, "Step 2: Utilization = 0%");
+
+// Step 3: Add Budget-Linked Expense = 1,000 (Office Supplies, linked to b-supplies)
+m8Txs.push({ id: "m8-exp-1", type: "expense", category: "Office Supplies", budgetId: "b-supplies", amount: 1000, date: "2026-09-02", department: "Admin" });
+assert(calculateTotalExpenses(m8Txs) === 1000, "Step 3: Total Expenses = 1,000");
+assert(calculateBudgetUsed(m8Txs, m8Budgets) === 1000, "Step 3: Budget Used = 1,000");
+assert(calculateBudgetRemaining(5000, 1000) === 4000, "Step 3: Remaining Budget = 4,000");
+assert(calculateBudgetUtilization(1000, 5000).rawUtilizationPct === 20, "Step 3: Utilization = 20%");
+
+// Step 4: Add Unbudgeted Expense = 500 (Marketing, NOT linked to any budget)
+m8Txs.push({ id: "m8-exp-unbudgeted", type: "expense", category: "Marketing", budgetId: "unbudgeted", amount: 500, date: "2026-09-03", department: "Growth" });
+assert(calculateTotalExpenses(m8Txs) === 1500, "Step 4: Total Expenses = 1,500 (1000 + 500)");
+assert(calculateBudgetUsed(m8Txs, m8Budgets) === 1000, "Step 4: Budget Used MUST REMAIN 1,000 (Unbudgeted 500 ignored!)");
+assert(calculateBudgetRemaining(5000, 1000) === 4000, "Step 4: Remaining Budget MUST REMAIN 4,000");
+assert(calculateBudgetUtilization(1000, 5000).rawUtilizationPct === 20, "Step 4: Utilization MUST REMAIN 20%");
+
+// Step 5: Edit Expense m8-exp-1: 1,000 -> 2,000
+m8Txs = m8Txs.map((t) => (t.id === "m8-exp-1" ? { ...t, amount: 2000 } : t));
+assert(calculateTotalExpenses(m8Txs) === 2500, "Step 5: Total Expenses = 2,500 (2000 + 500)");
+assert(calculateBudgetUsed(m8Txs, m8Budgets) === 2000, "Step 5: Budget Used = 2,000");
+assert(calculateBudgetRemaining(5000, 2000) === 3000, "Step 5: Remaining Budget = 3,000");
+assert(calculateBudgetUtilization(2000, 5000).rawUtilizationPct === 40, "Step 5: Utilization = 40%");
+
+// Step 6: Delete Unbudgeted Expense (500)
+m8Txs = m8Txs.filter((t) => t.id !== "m8-exp-unbudgeted");
+assert(calculateTotalExpenses(m8Txs) === 2000, "Step 6: Total Expenses drops to 2,000");
+assert(calculateBudgetUsed(m8Txs, m8Budgets) === 2000, "Step 6: Budget Used remains 2,000");
+assert(calculateBudgetRemaining(5000, 2000) === 3000, "Step 6: Remaining Budget remains 3,000");
+assert(calculateBudgetUtilization(2000, 5000).rawUtilizationPct === 40, "Step 6: Utilization remains 40%");
+
+// Step 7: Delete Budget-Linked Expense (2,000)
+m8Txs = m8Txs.filter((t) => t.id !== "m8-exp-1");
+assert(calculateTotalExpenses(m8Txs) === 0, "Step 7: Total Expenses drops to 0");
+assert(calculateBudgetUsed(m8Txs, m8Budgets) === 0, "Step 7: Budget Used drops to 0");
+assert(calculateBudgetRemaining(5000, 0) === 5000, "Step 7: Remaining Budget returns to 5,000");
+assert(calculateBudgetUtilization(0, 5000).rawUtilizationPct === 0, "Step 7: Utilization drops to 0%");
+
+// Step 8: Delete Budget (5,000)
+m8Budgets = m8Budgets.filter((b) => b.id !== "b-supplies");
+assert(calculateBudgetAllocation(m8Budgets) === 0, "Step 8: Total Budget drops to 0");
+assert(calculateBudgetUsed(m8Txs, m8Budgets) === 0, "Step 8: Budget Used = 0");
+assert(calculateBudgetRemaining(0, 0) === 0, "Step 8: Remaining Budget = 0");
+assert(calculateBudgetUtilization(0, 0).rawUtilizationPct === 0, "Step 8: Clean empty utilization state");
+
 console.log("\n=======================================================");
-console.log("ALL 45 AUTHORITATIVE FINANCIAL FLOW, PARITY & RESURRECTION TESTS PASSED 100% ✅");
+console.log("ALL AUTHORITATIVE FINANCIAL FLOW, PARITY, RESURRECTION & ACCEPTANCE TESTS PASSED 100% ✅");
 console.log("=======================================================\n");

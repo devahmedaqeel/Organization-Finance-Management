@@ -56,6 +56,7 @@ export interface Transaction {
   paymentMethod?: string;
   referenceNumber?: string;
   status?: "completed" | "pending" | "reconciled" | "failed";
+  budgetId?: string | null;
 }
 
 export interface Budget {
@@ -512,12 +513,10 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         dispatchNotification(unusualEvent, orgId, user?.id).catch(() => {});
       }
 
-      // 2. Line-item category budget check
-      const matchBudget = budgets.find(
-        (b) =>
-          (!b.department || b.department === "All" || b.department?.trim().toLowerCase() === newTx.department?.trim().toLowerCase()) &&
-          (!b.category || b.category === "All" || b.category?.trim().toLowerCase() === newTx.category?.trim().toLowerCase())
-      );
+      // 2. Line-item budget check (only for budget-linked expenses)
+      const matchBudget = newTx.budgetId
+        ? budgets.find((b) => b.id === newTx.budgetId)
+        : null;
       if (matchBudget && matchBudget.allocated > 0) {
         const newSpent = (matchBudget.spent || 0) + newTx.amount;
         const ratio = (newSpent / matchBudget.allocated) * 100;
@@ -1100,18 +1099,18 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   }, [budgets, transactions]);
 
   const totalLineBudgeted = useMemo(() => {
-    return budgets.reduce((s, b) => s + Number(b.allocated || 0), 0);
+    return calculateBudgetAllocation(budgets);
   }, [budgets]);
 
   const totalDeptBudgeted = useMemo(() => {
-    return departments.reduce((s, d) => s + Number(d.budgetAllocated || 0), 0);
+    return calculateBudgetAllocation([], departments);
   }, [departments]);
 
   const totalBudgeted = totalLineBudgeted > 0 ? totalLineBudgeted : totalDeptBudgeted;
   const actualCash = useMemo(() => calculateActualCash(transactions), [transactions]);
   const totalBudgetSpent = useMemo(() => {
-    return budgetsWithSpent.reduce((sum, b) => sum + Number(b.spent || 0), 0);
-  }, [budgetsWithSpent]);
+    return calculateBudgetUsed(transactions, budgets);
+  }, [transactions, budgets]);
   const totalBudgetRemaining = useMemo(() => calculateBudgetRemaining(totalBudgeted, totalBudgetSpent), [totalBudgeted, totalBudgetSpent]);
   const budgetUtilization = useMemo(() => totalBudgeted > 0 ? (totalBudgetSpent / totalBudgeted) * 100 : 0, [totalBudgeted, totalBudgetSpent]);
   const unreadNotificationCount = useMemo(() => notifications.filter((n) => !n.read).length, [notifications]);
