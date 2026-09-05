@@ -739,7 +739,7 @@ export default function DashboardScreen() {
               </View>
               <View style={[styles.kpiTag, { backgroundColor: colors.income + "18" }]}>
                 <Text style={[styles.kpiTagText, { color: colors.income }]}>
-                  {incomeGrowth !== 0 ? `${incomeGrowth > 0 ? "+" : ""}${incomeGrowth.toFixed(1)}%` : "Income"}
+                  Inflow
                 </Text>
               </View>
             </View>

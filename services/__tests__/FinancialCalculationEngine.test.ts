@@ -4,9 +4,9 @@ import {
   calculateExpenseDistribution,
   buildAuthoritativeFinancialModel,
 } from "../FinancialCalculationEngine";
-import { Transaction } from "@/types";
-import { Budget } from "@/services/BudgetService";
+import { Transaction, Budget } from "@/context/FinanceContext";
 import { NormalizedPeriod } from "../DatePeriodService";
+import { describe, test, expect } from "./testHelper";
 
 describe("FinancialCalculationEngine - Authoritative Test Suite", () => {
   // ==========================================================================
@@ -114,9 +114,9 @@ describe("FinancialCalculationEngine - Authoritative Test Suite", () => {
   describe("3. Expense Distribution Calculation", () => {
     test("Scenario 1: Total = 100,000, A = 50,000 (50%), B = 30,000 (30%), C = 20,000 (20%) => Sum = 100%", () => {
       const mockTxs: Transaction[] = [
-        { id: "1", type: "expense", amount: 50000, category: "Salaries", date: "2026-08-01" },
-        { id: "2", type: "expense", amount: 30000, category: "Rent", date: "2026-08-05" },
-        { id: "3", type: "expense", amount: 20000, category: "Utilities", date: "2026-08-10" },
+        { id: "1", type: "expense", amount: 50000, category: "Salaries", date: "2026-08-01", department: "General", description: "Salaries" },
+        { id: "2", type: "expense", amount: 30000, category: "Rent", date: "2026-08-05", department: "General", description: "Rent" },
+        { id: "3", type: "expense", amount: 20000, category: "Utilities", date: "2026-08-10", department: "General", description: "Utilities" },
       ];
 
       const result = calculateExpenseDistribution(mockTxs);

@@ -24,8 +24,9 @@ export interface Transaction {
   amount: number;
   date: string;
   department: string;
+  title?: string;
   description?: string;
-  status?: "completed" | "pending" | "failed" | string;
+  status?: "completed" | "pending" | "failed" | "reconciled" | string;
   paymentMethod?: string;
   organizationId?: string;
   addedBy?: string;
@@ -374,16 +375,16 @@ export function calculateBudgetUtilization(
     return {
       totalAllocated: 0,
       actualSpending,
-      utilizationPct: 0,
+      utilizationPct: null,
       rawUtilizationPct: 0,
-      displayPct: "0%",
+      displayPct: "N/A",
       clampedRingPct: 0,
       remainingAmount: 0,
       excessAmount: actualSpending,
       status: "no_budget",
-      statusLabel: "No Budget Set",
+      statusLabel: "No Budget Configured",
       statusColor: "#94A3B8",
-      remainingText: "No Budget Set",
+      remainingText: "No Budget Configured",
       isOverBudget: false,
       isValid: false,
       explanation: "No budget cap configured for the selected scope.",
@@ -471,13 +472,13 @@ export function calculateNetOperatingMargin(
       operatingRevenue: 0,
       operatingExpenses,
       operatingIncome,
-      operatingMarginPct: operatingExpenses > 0 ? -100 : 0,
-      rawMarginPct: operatingExpenses > 0 ? -100 : 0,
-      displayMargin: operatingExpenses > 0 ? "-100.0%" : "0%",
+      operatingMarginPct: null,
+      rawMarginPct: 0,
+      displayMargin: "N/A",
       expenseRatioPct: operatingExpenses > 0 ? 100 : 0,
       displayExpenseRatio: operatingExpenses > 0 ? "100.0%" : "0%",
       status: "no_revenue",
-      statusLabel: operatingExpenses > 0 ? "Operating Deficit" : "No Transactions",
+      statusLabel: "No Operating Revenue",
       statusColor: operatingExpenses > 0 ? "#F43F5E" : "#94A3B8",
       isLoss: operatingExpenses > 0,
       hasRevenue: false,
@@ -504,6 +505,35 @@ export function calculateNetOperatingMargin(
     statusColor = "#F59E0B";
   }
 
+  let previousPeriodRevenue: number | undefined;
+  let previousPeriodExpenses: number | undefined;
+  let previousPeriodIncome: number | undefined;
+  let previousPeriodMarginPct: number | null | undefined;
+  let marginChangeVsPrevious: number | null | undefined;
+  let trendDirection: "up" | "down" | "flat" | "new" | "na" | undefined;
+
+  if (previousRevenueRaw !== undefined && previousExpensesRaw !== undefined) {
+    previousPeriodRevenue = Math.max(0, safeNumber(previousRevenueRaw, 0));
+    previousPeriodExpenses = Math.max(0, safeNumber(previousExpensesRaw, 0));
+    previousPeriodIncome = previousPeriodRevenue - previousPeriodExpenses;
+
+    if (previousPeriodRevenue > 0) {
+      previousPeriodMarginPct = (previousPeriodIncome / previousPeriodRevenue) * 100;
+      marginChangeVsPrevious = rawMarginPct - previousPeriodMarginPct;
+      if (marginChangeVsPrevious > 0.1) {
+        trendDirection = "up";
+      } else if (marginChangeVsPrevious < -0.1) {
+        trendDirection = "down";
+      } else {
+        trendDirection = "flat";
+      }
+    } else {
+      previousPeriodMarginPct = null;
+      marginChangeVsPrevious = null;
+      trendDirection = "new";
+    }
+  }
+
   return {
     operatingRevenue,
     operatingExpenses,
@@ -521,6 +551,12 @@ export function calculateNetOperatingMargin(
     explanationText: isLoss
       ? `Operational shortfall of ${formatCurrencySafe(Math.abs(operatingIncome), currency)}.`
       : `Operating surplus of ${formatCurrencySafe(operatingIncome, currency)} (${rawMarginPct.toFixed(1)}% margin).`,
+    previousPeriodRevenue,
+    previousPeriodExpenses,
+    previousPeriodIncome,
+    previousPeriodMarginPct,
+    marginChangeVsPrevious,
+    trendDirection,
   };
 }
 
@@ -594,7 +630,7 @@ export function calculateExpenseDistribution(
     ];
   }
 
-  const sumPercentages = fullCategories.reduce((s, c) => s + c.pct, 0);
+  const sumPercentages = Math.round(fullCategories.reduce((s, c) => s + c.pct, 0));
   const topCategory = fullCategories[0];
 
   return {
@@ -616,7 +652,7 @@ export function calculateExpenseDistribution(
 export function buildAuthoritativeFinancialModel(
   transactions: Transaction[],
   budgets: Budget[],
-  period: NormalizedPeriod,
+  period?: NormalizedPeriod,
   currency: string = "PKR",
   previousPeriodTransactions?: Transaction[],
   departments?: Department[]
@@ -634,8 +670,16 @@ export function buildAuthoritativeFinancialModel(
   const margin = calculateNetOperatingMargin(totalIncome, totalExpenses, currency);
   const distribution = calculateExpenseDistribution(filteredTxs, previousPeriodTransactions);
 
+  const resolvedPeriod: NormalizedPeriod = period || {
+    mode: "presets",
+    startDate: "",
+    endDate: "",
+    label: "All Time",
+    granularity: "month",
+  };
+
   return {
-    period,
+    period: resolvedPeriod,
     budget,
     margin,
     distribution,

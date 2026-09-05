@@ -64,11 +64,14 @@ export interface ReportFilterOptions {
   period?: NormalizedPeriod;
   scope?: "period" | "all";
   departmentFilter?: string;
+  department?: string;
   categoryFilter?: string;
   typeFilter?: "all" | "income" | "expense";
   reportType?: ReportType;
   customTitle?: string;
   notes?: string;
+  startDate?: string;
+  endDate?: string;
   selectedSections?: ReportSectionSelections;
   selectedCharts?: ReportChartSelections;
 }

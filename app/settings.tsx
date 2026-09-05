@@ -32,7 +32,7 @@ interface FieldConfig {
   key: string;
   label: string;
   placeholder: string;
-  icon: keyof typeof Feather.glyphMap;
+  icon: string;
   keyboard?: "default" | "email-address" | "phone-pad";
   multiline?: boolean;
 }
@@ -333,7 +333,7 @@ export default function SettingsScreen() {
               { value: "light", icon: "sun", label: "Light" },
               { value: "system", icon: "monitor", label: "System" },
               { value: "dark", icon: "moon", label: "Dark" },
-            ] as { value: AppTheme; icon: keyof typeof Feather.glyphMap; label: string }[]
+            ] as { value: AppTheme; icon: string; label: string }[]
           ).map((opt) => {
             const active = (form.theme ?? "system") === opt.value;
             return (

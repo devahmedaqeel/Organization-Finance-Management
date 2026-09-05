@@ -958,7 +958,7 @@ export default function AIInsightsScreen() {
         <View style={[styles.disclaimerBox, { backgroundColor: colors.card, borderColor: colors.border, paddingVertical: 20 }]}>
           <Feather name="check-circle" size={24} color="#10B981" />
           <Text style={[styles.disclaimerText, { color: colors.foreground, fontSize: 13, marginTop: 6 }]}>
-            {insightFilter === "alerts"
+            {insightFilter === "critical" || insightFilter === "advisories"
               ? "No critical alerts or warnings found in this period."
               : insightFilter === "positive"
               ? "No positive insights recorded in this period."

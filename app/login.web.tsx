@@ -146,7 +146,7 @@ export default function WebLoginScreen() {
   const isMobile = width < 960;
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#07101F", minHeight: "100vh" }}>
+    <View style={{ flex: 1, backgroundColor: "#07101F", minHeight: "100%" }}>
       <OpenInAppBanner />
       <View style={[styles.root, { flexDirection: isMobile ? "column" : "row" }]}>
         {/* ─── LEFT SHOWCASE HERO PANEL (DESKTOP) ─── */}
@@ -514,7 +514,7 @@ export default function WebLoginScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    minHeight: "100vh",
+    minHeight: "100%",
     width: "100%",
   },
   leftHeroPanel: {
@@ -764,8 +764,8 @@ const styles = StyleSheet.create({
     fontSize: 13.5,
     fontFamily: "Inter_500Medium",
     color: "#F8FAFC",
-    outlineStyle: "none",
-  } as any,
+    outlineStyle: "none" as any,
+  },
   forgotLink: {
     fontSize: 11.5,
     fontFamily: "Inter_600SemiBold",

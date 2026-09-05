@@ -19,7 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DonutChart } from "@/components/DonutChart";
 import { ConfirmDeleteModal } from "@/components/ConfirmDeleteModal";
 import { useAuth } from "@/context/AuthContext";
-import { useFinance } from "@/context/FinanceContext";
+import { useFinance, Budget } from "@/context/FinanceContext";
 import { useColors } from "@/hooks/useColors";
 import { useSettings } from "@/context/SettingsContext";
 import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";

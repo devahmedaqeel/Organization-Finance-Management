@@ -125,6 +125,7 @@ export interface User {
   role: UserRole;
   organization: string;
   organizationId: string;
+  department?: string;
 }
 
 interface AuthContextValue {
@@ -615,7 +616,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return true;
   };
 
-  const loginWithGoogle = async (role: UserRole): Promise<boolean> => {
+  const loginWithGoogle = async (role: UserRole = "admin"): Promise<boolean> => {
     try {
       if (Platform.OS === "web") {
         const provider = new GoogleAuthProvider();
@@ -681,7 +682,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const loginWithGoogleCredential = async (idToken: string, accessToken: string, role: UserRole): Promise<boolean> => {
+  const loginWithGoogleCredential = async (idToken: string, accessToken: string, role: UserRole = "admin"): Promise<boolean> => {
     try {
       const credential = GoogleAuthProvider.credential(idToken, accessToken);
       const userCredential = await signInWithCredential(auth, credential);
@@ -740,7 +741,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signUp,
       forgotPassword,
       logout,
-      hasPermission: (perm: Permission) => hasPermission(user?.role, perm),
+      hasPermission: (permission: keyof RolePermissions) => user?.role ? (ROLE_PERMISSIONS[user.role]?.[permission] ?? false) : false,
     }),
     [user, isLoading, login, loginWithGoogle, loginWithGoogleCredential, signUp, forgotPassword, logout]
   );

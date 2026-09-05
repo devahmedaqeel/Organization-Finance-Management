@@ -1864,3 +1864,9 @@ export async function downloadPdfReport(
 ): Promise<PdfExportResult> {
   return await downloadFinancialReportPdf(opts as any);
 }
+
+export async function sharePdfReport(
+  opts: ReportOptions | EnterpriseReportData
+): Promise<PdfExportResult> {
+  return await downloadFinancialReportPdf(opts as any);
+}

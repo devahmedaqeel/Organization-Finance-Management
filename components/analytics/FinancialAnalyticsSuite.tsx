@@ -433,7 +433,7 @@ export function FinancialAnalyticsSuite({
               let activePct = 0;
               let ringColor = margin.statusColor;
               let centerLabel = margin.displayMargin;
-              let label = margin.statusLabel;
+              let label: string = margin.statusLabel;
               let sublabel = `${isLoss ? "-" : "+"}${formatCompactCurrency(Math.abs(income), currency)}`;
 
               if (marginMode === "outflow") {
@@ -1255,12 +1255,6 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
     alignItems: "center",
     justifyContent: "center",
-  },
-  donutWrap: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 6,
-    width: "100%",
   },
   emptyText: {
     fontSize: 12,

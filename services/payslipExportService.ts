@@ -154,11 +154,12 @@ export async function generatePayslipPDF(
   const info = await FileSystem.getInfoAsync(fileUri);
   console.log("[PAYSLIP] generated URI:", fileUri);
   console.log("[PAYSLIP] file exists:", info.exists);
-  console.log("[PAYSLIP] file size:", info.size || pdfBinary.length);
 
   if (!info.exists) {
     throw new Error("PAYSLIP_PDF_FILE_MISSING: PDF file was not written to storage.");
   }
+  console.log("[PAYSLIP] file size:", info.size || pdfBinary.length);
+
   if (info.size !== undefined && info.size <= 0) {
     throw new Error("PAYSLIP_PDF_EMPTY: PDF file size is 0 bytes.");
   }

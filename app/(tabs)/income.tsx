@@ -166,7 +166,6 @@ export default function IncomeScreen() {
             )}
           </View>
         }
-        showsVerticalScrollIndicator={false}
       />
 
       <AddTransactionModal

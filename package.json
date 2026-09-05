@@ -12,7 +12,8 @@
     "build:aab": "eas build -p android --profile production",
     "build:web": "expo export -p web",
     "deploy:hosting": "expo export -p web && firebase deploy --only hosting",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npx -y tsx services/__tests__/runAllTests.ts"
   },
   "dependencies": {
     "@expo-google-fonts/inter": "^0.4.0",
@@ -62,6 +63,7 @@
     "@babel/core": "^7.25.2",
     "@expo/cli": "54.0.23",
     "@expo/ngrok": "^4.1.0",
+    "@types/jest": "^30.0.0",
     "@types/react": "~19.1.10",
     "@types/react-dom": "~19.1.7",
     "typescript": "~5.9.2"

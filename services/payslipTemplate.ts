@@ -57,7 +57,7 @@ export function createPayslipExportData(
     department: entry.department || "General Administration",
     designation: entry.designation || "Staff Specialist",
     period: entry.month || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`,
-    basicSalary,
+    basicSalary: baseSalary,
     bonus,
     allowances: 0,
     deductions,

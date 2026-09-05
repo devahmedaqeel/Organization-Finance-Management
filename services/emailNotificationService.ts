@@ -11,7 +11,7 @@ import { db } from "@/config/firebase";
 import { PayrollEntry } from "@/context/FinanceContext";
 import { buildPayslipPdfBinary } from "./payslipPdfService";
 import { buildFinancialPdfBinary, ReportOptions } from "./ReportExportService";
-import { sanitizePdfFilename } from "./pdfDownloadService";
+import { sanitizeFilename as sanitizePdfFilename } from "./pdfDownloadService";
 
 export type EmailDeliveryStatus = "PENDING" | "SENDING" | "SENT" | "FAILED";
 
@@ -91,7 +91,12 @@ export async function sendSalaryPayslipEmail({
 
   // 2. Generate and verify PDF Binary
   console.log(`[EMAIL_SERVICE] Generating payslip PDF for ${payrollEntry.employeeName}...`);
-  const pdfBinary = buildPayslipPdfBinary(payrollEntry, orgInfo);
+  const pdfBinary = buildPayslipPdfBinary(payrollEntry, {
+    name: orgInfo.organizationName,
+    address: orgInfo.organizationAddress,
+    email: orgInfo.organizationEmail,
+    currency: orgInfo.currency,
+  });
   if (!pdfBinary || pdfBinary.length < 100) {
     throw new Error("PDF_GENERATION_FAILED: Failed to build payslip binary for email attachment.");
   }

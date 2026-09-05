@@ -22,8 +22,7 @@ import {
   computeNetOperatingBalanceHealth,
   filterTransactionsByPeriod,
 } from "@/services/DatePeriodService";
-import { Transaction, Department } from "@/context/FinanceContext";
-import { Budget } from "@/services/BudgetService";
+import { Transaction, Department, Budget } from "@/context/FinanceContext";
 import { SvgX, SvgFileText, SvgChevronDown, SvgTrendingUp, SvgArrowDownRight, SvgArrowUpRight } from "@/components/web/SvgIcons";
 
 export type DrillDownType = "budget" | "nob" | "expense";
@@ -85,13 +84,19 @@ export function FinancialDrillDownModal({
       totalIncome: 0,
       netOperatingBalance: 0,
       operatingMargin: 0,
+      expenseRatio: 0,
+      transactionCount: 0,
+      incomeCount: 0,
+      expenseCount: 0,
+      status: "healthy",
       isDeficit: false,
       statusLabel: "Balanced",
       statusColor: "#10B981",
+      incomeBreakdown: [],
       expenseBreakdown: [],
-      expenseCount: 0,
+      topExpenseCategories: [],
       monthlyTrend: [],
-    } as NetOperatingBalanceHealth;
+    };
   }, [nobHealth, transactions, period]);
 
   // Guaranteed safe extracted fields

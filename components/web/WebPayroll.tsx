@@ -462,7 +462,7 @@ export function WebPayroll() {
                         <TouchableOpacity
                           style={[styles.actionIconBtn, { borderColor: "#8B5CF640", backgroundColor: "#8B5CF612" }]}
                           onPress={() => handleExportEmployeeSlip(p)}
-                          title="Generate Salary Slip"
+                          accessibilityLabel="Generate Salary Slip"
                         >
                           <SvgFileText size={13} color="#8B5CF6" />
                         </TouchableOpacity>
@@ -475,7 +475,7 @@ export function WebPayroll() {
                                 setEditingEntry(p);
                                 setModalVisible(true);
                               }}
-                              title="Edit Entry"
+                              accessibilityLabel="Edit Entry"
                             >
                               <SvgEdit size={14} color={colors.primary} />
                             </TouchableOpacity>
@@ -483,7 +483,7 @@ export function WebPayroll() {
                             <TouchableOpacity
                               style={[styles.actionIconBtn, { borderColor: "#F43F5E30", backgroundColor: "#F43F5E12" }]}
                               onPress={() => setDeletingPayroll(p)}
-                              title="Delete Record"
+                              accessibilityLabel="Delete Record"
                             >
                               <SvgTrash size={14} color="#F43F5E" />
                             </TouchableOpacity>

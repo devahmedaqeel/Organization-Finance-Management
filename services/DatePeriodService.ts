@@ -2,9 +2,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Transaction } from "@/context/FinanceContext";
 
 export type Granularity = "day" | "week" | "month" | "year";
-export type SelectionMode = "days" | "months" | "year" | "presets";
+export type SelectionMode = "days" | "months" | "year" | "presets" | "custom";
 
 export interface NormalizedPeriod {
+  id?: string;
   mode: SelectionMode;
   startDate: string; // "YYYY-MM-DD"
   endDate: string; // "YYYY-MM-DD"
@@ -280,11 +281,12 @@ export function filterTransactionsByPeriod(
 
 export function computePeriodMetrics(
   transactions: Transaction[],
-  period: NormalizedPeriod
+  period?: NormalizedPeriod
 ): PeriodMetrics {
-  const filtered = filterTransactionsByPeriod(transactions, period);
-  const start = parseYMD(period.startDate);
-  const end = parseYMD(period.endDate);
+  const effectivePeriod = period || getPresetPeriod("all_time");
+  const filtered = filterTransactionsByPeriod(transactions, effectivePeriod);
+  const start = parseYMD(effectivePeriod.startDate);
+  const end = parseYMD(effectivePeriod.endDate);
   const durationDays = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
   const durationMonths = Number((durationDays / 30.4375).toFixed(1));
   const durationYears = Number((durationDays / 365.25).toFixed(2));
@@ -341,7 +343,7 @@ export function computeNetOperatingBalanceHealth(
 
   const operatingMargin = totalIncome > 0
     ? (netOperatingBalance / totalIncome) * 100
-    : (operatingExpenses > 0 ? -100 : 0);
+    : 0;
   const expenseRatio = totalIncome > 0
     ? (operatingExpenses / totalIncome) * 100
     : (operatingExpenses > 0 ? 100 : 0);
@@ -433,7 +435,7 @@ export function computeNetOperatingBalanceHealth(
     netOperatingBalance,
     operatingMargin,
     expenseRatio,
-    transactionCount: filtered.length,
+    transactionCount: incomeTxs.length + expenseTxs.length,
     incomeCount: incomeTxs.length,
     expenseCount: expenseTxs.length,
     status,

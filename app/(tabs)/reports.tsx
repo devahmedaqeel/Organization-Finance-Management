@@ -379,7 +379,6 @@ export default function ReportsScreen() {
 
           <HBarChart
             items={deptSpending}
-            height={18}
             currency={settings.currency}
           />
         </View>

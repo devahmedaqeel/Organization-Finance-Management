@@ -1,6 +1,6 @@
 import { Platform } from "react-native";
 import * as FileSystem from "expo-file-system/legacy";
-import { downloadPdf, PdfOperationResult } from "./pdfDownloadService";
+import { PdfExportResult, saveToPhoneFileManager } from "./pdfDownloadService";
 
 export interface CraftMyPdfOptions {
   apiKey?: string;
@@ -68,7 +68,7 @@ export async function generateCraftMyPdf({
  */
 export async function generateAndDownloadCraftMyPdf(
   options: CraftMyPdfOptions
-): Promise<PdfOperationResult> {
+): Promise<PdfExportResult> {
   const result = await generateCraftMyPdf(options);
 
   if (!result.file) {
@@ -79,10 +79,19 @@ export async function generateAndDownloadCraftMyPdf(
 
   // 1. Web Platform: Trigger browser download from URL
   if (Platform.OS === "web") {
-    return downloadPdf({
-      sourceUri: result.file,
+    if (typeof document !== "undefined") {
+      const a = document.createElement("a");
+      a.href = result.file;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+    return {
+      success: true,
+      uri: result.file,
       filename,
-    });
+    };
   }
 
   // 2. Mobile Platform (Android / iOS): Download remote file to local cache, then invoke SAF / system save
@@ -95,8 +104,11 @@ export async function generateAndDownloadCraftMyPdf(
     throw new Error(`Failed to download PDF from CraftMyPDF URL (HTTP ${downloadRes.status})`);
   }
 
-  return downloadPdf({
-    sourceUri: downloadRes.uri,
+  await saveToPhoneFileManager(downloadRes.uri, filename);
+
+  return {
+    success: true,
+    uri: downloadRes.uri,
     filename,
-  });
+  };
 }

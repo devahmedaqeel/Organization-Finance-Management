@@ -20,7 +20,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ProgressBar } from "@/components/ProgressBar";
 import { ConfirmDeleteModal } from "@/components/ConfirmDeleteModal";
 import { useAuth } from "@/context/AuthContext";
-import { useFinance } from "@/context/FinanceContext";
+import { useFinance, Department } from "@/context/FinanceContext";
 import { useColors } from "@/hooks/useColors";
 import { useSettings } from "@/context/SettingsContext";
 import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";

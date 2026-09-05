@@ -34,6 +34,7 @@ interface Props {
   totalExpenses: number;
   netBalance: number;
   onOpenStatement?: () => void;
+  currency?: string;
 }
 
 type TabType = "overview" | "mom" | "income" | "expense" | "departments" | "guide";
@@ -178,7 +179,7 @@ export function NetBalanceBreakdownModal({
   }, [transactions, settings.currency]);
 
   // Largest Single Transactions (High/Low)
-  const { largestInflow, largestOutflow } = useMemo(() => {
+  const { largestInflow, largestOutflow } = useMemo<{ largestInflow: Transaction | null; largestOutflow: Transaction | null }>(() => {
     let topIn: Transaction | null = null;
     let topOut: Transaction | null = null;
 
@@ -778,7 +779,7 @@ export function NetBalanceBreakdownModal({
                         {largestInflow ? `+${settings.currency} ${fmt(largestInflow.amount)}` : "None"}
                       </Text>
                       <Text style={[styles.milestoneSub, { color: colors.mutedForeground }]} numberOfLines={1}>
-                        {largestInflow ? largestInflow.title : "N/A"}
+                        {largestInflow ? (largestInflow.title || largestInflow.category || "Deposit") : "N/A"}
                       </Text>
                     </View>
 
@@ -792,7 +793,7 @@ export function NetBalanceBreakdownModal({
                         {largestOutflow ? `-${settings.currency} ${fmt(largestOutflow.amount)}` : "None"}
                       </Text>
                       <Text style={[styles.milestoneSub, { color: colors.mutedForeground }]} numberOfLines={1}>
-                        {largestOutflow ? largestOutflow.title : "N/A"}
+                        {largestOutflow ? (largestOutflow.title || largestOutflow.category || "Expense") : "N/A"}
                       </Text>
                     </View>
                   </View>

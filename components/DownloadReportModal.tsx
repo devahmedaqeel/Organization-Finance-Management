@@ -24,6 +24,7 @@ import {
   generateFinancialHtmlReport,
   downloadCsvReport,
   downloadPdfReport,
+  ReportOptions,
 } from "@/services/ReportExportService";
 import {
   ReportType,

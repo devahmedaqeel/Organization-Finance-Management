@@ -69,10 +69,7 @@ export function fromFirestoreDoc<T>(doc: any): T {
   return result as T;
 }
 
-/**
- * Fetch all documents in a collection via fast REST API (completes in ~200ms)
- */
-export async function fetchCollectionREST<T>(collectionName: string): Promise<T[]> {
+export async function fetchCollectionREST<T>(collectionName: string, organizationId?: string): Promise<T[]> {
   try {
     const res = await fetch(`${BASE_URL}/${collectionName}?pageSize=300`, {
       method: "GET",
@@ -81,7 +78,11 @@ export async function fetchCollectionREST<T>(collectionName: string): Promise<T[
     if (!res.ok) return [];
     const data = await res.json();
     if (!data.documents || !Array.isArray(data.documents)) return [];
-    return data.documents.map((d: any) => fromFirestoreDoc<T>(d));
+    const docs = data.documents.map((d: any) => fromFirestoreDoc<T>(d));
+    if (organizationId) {
+      return docs.filter((d: any) => !d.organizationId || d.organizationId === organizationId);
+    }
+    return docs;
   } catch (err) {
     console.log(`REST fetch error for ${collectionName}:`, err);
     return [];

@@ -12,7 +12,7 @@ import { NetOperatingBalanceHealthCard } from "@/components/NetOperatingBalanceH
 import { FinancialDrillDownModal, DrillDownType } from "@/components/FinancialDrillDownModal";
 import { DownloadReportModal } from "@/components/DownloadReportModal";
 import { openPdfReport } from "@/services/ReportExportService";
-import { buildEnterpriseReportData } from "@/services/reportDataService";
+import { buildEnterpriseReportData, ReportType } from "@/services/reportDataService";
 import {
   NormalizedPeriod,
   getPresetPeriod,

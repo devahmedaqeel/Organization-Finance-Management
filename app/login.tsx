@@ -23,7 +23,7 @@ import { GoogleIcon } from "@/components/GoogleIcon";
 
 type ScreenMode = "signin" | "signup";
 
-const SIGNUP_ROLES: { id: UserRole; label: string; desc: string; icon: keyof typeof Feather.glyphMap }[] = [
+const SIGNUP_ROLES: { id: UserRole; label: string; desc: string; icon: string }[] = [
   { id: "admin", label: "Admin", desc: "Create Org", icon: "shield" },
   { id: "accountant", label: "Accountant", desc: "Ledgers & Cash", icon: "dollar-sign" },
   { id: "manager", label: "Manager", desc: "Reports & Approvals", icon: "bar-chart-2" },

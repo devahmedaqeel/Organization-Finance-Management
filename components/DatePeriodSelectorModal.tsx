@@ -162,8 +162,8 @@ export function DatePeriodSelectorModal({
       label: `Last ${num} Days (${formatReadableDate(sYMD)} – ${formatReadableDate(eYMD)})`,
       granularity: num <= 31 ? "day" : "week",
     };
-    if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    onApply(calculated);
+    if (onApply) onApply(calculated);
+    else onSelectPeriod?.(calculated);
     onClose();
   };
 

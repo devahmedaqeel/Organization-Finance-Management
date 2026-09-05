@@ -101,8 +101,8 @@ function GlobalToast() {
   }, [translateY, opacity]);
 
   useEffect(() => {
-    const unregister = registerToastListener((title: string, message: string) => {
-      setToast({ visible: true, title, message });
+    const unregister = registerToastListener((title: string, message?: string) => {
+      setToast({ visible: true, title, message: message ?? "" });
       translateY.setValue(-120);
       opacity.setValue(0);
 

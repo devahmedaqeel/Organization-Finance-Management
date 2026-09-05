@@ -25,6 +25,7 @@ import {
   evaluateTransactionEvent,
 } from "@/services/notificationRules";
 import { recordAuditLog } from "@/services/auditService";
+import { can } from "@/services/permissionService";
 import {
   calculateTotalIncome,
   calculateTotalExpenses,
@@ -45,15 +46,16 @@ export interface Transaction {
   amount: number;
   date: string;
   department: string;
+  title?: string;
   description: string;
-  addedBy: string;
+  addedBy?: string;
   organizationId?: string;
   organization?: string;
   createdAt?: string;
   updatedAt?: string;
   paymentMethod?: string;
   referenceNumber?: string;
-  status?: "completed" | "pending" | "reconciled";
+  status?: "completed" | "pending" | "reconciled" | "failed";
 }
 
 export interface Budget {
@@ -88,6 +90,7 @@ export interface PayrollEntry {
   updatedAt?: string;
   designation?: string;
   paymentStatus?: "paid" | "pending" | "processing";
+  status?: "paid" | "pending" | "processing";
   bankAccountNumber?: string;
 }
 
@@ -115,8 +118,10 @@ interface FinanceContextValue {
   notifications: AppNotification[];
   unreadNotificationCount: number;
   syncStatus: SyncStatus;
+  loaded: boolean;
+  isLoading: boolean;
   refreshData: () => Promise<void>;
-  addTransaction: (t: Omit<Transaction, "id">) => Promise<void>;
+  addTransaction: (t: Omit<Transaction, "id" | "addedBy"> & { addedBy?: string }) => Promise<void>;
   updateTransaction: (id: string, t: Partial<Omit<Transaction, "id">>) => Promise<void>;
   deleteTransaction: (id: string) => Promise<void>;
   addBudget: (b: Omit<Budget, "id">) => Promise<void>;
@@ -223,25 +228,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const prevTransactionsRef = useRef<Transaction[]>([]);
   const deletedIdsRef = useRef<Set<string>>(new Set());
 
-  const isDemoOrg =
-    !user?.organizationId ||
-    user?.organizationId === "demo-org" ||
-    user?.organizationId === "org-9icgv4ijp" ||
-    user?.organizationId === "org_NINDrrl7vu" ||
-    user?.organizationId === "default_org";
-
-  const targetOrgIds = [
-    "org-9icgv4ijp",
-    "org_NINDrrl7vu",
-    "demo-org",
-    "default_org",
-    "Devorbit Tech",
-    "Ahmed Aqeel's Organization",
-    "Organization Finance Management",
-    "OFM — Organization Finance Management",
-  ];
-
-  const activeOrgId = user?.organizationId || "org-9icgv4ijp";
+  const activeOrgId = user?.organizationId || "demo-org";
   const cachePrefix = `ofm_cache:${activeOrgId}:`;
 
   // Push Token Registration
@@ -305,33 +292,37 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       setLoaded(true);
     });
 
-    // Instant direct REST sync with Firebase Cloud (completes in ~200ms without WebSocket stream delays)
+    // Instant direct REST sync with Firebase Cloud (scoped to activeOrgId)
     Promise.all([
-      fetchCollectionREST<Transaction>("transactions"),
-      fetchCollectionREST<Budget>("budgets"),
-      fetchCollectionREST<Department>("departments"),
-      fetchCollectionREST<PayrollEntry>("payroll"),
+      fetchCollectionREST<Transaction>("transactions", activeOrgId),
+      fetchCollectionREST<Budget>("budgets", activeOrgId),
+      fetchCollectionREST<Department>("departments", activeOrgId),
+      fetchCollectionREST<PayrollEntry>("payroll", activeOrgId),
     ]).then(([restTxs, restBudgets, restDepts, restPayroll]) => {
-      if (restTxs.length > 0) {
-        restTxs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        setTransactions(restTxs);
-        AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(restTxs)).catch(() => {});
+      const validTxs = restTxs.filter((t) => !deletedIdsRef.current.has(t.id));
+      if (validTxs.length > 0) {
+        validTxs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        setTransactions(validTxs);
+        AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(validTxs)).catch(() => {});
       }
-      if (restBudgets.length > 0) {
-        setBudgets(restBudgets);
-        AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(restBudgets)).catch(() => {});
+      const validBudgets = restBudgets.filter((b) => !deletedIdsRef.current.has(b.id));
+      if (validBudgets.length > 0) {
+        setBudgets(validBudgets);
+        AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(validBudgets)).catch(() => {});
       }
-      if (restDepts.length > 0) {
-        setDepartments(restDepts);
-        AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(restDepts)).catch(() => {});
+      const validDepts = restDepts.filter((d) => !deletedIdsRef.current.has(d.id));
+      if (validDepts.length > 0) {
+        setDepartments(validDepts);
+        AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(validDepts)).catch(() => {});
       }
-      if (restPayroll.length > 0) {
-        setPayroll(restPayroll);
-        AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(restPayroll)).catch(() => {});
+      const validPayroll = restPayroll.filter((p) => !deletedIdsRef.current.has(p.id));
+      if (validPayroll.length > 0) {
+        setPayroll(validPayroll);
+        AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(validPayroll)).catch(() => {});
       }
       setSyncStatus("synced");
     }).catch(() => {});
-  }, [activeOrgId, user?.id, isDemoOrg]);
+  }, [activeOrgId, user?.id]);
 
   // 2. Real-time Firebase Synchronization (Web ↔ Mobile ↔ Desktop)
   useEffect(() => {
@@ -346,19 +337,13 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     }
 
     setSyncStatus("synced");
-    const canonicalOrgName = user.organization || "Devorbit Tech";
     const canonicalOrgId = user.organizationId;
 
-    // Real-time listener for Transactions
-    const qTransactions = isDemoOrg
-      ? query(
-          collection(db, "transactions"),
-          where("organizationId", "in", targetOrgIds)
-        )
-      : query(
-          collection(db, "transactions"),
-          where("organizationId", "==", canonicalOrgId)
-        );
+    // Real-time listener for Transactions strictly scoped to organization
+    const qTransactions = query(
+      collection(db, "transactions"),
+      where("organizationId", "==", canonicalOrgId)
+    );
 
     const unsubTransactions = onSnapshot(
       qTransactions,
@@ -371,22 +356,10 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           }
         });
 
-        if (remoteItems.length > 0) {
-          remoteItems.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-          setTransactions(remoteItems);
-          prevTransactionsRef.current = remoteItems;
-          AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(remoteItems)).catch(() => {});
-        } else if (isDemoOrg) {
-          SEED_TRANSACTIONS.forEach((st) => {
-            setDoc(doc(db, "transactions", st.id), {
-              ...st,
-              organizationId: canonicalOrgId,
-              organization: canonicalOrgName,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            }).catch(() => {});
-          });
-        }
+        remoteItems.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        setTransactions(remoteItems);
+        prevTransactionsRef.current = remoteItems;
+        AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(remoteItems)).catch(() => {});
       },
       (err) => {
         if (err.code !== "permission-denied") {
@@ -395,16 +368,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       }
     );
 
-    // Real-time listener for Budgets
-    const qBudgets = isDemoOrg
-      ? query(
-          collection(db, "budgets"),
-          where("organizationId", "in", targetOrgIds)
-        )
-      : query(
-          collection(db, "budgets"),
-          where("organizationId", "==", canonicalOrgId)
-        );
+    // Real-time listener for Budgets strictly scoped to organization
+    const qBudgets = query(
+      collection(db, "budgets"),
+      where("organizationId", "==", canonicalOrgId)
+    );
 
     const unsubBudgets = onSnapshot(
       qBudgets,
@@ -416,10 +384,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           }
         });
 
-        if (remoteItems.length > 0) {
-          setBudgets(remoteItems);
-          AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(remoteItems)).catch(() => {});
-        }
+        setBudgets(remoteItems);
+        AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(remoteItems)).catch(() => {});
       },
       (err) => {
         if (err.code !== "permission-denied") {
@@ -428,16 +394,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       }
     );
 
-    // Real-time listener for Payroll
-    const qPayroll = isDemoOrg
-      ? query(
-          collection(db, "payroll"),
-          where("organizationId", "in", targetOrgIds)
-        )
-      : query(
-          collection(db, "payroll"),
-          where("organizationId", "==", canonicalOrgId)
-        );
+    // Real-time listener for Payroll strictly scoped to organization
+    const qPayroll = query(
+      collection(db, "payroll"),
+      where("organizationId", "==", canonicalOrgId)
+    );
 
     const unsubPayroll = onSnapshot(
       qPayroll,
@@ -449,10 +410,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           }
         });
 
-        if (remoteItems.length > 0) {
-          setPayroll(remoteItems);
-          AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(remoteItems)).catch(() => {});
-        }
+        setPayroll(remoteItems);
+        AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(remoteItems)).catch(() => {});
       },
       (err) => {
         if (err.code !== "permission-denied") {
@@ -461,16 +420,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       }
     );
 
-    // Real-time listener for Departments
-    const qDepartments = isDemoOrg
-      ? query(
-          collection(db, "departments"),
-          where("organizationId", "in", targetOrgIds)
-        )
-      : query(
-          collection(db, "departments"),
-          where("organizationId", "==", canonicalOrgId)
-        );
+    // Real-time listener for Departments strictly scoped to organization
+    const qDepartments = query(
+      collection(db, "departments"),
+      where("organizationId", "==", canonicalOrgId)
+    );
 
     const unsubDepartments = onSnapshot(
       qDepartments,
@@ -482,10 +436,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           }
         });
 
-        if (remoteItems.length > 0) {
-          setDepartments(remoteItems);
-          AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(remoteItems)).catch(() => {});
-        }
+        setDepartments(remoteItems);
+        AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(remoteItems)).catch(() => {});
       },
       (err) => {
         if (err.code !== "permission-denied") {
@@ -500,7 +452,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       unsubPayroll();
       unsubDepartments();
     };
-  }, [loaded, user?.id, user?.organizationId, activeOrgId, isDemoOrg]);
+  }, [loaded, user?.id, user?.organizationId, activeOrgId]);
 
   // 3. Organization-Scoped Local Cache Write
   useEffect(() => {
@@ -529,7 +481,12 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
   // --- CRUD Operations ---
 
-  const addTransaction = async (t: Omit<Transaction, "id">) => {
+  const addTransaction = async (t: Omit<Transaction, "id" | "addedBy"> & { addedBy?: string }) => {
+    if (!can(user, "create_transaction")) {
+      showFloatingToast("Permission Denied", "You do not have permission to add transactions.");
+      throw new Error("Permission denied: cannot create transaction");
+    }
+
     const id = generateSafeId("transactions");
     const now = new Date().toISOString();
     const orgName = user?.organization || "OFM — Organization Finance Management";
@@ -625,10 +582,16 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateTransaction = async (id: string, updates: Partial<Omit<Transaction, "id">>) => {
+    if (!can(user, "edit_transaction")) {
+      showFloatingToast("Permission Denied", "You do not have permission to edit transactions.");
+      throw new Error("Permission denied: cannot edit transaction");
+    }
+
     const enrichedUpdates = { ...updates, updatedAt: new Date().toISOString() };
     setTransactions((prev) => prev.map((t) => (t.id === id ? { ...t, ...enrichedUpdates } : t)));
     try {
       await setDoc(doc(db, "transactions", id), enrichedUpdates, { merge: true });
+      saveDocREST("transactions", id, enrichedUpdates).catch(() => {});
       recordAuditLog({
         organizationId: activeOrgId,
         actorUid: user?.id || "anonymous",
@@ -645,6 +608,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteTransaction = async (id: string) => {
+    if (!can(user, "delete_transaction")) {
+      showFloatingToast("Permission Denied", "You do not have permission to delete transactions.");
+      throw new Error("Permission denied: cannot delete transaction");
+    }
+
     deletedIdsRef.current.add(id);
     const orgKey = (user?.organizationId || "demo-org").replace(/[^a-zA-Z0-9]/g, "_");
     const aliasId = `tx_${id}_${orgKey}`;
@@ -654,6 +622,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     try {
       await deleteDoc(doc(db, "transactions", id)).catch(() => {});
       await deleteDoc(doc(db, "transactions", aliasId)).catch(() => {});
+      deleteDocREST("transactions", id).catch(() => {});
+      deleteDocREST("transactions", aliasId).catch(() => {});
       recordAuditLog({
         organizationId: activeOrgId,
         actorUid: user?.id || "anonymous",
@@ -669,6 +639,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addBudget = async (b: Omit<Budget, "id">) => {
+    if (!can(user, "manage_budgets")) {
+      showFloatingToast("Permission Denied", "You do not have permission to add budgets.");
+      throw new Error("Permission denied: cannot add budget");
+    }
+
     const id = generateSafeId("budgets");
     const now = new Date().toISOString();
     const orgName = user?.organization || "OFM — Organization Finance Management";
@@ -688,6 +663,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     setBudgets((prev) => [{ ...newBudget, spent: 0 }, ...prev.filter((item) => item.id !== id)]);
     try {
       await setDoc(doc(db, "budgets", id), newBudget);
+      saveDocREST("budgets", id, newBudget).catch(() => {});
       recordAuditLog({
         organizationId: orgId,
         actorUid: user?.id || "anonymous",
@@ -704,10 +680,16 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateBudget = async (id: string, updates: Partial<Omit<Budget, "id">>) => {
+    if (!can(user, "manage_budgets")) {
+      showFloatingToast("Permission Denied", "You do not have permission to edit budgets.");
+      throw new Error("Permission denied: cannot edit budget");
+    }
+
     const enrichedUpdates = { ...updates, updatedAt: new Date().toISOString() };
     setBudgets((prev) => prev.map((b) => (b.id === id ? { ...b, ...enrichedUpdates } : b)));
     try {
       await setDoc(doc(db, "budgets", id), enrichedUpdates, { merge: true });
+      saveDocREST("budgets", id, enrichedUpdates).catch(() => {});
       recordAuditLog({
         organizationId: activeOrgId,
         actorUid: user?.id || "anonymous",
@@ -724,6 +706,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteBudget = async (id: string) => {
+    if (!can(user, "manage_budgets")) {
+      showFloatingToast("Permission Denied", "You do not have permission to delete budgets.");
+      throw new Error("Permission denied: cannot delete budget");
+    }
+
     deletedIdsRef.current.add(id);
     const orgKey = (user?.organizationId || "demo-org").replace(/[^a-zA-Z0-9]/g, "_");
     const aliasId = `budget_${id}_${orgKey}`;
@@ -733,6 +720,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     try {
       await deleteDoc(doc(db, "budgets", id)).catch(() => {});
       await deleteDoc(doc(db, "budgets", aliasId)).catch(() => {});
+      deleteDocREST("budgets", id).catch(() => {});
+      deleteDocREST("budgets", aliasId).catch(() => {});
       recordAuditLog({
         organizationId: activeOrgId,
         actorUid: user?.id || "anonymous",
@@ -748,6 +737,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addPayroll = async (p: Omit<PayrollEntry, "id">) => {
+    if (!can(user, "manage_payroll")) {
+      showFloatingToast("Permission Denied", "You do not have permission to manage payroll.");
+      throw new Error("Permission denied: cannot create payroll");
+    }
+
     const id = generateSafeId("payroll");
     const now = new Date().toISOString();
     const orgName = user?.organization || "OFM — Organization Finance Management";
@@ -768,8 +762,6 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     setPayroll((prev) => [newPayroll, ...prev.filter((item) => item.id !== id)]);
 
     // ─── Automatic Ledger Expense Transaction Sync ───
-    // Automatically record an expense in the General Ledger under category "Salaries"
-    // and matching department so it directly deducts from that Department's Salaries Budget!
     const txId = `tx_pay_${id}`;
     const salaryTx: Transaction = {
       id: txId,
@@ -794,6 +786,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     try {
       await setDoc(doc(db, "payroll", id), newPayroll);
       await setDoc(doc(db, "transactions", txId), salaryTx).catch(() => {});
+      saveDocREST("payroll", id, newPayroll).catch(() => {});
+      saveDocREST("transactions", txId, salaryTx).catch(() => {});
       recordAuditLog({
         organizationId: orgId,
         actorUid: user?.id || "anonymous",
@@ -824,6 +818,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updatePayroll = async (id: string, updates: Partial<Omit<PayrollEntry, "id">>) => {
+    if (!can(user, "manage_payroll")) {
+      showFloatingToast("Permission Denied", "You do not have permission to manage payroll.");
+      throw new Error("Permission denied: cannot update payroll");
+    }
+
     const enrichedUpdates = { ...updates, updatedAt: new Date().toISOString() };
     let updatedNetSalary: number | undefined;
 
@@ -861,17 +860,16 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
     try {
       await setDoc(doc(db, "payroll", id), enrichedUpdates, { merge: true });
+      saveDocREST("payroll", id, enrichedUpdates).catch(() => {});
       if (updatedNetSalary !== undefined || updates.department || updates.employeeName) {
-        await setDoc(
-          doc(db, "transactions", txId),
-          {
-            amount: updatedNetSalary,
-            department: updates.department,
-            title: updates.employeeName ? `Salary — ${updates.employeeName} (${updates.month || "Current"})` : undefined,
-            updatedAt: new Date().toISOString(),
-          },
-          { merge: true }
-        ).catch(() => {});
+        const txUpdates = {
+          amount: updatedNetSalary,
+          department: updates.department,
+          title: updates.employeeName ? `Salary — ${updates.employeeName} (${updates.month || "Current"})` : undefined,
+          updatedAt: new Date().toISOString(),
+        };
+        await setDoc(doc(db, "transactions", txId), txUpdates, { merge: true }).catch(() => {});
+        saveDocREST("transactions", txId, txUpdates).catch(() => {});
       }
       recordAuditLog({
         organizationId: activeOrgId,
@@ -889,6 +887,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deletePayroll = async (id: string) => {
+    if (!can(user, "manage_payroll")) {
+      showFloatingToast("Permission Denied", "You do not have permission to delete payroll.");
+      throw new Error("Permission denied: cannot delete payroll");
+    }
+
     deletedIdsRef.current.add(id);
     const orgKey = (user?.organizationId || "demo-org").replace(/[^a-zA-Z0-9]/g, "_");
     const aliasId = `payroll_${id}_${orgKey}`;
@@ -904,6 +907,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       await deleteDoc(doc(db, "payroll", id)).catch(() => {});
       await deleteDoc(doc(db, "payroll", aliasId)).catch(() => {});
       await deleteDoc(doc(db, "transactions", txId)).catch(() => {});
+      deleteDocREST("payroll", id).catch(() => {});
+      deleteDocREST("payroll", aliasId).catch(() => {});
+      deleteDocREST("transactions", txId).catch(() => {});
       recordAuditLog({
         organizationId: activeOrgId,
         actorUid: user?.id || "anonymous",
@@ -919,6 +925,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addDepartment = async (d: Omit<Department, "id">) => {
+    if (!can(user, "manage_departments")) {
+      showFloatingToast("Permission Denied", "You do not have permission to manage departments.");
+      throw new Error("Permission denied: cannot create department");
+    }
+
     const id = generateSafeId("departments");
     const now = new Date().toISOString();
     const orgName = user?.organization || "OFM — Organization Finance Management";
@@ -937,6 +948,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     setDepartments((prev) => [...prev.filter((item) => item.id !== id), newDept]);
     try {
       await setDoc(doc(db, "departments", id), newDept);
+      saveDocREST("departments", id, newDept).catch(() => {});
       recordAuditLog({
         organizationId: orgId,
         actorUid: user?.id || "anonymous",
@@ -953,10 +965,16 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateDepartment = async (id: string, updates: Partial<Omit<Department, "id">>) => {
+    if (!can(user, "manage_departments")) {
+      showFloatingToast("Permission Denied", "You do not have permission to update departments.");
+      throw new Error("Permission denied: cannot update department");
+    }
+
     const enrichedUpdates = { ...updates, updatedAt: new Date().toISOString() };
     setDepartments((prev) => prev.map((d) => (d.id === id ? { ...d, ...enrichedUpdates } : d)));
     try {
       await setDoc(doc(db, "departments", id), enrichedUpdates, { merge: true });
+      saveDocREST("departments", id, enrichedUpdates).catch(() => {});
       recordAuditLog({
         organizationId: activeOrgId,
         actorUid: user?.id || "anonymous",
@@ -973,6 +991,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   };
 
   const deleteDepartment = async (id: string) => {
+    if (!can(user, "manage_departments")) {
+      showFloatingToast("Permission Denied", "You do not have permission to delete departments.");
+      throw new Error("Permission denied: cannot delete department");
+    }
+
     deletedIdsRef.current.add(id);
     const orgKey = (user?.organizationId || "demo-org").replace(/[^a-zA-Z0-9]/g, "_");
     const aliasId = `dept_${id}_${orgKey}`;
@@ -982,6 +1005,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     try {
       await deleteDoc(doc(db, "departments", id)).catch(() => {});
       await deleteDoc(doc(db, "departments", aliasId)).catch(() => {});
+      deleteDocREST("departments", id).catch(() => {});
+      deleteDocREST("departments", aliasId).catch(() => {});
       recordAuditLog({
         organizationId: activeOrgId,
         actorUid: user?.id || "anonymous",
@@ -996,8 +1021,10 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const rawTxIncome = useMemo(() => calculateTotalIncome(transactions), [transactions]);
+  // Authoritative Central Financial Calculations (FinancialCalculationEngine)
+  const totalIncome = useMemo(() => calculateTotalIncome(transactions), [transactions]);
   const totalExpenses = useMemo(() => calculateTotalExpenses(transactions), [transactions]);
+  const netBalance = useMemo(() => calculateNetOperatingResult(transactions), [transactions]);
 
   const budgetsWithSpent = useMemo(() => {
     return budgets.map((b) => {
@@ -1015,13 +1042,6 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   }, [departments]);
 
   const totalBudgeted = totalLineBudgeted > 0 ? totalLineBudgeted : totalDeptBudgeted;
-  
-  // Real-time Total Income includes transaction income + allocated budget pool ("agr mae budet allocate kro inocme ma edlo")
-  // Whenever budget is allocated, it adds to income so margin reflects it accurately on web and mobile app
-  const totalIncome = useMemo(() => rawTxIncome + totalBudgeted, [rawTxIncome, totalBudgeted]);
-
-  // Real-time Total Balance = Total Income (including allocated budget) - Total Expenses
-  const netBalance = useMemo(() => totalIncome - totalExpenses, [totalIncome, totalExpenses]);
   const actualCash = useMemo(() => calculateActualCash(transactions), [transactions]);
   const totalBudgetSpent = useMemo(() => {
     return budgetsWithSpent.reduce((sum, b) => sum + Number(b.spent || 0), 0);
@@ -1034,13 +1054,13 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     setSyncStatus("syncing");
     try {
       const fetchPromise = Promise.all([
-        fetchCollectionREST<Transaction>("transactions"),
-        fetchCollectionREST<Budget>("budgets"),
-        fetchCollectionREST<Department>("departments"),
-        fetchCollectionREST<PayrollEntry>("payroll"),
+        fetchCollectionREST<Transaction>("transactions", activeOrgId),
+        fetchCollectionREST<Budget>("budgets", activeOrgId),
+        fetchCollectionREST<Department>("departments", activeOrgId),
+        fetchCollectionREST<PayrollEntry>("payroll", activeOrgId),
       ]);
       const timeoutPromise = new Promise<any[]>((resolve) =>
-        setTimeout(() => resolve([[], [], [], []]), 2000)
+        setTimeout(() => resolve([[], [], [], []]), 2500)
       );
       const [restTxs, restBudgets, restDepts, restPayroll] = await Promise.race([
         fetchPromise,
@@ -1048,27 +1068,31 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       ]);
 
       if (restTxs && restTxs.length > 0) {
-        restTxs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        setTransactions(restTxs);
-        AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(restTxs)).catch(() => {});
+        const validTxs = restTxs.filter((t: Transaction) => !deletedIdsRef.current.has(t.id));
+        validTxs.sort((a: Transaction, b: Transaction) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        setTransactions(validTxs);
+        AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(validTxs)).catch(() => {});
       }
       if (restBudgets && restBudgets.length > 0) {
-        setBudgets(restBudgets);
-        AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(restBudgets)).catch(() => {});
+        const validBudgets = restBudgets.filter((b: Budget) => !deletedIdsRef.current.has(b.id));
+        setBudgets(validBudgets);
+        AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(validBudgets)).catch(() => {});
       }
       if (restDepts && restDepts.length > 0) {
-        setDepartments(restDepts);
-        AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(restDepts)).catch(() => {});
+        const validDepts = restDepts.filter((d: Department) => !deletedIdsRef.current.has(d.id));
+        setDepartments(validDepts);
+        AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(validDepts)).catch(() => {});
       }
       if (restPayroll && restPayroll.length > 0) {
-        setPayroll(restPayroll);
-        AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(restPayroll)).catch(() => {});
+        const validPayroll = restPayroll.filter((p: PayrollEntry) => !deletedIdsRef.current.has(p.id));
+        setPayroll(validPayroll);
+        AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(validPayroll)).catch(() => {});
       }
     } catch (e) {
     } finally {
       setSyncStatus("synced");
     }
-  }, [cachePrefix]);
+  }, [cachePrefix, activeOrgId]);
 
   const financeValue = useMemo(() => ({
     transactions,
@@ -1078,6 +1102,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     notifications,
     unreadNotificationCount,
     syncStatus,
+    loaded,
+    isLoading: !loaded,
     refreshData,
     addTransaction,
     updateTransaction,
@@ -1108,6 +1134,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     notifications,
     unreadNotificationCount,
     syncStatus,
+    loaded,
     addTransaction,
     updateTransaction,
     deleteTransaction,

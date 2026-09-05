@@ -403,10 +403,6 @@ ${orgName}`;
         if (prev.some((p) => (p.email || "").toLowerCase() === (email || "").toLowerCase())) return prev;
         return [...prev, newMember];
       });
-      setPendingInvites((prev) => {
-      if (prev.some((p) => (p.email || "").toLowerCase() === (email || "").toLowerCase())) return prev;
-      return [{ email, role, addedAt: Date.now() }, ...prev];
-    });
     } catch (firestoreErr) {
       console.warn("Firestore invitation persist notice:", firestoreErr);
     }
@@ -1058,5 +1054,19 @@ const styles = StyleSheet.create({
   actionBtnText: {
     fontSize: 13,
     fontFamily: "Inter_700Bold",
+  },
+  infoBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  infoBannerText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 17,
   },
 });

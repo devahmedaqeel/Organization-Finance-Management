@@ -220,7 +220,6 @@ export default function ExpensesScreen() {
             )}
           </View>
         }
-        showsVerticalScrollIndicator={false}
       />
 
       <AddTransactionModal

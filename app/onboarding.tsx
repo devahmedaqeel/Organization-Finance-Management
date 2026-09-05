@@ -23,7 +23,7 @@ interface Slide {
   titleUr: string;
   descEn: string;
   descUr: string;
-  icon: keyof typeof Feather.glyphMap;
+  icon: string;
   color: string;
   bgColor: string;
 }

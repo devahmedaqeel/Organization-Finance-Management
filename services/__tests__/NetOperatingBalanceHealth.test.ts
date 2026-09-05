@@ -5,6 +5,7 @@ import {
   isOperatingExpense,
 } from "../DatePeriodService";
 import { Transaction } from "@/context/FinanceContext";
+import { describe, test, expect } from "./testHelper";
 
 const mockPeriod: NormalizedPeriod = {
   startDate: "2026-01-01",
@@ -49,7 +50,7 @@ describe("Net Operating Balance Health Engine", () => {
         category: "Utilities",
         date: "2026-05-05",
       },
-    ];
+    ] as any[];
 
     const result = computeNetOperatingBalanceHealth(txs, mockPeriod);
 
@@ -75,7 +76,7 @@ describe("Net Operating Balance Health Engine", () => {
         category: "Rent",
         date: "2026-02-01",
       },
-    ];
+    ] as any[];
 
     const result = computeNetOperatingBalanceHealth(txs, mockPeriod);
 
@@ -106,7 +107,7 @@ describe("Net Operating Balance Health Engine", () => {
         category: "Supplies",
         date: "2026-03-05",
       },
-    ];
+    ] as any[];
 
     const result = computeNetOperatingBalanceHealth(txs, mockPeriod);
 
@@ -136,7 +137,7 @@ describe("Net Operating Balance Health Engine", () => {
         category: "Operations",
         date: "2026-03-05",
       },
-    ];
+    ] as any[];
 
     const result = computeNetOperatingBalanceHealth(txs, mockPeriod);
 

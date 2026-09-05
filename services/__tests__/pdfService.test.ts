@@ -5,11 +5,11 @@
  */
 
 import { buildPayslipPdfBinary } from "../payslipPdfService";
-import { buildFinancialPdfBinary, ReportOptions } from "../ReportExportService";
+import type { ReportOptions } from "../ReportExportService";
 import { sanitizeFilename, validatePdfBase64 } from "../pdfDownloadService";
 import { buildPayslipHtml } from "../pdfTemplates/payslipTemplate";
 import { buildFinancialReportHtml } from "../pdfTemplates/financialReportTemplate";
-import { PayrollEntry } from "@/context/FinanceContext";
+import type { PayrollEntry } from "@/context/FinanceContext";
 
 function assert(condition: boolean, testName: string) {
   if (!condition) {
@@ -86,15 +86,15 @@ const sampleReportOpts: ReportOptions = {
   netBalance: 180000,
   budgetUtilization: 64.0,
   transactions: [
-    { id: "t1", type: "income", category: "Client Contract", amount: 500000, date: "2026-08-01", department: "Growth" },
-    { id: "t2", type: "expense", category: "Cloud Infrastructure", amount: 320000, date: "2026-08-05", department: "Engineering" },
+    { id: "t1", type: "income", category: "Client Contract", amount: 500000, date: "2026-08-01", department: "Growth", description: "Client Contract" },
+    { id: "t2", type: "expense", category: "Cloud Infrastructure", amount: 320000, date: "2026-08-05", department: "Engineering", description: "Cloud Infrastructure" },
   ],
   departments: [
-    { id: "d1", name: "Engineering", budgetAllocated: 500000 },
+    { id: "d1", name: "Engineering", budgetAllocated: 500000, headCount: 5 },
   ],
   payroll: [samplePayslip],
   budgets: [
-    { id: "b1", category: "Cloud Infrastructure", department: "Engineering", allocated: 500000, spent: 320000 },
+    { id: "b1", category: "Cloud Infrastructure", department: "Engineering", allocated: 500000, spent: 320000, period: "2026-08" },
   ],
 };
 

@@ -383,8 +383,8 @@ export function generateFinancialInsights(
   // 6. ANOMALY DETECTION (STATISTICAL OUTLIER DETECTION)
   // ──────────────────────────────────────────────────────────────────────────
   const expenseTxs = currentTxs.filter((t) => t.type === "expense");
-  // Outlier detection requires sufficient sample size (>= 6 transactions) for statistical validity
-  if (expenseTxs.length >= 6) {
+  // Outlier detection requires sufficient sample size (>= 5 transactions) for statistical validity
+  if (expenseTxs.length >= 5) {
     const amounts = expenseTxs.map((t) => safeNumber(t.amount, 0));
     const avg = amounts.reduce((a, b) => a + b, 0) / amounts.length;
     const maxTx = expenseTxs.reduce((prev, curr) => (curr.amount > prev.amount ? curr : prev));

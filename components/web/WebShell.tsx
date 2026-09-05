@@ -379,7 +379,7 @@ export function WebShell() {
                 navigateToTab(item.id);
                 if (isDrawer) setMobileDrawerOpen(false);
               }}
-              title={(!isDrawer && sidebarCollapsed) ? item.label : undefined}
+              accessibilityLabel={(!isDrawer && sidebarCollapsed) ? item.label : undefined}
               activeOpacity={0.7}
             >
               {renderNavIcon(item.icon, 16, isActive ? colors.primary : colors.mutedForeground)}
@@ -482,7 +482,7 @@ export function WebShell() {
               <TouchableOpacity
                 style={[styles.collapseBtn, { borderColor: colors.border }]}
                 onPress={() => setSidebarCollapsed(!sidebarCollapsed)}
-                title={sidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+                accessibilityLabel={sidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
                 activeOpacity={0.7}
               >
                 {sidebarCollapsed ? (
@@ -509,7 +509,7 @@ export function WebShell() {
               <>
                 <View
                   style={[styles.userAvatar, { backgroundColor: colors.primary + "20" }]}
-                  title={`Logged in as ${user?.name || "User"} (${(user?.role || "admin").toUpperCase()})`}
+                  accessibilityLabel={`Logged in as ${user?.name || "User"} (${(user?.role || "admin").toUpperCase()})`}
                 >
                   <Text style={[styles.userAvatarText, { color: colors.primary }]}>
                     {(user?.name || "User").charAt(0).toUpperCase()}
@@ -518,7 +518,7 @@ export function WebShell() {
                 <TouchableOpacity
                   style={[styles.logoutBtn, { borderColor: colors.border, padding: 8, borderRadius: 8 }]}
                   onPress={logout}
-                  title="Log Out"
+                  accessibilityLabel="Log Out"
                   activeOpacity={0.75}
                 >
                   <SvgLogOut size={14} color={colors.expense} />
@@ -545,7 +545,7 @@ export function WebShell() {
                 <TouchableOpacity
                   style={[styles.logoutBtn, { borderColor: colors.border }]}
                   onPress={logout}
-                  title="Log Out"
+                  accessibilityLabel="Log Out"
                   activeOpacity={0.75}
                 >
                   <SvgLogOut size={15} color={colors.expense} />
@@ -762,7 +762,7 @@ export function WebShell() {
             <TouchableOpacity
               style={[styles.topIconBtn, { borderColor: colors.border, position: "relative" }]}
               onPress={() => setNotificationModalVisible(true)}
-              title="Notifications & System Alerts"
+              accessibilityLabel="Notifications & System Alerts"
               activeOpacity={0.75}
             >
               <SvgBell size={16} color={colors.foreground} />
@@ -792,7 +792,7 @@ export function WebShell() {
             <TouchableOpacity
               style={[styles.topIconBtn, { borderColor: colors.border }]}
               onPress={toggleTheme}
-              title="Toggle Theme"
+              accessibilityLabel="Toggle Theme"
             >
               {settings.theme === "dark" ? (
                 <SvgSun size={16} color={colors.foreground} />
