@@ -91,7 +91,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
     return calculateFinancialHealth(transactions, budgets, payroll, activePeriod);
   }, [transactions, budgets, payroll, activePeriod]);
 
-  const { healthScore, status: healthLabel, statusColor: healthColor } = healthReport;
+  const { hasData, healthScore, status: healthLabel, statusColor: healthColor } = healthReport;
 
   // 2. Authoritative Actionable Insights
   const actionableInsights = useMemo(() => {
@@ -196,7 +196,6 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
     return totalSpentOnBudgets > 0 ? totalSpentOnBudgets : Math.min(displayedExpense, totalAllocatedBudget);
   }, [consolidatedBudgets, displayedTxs, displayedExpense, totalAllocatedBudget]);
 
-
   const displayedBudgetUtil = totalAllocatedBudget > 0 ? (displayedBudgetSpent / totalAllocatedBudget) * 100 : 0;
 
   // Transaction Metrics computed strictly from displayed transactions
@@ -289,14 +288,14 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
       .sort((a, b) => b.value - a.value || (a.label || "").localeCompare(b.label || "")),
   [consolidatedBudgets, displayedTxs, settings.currency]);
 
-  // Authoritative real-time net surplus margin computed directly from active timeline scope
+  // Dynamic growth metrics computed strictly from current vs baseline active points
   const { periodGrowth, periodGrowthLabel } = useMemo(() => {
-    const activeInc = selectedPoint
-      ? Number(selectedPoint.income || 0)
-      : chartPoints.reduce((s, p) => s + Number(p.income || 0), 0);
-    const activeExp = selectedPoint
-      ? Number(selectedPoint.expense || 0)
-      : chartPoints.reduce((s, p) => s + Number(p.expense || 0), 0);
+    if (chartPoints.length === 0) {
+      return { periodGrowth: 0, periodGrowthLabel: "0.0% Balanced" };
+    }
+    const targetPoints = selectedPoint ? [selectedPoint] : chartPoints;
+    const activeInc = targetPoints.reduce((s, p) => s + (p.income || 0), 0);
+    const activeExp = targetPoints.reduce((s, p) => s + (p.expense || 0), 0);
     const activeNet = activeInc - activeExp;
 
     if (activeInc === 0 && activeExp === 0) {
@@ -396,35 +395,62 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
         <Text style={[styles.cardTitle, { color: colors.foreground }]}>Financial Health Score</Text>
         <View style={[styles.healthRow, isMobile && { flexDirection: "column", alignItems: "center", gap: 16 }]}>
           <RingProgress
-            percentage={healthScore}
+            percentage={healthScore ?? 0}
+            centerLabel={healthScore !== null ? `${healthScore}%` : "N/A"}
             size={126}
             strokeWidth={12}
             color={healthColor}
-            label={healthLabel}
-            sublabel={healthScore >= 80 ? "Optimal" : healthScore >= 60 ? "Stable" : "Watch"}
+            label={hasData ? healthLabel : "NO DATA"}
+            sublabel={
+              !hasData
+                ? "INACTIVE"
+                : healthScore! >= 80
+                ? "Optimal"
+                : healthScore! >= 60
+                ? "Stable"
+                : "Watch"
+            }
           />
           <View style={[styles.healthRight, isMobile && { alignItems: "center", width: "100%" }]}>
             <Text style={[styles.healthScore, { color: healthColor }]}>
-              {healthScore}<Text style={styles.healthScoreMax}>/100</Text>
+              {healthScore !== null ? (
+                <>
+                  {healthScore}<Text style={styles.healthScoreMax}>/100</Text>
+                </>
+              ) : (
+                "N/A"
+              )}
             </Text>
-            <Text style={[styles.healthLabel, { color: healthColor }]}>{healthLabel}</Text>
+            <Text style={[styles.healthLabel, { color: healthColor }]}>
+              {hasData ? healthLabel : "No Financial Data"}
+            </Text>
 
             <View style={[styles.healthStats, isMobile && { justifyContent: "center" }]}>
               {[
                 {
                   label: "Net Balance",
-                  value: `${displayedNet >= 0 ? "+" : "-"}${settings.currency} ${fmt(Math.abs(displayedNet))}`,
+                  value: displayedTxs.length > 0 || displayedNet !== 0
+                    ? `${displayedNet >= 0 ? "+" : "-"}${settings.currency} ${fmt(Math.abs(displayedNet))}`
+                    : `${settings.currency} 0`,
                   color: displayedNet >= 0 ? "#10B981" : "#F43F5E",
                 },
                 {
                   label: "Profit Margin",
-                  value: `${profitMargin >= 0 ? "+" : ""}${profitMargin.toFixed(1)}%`,
-                  color: profitMargin > 10 ? "#10B981" : profitMargin >= 0 ? "#38BDF8" : "#F43F5E",
+                  value: (displayedIncome > 0 || displayedExpense > 0)
+                    ? `${profitMargin >= 0 ? "+" : ""}${profitMargin.toFixed(1)}%`
+                    : "N/A",
+                  color: (displayedIncome > 0 || displayedExpense > 0)
+                    ? (profitMargin > 10 ? "#10B981" : profitMargin >= 0 ? "#38BDF8" : "#F43F5E")
+                    : "#94A3B8",
                 },
                 {
                   label: "Budget Used",
-                  value: `${displayedBudgetUtil.toFixed(0)}%`,
-                  color: displayedBudgetUtil <= 75 ? "#10B981" : displayedBudgetUtil <= 100 ? "#F59E0B" : "#F43F5E",
+                  value: totalAllocatedBudget > 0
+                    ? `${displayedBudgetUtil.toFixed(0)}%`
+                    : "N/A",
+                  color: totalAllocatedBudget > 0
+                    ? (displayedBudgetUtil <= 75 ? "#10B981" : displayedBudgetUtil <= 100 ? "#F59E0B" : "#F43F5E")
+                    : "#94A3B8",
                 },
                 hasMoMComparison
                   ? {
@@ -434,8 +460,12 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
                     }
                   : {
                       label: "Burn Rate",
-                      value: `${expenseRatio.toFixed(1)}%`,
-                      color: expenseRatio <= 65 ? "#10B981" : expenseRatio <= 85 ? "#F59E0B" : "#F43F5E",
+                      value: (displayedIncome > 0 || displayedExpense > 0)
+                        ? `${expenseRatio.toFixed(1)}%`
+                        : "N/A",
+                      color: (displayedIncome > 0 || displayedExpense > 0)
+                        ? (expenseRatio <= 65 ? "#10B981" : expenseRatio <= 85 ? "#F59E0B" : "#F43F5E")
+                        : "#94A3B8",
                     },
               ].map((s, i) => (
                 <View key={i} style={[styles.healthStat, { backgroundColor: colors.background, borderColor: colors.border }]}>
@@ -1006,9 +1036,15 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
 
       {displayedInsights.length === 0 ? (
         <View style={[styles.disclaimerBox, { backgroundColor: colors.card, borderColor: colors.border, paddingVertical: 20 }]}>
-          <SvgCheckCircle size={24} color="#10B981" />
+          {hasData ? (
+            <SvgCheckCircle size={24} color="#10B981" />
+          ) : (
+            <SvgInfo size={24} color="#94A3B8" />
+          )}
           <Text style={[styles.disclaimerText, { color: colors.foreground, fontSize: 13, marginTop: 6 }]}>
-            {insightFilter === "critical" || insightFilter === "advisories"
+            {!hasData
+              ? "No financial data available yet. Add income, expenses, or budgets to generate real-time AI financial intelligence."
+              : insightFilter === "critical" || insightFilter === "advisories"
               ? "No critical alerts or warnings found in this period."
               : insightFilter === "positive"
               ? "No positive insights recorded in this period."

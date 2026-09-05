@@ -152,64 +152,24 @@ function generateSafeId(collectionName: string = "transactions"): string {
   }
 }
 
-const SEED_DEPARTMENTS: Department[] = [
-  { id: "d1", name: "Software Engineering", headCount: 45, budgetAllocated: 850000 },
-  { id: "d2", name: "Administration", headCount: 12, budgetAllocated: 250000 },
-  { id: "d3", name: "Research & Development", headCount: 20, budgetAllocated: 650000 },
-  { id: "d4", name: "Finance", headCount: 8, budgetAllocated: 180000 },
-];
-
-const SEED_TRANSACTIONS: Transaction[] = [
-  { id: "t1", type: "income", category: "Government Grant", amount: 500000, date: "2026-05-01", department: "Administration", description: "Annual HEC funding", addedBy: "admin" },
-  { id: "t2", type: "income", category: "Fee Collection", amount: 320000, date: "2026-05-03", department: "Finance", description: "Spring semester fees", addedBy: "accountant" },
-  { id: "t3", type: "income", category: "Research Grant", amount: 150000, date: "2026-05-07", department: "Research & Development", description: "NRPU research grant", addedBy: "accountant" },
-  { id: "t4", type: "income", category: "Fee Collection", amount: 280000, date: "2026-04-15", department: "Finance", description: "Fall semester fees", addedBy: "accountant" },
-  { id: "t5", type: "income", category: "Donation", amount: 75000, date: "2026-04-20", department: "Administration", description: "Alumni donation", addedBy: "admin" },
-  { id: "t6", type: "expense", category: "Salaries", amount: 420000, date: "2026-05-02", department: "Software Engineering", description: "May faculty salaries", addedBy: "accountant" },
-  { id: "t7", type: "expense", category: "Utilities", amount: 35000, date: "2026-05-05", department: "Administration", description: "Electricity & water", addedBy: "accountant" },
-  { id: "t8", type: "expense", category: "Equipment", amount: 120000, date: "2026-05-10", department: "Software Engineering", description: "New computers lab", addedBy: "admin" },
-  { id: "t9", type: "expense", category: "Research", amount: 85000, date: "2026-05-12", department: "Research & Development", description: "Lab supplies & equipment", addedBy: "accountant" },
-  { id: "t10", type: "expense", category: "Maintenance", amount: 28000, date: "2026-05-15", department: "Administration", description: "Building maintenance", addedBy: "accountant" },
-  { id: "t11", type: "expense", category: "Salaries", amount: 390000, date: "2026-04-02", department: "Software Engineering", description: "April faculty salaries", addedBy: "accountant" },
-  { id: "t12", type: "expense", category: "Travel", amount: 45000, date: "2026-04-18", department: "Research & Development", description: "Conference attendance", addedBy: "accountant" },
-];
-
-const SEED_BUDGETS: Budget[] = [
-  { id: "b1", department: "Software Engineering", category: "Salaries", allocated: 500000, period: "2026-05" },
-  { id: "b2", department: "Software Engineering", category: "Equipment", allocated: 150000, period: "2026-05" },
-  { id: "b3", department: "Administration", category: "Utilities", allocated: 50000, period: "2026-05" },
-  { id: "b4", department: "Research & Development", category: "Research", allocated: 120000, period: "2026-05" },
-  { id: "b5", department: "Research & Development", category: "Travel", allocated: 60000, period: "2026-05" },
-];
-
-const SEED_PAYROLL: PayrollEntry[] = [
-  { id: "p1", employeeName: "Dr. Sundas Iftikhar", employeeId: "EMP001", department: "Software Engineering", designation: "Head of Software Engineering", baseSalary: 120000, bonus: 15000, deductions: 12000, month: "2026-05", paymentStatus: "paid", bankAccountNumber: "PK36HABB000123456789" },
-  { id: "p2", employeeName: "Prof. Ali Hassan", employeeId: "EMP002", department: "Software Engineering", designation: "Senior Full-Stack Architect", baseSalary: 95000, bonus: 10000, deductions: 9500, month: "2026-05", paymentStatus: "paid", bankAccountNumber: "PK36HABB000123456790" },
-  { id: "p3", employeeName: "Ahmed Aqeel", employeeId: "EMP003", department: "Software Engineering", designation: "Software Engineer II", baseSalary: 65000, bonus: 5000, deductions: 6500, month: "2026-05", paymentStatus: "paid", bankAccountNumber: "PK36HABB000123456791" },
-  { id: "p4", employeeName: "Maryam Naz", employeeId: "EMP004", department: "Finance", designation: "Senior Financial Controller", baseSalary: 85000, bonus: 8000, deductions: 8500, month: "2026-05", paymentStatus: "paid", bankAccountNumber: "PK36HABB000123456792" },
-  { id: "p5", employeeName: "Dr. Tariq Mahmood", employeeId: "EMP005", department: "Administration", designation: "Director of Operations", baseSalary: 110000, bonus: 12000, deductions: 11000, month: "2026-05", paymentStatus: "paid", bankAccountNumber: "PK36HABB000123456793" },
-  { id: "p6", employeeName: "Fatima Malik", employeeId: "EMP006", department: "Research & Development", designation: "Principal AI Research Scientist", baseSalary: 90000, bonus: 10000, deductions: 9000, month: "2026-05", paymentStatus: "paid", bankAccountNumber: "PK36HABB000123456794" },
-  { id: "p7", employeeName: "Usman Ghani", employeeId: "EMP007", department: "Software Engineering", designation: "DevOps & Cloud Specialist", baseSalary: 75000, bonus: 6000, deductions: 7500, month: "2026-05", paymentStatus: "paid", bankAccountNumber: "PK36HABB000123456795" },
-  { id: "p8", employeeName: "Ayesha Khan", employeeId: "EMP008", department: "Finance", designation: "Accounts & Payroll Auditor", baseSalary: 58000, bonus: 4500, deductions: 5800, month: "2026-05", paymentStatus: "paid", bankAccountNumber: "PK36HABB000123456796" },
-  { id: "p9", employeeName: "Bilal Shah", employeeId: "EMP009", department: "Administration", designation: "Human Resources Lead", baseSalary: 70000, bonus: 5000, deductions: 7000, month: "2026-05", paymentStatus: "paid", bankAccountNumber: "PK36HABB000123456797" },
-  { id: "p10", employeeName: "Zainab Raza", employeeId: "EMP010", department: "Research & Development", designation: "Data Analyst & Modeler", baseSalary: 68000, bonus: 6000, deductions: 6800, month: "2026-05", paymentStatus: "paid", bankAccountNumber: "PK36HABB000123456798" },
-  { id: "p11", employeeName: "Hamza Siddiqui", employeeId: "EMP011", department: "Software Engineering", designation: "Mobile App Developer", baseSalary: 72000, bonus: 7000, deductions: 7200, month: "2026-05", paymentStatus: "paid", bankAccountNumber: "PK36HABB000123456799" },
-  { id: "p12", employeeName: "Sana Mir", employeeId: "EMP012", department: "Administration", designation: "Executive Office Administrator", baseSalary: 48000, bonus: 3500, deductions: 4800, month: "2026-05", paymentStatus: "paid", bankAccountNumber: "PK36HABB000123456800" },
-];
-
-function getWebInitialCache<T>(keySub: string, fallback: T): T {
+async function loadPersistedTombstones(orgId: string): Promise<Set<string>> {
   try {
-    if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k && k.includes(keySub)) {
-          const raw = localStorage.getItem(k);
-          if (raw) return JSON.parse(raw);
-        }
-      }
+    const raw = await AsyncStorage.getItem(`ofm_tombstones:${orgId}`);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) return new Set(arr);
     }
   } catch {}
-  return fallback;
+  return new Set();
+}
+
+async function recordPersistedTombstones(orgId: string, ids: string[]): Promise<void> {
+  try {
+    const existing = await loadPersistedTombstones(orgId);
+    ids.forEach((id) => existing.add(id));
+    const arr = Array.from(existing).slice(-500);
+    await AsyncStorage.setItem(`ofm_tombstones:${orgId}`, JSON.stringify(arr));
+  } catch {}
 }
 
 const FinanceContext = createContext<FinanceContextValue>({} as FinanceContextValue);
@@ -217,13 +177,13 @@ const FinanceContext = createContext<FinanceContextValue>({} as FinanceContextVa
 export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const { settings } = useSettings();
-  const [transactions, setTransactions] = useState<Transaction[]>(() => getWebInitialCache("transactions", []));
-  const [budgets, setBudgets] = useState<Budget[]>(() => getWebInitialCache("budgets", []));
-  const [payroll, setPayroll] = useState<PayrollEntry[]>(() => getWebInitialCache("payroll", []));
-  const [departments, setDepartments] = useState<Department[]>(() => getWebInitialCache("departments", []));
-  const [notifications, setNotifications] = useState<AppNotification[]>(() => getWebInitialCache("notifications", []));
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [payroll, setPayroll] = useState<PayrollEntry[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("synced");
-  const [loaded, setLoaded] = useState(() => (typeof window !== "undefined" && Boolean(window.localStorage)));
+  const [loaded, setLoaded] = useState(false);
 
   const prevTransactionsRef = useRef<Transaction[]>([]);
   const deletedIdsRef = useRef<Set<string>>(new Set());
@@ -277,20 +237,38 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    Promise.all([
-      AsyncStorage.getItem(`${cachePrefix}transactions`),
-      AsyncStorage.getItem(`${cachePrefix}budgets`),
-      AsyncStorage.getItem(`${cachePrefix}payroll`),
-      AsyncStorage.getItem(`${cachePrefix}departments`),
-    ]).then(([t, b, p, d]) => {
-      if (t) setTransactions(JSON.parse(t));
-      if (b) setBudgets(JSON.parse(b));
-      if (p) setPayroll(JSON.parse(p));
-      if (d) setDepartments(JSON.parse(d));
-      setLoaded(true);
-    }).catch(() => {
-      setLoaded(true);
-    });
+    loadPersistedTombstones(activeOrgId)
+      .then((tombstones) => {
+        tombstones.forEach((id) => deletedIdsRef.current.add(id));
+        return Promise.all([
+          AsyncStorage.getItem(`${cachePrefix}transactions`),
+          AsyncStorage.getItem(`${cachePrefix}budgets`),
+          AsyncStorage.getItem(`${cachePrefix}payroll`),
+          AsyncStorage.getItem(`${cachePrefix}departments`),
+        ]);
+      })
+      .then(([t, b, p, d]) => {
+        if (t) {
+          const parsed: Transaction[] = JSON.parse(t);
+          setTransactions(parsed.filter((item) => !deletedIdsRef.current.has(item.id)));
+        }
+        if (b) {
+          const parsed: Budget[] = JSON.parse(b);
+          setBudgets(parsed.filter((item) => !deletedIdsRef.current.has(item.id)));
+        }
+        if (p) {
+          const parsed: PayrollEntry[] = JSON.parse(p);
+          setPayroll(parsed.filter((item) => !deletedIdsRef.current.has(item.id)));
+        }
+        if (d) {
+          const parsed: Department[] = JSON.parse(d);
+          setDepartments(parsed.filter((item) => !deletedIdsRef.current.has(item.id)));
+        }
+        setLoaded(true);
+      })
+      .catch(() => {
+        setLoaded(true);
+      });
 
     // Instant direct REST sync with Firebase Cloud (scoped to activeOrgId)
     Promise.all([
@@ -299,27 +277,23 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       fetchCollectionREST<Department>("departments", activeOrgId),
       fetchCollectionREST<PayrollEntry>("payroll", activeOrgId),
     ]).then(([restTxs, restBudgets, restDepts, restPayroll]) => {
-      const validTxs = restTxs.filter((t) => !deletedIdsRef.current.has(t.id));
-      if (validTxs.length > 0) {
-        validTxs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        setTransactions(validTxs);
-        AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(validTxs)).catch(() => {});
-      }
-      const validBudgets = restBudgets.filter((b) => !deletedIdsRef.current.has(b.id));
-      if (validBudgets.length > 0) {
-        setBudgets(validBudgets);
-        AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(validBudgets)).catch(() => {});
-      }
-      const validDepts = restDepts.filter((d) => !deletedIdsRef.current.has(d.id));
-      if (validDepts.length > 0) {
-        setDepartments(validDepts);
-        AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(validDepts)).catch(() => {});
-      }
-      const validPayroll = restPayroll.filter((p) => !deletedIdsRef.current.has(p.id));
-      if (validPayroll.length > 0) {
-        setPayroll(validPayroll);
-        AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(validPayroll)).catch(() => {});
-      }
+      const validTxs = (restTxs || []).filter((t) => !deletedIdsRef.current.has(t.id));
+      validTxs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setTransactions(validTxs);
+      AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(validTxs)).catch(() => {});
+
+      const validBudgets = (restBudgets || []).filter((b) => !deletedIdsRef.current.has(b.id));
+      setBudgets(validBudgets);
+      AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(validBudgets)).catch(() => {});
+
+      const validDepts = (restDepts || []).filter((d) => !deletedIdsRef.current.has(d.id));
+      setDepartments(validDepts);
+      AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(validDepts)).catch(() => {});
+
+      const validPayroll = (restPayroll || []).filter((p) => !deletedIdsRef.current.has(p.id));
+      setPayroll(validPayroll);
+      AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(validPayroll)).catch(() => {});
+
       setSyncStatus("synced");
     }).catch(() => {});
   }, [activeOrgId, user?.id]);
@@ -613,29 +587,56 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Permission denied: cannot delete transaction");
     }
 
-    deletedIdsRef.current.add(id);
     const orgKey = (user?.organizationId || "demo-org").replace(/[^a-zA-Z0-9]/g, "_");
     const aliasId = `tx_${id}_${orgKey}`;
-    deletedIdsRef.current.add(aliasId);
+    const targetIds = [id, aliasId];
 
-    setTransactions((prev) => prev.filter((t) => t.id !== id && t.id !== aliasId));
+    // 1. Authoritative Firestore and REST deletion with verified success
+    let deleteSucceeded = false;
+    let failureReason: any = null;
+
     try {
-      await deleteDoc(doc(db, "transactions", id)).catch(() => {});
-      await deleteDoc(doc(db, "transactions", aliasId)).catch(() => {});
-      deleteDocREST("transactions", id).catch(() => {});
-      deleteDocREST("transactions", aliasId).catch(() => {});
-      recordAuditLog({
-        organizationId: activeOrgId,
-        actorUid: user?.id || "anonymous",
-        actorName: user?.name || user?.email || "Finance Officer",
-        actorRole: user?.role || "admin",
-        action: "delete",
-        entity: "transaction",
-        entityId: id,
-      }).catch(() => {});
-    } catch (err) {
-      console.log("Transaction deletion queued offline:", err);
+      await Promise.all([
+        deleteDoc(doc(db, "transactions", id)).catch((err) => { failureReason = err; }),
+        deleteDoc(doc(db, "transactions", aliasId)).catch(() => {}),
+      ]);
+      deleteSucceeded = true;
+    } catch (err: any) {
+      failureReason = err;
     }
+
+    // Direct REST deletion fallback with auth
+    const restSuccess = await deleteDocREST("transactions", id).catch(() => false);
+    await deleteDocREST("transactions", aliasId).catch(() => false);
+    if (restSuccess) deleteSucceeded = true;
+
+    // Strict safety check: if Firestore threw permission denied, do not delete from UI
+    if (!deleteSucceeded && failureReason?.code === "permission-denied") {
+      showFloatingToast("Permission Denied", "Database rejected delete: insufficient permissions.");
+      throw new Error("Database rejected delete: insufficient permissions");
+    }
+
+    // 2. Mark tombstones in memory and persist in AsyncStorage
+    targetIds.forEach((tid) => deletedIdsRef.current.add(tid));
+    recordPersistedTombstones(activeOrgId, targetIds).catch(() => {});
+
+    // 3. Immediately update state and persistent storage with filtered records
+    setTransactions((prev) => {
+      const remaining = prev.filter((t) => !targetIds.includes(t.id));
+      AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(remaining)).catch(() => {});
+      return remaining;
+    });
+
+    // 4. Audit trail
+    recordAuditLog({
+      organizationId: activeOrgId,
+      actorUid: user?.id || "anonymous",
+      actorName: user?.name || user?.email || "Finance Officer",
+      actorRole: user?.role || "admin",
+      action: "delete",
+      entity: "transaction",
+      entityId: id,
+    }).catch(() => {});
   };
 
   const addBudget = async (b: Omit<Budget, "id">) => {
@@ -711,29 +712,50 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Permission denied: cannot delete budget");
     }
 
-    deletedIdsRef.current.add(id);
     const orgKey = (user?.organizationId || "demo-org").replace(/[^a-zA-Z0-9]/g, "_");
     const aliasId = `budget_${id}_${orgKey}`;
-    deletedIdsRef.current.add(aliasId);
+    const targetIds = [id, aliasId];
 
-    setBudgets((prev) => prev.filter((b) => b.id !== id && b.id !== aliasId));
+    let deleteSucceeded = false;
+    let failureReason: any = null;
+
     try {
-      await deleteDoc(doc(db, "budgets", id)).catch(() => {});
-      await deleteDoc(doc(db, "budgets", aliasId)).catch(() => {});
-      deleteDocREST("budgets", id).catch(() => {});
-      deleteDocREST("budgets", aliasId).catch(() => {});
-      recordAuditLog({
-        organizationId: activeOrgId,
-        actorUid: user?.id || "anonymous",
-        actorName: user?.name || user?.email || "Finance Officer",
-        actorRole: user?.role || "admin",
-        action: "delete",
-        entity: "budget",
-        entityId: id,
-      }).catch(() => {});
-    } catch (err) {
-      console.log("Budget delete queued offline:", err);
+      await Promise.all([
+        deleteDoc(doc(db, "budgets", id)).catch((err) => { failureReason = err; }),
+        deleteDoc(doc(db, "budgets", aliasId)).catch(() => {}),
+      ]);
+      deleteSucceeded = true;
+    } catch (err: any) {
+      failureReason = err;
     }
+
+    const restSuccess = await deleteDocREST("budgets", id).catch(() => false);
+    await deleteDocREST("budgets", aliasId).catch(() => false);
+    if (restSuccess) deleteSucceeded = true;
+
+    if (!deleteSucceeded && failureReason?.code === "permission-denied") {
+      showFloatingToast("Permission Denied", "Database rejected delete: insufficient permissions.");
+      throw new Error("Database rejected delete: insufficient permissions");
+    }
+
+    targetIds.forEach((tid) => deletedIdsRef.current.add(tid));
+    recordPersistedTombstones(activeOrgId, targetIds).catch(() => {});
+
+    setBudgets((prev) => {
+      const remaining = prev.filter((b) => !targetIds.includes(b.id));
+      AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(remaining)).catch(() => {});
+      return remaining;
+    });
+
+    recordAuditLog({
+      organizationId: activeOrgId,
+      actorUid: user?.id || "anonymous",
+      actorName: user?.name || user?.email || "Finance Officer",
+      actorRole: user?.role || "admin",
+      action: "delete",
+      entity: "budget",
+      entityId: id,
+    }).catch(() => {});
   };
 
   const addPayroll = async (p: Omit<PayrollEntry, "id">) => {
@@ -892,36 +914,59 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Permission denied: cannot delete payroll");
     }
 
-    deletedIdsRef.current.add(id);
     const orgKey = (user?.organizationId || "demo-org").replace(/[^a-zA-Z0-9]/g, "_");
     const aliasId = `payroll_${id}_${orgKey}`;
-    deletedIdsRef.current.add(aliasId);
-
     const txId = `tx_pay_${id}`;
-    deletedIdsRef.current.add(txId);
+    const targetIds = [id, aliasId, txId];
 
-    setPayroll((prev) => prev.filter((p) => p.id !== id && p.id !== aliasId));
-    setTransactions((prev) => prev.filter((t) => t.id !== txId));
+    let deleteSucceeded = false;
+    let failureReason: any = null;
 
     try {
-      await deleteDoc(doc(db, "payroll", id)).catch(() => {});
-      await deleteDoc(doc(db, "payroll", aliasId)).catch(() => {});
-      await deleteDoc(doc(db, "transactions", txId)).catch(() => {});
-      deleteDocREST("payroll", id).catch(() => {});
-      deleteDocREST("payroll", aliasId).catch(() => {});
-      deleteDocREST("transactions", txId).catch(() => {});
-      recordAuditLog({
-        organizationId: activeOrgId,
-        actorUid: user?.id || "anonymous",
-        actorName: user?.name || user?.email || "Finance Officer",
-        actorRole: user?.role || "admin",
-        action: "delete",
-        entity: "payroll",
-        entityId: id,
-      }).catch(() => {});
-    } catch (err) {
-      console.log("Payroll delete queued offline:", err);
+      await Promise.all([
+        deleteDoc(doc(db, "payroll", id)).catch((err) => { failureReason = err; }),
+        deleteDoc(doc(db, "payroll", aliasId)).catch(() => {}),
+        deleteDoc(doc(db, "transactions", txId)).catch(() => {}),
+      ]);
+      deleteSucceeded = true;
+    } catch (err: any) {
+      failureReason = err;
     }
+
+    const restSuccess = await deleteDocREST("payroll", id).catch(() => false);
+    await deleteDocREST("payroll", aliasId).catch(() => false);
+    await deleteDocREST("transactions", txId).catch(() => false);
+    if (restSuccess) deleteSucceeded = true;
+
+    if (!deleteSucceeded && failureReason?.code === "permission-denied") {
+      showFloatingToast("Permission Denied", "Database rejected delete: insufficient permissions.");
+      throw new Error("Database rejected delete: insufficient permissions");
+    }
+
+    targetIds.forEach((tid) => deletedIdsRef.current.add(tid));
+    recordPersistedTombstones(activeOrgId, targetIds).catch(() => {});
+
+    setPayroll((prev) => {
+      const remaining = prev.filter((p) => p.id !== id && p.id !== aliasId);
+      AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(remaining)).catch(() => {});
+      return remaining;
+    });
+
+    setTransactions((prev) => {
+      const remaining = prev.filter((t) => t.id !== txId);
+      AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(remaining)).catch(() => {});
+      return remaining;
+    });
+
+    recordAuditLog({
+      organizationId: activeOrgId,
+      actorUid: user?.id || "anonymous",
+      actorName: user?.name || user?.email || "Finance Officer",
+      actorRole: user?.role || "admin",
+      action: "delete",
+      entity: "payroll",
+      entityId: id,
+    }).catch(() => {});
   };
 
   const addDepartment = async (d: Omit<Department, "id">) => {
@@ -996,29 +1041,50 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Permission denied: cannot delete department");
     }
 
-    deletedIdsRef.current.add(id);
     const orgKey = (user?.organizationId || "demo-org").replace(/[^a-zA-Z0-9]/g, "_");
     const aliasId = `dept_${id}_${orgKey}`;
-    deletedIdsRef.current.add(aliasId);
+    const targetIds = [id, aliasId];
 
-    setDepartments((prev) => prev.filter((d) => d.id !== id && d.id !== aliasId));
+    let deleteSucceeded = false;
+    let failureReason: any = null;
+
     try {
-      await deleteDoc(doc(db, "departments", id)).catch(() => {});
-      await deleteDoc(doc(db, "departments", aliasId)).catch(() => {});
-      deleteDocREST("departments", id).catch(() => {});
-      deleteDocREST("departments", aliasId).catch(() => {});
-      recordAuditLog({
-        organizationId: activeOrgId,
-        actorUid: user?.id || "anonymous",
-        actorName: user?.name || user?.email || "Finance Officer",
-        actorRole: user?.role || "admin",
-        action: "delete",
-        entity: "department",
-        entityId: id,
-      }).catch(() => {});
-    } catch (err) {
-      console.log("Department delete queued offline:", err);
+      await Promise.all([
+        deleteDoc(doc(db, "departments", id)).catch((err) => { failureReason = err; }),
+        deleteDoc(doc(db, "departments", aliasId)).catch(() => {}),
+      ]);
+      deleteSucceeded = true;
+    } catch (err: any) {
+      failureReason = err;
     }
+
+    const restSuccess = await deleteDocREST("departments", id).catch(() => false);
+    await deleteDocREST("departments", aliasId).catch(() => false);
+    if (restSuccess) deleteSucceeded = true;
+
+    if (!deleteSucceeded && failureReason?.code === "permission-denied") {
+      showFloatingToast("Permission Denied", "Database rejected delete: insufficient permissions.");
+      throw new Error("Database rejected delete: insufficient permissions");
+    }
+
+    targetIds.forEach((tid) => deletedIdsRef.current.add(tid));
+    recordPersistedTombstones(activeOrgId, targetIds).catch(() => {});
+
+    setDepartments((prev) => {
+      const remaining = prev.filter((d) => !targetIds.includes(d.id));
+      AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(remaining)).catch(() => {});
+      return remaining;
+    });
+
+    recordAuditLog({
+      organizationId: activeOrgId,
+      actorUid: user?.id || "anonymous",
+      actorName: user?.name || user?.email || "Finance Officer",
+      actorRole: user?.role || "admin",
+      action: "delete",
+      entity: "department",
+      entityId: id,
+    }).catch(() => {});
   };
 
   // Authoritative Central Financial Calculations (FinancialCalculationEngine)
@@ -1067,27 +1133,22 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         timeoutPromise,
       ]);
 
-      if (restTxs && restTxs.length > 0) {
-        const validTxs = restTxs.filter((t: Transaction) => !deletedIdsRef.current.has(t.id));
-        validTxs.sort((a: Transaction, b: Transaction) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        setTransactions(validTxs);
-        AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(validTxs)).catch(() => {});
-      }
-      if (restBudgets && restBudgets.length > 0) {
-        const validBudgets = restBudgets.filter((b: Budget) => !deletedIdsRef.current.has(b.id));
-        setBudgets(validBudgets);
-        AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(validBudgets)).catch(() => {});
-      }
-      if (restDepts && restDepts.length > 0) {
-        const validDepts = restDepts.filter((d: Department) => !deletedIdsRef.current.has(d.id));
-        setDepartments(validDepts);
-        AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(validDepts)).catch(() => {});
-      }
-      if (restPayroll && restPayroll.length > 0) {
-        const validPayroll = restPayroll.filter((p: PayrollEntry) => !deletedIdsRef.current.has(p.id));
-        setPayroll(validPayroll);
-        AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(validPayroll)).catch(() => {});
-      }
+      const validTxs = (restTxs || []).filter((t: Transaction) => !deletedIdsRef.current.has(t.id));
+      validTxs.sort((a: Transaction, b: Transaction) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setTransactions(validTxs);
+      AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(validTxs)).catch(() => {});
+
+      const validBudgets = (restBudgets || []).filter((b: Budget) => !deletedIdsRef.current.has(b.id));
+      setBudgets(validBudgets);
+      AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(validBudgets)).catch(() => {});
+
+      const validDepts = (restDepts || []).filter((d: Department) => !deletedIdsRef.current.has(d.id));
+      setDepartments(validDepts);
+      AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(validDepts)).catch(() => {});
+
+      const validPayroll = (restPayroll || []).filter((p: PayrollEntry) => !deletedIdsRef.current.has(p.id));
+      setPayroll(validPayroll);
+      AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(validPayroll)).catch(() => {});
     } catch (e) {
     } finally {
       setSyncStatus("synced");

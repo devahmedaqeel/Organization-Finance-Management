@@ -71,7 +71,7 @@ export default function AIInsightsScreen() {
     return calculateFinancialHealth(transactions, budgets, payroll, activePeriod);
   }, [transactions, budgets, payroll, activePeriod]);
 
-  const { healthScore, status: healthLabel, statusColor: healthColor, metrics: healthMetrics } = healthReport;
+  const { hasData, healthScore, status: healthLabel, statusColor: healthColor, metrics: healthMetrics } = healthReport;
 
   // 2. Authoritative Actionable Insights
   const actionableInsights = useMemo(() => {
@@ -425,32 +425,61 @@ export default function AIInsightsScreen() {
           <Text style={[styles.cardTitle, { color: colors.foreground }]}>Financial Health Score</Text>
           <View style={styles.healthRow}>
             <RingProgress
-              percentage={healthScore}
+              percentage={healthScore ?? 0}
+              centerLabel={healthScore !== null ? `${healthScore}%` : "N/A"}
               size={120}
               strokeWidth={11}
               color={healthColor}
-              label={healthLabel}
-              sublabel={healthScore >= 80 ? "Optimal" : healthScore >= 60 ? "Stable" : "Watch"}
+              label={hasData ? healthLabel : "NO DATA"}
+              sublabel={
+                !hasData
+                  ? "INACTIVE"
+                  : healthScore! >= 80
+                  ? "Optimal"
+                  : healthScore! >= 60
+                  ? "Stable"
+                  : "Watch"
+              }
             />
             <View style={styles.healthRight}>
-              <Text style={[styles.healthScore, { color: healthColor }]}>{healthScore}<Text style={styles.healthScoreMax}>/100</Text></Text>
-              <Text style={[styles.healthLabel, { color: healthColor }]}>{healthLabel}</Text>
+              <Text style={[styles.healthScore, { color: healthColor }]}>
+                {healthScore !== null ? (
+                  <>
+                    {healthScore}<Text style={styles.healthScoreMax}>/100</Text>
+                  </>
+                ) : (
+                  "N/A"
+                )}
+              </Text>
+              <Text style={[styles.healthLabel, { color: healthColor }]}>
+                {hasData ? healthLabel : "No Financial Data"}
+              </Text>
             <View style={styles.healthStats}>
               {[
                 {
                   label: "Net Balance",
-                  value: `${displayedNet >= 0 ? "+" : "-"}${settings.currency} ${fmt(Math.abs(displayedNet))}`,
+                  value: displayedTxs.length > 0 || displayedNet !== 0
+                    ? `${displayedNet >= 0 ? "+" : "-"}${settings.currency} ${fmt(Math.abs(displayedNet))}`
+                    : `${settings.currency} 0`,
                   color: displayedNet >= 0 ? "#10B981" : "#F43F5E",
                 },
                 {
                   label: "Profit Margin",
-                  value: `${profitMargin >= 0 ? "+" : ""}${profitMargin.toFixed(1)}%`,
-                  color: profitMargin > 10 ? "#10B981" : profitMargin >= 0 ? "#38BDF8" : "#F43F5E",
+                  value: (displayedIncome > 0 || displayedExpense > 0)
+                    ? `${profitMargin >= 0 ? "+" : ""}${profitMargin.toFixed(1)}%`
+                    : "N/A",
+                  color: (displayedIncome > 0 || displayedExpense > 0)
+                    ? (profitMargin > 10 ? "#10B981" : profitMargin >= 0 ? "#38BDF8" : "#F43F5E")
+                    : "#94A3B8",
                 },
                 {
                   label: "Budget Used",
-                  value: `${displayedBudgetUtil.toFixed(0)}%`,
-                  color: displayedBudgetUtil <= 75 ? "#10B981" : displayedBudgetUtil <= 100 ? "#F59E0B" : "#F43F5E",
+                  value: totalAllocatedBudget > 0
+                    ? `${displayedBudgetUtil.toFixed(0)}%`
+                    : "N/A",
+                  color: totalAllocatedBudget > 0
+                    ? (displayedBudgetUtil <= 75 ? "#10B981" : displayedBudgetUtil <= 100 ? "#F59E0B" : "#F43F5E")
+                    : "#94A3B8",
                 },
                 hasMoMComparison
                   ? {
@@ -460,8 +489,12 @@ export default function AIInsightsScreen() {
                     }
                   : {
                       label: "Burn Rate",
-                      value: `${expenseRatio.toFixed(1)}%`,
-                      color: expenseRatio <= 65 ? "#10B981" : expenseRatio <= 85 ? "#F59E0B" : "#F43F5E",
+                      value: (displayedIncome > 0 || displayedExpense > 0)
+                        ? `${expenseRatio.toFixed(1)}%`
+                        : "N/A",
+                      color: (displayedIncome > 0 || displayedExpense > 0)
+                        ? (expenseRatio <= 65 ? "#10B981" : expenseRatio <= 85 ? "#F59E0B" : "#F43F5E")
+                        : "#94A3B8",
                     },
               ].map((s, i) => (
                 <View key={i} style={styles.healthStat}>
@@ -956,9 +989,11 @@ export default function AIInsightsScreen() {
       </Text>
       {displayedInsights.length === 0 ? (
         <View style={[styles.disclaimerBox, { backgroundColor: colors.card, borderColor: colors.border, paddingVertical: 20 }]}>
-          <Feather name="check-circle" size={24} color="#10B981" />
+          <Feather name={hasData ? "check-circle" : "info"} size={24} color={hasData ? "#10B981" : "#94A3B8"} />
           <Text style={[styles.disclaimerText, { color: colors.foreground, fontSize: 13, marginTop: 6 }]}>
-            {insightFilter === "critical" || insightFilter === "advisories"
+            {!hasData
+              ? "No financial data available yet. Add income, expenses, or budgets to generate real-time AI financial intelligence."
+              : insightFilter === "critical" || insightFilter === "advisories"
               ? "No critical alerts or warnings found in this period."
               : insightFilter === "positive"
               ? "No positive insights recorded in this period."

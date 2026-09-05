@@ -1050,7 +1050,7 @@ export default function DashboardScreen() {
               <View
                 style={{
                   height: "100%",
-                  width: `${payroll.length === 0 ? 0 : Math.min(Math.max(totalExpenses > 0 ? (payroll.reduce((s, p) => s + (p.baseSalary || 0) + (p.bonus || 0) - (p.deductions || 0), 0) / totalExpenses) * 100 : 50, 6), 100)}%`,
+                  width: `${payroll.length === 0 ? 0 : Math.min(Math.max(totalExpenses > 0 ? (payroll.reduce((s, p) => s + (p.baseSalary || 0) + (p.bonus || 0) - (p.deductions || 0), 0) / totalExpenses) * 100 : 0, 6), 100)}%`,
                   backgroundColor: "#8B5CF6",
                   borderRadius: 2,
                 }}

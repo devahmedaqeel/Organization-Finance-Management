@@ -270,10 +270,18 @@ export function filterTransactionsByPeriod(
   period: NormalizedPeriod
 ): Transaction[] {
   if (!transactions || transactions.length === 0) return [];
-  if (!period || !period.startDate || !period.endDate) return transactions;
+  if (!period || !period.startDate || !period.endDate) {
+    return transactions.filter((t) => {
+      if (!t) return false;
+      const status = (t as any).status;
+      return status !== "deleted" && status !== "void" && status !== "cancelled";
+    });
+  }
   const { startDate, endDate } = period;
   return transactions.filter((t) => {
     if (!t || !t.date) return false;
+    const status = (t as any).status;
+    if (status === "deleted" || status === "void" || status === "cancelled") return false;
     const txDate = t.date.slice(0, 10);
     return txDate >= startDate && txDate <= endDate;
   });
@@ -292,10 +300,10 @@ export function computePeriodMetrics(
   const durationYears = Number((durationDays / 365.25).toFixed(2));
 
   const totalIncome = filtered
-    .filter((t) => t.type === "income")
+    .filter((t) => t.type === "income" && (t as any).status !== "deleted" && (t as any).status !== "void" && (t as any).status !== "cancelled")
     .reduce((s, t) => s + t.amount, 0);
   const totalExpense = filtered
-    .filter((t) => t.type === "expense")
+    .filter((t) => t.type === "expense" && (t as any).status !== "deleted" && (t as any).status !== "void" && (t as any).status !== "cancelled")
     .reduce((s, t) => s + t.amount, 0);
   const netBalance = totalIncome - totalExpense;
   const savingsRate = totalIncome > 0 ? (netBalance / totalIncome) * 100 : 0;

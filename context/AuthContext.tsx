@@ -723,9 +723,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("Firebase logout error:", e);
     }
     await AsyncStorage.removeItem("ofm_user");
+
+    // Purge all organization-scoped caches and tombstones from AsyncStorage
+    try {
+      const allKeys = await AsyncStorage.getAllKeys();
+      const cacheKeys = allKeys.filter(
+        (k) =>
+          k.startsWith("ofm_cache:") ||
+          k.startsWith("ofm_tombstones:") ||
+          k.includes("transactions") ||
+          k.includes("budgets") ||
+          k.includes("payroll") ||
+          k.includes("departments")
+      );
+      if (cacheKeys.length > 0) {
+        await AsyncStorage.multiRemove(cacheKeys);
+      }
+    } catch (e) {}
+
+    // Purge all web local/session caches
     if (typeof window !== "undefined") {
       try {
         sessionStorage.clear();
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const k = localStorage.key(i);
+          if (
+            k &&
+            (k.startsWith("ofm_cache:") ||
+             k.startsWith("ofm_tombstones:") ||
+             k.includes("transactions") ||
+             k.includes("budgets") ||
+             k.includes("payroll") ||
+             k.includes("departments"))
+          ) {
+            localStorage.removeItem(k);
+          }
+        }
       } catch (e) {}
     }
     setUser(null);

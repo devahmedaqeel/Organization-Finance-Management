@@ -4,8 +4,20 @@
  * Bypasses mobile ISP streaming/WebSocket blocks and 10s timeout warnings.
  */
 
+import { auth } from "../config/firebase";
+
 const PROJECT_ID = "ofmapp-main";
 const BASE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
+
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  try {
+    const token = await auth?.currentUser?.getIdToken();
+    if (token) {
+      return { Authorization: `Bearer ${token}` };
+    }
+  } catch {}
+  return {};
+}
 
 export function toFirestoreFields(obj: Record<string, any>): Record<string, any> {
   const fields: Record<string, any> = {};
@@ -71,16 +83,17 @@ export function fromFirestoreDoc<T>(doc: any): T {
 
 export async function fetchCollectionREST<T>(collectionName: string, organizationId?: string): Promise<T[]> {
   try {
+    const authHeaders = await getAuthHeaders();
     const res = await fetch(`${BASE_URL}/${collectionName}?pageSize=300`, {
       method: "GET",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...authHeaders },
     });
     if (!res.ok) return [];
     const data = await res.json();
     if (!data.documents || !Array.isArray(data.documents)) return [];
     const docs = data.documents.map((d: any) => fromFirestoreDoc<T>(d));
     if (organizationId) {
-      return docs.filter((d: any) => !d.organizationId || d.organizationId === organizationId);
+      return docs.filter((d: any) => d.organizationId === organizationId);
     }
     return docs;
   } catch (err) {
@@ -95,9 +108,10 @@ export async function fetchCollectionREST<T>(collectionName: string, organizatio
 export async function saveDocREST(collectionName: string, docId: string, data: Record<string, any>): Promise<boolean> {
   try {
     const fields = toFirestoreFields(data);
+    const authHeaders = await getAuthHeaders();
     const res = await fetch(`${BASE_URL}/${collectionName}/${docId}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...authHeaders },
       body: JSON.stringify({ fields }),
     });
     return res.ok;
@@ -112,10 +126,12 @@ export async function saveDocREST(collectionName: string, docId: string, data: R
  */
 export async function deleteDocREST(collectionName: string, docId: string): Promise<boolean> {
   try {
+    const authHeaders = await getAuthHeaders();
     const res = await fetch(`${BASE_URL}/${collectionName}/${docId}`, {
       method: "DELETE",
+      headers: { ...authHeaders },
     });
-    return res.ok;
+    return res.ok || res.status === 404;
   } catch (err) {
     console.log(`REST delete error for ${collectionName}/${docId}:`, err);
     return false;
