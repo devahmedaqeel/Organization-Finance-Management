@@ -43,6 +43,7 @@ import {
   calculateBudgetAllocation,
   calculateBudgetUsed,
   calculateBudgetRemaining,
+  calculateTotalAvailableFunds,
 } from "@/services/FinancialCalculationEngine";
 import { calculateFinancialHealth } from "@/services/financialHealthService";
 import { generateFinancialInsights } from "@/services/financialInsightsService";
@@ -192,6 +193,9 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
   }, [totalAllocatedBudget, displayedBudgetSpent]);
 
   const displayedBudgetUtil = totalAllocatedBudget > 0 ? (displayedBudgetSpent / totalAllocatedBudget) * 100 : 0;
+  const displayedTotalFunds = useMemo(() => {
+    return calculateTotalAvailableFunds(displayedIncome, totalAllocatedBudget, displayedExpense);
+  }, [displayedIncome, totalAllocatedBudget, displayedExpense]);
 
   // Transaction Metrics computed strictly from displayed transactions
   const txStats = useMemo(() => {
@@ -423,7 +427,14 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
             <View style={[styles.healthStats, isMobile && { justifyContent: "center" }]}>
               {[
                 {
-                  label: "Net Balance",
+                  label: "Total Funds",
+                  value: (displayedIncome > 0 || totalAllocatedBudget > 0 || displayedExpense > 0)
+                    ? `${displayedTotalFunds >= 0 ? "+" : "-"}${settings.currency} ${fmt(Math.abs(displayedTotalFunds))}`
+                    : `${settings.currency} 0`,
+                  color: displayedTotalFunds >= 0 ? "#10B981" : "#F43F5E",
+                },
+                {
+                  label: "Net Surplus",
                   value: displayedTxs.length > 0 || displayedNet !== 0
                     ? `${displayedNet >= 0 ? "+" : "-"}${settings.currency} ${fmt(Math.abs(displayedNet))}`
                     : `${settings.currency} 0`,

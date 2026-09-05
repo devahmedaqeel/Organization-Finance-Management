@@ -265,6 +265,23 @@ export function calculateActualCash(
 }
 
 /**
+ * 4b. TOTAL AVAILABLE FUNDS:
+ * Combined organizational capital pool (Total Income + Total Budget - Total Expenses).
+ * When an expense occurs (budget-linked or unbudgeted), it increases Total Expenses
+ * and immediately decreases the Total Available Funds.
+ */
+export function calculateTotalAvailableFunds(
+  totalIncome: number,
+  totalBudget: number,
+  totalExpenses: number
+): number {
+  const inc = safeNumber(totalIncome, 0);
+  const bud = safeNumber(totalBudget, 0);
+  const exp = safeNumber(totalExpenses, 0);
+  return (inc + bud) - exp;
+}
+
+/**
  * Check if an expense transaction is specifically linked to an active budget.
  * Explicit budgetId takes precedence; if unspecified (legacy), matches active budget by category.
  * Explicitly unbudgeted transactions ("none", "unbudgeted") are never linked.

@@ -28,6 +28,7 @@ import {
   calculateBudgetAllocation,
   calculateBudgetUsed,
   calculateBudgetRemaining,
+  calculateTotalAvailableFunds,
 } from "@/services/FinancialCalculationEngine";
 import { FinancialAnalyticsSuite } from "@/components/analytics/FinancialAnalyticsSuite";
 import { NotificationCenterModal } from "@/components/NotificationCenterModal";
@@ -107,7 +108,7 @@ export function WebDashboard({
     );
   }, [transactions, budgets, departments, activePeriod, settings.currency]);
 
-  const [balanceViewMode, setBalanceViewMode] = useState<"cashflow" | "expenses" | "budget">("cashflow");
+  const [balanceViewMode, setBalanceViewMode] = useState<"total" | "cashflow" | "expenses" | "budget">("total");
   const realNetOperatingResult = totalIncome - totalExpenses;
   const isDeficit = realNetOperatingResult < 0;
   const netMargin = totalIncome > 0 ? ((realNetOperatingResult / totalIncome) * 100) : (totalExpenses > 0 ? -100 : 0);
@@ -121,10 +122,13 @@ export function WebDashboard({
   const totalBudgetSpent = calculateBudgetUsed(transactions, budgets);
   const netBudgetRemaining = calculateBudgetRemaining(totalBudgeted, totalBudgetSpent);
   const netBudgetUtilization = totalBudgeted > 0 ? (totalBudgetSpent / totalBudgeted) * 100 : 0;
+  const totalAvailableFunds = calculateTotalAvailableFunds(totalIncome, totalBudgeted, totalExpenses);
   
-  // Real-time authoritative display balance (Net Surplus vs Total Outflows vs Allocated Budget)
+  // Real-time authoritative display balance (Total Available Funds vs Net Surplus vs Allocated Budget vs Outflows)
   const currentHeroBalance =
-    balanceViewMode === "cashflow"
+    balanceViewMode === "total"
+      ? totalAvailableFunds
+      : balanceViewMode === "cashflow"
       ? netBalance
       : balanceViewMode === "budget"
       ? totalBudgeted
@@ -322,7 +326,9 @@ export function WebDashboard({
               <SvgShield size={12} color="#38BDF8" />
             </View>
             <Text style={{ color: "#FFFFFF", fontSize: isMobile ? 12 : 13, fontFamily: "Inter_800ExtraBold", letterSpacing: 1.0 }}>
-              {balanceViewMode === "cashflow"
+              {balanceViewMode === "total"
+                ? "TOTAL AVAILABLE FUNDS"
+                : balanceViewMode === "cashflow"
                 ? "OPERATING RESULT"
                 : balanceViewMode === "budget"
                 ? "ALLOCATED BUDGET CAP"
@@ -366,18 +372,45 @@ export function WebDashboard({
           </TouchableOpacity>
         </View>
 
-        {/* View Mode Switcher Pills (Net Operating Result vs Total Outflows) - Side-by-side on Mobile */}
-        <View style={{ flexDirection: "row", gap: isMobile ? 6 : 10, marginTop: -2, marginBottom: 14, flexWrap: isMobile ? "nowrap" : "wrap" }}>
+        {/* View Mode Switcher Pills (Total Funds vs Net Surplus vs Budget vs Outflows) */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ maxWidth: "100%", width: "100%", flexGrow: 0, marginBottom: 12 }}
+          contentContainerStyle={{ flexDirection: "row", gap: isMobile ? 6 : 8, alignItems: "center" }}
+        >
+          {/* Pill 1: Total Available Funds (Income + Budget - Outflows) */}
           <TouchableOpacity
             style={{
-              flex: isMobile ? 1 : undefined,
               flexDirection: "row",
               alignItems: "center",
-              justifyContent: "center",
-              gap: isMobile ? 5 : 7,
-              paddingHorizontal: isMobile ? 8 : 14,
-              paddingVertical: isMobile ? 5 : 7,
-              borderRadius: isMobile ? 10 : 14,
+              gap: 6,
+              paddingHorizontal: isMobile ? 10 : 13,
+              paddingVertical: isMobile ? 5 : 6.5,
+              borderRadius: isMobile ? 10 : 12,
+              backgroundColor: balanceViewMode === "total" ? "rgba(56, 189, 248, 0.35)" : "rgba(255, 255, 255, 0.08)",
+              borderWidth: 1.2,
+              borderColor: balanceViewMode === "total" ? "#38BDF8" : "rgba(255, 255, 255, 0.15)",
+              cursor: "pointer" as any,
+            }}
+            onPress={() => setBalanceViewMode("total")}
+            activeOpacity={0.8}
+          >
+            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#38BDF8" }} />
+            <Text style={{ color: balanceViewMode === "total" ? "#FFFFFF" : "rgba(255, 255, 255, 0.75)", fontSize: isMobile ? 10.5 : 11.5, fontFamily: "Inter_700Bold" }}>
+              Total Balance ({totalAvailableFunds >= 0 ? "+" : "-"}{settings.currency} {fmt(Math.abs(totalAvailableFunds))})
+            </Text>
+          </TouchableOpacity>
+
+          {/* Pill 2: Net Surplus (Inflows - Outflows) */}
+          <TouchableOpacity
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 6,
+              paddingHorizontal: isMobile ? 10 : 13,
+              paddingVertical: isMobile ? 5 : 6.5,
+              borderRadius: isMobile ? 10 : 12,
               backgroundColor: balanceViewMode === "cashflow" ? "rgba(59, 130, 246, 0.30)" : "rgba(255, 255, 255, 0.08)",
               borderWidth: 1.2,
               borderColor: balanceViewMode === "cashflow" ? "#60A5FA" : "rgba(255, 255, 255, 0.15)",
@@ -387,21 +420,43 @@ export function WebDashboard({
             activeOpacity={0.8}
           >
             <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#10B981" }} />
-            <Text style={{ color: balanceViewMode === "cashflow" ? "#FFFFFF" : "rgba(255, 255, 255, 0.75)", fontSize: isMobile ? 10 : 12, fontFamily: "Inter_700Bold" }} numberOfLines={1}>
-              {isMobile ? `Surplus (${netBalance >= 0 ? "+" : "-"}${fmt(Math.abs(netBalance))})` : `Net Surplus (${netBalance >= 0 ? "+" : "-"}${settings.currency} ${fmt(Math.abs(netBalance))})`}
+            <Text style={{ color: balanceViewMode === "cashflow" ? "#FFFFFF" : "rgba(255, 255, 255, 0.75)", fontSize: isMobile ? 10.5 : 11.5, fontFamily: "Inter_700Bold" }}>
+              Net Surplus ({netBalance >= 0 ? "+" : "-"}{settings.currency} {fmt(Math.abs(netBalance))})
             </Text>
           </TouchableOpacity>
 
+          {/* Pill 3: Budget Cap */}
           <TouchableOpacity
             style={{
-              flex: isMobile ? 1 : undefined,
               flexDirection: "row",
               alignItems: "center",
-              justifyContent: "center",
-              gap: isMobile ? 5 : 7,
-              paddingHorizontal: isMobile ? 8 : 14,
-              paddingVertical: isMobile ? 5 : 7,
-              borderRadius: isMobile ? 10 : 14,
+              gap: 6,
+              paddingHorizontal: isMobile ? 10 : 13,
+              paddingVertical: isMobile ? 5 : 6.5,
+              borderRadius: isMobile ? 10 : 12,
+              backgroundColor: balanceViewMode === "budget" ? "rgba(129, 140, 248, 0.30)" : "rgba(255, 255, 255, 0.08)",
+              borderWidth: 1.2,
+              borderColor: balanceViewMode === "budget" ? "#818CF8" : "rgba(255, 255, 255, 0.15)",
+              cursor: "pointer" as any,
+            }}
+            onPress={() => setBalanceViewMode("budget")}
+            activeOpacity={0.8}
+          >
+            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#818CF8" }} />
+            <Text style={{ color: balanceViewMode === "budget" ? "#FFFFFF" : "rgba(255, 255, 255, 0.75)", fontSize: isMobile ? 10.5 : 11.5, fontFamily: "Inter_700Bold" }}>
+              Budget ({settings.currency} {fmt(totalBudgeted)})
+            </Text>
+          </TouchableOpacity>
+
+          {/* Pill 4: Total Outflows */}
+          <TouchableOpacity
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              gap: 6,
+              paddingHorizontal: isMobile ? 10 : 13,
+              paddingVertical: isMobile ? 5 : 6.5,
+              borderRadius: isMobile ? 10 : 12,
               backgroundColor: balanceViewMode === "expenses" ? "rgba(244, 63, 94, 0.30)" : "rgba(255, 255, 255, 0.08)",
               borderWidth: 1.2,
               borderColor: balanceViewMode === "expenses" ? "#F43F5E" : "rgba(255, 255, 255, 0.15)",
@@ -411,10 +466,23 @@ export function WebDashboard({
             activeOpacity={0.8}
           >
             <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#F43F5E" }} />
-            <Text style={{ color: balanceViewMode === "expenses" ? "#FFFFFF" : "rgba(255, 255, 255, 0.75)", fontSize: isMobile ? 10 : 12, fontFamily: "Inter_700Bold" }} numberOfLines={1}>
-              {isMobile ? `Outflows (-${fmt(totalExpenses)})` : `Total Outflows (-${settings.currency} ${fmt(totalExpenses)})`}
+            <Text style={{ color: balanceViewMode === "expenses" ? "#FFFFFF" : "rgba(255, 255, 255, 0.75)", fontSize: isMobile ? 10.5 : 11.5, fontFamily: "Inter_700Bold" }}>
+              Outflows (-{settings.currency} {fmt(totalExpenses)})
             </Text>
           </TouchableOpacity>
+        </ScrollView>
+
+        {/* Dynamic Formula Breakdown Subtitle */}
+        <View style={{ marginBottom: 10 }}>
+          <Text style={{ color: "rgba(255, 255, 255, 0.75)", fontSize: isMobile ? 11 : 12, fontFamily: "Inter_500Medium" }}>
+            {balanceViewMode === "total"
+              ? `Revenue (${settings.currency} ${fmt(totalIncome)}) + Budget (${settings.currency} ${fmt(totalBudgeted)}) - Outflows (${settings.currency} ${fmt(totalExpenses)})`
+              : balanceViewMode === "cashflow"
+              ? `Inflows (${settings.currency} ${fmt(totalIncome)}) - Outflows (${settings.currency} ${fmt(totalExpenses)})`
+              : balanceViewMode === "budget"
+              ? `Allocated Limit (${settings.currency} ${fmt(totalBudgeted)}) - Budget Used (${settings.currency} ${fmt(totalBudgetSpent)})`
+              : `Total Disbursed Outflows (${settings.currency} ${fmt(totalExpenses)})`}
+          </Text>
         </View>
 
         {/* Balance Hero Amount Display + Growth Metric Pill */}
@@ -471,6 +539,8 @@ export function WebDashboard({
             <Text style={{ color: currentHeroIsDeficit ? "#FB7185" : "#34D399", fontSize: isMobile ? 11.5 : 12, fontFamily: "Inter_700Bold" }}>
               {balanceViewMode === "expenses"
                 ? `${clampedSpendRatio}% Outflow`
+                : balanceViewMode === "total"
+                ? `${totalIncome + totalBudgeted > 0 ? (((totalIncome + totalBudgeted - totalExpenses) / (totalIncome + totalBudgeted)) * 100).toFixed(1) : "0.0"}% Active`
                 : `${netMargin >= 0 ? "+" : ""}${netMargin.toFixed(1)}% Margin`}
             </Text>
           </TouchableOpacity>
@@ -480,12 +550,16 @@ export function WebDashboard({
         <View style={{ gap: 7, marginTop: 2 }}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
             <Text style={{ color: "#CBD5E1", fontSize: isMobile ? 11 : 11.5, fontFamily: "Inter_500Medium" }}>
-              {isDeficit
+              {balanceViewMode === "total"
+                ? `${settings.currency} ${fmt(totalExpenses)} Outflows (${(totalIncome + totalBudgeted) > 0 ? ((totalExpenses / (totalIncome + totalBudgeted)) * 100).toFixed(0) : 0}%)`
+                : isDeficit
                 ? `${Math.round(rawSpendRatio)}% Overspent`
                 : `${clampedSpendRatio}% Total Spent`}
             </Text>
             <Text style={{ color: currentHeroIsDeficit ? "#FB7185" : "#34D399", fontSize: isMobile ? 11 : 11.5, fontFamily: "Inter_700Bold" }}>
-              {isDeficit
+              {balanceViewMode === "total"
+                ? `${settings.currency} ${fmt(Math.max(0, totalAvailableFunds))} Available (${(totalIncome + totalBudgeted) > 0 ? (Math.max(0, totalAvailableFunds) / (totalIncome + totalBudgeted) * 100).toFixed(0) : 100}% Funds)`
+                : isDeficit
                 ? "Operating Deficit"
                 : `${retainedSurplusPct}% Net Surplus`}
             </Text>
@@ -495,7 +569,13 @@ export function WebDashboard({
               style={{
                 height: "100%",
                 borderRadius: 3,
-                width: `${isDeficit ? 100 : Math.max(clampedSpendRatio, 2.5)}%`,
+                width: `${
+                  balanceViewMode === "total"
+                    ? (totalIncome + totalBudgeted > 0 ? Math.min(100, Math.max(2.5, (totalExpenses / (totalIncome + totalBudgeted)) * 100)) : 2.5)
+                    : isDeficit
+                    ? 100
+                    : Math.max(clampedSpendRatio, 2.5)
+                }%`,
                 backgroundColor: currentHeroIsDeficit ? "#FB7185" : "#38BDF8",
                 shadowColor: currentHeroIsDeficit ? "#FB7185" : "#38BDF8",
                 shadowOffset: { width: 0, height: 0 },

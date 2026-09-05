@@ -31,6 +31,7 @@ import {
   calculateTotalExpenses,
   calculateNetOperatingResult,
   calculateActualCash,
+  calculateTotalAvailableFunds,
   calculateBudgetSpentForCategory,
   calculateBudgetAllocation,
   calculateBudgetUsed,
@@ -143,6 +144,7 @@ interface FinanceContextValue {
   totalDeptBudgeted: number;
   totalBudgetSpent: number;
   totalBudgetRemaining: number;
+  totalAvailableFunds: number;
 }
 
 function generateSafeId(collectionName: string = "transactions"): string {
@@ -1113,6 +1115,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   }, [transactions, budgets]);
   const totalBudgetRemaining = useMemo(() => calculateBudgetRemaining(totalBudgeted, totalBudgetSpent), [totalBudgeted, totalBudgetSpent]);
   const budgetUtilization = useMemo(() => totalBudgeted > 0 ? (totalBudgetSpent / totalBudgeted) * 100 : 0, [totalBudgeted, totalBudgetSpent]);
+  const totalAvailableFunds = useMemo(() => {
+    return calculateTotalAvailableFunds(totalIncome, totalBudgeted, totalExpenses);
+  }, [totalIncome, totalBudgeted, totalExpenses]);
   const unreadNotificationCount = useMemo(() => notifications.filter((n) => !n.read).length, [notifications]);
 
   const refreshData = useCallback(async () => {
@@ -1186,6 +1191,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     totalDeptBudgeted,
     totalBudgetSpent,
     totalBudgetRemaining,
+    totalAvailableFunds,
   }), [
     transactions,
     budgetsWithSpent,
@@ -1216,6 +1222,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     totalDeptBudgeted,
     totalBudgetSpent,
     totalBudgetRemaining,
+    totalAvailableFunds,
   ]);
 
   return (

@@ -27,6 +27,7 @@ import {
   calculateNetOperatingMargin,
   calculateExpenseDistribution,
   buildAuthoritativeFinancialModel,
+  calculateTotalAvailableFunds,
 } from "../FinancialCalculationEngine";
 
 function assert(condition: boolean, testName: string) {
@@ -463,6 +464,63 @@ assert(calculateBudgetAllocation(m8Budgets) === 0, "Step 8: Total Budget drops t
 assert(calculateBudgetUsed(m8Txs, m8Budgets) === 0, "Step 8: Budget Used = 0");
 assert(calculateBudgetRemaining(0, 0) === 0, "Step 8: Remaining Budget = 0");
 assert(calculateBudgetUtilization(0, 0).rawUtilizationPct === 0, "Step 8: Clean empty utilization state");
+
+// ============================================================================
+// SCENARIO 35: TOTAL AVAILABLE FUNDS (INCOME + BUDGET - ALL EXPENSES)
+// (Top hero balance combines both Income & Budget, and decreases upon ANY expense)
+// ============================================================================
+console.log("\n--- SCENARIO 35: Total Available Funds (Income + Budget - All Outflows) ---");
+
+let fundTxs: Transaction[] = [];
+let fundBudgets: Budget[] = [];
+
+// Initial: Income = 10,000, Budget = 6,000, Expense = 0
+fundTxs.push({ id: "f-inc-1", type: "income", category: "Client Contract", amount: 10000, date: "2026-09-01", department: "Commercial" });
+fundBudgets.push({ id: "f-b-cloud", category: "Cloud Hosting", allocated: 6000, department: "Engineering" });
+
+const initInc = calculateTotalIncome(fundTxs);
+const initBud = calculateBudgetAllocation(fundBudgets);
+const initExp = calculateTotalExpenses(fundTxs);
+const initFunds = calculateTotalAvailableFunds(initInc, initBud, initExp);
+
+assert(initInc === 10000, "Income is 10,000");
+assert(initBud === 6000, "Budget is 6,000");
+assert(initExp === 0, "Initial Expenses is 0");
+assert(initFunds === 16000, "TOP HERO BALANCE: Total Available Funds combines both (10k + 6k = 16,000)");
+
+// Expense 1: Budget-linked expense = 1,000 (Cloud Hosting)
+fundTxs.push({ id: "f-exp-1", type: "expense", category: "Cloud Hosting", budgetId: "f-b-cloud", amount: 1000, date: "2026-09-02", department: "Engineering" });
+const exp1Total = calculateTotalExpenses(fundTxs);
+const fundsAfterExp1 = calculateTotalAvailableFunds(initInc, initBud, exp1Total);
+assert(exp1Total === 1000, "Expenses = 1,000");
+assert(fundsAfterExp1 === 15000, "BUDGET EXPENSE: Total Funds decreases from 16,000 to 15,000 (-1,000)");
+
+// Expense 2: Other / Unbudgeted expense = 500 (Marketing)
+fundTxs.push({ id: "f-exp-2", type: "expense", category: "Marketing", budgetId: "unbudgeted", amount: 500, date: "2026-09-03", department: "Growth" });
+const exp2Total = calculateTotalExpenses(fundTxs);
+const fundsAfterExp2 = calculateTotalAvailableFunds(initInc, initBud, exp2Total);
+assert(exp2Total === 1500, "Expenses = 1,500");
+assert(fundsAfterExp2 === 14500, "UNBUDGETED EXPENSE: Total Funds decreases further from 15,000 to 14,500 (-500)");
+
+// Delete Unbudgeted expense
+fundTxs = fundTxs.filter((t) => t.id !== "f-exp-2");
+const expAfterDel = calculateTotalExpenses(fundTxs);
+const fundsAfterDel = calculateTotalAvailableFunds(initInc, initBud, expAfterDel);
+assert(expAfterDel === 1000, "Expenses returns to 1,000");
+assert(fundsAfterDel === 15000, "DELETE EXPENSE: Total Funds immediately recovers to 15,000 (+500)");
+
+// Delete Budget-linked expense
+fundTxs = fundTxs.filter((t) => t.id !== "f-exp-1");
+const expZero = calculateTotalExpenses(fundTxs);
+const fundsFull = calculateTotalAvailableFunds(initInc, initBud, expZero);
+assert(expZero === 0, "Expenses returns to 0");
+assert(fundsFull === 16000, "DELETE ALL EXPENSES: Total Funds returns to full 16,000");
+
+// Delete All records
+fundTxs = [];
+fundBudgets = [];
+const emptyFunds = calculateTotalAvailableFunds(0, 0, 0);
+assert(emptyFunds === 0, "EMPTY LEDGER: Total Funds is 0");
 
 console.log("\n=======================================================");
 console.log("ALL AUTHORITATIVE FINANCIAL FLOW, PARITY, RESURRECTION & ACCEPTANCE TESTS PASSED 100% ✅");
