@@ -184,24 +184,27 @@ export default function DashboardScreen() {
   const webTop = Platform.OS === "web" ? 67 : 0;
   const roleColor = ROLE_COLORS[user?.role ?? "admin"];
   const [balanceViewMode, setBalanceViewMode] = useState<"cashflow" | "expenses" | "budget">("cashflow");
-  const realNetOperatingResult = totalIncome - totalExpenses;
-  const isDeficit = realNetOperatingResult < 0;
-  const netMargin = totalIncome > 0 ? (realNetOperatingResult / totalIncome) * 100 : (totalExpenses > 0 ? -100 : 0);
-  const rawSpendRatio = totalIncome > 0 ? (totalExpenses / totalIncome) * 100 : (totalExpenses > 0 ? 100 : 0);
-  const clampedSpendRatio = Math.min(Math.round(rawSpendRatio), 100);
-  const retainedSurplusPct = Math.max(0, Math.round(100 - rawSpendRatio));
-
   const totalLineBudgeted = calculateBudgetAllocation(budgets);
   const totalDeptBudgeted = calculateBudgetAllocation([], departments);
   const totalBudgeted = totalLineBudgeted > 0 ? totalLineBudgeted : totalDeptBudgeted;
   const totalBudgetSpent = calculateBudgetUsed(transactions, budgets);
   const netBudgetRemaining = calculateBudgetRemaining(totalBudgeted, totalBudgetSpent);
   const netBudgetUtilization = totalBudgeted > 0 ? (totalBudgetSpent / totalBudgeted) * 100 : 0;
+
+  // Net Surplus incorporates Institutional Income and Budget Allocated minus Outflows
+  const netSurplus = (totalIncome + totalBudgeted) - totalExpenses;
+  const totalFundingPool = totalIncome + totalBudgeted;
+  const realNetOperatingResult = netSurplus;
+  const isDeficit = realNetOperatingResult < 0;
+  const netMargin = totalFundingPool > 0 ? (realNetOperatingResult / totalFundingPool) * 100 : (totalExpenses > 0 ? -100 : 0);
+  const rawSpendRatio = totalFundingPool > 0 ? (totalExpenses / totalFundingPool) * 100 : (totalExpenses > 0 ? 100 : 0);
+  const clampedSpendRatio = Math.min(Math.round(rawSpendRatio), 100);
+  const retainedSurplusPct = Math.max(0, Math.round(100 - rawSpendRatio));
   
   // Real-time authoritative display balance (Net Surplus vs Total Outflows vs Allocated Budget)
   const currentHeroBalance =
     balanceViewMode === "cashflow"
-      ? netBalance
+      ? netSurplus
       : balanceViewMode === "budget"
       ? totalBudgeted
       : -totalExpenses;
@@ -577,7 +580,7 @@ export default function DashboardScreen() {
               adjustsFontSizeToFit
               minimumFontScale={0.75}
             >
-              Surplus ({netBalance >= 0 ? "+" : "-"}{settings.currency} {fmt(Math.abs(netBalance))})
+              Surplus ({netSurplus >= 0 ? "+" : "-"}{settings.currency} {fmt(Math.abs(netSurplus))})
             </Text>
           </TouchableOpacity>
 
@@ -1452,7 +1455,7 @@ export default function DashboardScreen() {
         budgets={budgets}
         totalIncome={totalIncome}
         totalExpenses={totalExpenses}
-        netBalance={netBalance}
+        netBalance={netSurplus}
         onOpenStatement={() => {
           setNetModalVisible(false);
           setExportModalVisible(true);
