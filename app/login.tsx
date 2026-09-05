@@ -118,9 +118,10 @@ export default function LoginScreen() {
     safeHapticSelection();
   };
 
-  const handleLogin = async () => {
-    const cleanEmail = email.trim();
-    if (!cleanEmail || !password.trim()) {
+  const handleLogin = async (overrideEmail?: string, overridePassword?: string) => {
+    const cleanEmail = (overrideEmail || email).trim();
+    const cleanPass = (overridePassword || password).trim();
+    if (!cleanEmail || !cleanPass) {
       setError("Please enter your email and password.");
       safeHapticNotification(Haptics.NotificationFeedbackType.Warning);
       return;
@@ -128,7 +129,7 @@ export default function LoginScreen() {
     setLoading(true);
     setError("");
     // Role is authoritative on backend; login verifies credentials and loads assigned Firestore permissions
-    const success = await login(cleanEmail, password);
+    const success = await login(cleanEmail, cleanPass);
     setLoading(false);
     if (success) {
       safeHapticNotification(Haptics.NotificationFeedbackType.Success);
@@ -141,7 +142,7 @@ export default function LoginScreen() {
 
   const handleSignUp = async () => {
     const cleanName = name.trim();
-    const cleanOrg = orgNameOrInvite.trim();
+    const cleanOrg = orgNameOrInvite.trim() || "Devorbit Tech";
     const cleanEmail = email.trim();
 
     if (!cleanName) { setError("Please enter your full name."); return; }
@@ -328,6 +329,50 @@ export default function LoginScreen() {
             </View>
           )}
 
+          {/* 1-Tap Quick Demo Cloud Access (Devorbit Tech) */}
+          {mode === "signin" && (
+            <View style={{ gap: 8, marginBottom: 12 }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <Text style={styles.fieldLabel}>INSTANT DEMO ACCESS</Text>
+                <Text style={{ fontSize: 10, color: "#38BDF8", fontFamily: "Inter_600SemiBold" }}>Devorbit Tech</Text>
+              </View>
+              <View style={{ flexDirection: "row", gap: 6 }}>
+                {[
+                  { role: "admin", label: "Admin", email: "admin@ofm.com", pass: "Admin123", color: "#3B82F6", icon: "shield" },
+                  { role: "accountant", label: "Accountant", email: "accountant@ofm.com", pass: "Account123", color: "#10B981", icon: "dollar-sign" },
+                  { role: "manager", label: "Manager", email: "manager@ofm.com", pass: "Manager123", color: "#8B5CF6", icon: "bar-chart-2" },
+                  { role: "employee", label: "Staff", email: "employee@ofm.com", pass: "Employee123", color: "#F59E0B", icon: "user" },
+                ].map((item) => (
+                  <TouchableOpacity
+                    key={item.role}
+                    style={{
+                      flex: 1,
+                      paddingVertical: 8,
+                      paddingHorizontal: 4,
+                      borderRadius: 10,
+                      backgroundColor: email === item.email ? "rgba(59, 130, 246, 0.20)" : "rgba(255, 255, 255, 0.05)",
+                      borderWidth: 1,
+                      borderColor: email === item.email ? item.color : "rgba(255, 255, 255, 0.12)",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 4,
+                    }}
+                    onPress={() => {
+                      setEmail(item.email);
+                      setPassword(item.pass);
+                      setError("");
+                      handleLogin(item.email, item.pass);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Feather name={item.icon as any} size={14} color={item.color} />
+                    <Text style={{ color: "#F8FAFC", fontSize: 10.5, fontFamily: "Inter_700Bold" }}>{item.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
+
           {/* Email Field */}
           <View style={styles.fieldGroup}>
             <Text style={styles.fieldLabel}>{mode === "signup" ? "WORK EMAIL" : "EMAIL ADDRESS"}</Text>
@@ -407,7 +452,7 @@ export default function LoginScreen() {
           {/* Primary Action CTA */}
           <TouchableOpacity
             style={[styles.primaryBtn, loading && { opacity: 0.75 }]}
-            onPress={mode === "signin" ? handleLogin : handleSignUp}
+            onPress={mode === "signin" ? () => handleLogin() : handleSignUp}
             disabled={loading}
             activeOpacity={0.85}
           >

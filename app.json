@@ -4,7 +4,7 @@
     "description": "OFM — Organization Finance Management is an enterprise financial management platform for institutional budgets, ledger transactions, department cost centers, and real-time collaboration.",
     "slug": "ofm-main-updated",
     "owner": "engraqeels-team",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "ofm-app",
@@ -29,7 +29,7 @@
     },
     "android": {
       "package": "com.organization.financemanager",
-      "versionCode": 5,
+      "versionCode": 6,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#ffffff"

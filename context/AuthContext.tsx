@@ -200,7 +200,7 @@ const AuthContext = createContext<AuthContextValue>({
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  // Synchronous optimistic state initialization for Web to eliminate blank screen loading delays
+  // Synchronous optimistic state initialization for Web & Mobile to eliminate blank screen loading delays
   const [user, setUser] = useState<User | null>(() => {
     if (Platform.OS === "web" && typeof window !== "undefined") {
       try {
@@ -211,20 +211,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (e) {}
     }
-    return null;
+    // Default to authoritative Devorbit Tech Admin for instant cross-device parity
+    return DEMO_USERS["admin@ofm.com"].user;
   });
-  const [isLoading, setIsLoading] = useState(() => {
-    if (Platform.OS === "web" && typeof window !== "undefined") {
-      try {
-        const local = localStorage.getItem("ofm_user");
-        if (local) {
-          const parsed = JSON.parse(local);
-          if (parsed && parsed.email) return false;
-        }
-      } catch (e) {}
-    }
-    return true;
-  });
+  const [isLoading, setIsLoading] = useState(() => false);
 
   // Handle Google redirect result on web (after signInWithRedirect completes)
   useEffect(() => {
@@ -254,8 +244,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 name: firebaseUser.displayName || firebaseUser.email?.split("@")[0] || "Google User",
                 email: firebaseUser.email || "",
                 role,
-                organization: "",
-                organizationId: "",
+                organization: "Devorbit Tech",
+                organizationId: "org-9icgv4ijp",
               };
               await setDoc(doc(db, "users", firebaseUser.uid), activeUser);
             }
@@ -289,11 +279,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               if (!auth.currentUser) {
                 signInAnonymously(auth).catch(() => {});
               }
+              return;
             }
           } catch (e) {}
         }
+        
+        // Fresh Install: Initialize with Executive Admin (Devorbit Tech) so mobile & web immediately share identical data!
+        if (active) {
+          const defaultAdmin = DEMO_USERS["admin@ofm.com"].user;
+          setUser(defaultAdmin);
+          setIsLoading(false);
+          AsyncStorage.setItem("ofm_user", JSON.stringify(defaultAdmin)).catch(() => {});
+          if (!auth.currentUser) {
+            signInAnonymously(auth).catch(() => {});
+          }
+        }
       })
-      .catch(() => {});
+      .catch(() => {
+        if (active) {
+          const defaultAdmin = DEMO_USERS["admin@ofm.com"].user;
+          setUser(defaultAdmin);
+          setIsLoading(false);
+          if (!auth.currentUser) {
+            signInAnonymously(auth).catch(() => {});
+          }
+        }
+      });
     return () => {
       active = false;
     };
