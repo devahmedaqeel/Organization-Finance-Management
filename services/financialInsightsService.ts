@@ -97,17 +97,20 @@ export function generateFinancialInsights(
   // ──────────────────────────────────────────────────────────────────────────
   if (net < 0 && expense > 0) {
     const burnRatio = income > 0 ? (expense / income) * 100 : 100;
+    const excessOverRevenue = income > 0 ? ((expense - income) / income) * 100 : 100;
     insights.push({
       id: `cf-deficit-${currentPeriod.label}`,
       organizationId: orgId,
       type: "OPERATING_DEFICIT",
       title: "Operating Deficit Notice",
       summary: `Disbursements exceed recognized institutional inflows by ${currency} ${Math.abs(net).toLocaleString()} during ${currentPeriod.label}.`,
-      whyItMatters: `Spending is currently ${burnRatio.toFixed(0)}% of incoming revenue, which degrades treasury reserves.`,
+      whyItMatters: income > 0
+        ? `Disbursements exceed incoming revenue by ${excessOverRevenue.toFixed(1)}% (total spending is ${burnRatio.toFixed(1)}% of inflows), creating a deficit that degrades treasury reserves.`
+        : `Operating with zero incoming revenue (${currency} ${expense.toLocaleString()} disbursed), which depletes cash reserves.`,
       recommendedAction: "Review discretionary disbursements in Expenses and pause non-essential requisitions.",
       severity: "CRITICAL",
       category: "cashflow",
-      metric: `-${currency} ${Math.abs(net).toLocaleString()}`,
+      metric: `-${currency} ${Math.abs(net).toLocaleString()} (-${excessOverRevenue.toFixed(1)}% Deficit)`,
       currentValue: net,
       period: currentPeriod.label,
       sourceReference: "Executive Cash Flow Ledger",
@@ -300,21 +303,22 @@ export function generateFinancialInsights(
 
       if (util > 100) {
         const excess = spent - allocated;
+        const overrunPct = (excess / allocated) * 100;
         insights.push({
           id: `budget-over-${b.id}`,
           organizationId: orgId,
           type: "BUDGET_OVERRUN",
           title: `Budget Limit Exceeded: ${b.category || b.department}`,
-          summary: `${b.category || b.department} has spent ${currency} ${spent.toLocaleString()}, exceeding its limit of ${currency} ${allocated.toLocaleString()} by ${currency} ${excess.toLocaleString()} (${util.toFixed(1)}%).`,
+          summary: `${b.category || b.department} has spent ${currency} ${spent.toLocaleString()} (${util.toFixed(1)}% of allocated budget), exceeding its limit of ${currency} ${allocated.toLocaleString()} by ${currency} ${excess.toLocaleString()} (+${overrunPct.toFixed(1)}% over budget).`,
           whyItMatters: "Unauthorized budget overruns directly degrade institutional operating margin.",
           recommendedAction: "Request formal budget expansion authorization or freeze unapproved disbursements.",
           severity: "CRITICAL",
           category: "budget",
-          metric: `${util.toFixed(1)}% Utilized (+${currency} ${excess.toLocaleString()})`,
+          metric: `+${overrunPct.toFixed(1)}% Over Budget (${util.toFixed(1)}% Utilized)`,
           currentValue: spent,
           previousValue: allocated,
           changeAmount: excess,
-          changePercent: util,
+          changePercent: overrunPct,
           period: currentPeriod.label,
           sourceReference: `Budget Control / ${b.category || b.department}`,
           actionRoute: "/budget",

@@ -79,10 +79,12 @@ export function evaluateBudgetEvent(
   const period = budget.period || new Date().toISOString().substring(0, 7);
 
   if (ratio >= config.budgetOverThreshold) {
+    const excess = spent - allocated;
+    const overrunPct = (excess / allocated) * 100;
     return {
       type: "BUDGET_OVER",
       title: "Budget Exceeded",
-      message: `${budget.category || budget.department} has spent ${currency} ${spent.toLocaleString()}, exceeding its limit of ${currency} ${allocated.toLocaleString()} (${(ratio * 100).toFixed(0)}%).`,
+      message: `${budget.category || budget.department} has spent ${currency} ${spent.toLocaleString()} (${(ratio * 100).toFixed(0)}% of limit), exceeding its ${currency} ${allocated.toLocaleString()} budget by ${currency} ${excess.toLocaleString()} (+${overrunPct.toFixed(0)}% over budget).`,
       severity: "CRITICAL",
       actionRoute: "/budget",
       entityId: budget.id,
