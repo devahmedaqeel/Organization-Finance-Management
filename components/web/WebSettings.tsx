@@ -435,13 +435,6 @@ export function WebSettings() {
               </View>
 
               <View style={styles.userSessionMetaRow}>
-                <Text style={[styles.userSessionMetaLabel, { color: colors.mutedForeground }]}>Tenant ID</Text>
-                <Text style={[styles.userSessionMetaValue, { color: colors.mutedForeground, fontFamily: "monospace" }]} numberOfLines={1}>
-                  {user?.organizationId || "default_org"}
-                </Text>
-              </View>
-
-              <View style={styles.userSessionMetaRow}>
                 <Text style={[styles.userSessionMetaLabel, { color: colors.mutedForeground }]}>Clearance</Text>
                 <Text style={[styles.userSessionMetaValue, { color: colors.income }]}>
                   {user?.role === "admin" ? "Full Institutional Administrator" : "Scoped Role Clearance"}

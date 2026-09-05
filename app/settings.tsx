@@ -368,13 +368,6 @@ export default function SettingsScreen() {
                 {user?.organization || settings.organizationName || "Devorbit Tech"}
               </Text>
             </View>
-
-            <View style={styles.userMetaItem}>
-              <Text style={[styles.userMetaLabel, { color: colors.mutedForeground }]}>TENANT ID</Text>
-              <Text style={[styles.userMetaValue, { color: colors.mutedForeground, fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" }]} numberOfLines={1}>
-                {user?.organizationId || "default_org"}
-              </Text>
-            </View>
           </View>
         </View>
 
