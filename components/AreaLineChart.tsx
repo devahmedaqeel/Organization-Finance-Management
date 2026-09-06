@@ -372,6 +372,8 @@ export function AreaLineChart({
                 activeOpacity={0.7}
               >
                 <Text
+                  numberOfLines={1}
+                  ellipsizeMode="clip"
                   style={[
                     styles.rangeText,
                     { color: isSelected ? "#FFFFFF" : colors.mutedForeground },
@@ -802,14 +804,20 @@ const styles = StyleSheet.create({
     paddingRight: 6,
   },
   rangeChip: {
-    paddingHorizontal: 11,
+    minWidth: 38,
+    paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 10,
     borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
   },
   rangeText: {
     fontSize: 11,
     fontFamily: "Inter_600SemiBold",
+    textAlign: "center",
+    includeFontPadding: false,
   },
   calendarBtn: {
     flexDirection: "row",

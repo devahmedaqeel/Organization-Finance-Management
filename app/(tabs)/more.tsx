@@ -95,7 +95,7 @@ export default function MoreScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
-  const { totalIncome, totalExpenses, netBalance, transactions, payroll, departments } = useFinance();
+  const { totalIncome, totalExpenses, netBalance, transactions, payroll, departments, budgets, totalAvailableFunds } = useFinance();
   const { settings } = useSettings();
   const [allTxModal, setAllTxModal] = useState(false);
   const [netBalanceModal, setNetBalanceModal] = useState(false);
@@ -444,9 +444,11 @@ export default function MoreScreen() {
         onClose={() => setNetBalanceModal(false)}
         transactions={transactions}
         departments={departments}
+        budgets={budgets}
         totalIncome={totalIncome}
         totalExpenses={totalExpenses}
         netBalance={netBalance}
+        netSurplus={totalAvailableFunds}
         onOpenStatement={() => {
           setNetBalanceModal(false);
           setStatementModal(true);

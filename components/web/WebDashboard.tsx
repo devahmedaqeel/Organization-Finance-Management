@@ -160,7 +160,20 @@ export function WebDashboard({
       : balanceViewMode === "budget"
       ? totalBudgeted
       : -totalExpenses;
-  const currentHeroIsDeficit = balanceViewMode === "cashflow" ? isEffectiveDeficit : currentHeroBalance < 0;
+  const isHeroExpenseDeficit = totalBudgeted > 0 ? totalExpenses > totalBudgeted : totalExpenses > totalIncome;
+  const currentHeroIsDeficit = balanceViewMode === "cashflow" ? isEffectiveDeficit : isHeroExpenseDeficit;
+
+  const heroBadgeColor = currentHeroIsDeficit ? "#FB7185" : "#34D399";
+  const heroBadgeBg = currentHeroIsDeficit ? "rgba(244, 63, 94, 0.20)" : "rgba(16, 185, 129, 0.20)";
+  const heroBadgeBorder = currentHeroIsDeficit ? "rgba(244, 63, 94, 0.50)" : "rgba(16, 185, 129, 0.50)";
+
+  const heroBadgeText = balanceViewMode === "expenses"
+    ? (totalBudgeted > 0
+        ? (totalExpenses > totalBudgeted ? `Over Budget (${budgetExpensePct}%)` : `Within Budget (${budgetExpensePct}% Used)`)
+        : (totalExpenses > totalIncome ? `Exceeds Inflows (${expensePctOfIncome}%)` : `Funded (${expensePctOfIncome}% of Inflows)`))
+    : (totalBudgeted > 0
+        ? `${isFundingDeficit ? "-" : "+"}${retainedSurplusPct}% Surplus`
+        : `${operatingMargin >= 0 ? "+" : ""}${operatingMargin.toFixed(1)}% Margin`);
 
   const now = new Date();
   const curYm = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -486,25 +499,21 @@ export function WebDashboard({
               paddingHorizontal: isMobile ? 10 : 12,
               paddingVertical: isMobile ? 5 : 7,
               borderRadius: isMobile ? 14 : 20,
-              backgroundColor: currentHeroIsDeficit ? "rgba(244, 63, 94, 0.20)" : "rgba(16, 185, 129, 0.20)",
+              backgroundColor: heroBadgeBg,
               borderWidth: 1.5,
-              borderColor: currentHeroIsDeficit ? "rgba(244, 63, 94, 0.50)" : "rgba(16, 185, 129, 0.50)",
+              borderColor: heroBadgeBorder,
               cursor: "pointer" as any,
             }}
             onPress={() => setGrowthMode((m) => (m + 1) % 4)}
             activeOpacity={0.8}
           >
-            {currentHeroIsDeficit ? (
-              <SvgTrendingDown size={12} color="#FB7185" />
-            ) : (
-              <SvgTrendingUp size={12} color="#34D399" />
-            )}
-            <Text style={{ color: currentHeroIsDeficit ? "#FB7185" : "#34D399", fontSize: isMobile ? 11.5 : 12, fontFamily: "Inter_700Bold" }}>
-              {balanceViewMode === "expenses"
-                ? `${totalBudgeted > 0 ? budgetExpensePct : expensePctOfIncome}% of ${totalBudgeted > 0 ? "Budget" : "Inflows"}`
-                : totalBudgeted > 0
-                ? `${isFundingDeficit ? "-" : "+"}${retainedSurplusPct}% Surplus`
-                : `${operatingMargin >= 0 ? "+" : ""}${operatingMargin.toFixed(1)}% Margin`}
+            <Feather
+              name={balanceViewMode === "expenses" ? (currentHeroIsDeficit ? "alert-triangle" : "check-circle") : (currentHeroIsDeficit ? "trending-down" : "trending-up")}
+              size={12}
+              color={heroBadgeColor}
+            />
+            <Text style={{ color: heroBadgeColor, fontSize: isMobile ? 11.5 : 12, fontFamily: "Inter_700Bold" }}>
+              {heroBadgeText}
             </Text>
           </TouchableOpacity>
         </View>
@@ -1102,7 +1111,8 @@ export function WebDashboard({
         budgets={budgets}
         totalIncome={totalIncome}
         totalExpenses={totalExpenses}
-        netBalance={netSurplus}
+        netBalance={netBalance}
+        netSurplus={netSurplus}
         currency={settings.currency}
       />
 

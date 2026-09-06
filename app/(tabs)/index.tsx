@@ -278,7 +278,23 @@ export default function DashboardScreen() {
       : balanceViewMode === "budget"
       ? totalBudgeted
       : -totalExpenses;
-  const currentHeroIsDeficit = balanceViewMode === "cashflow" ? isEffectiveDeficit : currentHeroBalance < 0;
+  const isHeroExpenseDeficit = totalBudgeted > 0 ? totalExpenses > totalBudgeted : totalExpenses > totalIncome;
+  const currentHeroIsDeficit = balanceViewMode === "cashflow" ? isEffectiveDeficit : isHeroExpenseDeficit;
+
+  const heroBadgeColor = currentHeroIsDeficit ? "#FB7185" : "#34D399";
+  const heroBadgeBg = currentHeroIsDeficit ? "rgba(244, 63, 94, 0.20)" : "rgba(16, 185, 129, 0.20)";
+  const heroBadgeBorder = currentHeroIsDeficit ? "rgba(244, 63, 94, 0.50)" : "rgba(16, 185, 129, 0.50)";
+  const heroBadgeIcon = balanceViewMode === "expenses"
+    ? (currentHeroIsDeficit ? "alert-triangle" : "check-circle")
+    : (currentHeroIsDeficit ? "trending-down" : "trending-up");
+
+  const heroBadgeText = balanceViewMode === "expenses"
+    ? (totalBudgeted > 0
+        ? (totalExpenses > totalBudgeted ? `Over Budget (${budgetExpensePct}%)` : `Within Budget (${budgetExpensePct}% Used)`)
+        : (totalExpenses > totalIncome ? `Exceeds Inflows (${expensePctOfIncome}%)` : `Funded (${expensePctOfIncome}% of Inflows)`))
+    : (totalBudgeted > 0
+        ? `${isFundingDeficit ? "-" : "+"}${retainedSurplusPct}% Surplus`
+        : `${operatingMargin >= 0 ? "+" : ""}${operatingMargin.toFixed(1)}% Margin`);
 
   // Filtered transactions for the modal viewer
   const filteredTransactions = useMemo(() => {
@@ -773,9 +789,9 @@ export default function DashboardScreen() {
               paddingHorizontal: 11,
               paddingVertical: 6,
               borderRadius: 18,
-              backgroundColor: currentHeroIsDeficit ? "rgba(244, 63, 94, 0.20)" : "rgba(16, 185, 129, 0.20)",
+              backgroundColor: heroBadgeBg,
               borderWidth: 1.5,
-              borderColor: currentHeroIsDeficit ? "rgba(244, 63, 94, 0.50)" : "rgba(16, 185, 129, 0.50)",
+              borderColor: heroBadgeBorder,
               flexShrink: 0,
             }}
             onPress={() => {
@@ -785,16 +801,12 @@ export default function DashboardScreen() {
             activeOpacity={0.8}
           >
             <Feather
-              name={currentHeroIsDeficit ? "trending-down" : "trending-up"}
+              name={heroBadgeIcon as any}
               size={12}
-              color={currentHeroIsDeficit ? "#FB7185" : "#34D399"}
+              color={heroBadgeColor}
             />
-            <Text style={{ color: currentHeroIsDeficit ? "#FB7185" : "#34D399", fontSize: 12, fontFamily: "Inter_700Bold" }}>
-              {balanceViewMode === "expenses"
-                ? `${totalBudgeted > 0 ? budgetExpensePct : expensePctOfIncome}% of ${totalBudgeted > 0 ? "Budget" : "Inflows"}`
-                : totalBudgeted > 0
-                ? `${isFundingDeficit ? "-" : "+"}${retainedSurplusPct}% Surplus`
-                : `${operatingMargin >= 0 ? "+" : ""}${operatingMargin.toFixed(1)}% Margin`}
+            <Text style={{ color: heroBadgeColor, fontSize: 12, fontFamily: "Inter_700Bold" }}>
+              {heroBadgeText}
             </Text>
           </TouchableOpacity>
         </View>
@@ -1677,7 +1689,8 @@ export default function DashboardScreen() {
         budgets={budgets}
         totalIncome={totalIncome}
         totalExpenses={totalExpenses}
-        netBalance={netSurplus}
+        netBalance={netBalance}
+        netSurplus={netSurplus}
         onOpenStatement={() => {
           setNetModalVisible(false);
           setExportModalVisible(true);
