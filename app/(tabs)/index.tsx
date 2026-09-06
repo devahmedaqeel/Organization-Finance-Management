@@ -883,7 +883,7 @@ export default function DashboardScreen() {
             </View>
           </TouchableOpacity>
 
-          {/* Card 3: Budget Used */}
+          {/* Card 3: Total Budget */}
           <TouchableOpacity
             style={[
               styles.kpiCard,
@@ -973,16 +973,16 @@ export default function DashboardScreen() {
             <Text
               style={{
                 fontSize: 9.5,
-                color: totalBudgeted === 0 ? colors.mutedForeground : totalExpenses > totalBudgeted ? colors.expense : colors.income,
+                color: totalBudgeted === 0 ? colors.mutedForeground : totalBudgetSpent > totalBudgeted ? colors.expense : colors.income,
                 fontFamily: "Inter_600SemiBold",
                 marginTop: -2,
               }}
             >
               {totalBudgeted === 0
                 ? "No Budget Set"
-                : totalExpenses > totalBudgeted
-                ? `${settings.currency} ${fmt(totalExpenses - totalBudgeted)} Over Limit`
-                : `${settings.currency} ${fmt(Math.max(totalBudgeted - totalExpenses, 0))} Left`}
+                : totalBudgetSpent > totalBudgeted
+                ? `${settings.currency} ${fmt(totalBudgetSpent - totalBudgeted)} Over Limit`
+                : `${settings.currency} ${fmt(netBudgetRemaining)} Available`}
             </Text>
             <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 4, overflow: "hidden" }}>
               <View
@@ -995,6 +995,268 @@ export default function DashboardScreen() {
                       : budgetUtilization > 80
                       ? colors.warning
                       : "#3B82F6",
+                  borderRadius: 2,
+                }}
+              />
+            </View>
+          </TouchableOpacity>
+
+          {/* Card 4: Budget Used */}
+          <TouchableOpacity
+            style={[
+              styles.kpiCard,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+                width: Math.max(statCardW, 140),
+              },
+            ]}
+            onPress={() => {
+              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push("/budget");
+            }}
+            activeOpacity={0.75}
+          >
+            <View style={styles.kpiTopRow}>
+              <View
+                style={[
+                  styles.kpiIconWrap,
+                  {
+                    backgroundColor: "#F59E0B20",
+                  },
+                ]}
+              >
+                <Feather name="target" size={17} color="#F59E0B" />
+              </View>
+              <View
+                style={[
+                  styles.kpiTag,
+                  {
+                    backgroundColor: (netBudgetUtilization > 100 ? colors.expense : "#F59E0B") + "18",
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.kpiTagText,
+                    {
+                      color: netBudgetUtilization > 100 ? colors.expense : "#F59E0B",
+                    },
+                  ]}
+                >
+                  {netBudgetUtilization.toFixed(0)}% Used
+                </Text>
+              </View>
+            </View>
+            <Text
+              style={[
+                styles.kpiValueText,
+                {
+                  color: colors.foreground,
+                },
+              ]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
+              {settings.currency} {fmt(totalBudgetSpent)}
+            </Text>
+            <Text style={[styles.kpiLabelText, { color: colors.mutedForeground }]}>
+              Budget Used
+            </Text>
+            <Text
+              style={{
+                fontSize: 9.5,
+                color: colors.mutedForeground,
+                fontFamily: "Inter_600SemiBold",
+                marginTop: -2,
+              }}
+            >
+              {budgets.length} Active Budgets
+            </Text>
+            <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 4, overflow: "hidden" }}>
+              <View
+                style={{
+                  height: "100%",
+                  width: `${totalBudgeted === 0 ? 0 : Math.min(Math.max(netBudgetUtilization, 4), 100)}%`,
+                  backgroundColor: netBudgetUtilization > 100 ? colors.expense : "#F59E0B",
+                  borderRadius: 2,
+                }}
+              />
+            </View>
+          </TouchableOpacity>
+
+          {/* Card 5: Remaining Budget */}
+          <TouchableOpacity
+            style={[
+              styles.kpiCard,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+                width: Math.max(statCardW, 140),
+              },
+            ]}
+            onPress={() => {
+              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push("/budget");
+            }}
+            activeOpacity={0.75}
+          >
+            <View style={styles.kpiTopRow}>
+              <View
+                style={[
+                  styles.kpiIconWrap,
+                  {
+                    backgroundColor: (netBudgetRemaining >= 0 ? "#10B981" : colors.expense) + "20",
+                  },
+                ]}
+              >
+                <Feather
+                  name="check-circle"
+                  size={17}
+                  color={netBudgetRemaining >= 0 ? "#10B981" : colors.expense}
+                />
+              </View>
+              <View
+                style={[
+                  styles.kpiTag,
+                  {
+                    backgroundColor: (netBudgetRemaining >= 0 ? "#10B981" : colors.expense) + "18",
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.kpiTagText,
+                    {
+                      color: netBudgetRemaining >= 0 ? "#10B981" : colors.expense,
+                    },
+                  ]}
+                >
+                  {netBudgetRemaining >= 0 ? "Surplus" : "Exceeded"}
+                </Text>
+              </View>
+            </View>
+            <Text
+              style={[
+                styles.kpiValueText,
+                {
+                  color: colors.foreground,
+                },
+              ]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
+              {settings.currency} {fmt(netBudgetRemaining)}
+            </Text>
+            <Text style={[styles.kpiLabelText, { color: colors.mutedForeground }]}>
+              Remaining Budget
+            </Text>
+            <Text
+              style={{
+                fontSize: 9.5,
+                color: netBudgetRemaining >= 0 ? "#10B981" : colors.expense,
+                fontFamily: "Inter_600SemiBold",
+                marginTop: -2,
+              }}
+            >
+              {totalBudgeted > 0
+                ? `${Math.max(0, 100 - netBudgetUtilization).toFixed(0)}% Unspent`
+                : "No Budget"}
+            </Text>
+            <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 4, overflow: "hidden" }}>
+              <View
+                style={{
+                  height: "100%",
+                  width: `${totalBudgeted === 0 ? 0 : Math.min(Math.max(Math.max(0, 100 - netBudgetUtilization), 4), 100)}%`,
+                  backgroundColor: netBudgetRemaining >= 0 ? "#10B981" : colors.expense,
+                  borderRadius: 2,
+                }}
+              />
+            </View>
+          </TouchableOpacity>
+
+          {/* Card 6: Net Operating Balance */}
+          <TouchableOpacity
+            style={[
+              styles.kpiCard,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+                width: Math.max(statCardW, 140),
+              },
+            ]}
+            onPress={() => {
+              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setNetModalVisible(true);
+            }}
+            activeOpacity={0.75}
+          >
+            <View style={styles.kpiTopRow}>
+              <View
+                style={[
+                  styles.kpiIconWrap,
+                  {
+                    backgroundColor: (netBalance >= 0 ? "#6366F1" : colors.expense) + "20",
+                  },
+                ]}
+              >
+                <Feather
+                  name="dollar-sign"
+                  size={17}
+                  color={netBalance >= 0 ? "#6366F1" : colors.expense}
+                />
+              </View>
+              <View
+                style={[
+                  styles.kpiTag,
+                  {
+                    backgroundColor: (netBalance >= 0 ? "#6366F1" : colors.expense) + "18",
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.kpiTagText,
+                    {
+                      color: netBalance >= 0 ? "#6366F1" : colors.expense,
+                    },
+                  ]}
+                >
+                  {netBalance >= 0 ? "Surplus" : "Deficit"}
+                </Text>
+              </View>
+            </View>
+            <Text
+              style={[
+                styles.kpiValueText,
+                {
+                  color: netBalance >= 0 ? "#10B981" : colors.expense,
+                },
+              ]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
+              {netBalance >= 0 ? "+" : "-"}{settings.currency} {fmt(Math.abs(netBalance))}
+            </Text>
+            <Text style={[styles.kpiLabelText, { color: colors.mutedForeground }]}>
+              Net Balance
+            </Text>
+            <Text
+              style={{
+                fontSize: 9.5,
+                color: netBalance >= 0 ? "#10B981" : colors.expense,
+                fontFamily: "Inter_600SemiBold",
+                marginTop: -2,
+              }}
+            >
+              {netMargin >= 0 ? "+" : ""}{netMargin.toFixed(1)}% Margin
+            </Text>
+            <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 4, overflow: "hidden" }}>
+              <View
+                style={{
+                  height: "100%",
+                  width: `${Math.min(Math.max(retainedSurplusPct, 4), 100)}%`,
+                  backgroundColor: netBalance >= 0 ? "#6366F1" : colors.expense,
                   borderRadius: 2,
                 }}
               />
