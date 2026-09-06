@@ -541,9 +541,9 @@ export function WebDashboard({
         </View>
       </LinearGradient>
 
-      {/* ─── 4 Multi-Metric KPI Cards Row ─── */}
+      {/* ─── 5 Multi-Metric KPI Cards Row (Exact Mobile App Parity) ─── */}
       <View style={styles.kpiGrid}>
-        {/* Card 1: Inflows */}
+        {/* Card 1: Total Income */}
         <TouchableOpacity
           style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}
           onPress={() => onNavigate("income")}
@@ -551,22 +551,49 @@ export function WebDashboard({
         >
           <View style={styles.kpiCardHeader}>
             <View style={[styles.kpiIconSquare, { backgroundColor: colors.income + "18" }]}>
-              <SvgArrowUpRight size={18} color={colors.income} />
+              <Feather name="arrow-up-circle" size={17} color={colors.income} />
             </View>
             <View style={[styles.kpiTag, { backgroundColor: colors.income + "15" }]}>
-              <Text style={[styles.kpiTagText, { color: colors.income }]}>{totalIncome > 0 ? `${incomeRetainedPct}% Retained` : "Inflows"}</Text>
+              <Text style={[styles.kpiTagText, { color: colors.income }]} numberOfLines={1}>Inflow</Text>
             </View>
           </View>
           <WebCountUp
             value={totalIncome}
-            prefix={`${settings.currency} `}
+            prefix={`+${settings.currency} `}
             formatter={fmt}
             style={[styles.kpiBigNumber, { color: colors.foreground }]}
           />
-          <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>Institutional Revenue</Text>
+          <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]} numberOfLines={1}>Total Income</Text>
+          <Text
+            style={{
+              fontSize: 10,
+              color: isDeficit ? colors.expense : colors.income,
+              fontFamily: "Inter_600SemiBold",
+              marginTop: -2,
+            }}
+            numberOfLines={1}
+          >
+            {totalIncome === 0
+              ? "No Income (0%)"
+              : isDeficit
+              ? "0% Retained (Deficit)"
+              : totalExpenses === totalIncome
+              ? "0% Retained (Break-even)"
+              : `${incomeRetainedPct}% Retained`}
+          </Text>
+          <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 4, overflow: "hidden" }}>
+            <View
+              style={{
+                height: "100%",
+                width: `${totalIncome === 0 ? 0 : isDeficit ? 0 : Math.min(Math.max(incomeRetainedPct, 2), 100)}%`,
+                backgroundColor: isDeficit ? colors.expense : colors.income,
+                borderRadius: 2,
+              }}
+            />
+          </View>
         </TouchableOpacity>
 
-        {/* Card 2: Outflows */}
+        {/* Card 2: Total Expenses */}
         <TouchableOpacity
           style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}
           onPress={() => onNavigate("expenses")}
@@ -574,35 +601,120 @@ export function WebDashboard({
         >
           <View style={styles.kpiCardHeader}>
             <View style={[styles.kpiIconSquare, { backgroundColor: colors.expense + "18" }]}>
-              <SvgArrowDownLeft size={18} color={colors.expense} />
+              <Feather name="arrow-down-circle" size={17} color={colors.expense} />
             </View>
-            <View style={[styles.kpiTag, { backgroundColor: (totalExpenses === 0 ? colors.income : isDeficit ? colors.expense : totalExpenses === totalIncome ? colors.warning : colors.primary) + "18" }]}>
-              <Text style={[styles.kpiTagText, { color: totalExpenses === 0 ? colors.income : isDeficit ? colors.expense : totalExpenses === totalIncome ? colors.warning : colors.primary }]}>
-                {totalExpenses === 0 ? "No Outflows" : isDeficit ? "Over Inflow" : totalExpenses === totalIncome ? "Break-even" : `${expensePctOfIncome}% Spent`}
+            <View
+              style={[
+                styles.kpiTag,
+                { backgroundColor: (totalExpenses === 0 ? colors.income : isDeficit ? colors.expense : totalExpenses === totalIncome ? colors.warning : colors.primary) + "18" },
+              ]}
+            >
+              <Text style={[styles.kpiTagText, { color: totalExpenses === 0 ? colors.income : isDeficit ? colors.expense : totalExpenses === totalIncome ? colors.warning : colors.primary }]} numberOfLines={1}>
+                {totalExpenses === 0 ? "No Outflows" : isDeficit ? "Over Inflow" : totalExpenses === totalIncome ? "Break-even" : "Outflows"}
               </Text>
             </View>
           </View>
           <WebCountUp
             value={totalExpenses}
-            prefix={`${settings.currency} `}
+            prefix={`-${settings.currency} `}
             formatter={fmt}
             style={[styles.kpiBigNumber, { color: colors.foreground }]}
           />
-          <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>Operational Expenses</Text>
+          <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]} numberOfLines={1}>Total Expenses</Text>
+          <Text
+            style={{
+              fontSize: 10,
+              color: totalExpenses === 0 ? colors.income : isDeficit ? colors.expense : colors.foreground,
+              fontFamily: "Inter_600SemiBold",
+              marginTop: -2,
+            }}
+            numberOfLines={1}
+          >
+            {totalExpenses === 0
+              ? "0% of Inflows"
+              : totalIncome > 0
+              ? `${expensePctOfIncome}% of Inflow Spent`
+              : "100% Outflows (No Inflow)"}
+          </Text>
+          <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 4, overflow: "hidden" }}>
+            <View
+              style={{
+                height: "100%",
+                width: `${totalExpenses === 0 ? 0 : Math.min(Math.max(expensePctOfIncome, 4), 100)}%`,
+                backgroundColor: totalExpenses === 0 ? colors.income : isDeficit ? colors.expense : expensePctOfIncome > 80 ? colors.warning : colors.income,
+                borderRadius: 2,
+              }}
+            />
+          </View>
         </TouchableOpacity>
 
-        {/* Card 3: Total Budget Allocated */}
+        {/* Card 3: Total Budget */}
         <TouchableOpacity
           style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}
           onPress={() => onNavigate("budgets")}
           activeOpacity={0.8}
         >
           <View style={styles.kpiCardHeader}>
-            <View style={[styles.kpiIconSquare, { backgroundColor: (totalBudgeted === 0 ? colors.mutedForeground : "#3B82F6") + "18" }]}>
-              <SvgPieChart size={18} color={totalBudgeted === 0 ? colors.mutedForeground : "#3B82F6"} />
+            <View
+              style={[
+                styles.kpiIconSquare,
+                {
+                  backgroundColor:
+                    (totalBudgeted === 0
+                      ? colors.muted
+                      : budgetUsedPct > 100
+                      ? colors.expense
+                      : budgetUsedPct > 80
+                      ? colors.warning
+                      : "#3B82F6") + "18",
+                },
+              ]}
+            >
+              <Feather
+                name="pie-chart"
+                size={17}
+                color={
+                  totalBudgeted === 0
+                    ? colors.mutedForeground
+                    : budgetUsedPct > 100
+                    ? colors.expense
+                    : budgetUsedPct > 80
+                    ? colors.warning
+                    : "#3B82F6"
+                }
+              />
             </View>
-            <View style={[styles.kpiTag, { backgroundColor: (totalBudgeted === 0 ? colors.mutedForeground : "#3B82F6") + "15" }]}>
-              <Text style={[styles.kpiTagText, { color: totalBudgeted === 0 ? colors.mutedForeground : "#3B82F6" }]}>
+            <View
+              style={[
+                styles.kpiTag,
+                {
+                  backgroundColor:
+                    (totalBudgeted === 0
+                      ? colors.muted
+                      : budgetUsedPct > 100
+                      ? colors.expense
+                      : budgetUsedPct > 80
+                      ? colors.warning
+                      : "#3B82F6") + "15",
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.kpiTagText,
+                  {
+                    color:
+                      totalBudgeted === 0
+                        ? colors.mutedForeground
+                        : budgetUsedPct > 100
+                        ? colors.expense
+                        : budgetUsedPct > 80
+                        ? colors.warning
+                        : "#3B82F6",
+                  },
+                ]}
+                numberOfLines={1}
+              >
                 {totalBudgeted === 0 ? "No Budget" : budgetUsedPct > 100 ? "Over Limit" : `${budgetUsedPct}% Used`}
               </Text>
             </View>
@@ -613,25 +725,126 @@ export function WebDashboard({
             formatter={fmt}
             style={[styles.kpiBigNumber, { color: colors.foreground }]}
           />
-          <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>Total Budget Allocated</Text>
+          <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]} numberOfLines={1}>Total Budget</Text>
+          <Text
+            style={{
+              fontSize: 10,
+              color: totalBudgeted === 0 ? colors.mutedForeground : totalBudgetSpent > totalBudgeted ? colors.expense : colors.income,
+              fontFamily: "Inter_600SemiBold",
+              marginTop: -2,
+            }}
+            numberOfLines={1}
+          >
+            {totalBudgeted === 0
+              ? "No Active Budget"
+              : totalBudgetSpent > totalBudgeted
+              ? `${settings.currency} ${fmt(totalBudgetSpent - totalBudgeted)} Over Limit`
+              : `${settings.currency} ${fmt(netBudgetRemaining)} Available`}
+          </Text>
+          <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 4, overflow: "hidden" }}>
+            <View
+              style={{
+                height: "100%",
+                width: `${totalBudgeted === 0 ? 0 : Math.min(Math.max(budgetUsedPct, 4), 100)}%`,
+                backgroundColor:
+                  budgetUsedPct > 100
+                    ? colors.expense
+                    : budgetUsedPct > 80
+                    ? colors.warning
+                    : "#3B82F6",
+                borderRadius: 2,
+              }}
+            />
+          </View>
         </TouchableOpacity>
 
-        {/* Card 4: Monitored Units */}
+        {/* Card 4: Transactions */}
         <TouchableOpacity
           style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-          onPress={() => onNavigate("departments")}
+          onPress={() => onNavigate("transactions")}
+          activeOpacity={0.8}
+        >
+          <View style={styles.kpiCardHeader}>
+            <View style={[styles.kpiIconSquare, { backgroundColor: colors.primary + "18" }]}>
+              <Feather name="list" size={17} color={colors.primary} />
+            </View>
+            <View style={[styles.kpiTag, { backgroundColor: (transactions.length > 0 ? colors.primary : colors.muted) + "15" }]}>
+              <Text style={[styles.kpiTagText, { color: transactions.length > 0 ? colors.primary : colors.mutedForeground }]} numberOfLines={1}>
+                {transactions.length > 0 ? "Active" : "Empty"}
+              </Text>
+            </View>
+          </View>
+          <Text style={[styles.kpiBigNumber, { color: colors.foreground }]}>{transactions.length}</Text>
+          <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]} numberOfLines={1}>Transactions</Text>
+          <Text
+            style={{ fontSize: 10, color: transactions.length > 0 ? colors.primary : colors.mutedForeground, fontFamily: "Inter_600SemiBold", marginTop: -2 }}
+            numberOfLines={1}
+          >
+            {transactions.length > 0
+              ? `${transactions.filter(t => t.type === 'income').length} In · ${transactions.filter(t => t.type === 'expense').length} Out`
+              : "No Transactions"}
+          </Text>
+          <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 4, overflow: "hidden", flexDirection: "row" }}>
+            {transactions.length > 0 ? (
+              <>
+                <View
+                  style={{
+                    height: "100%",
+                    width: `${(transactions.filter(t => t.type === 'income').length / transactions.length) * 100}%`,
+                    backgroundColor: colors.income,
+                  }}
+                />
+                <View
+                  style={{
+                    height: "100%",
+                    width: `${(transactions.filter(t => t.type === 'expense').length / transactions.length) * 100}%`,
+                    backgroundColor: colors.expense,
+                  }}
+                />
+              </>
+            ) : null}
+          </View>
+        </TouchableOpacity>
+
+        {/* Card 5: Staff Payroll */}
+        <TouchableOpacity
+          style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+          onPress={() => onNavigate("payroll")}
           activeOpacity={0.8}
         >
           <View style={styles.kpiCardHeader}>
             <View style={[styles.kpiIconSquare, { backgroundColor: "#8B5CF618" }]}>
-              <SvgLayers size={18} color="#8B5CF6" />
+              <Feather name="users" size={17} color="#8B5CF6" />
             </View>
-            <View style={[styles.kpiTag, { backgroundColor: "#8B5CF615" }]}>
-              <Text style={[styles.kpiTagText, { color: "#8B5CF6" }]}>{departments.length} Units</Text>
+            <View style={[styles.kpiTag, { backgroundColor: (payroll.length > 0 ? "#8B5CF6" : colors.muted) + "15" }]}>
+              <Text style={[styles.kpiTagText, { color: payroll.length > 0 ? "#8B5CF6" : colors.mutedForeground }]} numberOfLines={1}>
+                {payroll.length} Staff
+              </Text>
             </View>
           </View>
-          <Text style={[styles.kpiBigNumber, { color: colors.foreground }]}>{departments.length} Depts</Text>
-          <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>Monitored Cost Centers</Text>
+          <WebCountUp
+            value={totalPayroll}
+            prefix={`${settings.currency} `}
+            formatter={fmt}
+            style={[styles.kpiBigNumber, { color: colors.foreground }]}
+          />
+          <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]} numberOfLines={1}>Staff Payroll</Text>
+          <Text
+            style={{ fontSize: 10, color: payroll.length > 0 ? "#8B5CF6" : colors.mutedForeground, fontFamily: "Inter_600SemiBold", marginTop: -2 }}
+            numberOfLines={1}
+          >
+            {payroll.length > 0 ? `${payroll.length} Disbursals` : "No Payroll"}
+          </Text>
+          <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 4, overflow: "hidden" }}>
+            <View
+              style={{
+                height: "100%",
+                width: `${totalExpenses > 0 ? Math.min(Math.max((totalPayroll / totalExpenses) * 100, 4), 100) : 0}%`,
+                backgroundColor: "#8B5CF6",
+                borderRadius: 2,
+              }}
+            />
+          </View>
         </TouchableOpacity>
       </View>
 
@@ -1112,16 +1325,23 @@ const styles = StyleSheet.create({
   },
   kpiGrid: {
     flexDirection: "row",
-    gap: 14,
+    gap: 12,
     flexWrap: "wrap",
+    width: "100%",
   },
   kpiCard: {
     flex: 1,
-    minWidth: 160,
+    minWidth: 165,
     borderRadius: 16,
     borderWidth: 1,
-    padding: 16,
-    gap: 8,
+    padding: 14,
+    gap: 6,
+    cursor: "pointer" as any,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   kpiCardHeader: {
     flexDirection: "row",
