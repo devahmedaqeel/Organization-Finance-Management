@@ -731,14 +731,14 @@ export function WebShell() {
               style={{
                 flexDirection: "row",
                 alignItems: "center",
-                gap: 5,
+                gap: 5.5,
                 backgroundColor: "rgba(16, 185, 129, 0.12)",
                 borderColor: "rgba(16, 185, 129, 0.35)",
                 borderWidth: 1,
-                paddingHorizontal: isMobile ? 7 : 8,
-                paddingVertical: 4,
+                paddingHorizontal: 10,
+                paddingVertical: 4.5,
                 borderRadius: 14,
-                marginRight: isMobile ? 4 : 6,
+                marginRight: isMobile ? 4 : 8,
                 flexShrink: 0,
               }}
             >
@@ -748,17 +748,48 @@ export function WebShell() {
                   height: 6,
                   borderRadius: 3,
                   backgroundColor: "#10B981",
+                  flexShrink: 0,
                 }}
               />
               <Text
                 style={{
-                  fontSize: 10.5,
-                  fontFamily: "Inter_600SemiBold",
+                  fontSize: 11,
+                  fontFamily: "Inter_700Bold",
                   color: "#10B981",
                   letterSpacing: 0.2,
                 }}
+                numberOfLines={1}
               >
-                {isMobile ? "Live" : "Live Cloud"}
+                Cloud Sync
+              </Text>
+            </View>
+
+            {/* Header User Role Badge (ADMIN / etc.) */}
+            <View
+              style={{
+                paddingHorizontal: 9,
+                paddingVertical: 4,
+                borderRadius: 12,
+                borderWidth: 1.2,
+                backgroundColor: (user?.role === "admin" ? "#6366F1" : user?.role === "accountant" ? "#0EA5E9" : user?.role === "manager" ? "#10B981" : "#F59E0B") + "18",
+                borderColor: (user?.role === "admin" ? "#6366F1" : user?.role === "accountant" ? "#0EA5E9" : user?.role === "manager" ? "#10B981" : "#F59E0B") + "45",
+                marginRight: isMobile ? 4 : 8,
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 10,
+                  fontFamily: "Inter_800ExtraBold",
+                  color: user?.role === "admin" ? "#6366F1" : user?.role === "accountant" ? "#0EA5E9" : user?.role === "manager" ? "#10B981" : "#F59E0B",
+                  letterSpacing: 0.4,
+                  textAlign: "center",
+                }}
+                numberOfLines={1}
+              >
+                {(user?.role || "admin").toUpperCase()}
               </Text>
             </View>
 

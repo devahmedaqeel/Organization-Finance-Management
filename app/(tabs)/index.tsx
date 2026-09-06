@@ -470,7 +470,14 @@ export default function DashboardScreen() {
             </TouchableOpacity>
 
             <View style={[styles.roleBadge, { backgroundColor: roleColor + "18", borderColor: roleColor + "45" }]}>
-              <Text style={[styles.roleText, { color: roleColor }]}>{user?.role?.toUpperCase()}</Text>
+              <Text
+                style={[styles.roleText, { color: roleColor }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+              >
+                {user?.role?.toUpperCase()}
+              </Text>
             </View>
 
             <TouchableOpacity
@@ -521,6 +528,8 @@ export default function DashboardScreen() {
                 { color: syncStatus === "synced" ? "#10B981" : "#F59E0B" },
               ]}
               numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.85}
             >
               {syncStatus === "synced" ? "Cloud Sync" : "Syncing..."}
             </Text>
@@ -1700,7 +1709,10 @@ const styles = StyleSheet.create({
     paddingVertical: 4.5,
     borderRadius: 12,
     borderWidth: 1,
-    flexShrink: 1,
+    flex: 1,
+    maxWidth: "54%",
+    minWidth: 0,
+    marginRight: 4,
   },
   orgName: {
     fontFamily: "Inter_600SemiBold",
@@ -1721,6 +1733,7 @@ const styles = StyleSheet.create({
   },
   userNameWrap: {
     flex: 1,
+    minWidth: 0,
     marginRight: 8,
   },
   name: {
@@ -1731,8 +1744,8 @@ const styles = StyleSheet.create({
   syncBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 8,
+    gap: 5.5,
+    paddingHorizontal: 9,
     paddingVertical: 4,
     borderRadius: 12,
     borderWidth: 1,
@@ -1742,22 +1755,28 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
+    flexShrink: 0,
   },
   syncText: {
-    fontSize: 10.5,
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.2,
+    flexShrink: 0,
   },
   roleBadge: {
-    paddingHorizontal: 9,
-    paddingVertical: 4.5,
-    borderRadius: 14,
+    paddingHorizontal: 8.5,
+    paddingVertical: 4,
+    borderRadius: 12,
     borderWidth: 1.2,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
   },
   roleText: {
     fontSize: 10,
     fontFamily: "Inter_800ExtraBold",
-    letterSpacing: 0.6,
+    letterSpacing: 0.4,
+    textAlign: "center",
   },
   iconBtn: {
     width: 32,
