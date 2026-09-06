@@ -4,6 +4,7 @@ import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useMemo, useState, useEffect, useCallback } from "react";
 import {
+  ActivityIndicator,
   Animated,
   BackHandler,
   Dimensions,
@@ -178,6 +179,20 @@ export default function DashboardScreen() {
   const [exportModalVisible, setExportModalVisible] = useState<boolean>(false);
   const [netModalVisible, setNetModalVisible] = useState<boolean>(false);
   const [notificationModalVisible, setNotificationModalVisible] = useState<boolean>(false);
+  const [logoutModalVisible, setLogoutModalVisible] = useState<boolean>(false);
+  const [isLoggingOut, setIsLoggingOut] = useState<boolean>(false);
+
+  const handleConfirmLogout = useCallback(async () => {
+    try {
+      setIsLoggingOut(true);
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setLogoutModalVisible(false);
+      await logout();
+      router.replace("/login");
+    } catch {
+      setIsLoggingOut(false);
+    }
+  }, [logout]);
   const [txSearchQuery, setTxSearchQuery] = useState<string>("");
   const [txTypeFilter, setTxTypeFilter] = useState<"all" | "income" | "expense">("all");
   const selectedCurrency = useMemo(() => WORLD_CURRENCIES.find(c => c.code === settings.currency), [settings.currency]);
@@ -380,85 +395,96 @@ export default function DashboardScreen() {
         />
       }
     >
-      {/* Header */}
-      <View style={styles.headerRow}>
-        <View style={styles.headerLeft}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1, paddingRight: 6 }}>
+      {/* ─── Executive 2-Tier Header ─── */}
+      <View style={styles.headerContainer}>
+        {/* Tier 1: Brand / Organization & Action Controls */}
+        <View style={styles.headerTopBar}>
+          <View style={[styles.orgBadge, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={{ fontSize: 13, transform: [{ translateY: Platform.OS === 'ios' ? 0.5 : 0 }] }}>{selectedCurrency?.flag ?? "🌐"}</Text>
-            <Text style={[styles.greeting, { color: colors.mutedForeground, flex: 1 }]}>
+            <Text
+              style={[styles.orgName, { color: colors.mutedForeground }]}
+              numberOfLines={1}
+            >
               {settings.organizationName || user?.organization || "Organization Finance Management"}
             </Text>
           </View>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 2 }}>
-            <Text style={[styles.name, { color: colors.foreground }]}>{user?.name ?? "User"}</Text>
-            <View style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 4,
-              backgroundColor: syncStatus === "synced" ? "rgba(16, 185, 129, 0.12)" : "rgba(245, 158, 11, 0.12)",
-              paddingHorizontal: 7,
-              paddingVertical: 2.5,
-              borderRadius: 12,
-              borderWidth: 1,
-              borderColor: syncStatus === "synced" ? "rgba(16, 185, 129, 0.3)" : "rgba(245, 158, 11, 0.3)",
-            }}>
-              <View style={{
-                width: 6,
-                height: 6,
-                borderRadius: 3,
-                backgroundColor: syncStatus === "synced" ? "#10B981" : "#F59E0B",
-              }} />
-              <Text style={{
-                fontSize: 10,
-                fontWeight: "600",
-                color: syncStatus === "synced" ? "#10B981" : "#F59E0B",
-                letterSpacing: 0.2,
-              }}>
-                {syncStatus === "synced" ? "Cloud Sync" : "Syncing..."}
-              </Text>
+
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              onPress={() => {
+                if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setNotificationModalVisible(true);
+              }}
+              style={[styles.iconBtn, { borderColor: colors.border, backgroundColor: colors.card, position: "relative" }]}
+              activeOpacity={0.7}
+              accessibilityLabel="Notifications"
+            >
+              <Feather name="bell" size={15} color={colors.foreground} />
+              {unreadNotificationCount > 0 && (
+                <View style={styles.notifBadge}>
+                  <Text style={styles.notifBadgeText}>
+                    {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <View style={[styles.roleBadge, { backgroundColor: roleColor + "18", borderColor: roleColor + "45" }]}>
+              <Text style={[styles.roleText, { color: roleColor }]}>{user?.role?.toUpperCase()}</Text>
             </View>
+
+            <TouchableOpacity
+              onPress={() => {
+                if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                setLogoutModalVisible(true);
+              }}
+              style={[styles.iconBtn, styles.logoutIconBtn, { borderColor: colors.border, backgroundColor: colors.card }]}
+              activeOpacity={0.7}
+              accessibilityLabel="Log Out"
+            >
+              <Feather name="log-out" size={15} color="#EF4444" />
+            </TouchableOpacity>
           </View>
         </View>
-        <View style={styles.headerRight}>
-          <TouchableOpacity
-            onPress={() => {
-              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setNotificationModalVisible(true);
-            }}
-            style={[styles.iconBtn, { borderColor: colors.border, position: "relative" }]}
-            activeOpacity={0.7}
-          >
-            <Feather name="bell" size={15} color={colors.foreground} />
-            {unreadNotificationCount > 0 && (
-              <View
-                style={{
-                  position: "absolute",
-                  top: -2,
-                  right: -2,
-                  minWidth: 15,
-                  height: 15,
-                  borderRadius: 7.5,
-                  backgroundColor: "#EF4444",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  paddingHorizontal: 2,
-                }}
-              >
-                <Text style={{ fontSize: 9, fontFamily: "Inter_700Bold", color: "#FFFFFF" }}>
-                  {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-          <View style={[styles.roleBadge, { backgroundColor: roleColor + "22", borderColor: roleColor }]}>
-            <Text style={[styles.roleText, { color: roleColor }]}>{user?.role?.toUpperCase()}</Text>
+
+        {/* Tier 2: User Identity & Live Sync Status */}
+        <View style={styles.headerUserBar}>
+          <View style={styles.userNameWrap}>
+            <Text
+              style={[styles.name, { color: colors.foreground }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+            >
+              {user?.name ?? "User"}
+            </Text>
           </View>
-          <TouchableOpacity
-            onPress={async () => { await logout(); router.replace("/login"); }}
-            style={[styles.iconBtn, { borderColor: colors.border }]}
+
+          <View
+            style={[
+              styles.syncBadge,
+              {
+                backgroundColor: syncStatus === "synced" ? "rgba(16, 185, 129, 0.12)" : "rgba(245, 158, 11, 0.12)",
+                borderColor: syncStatus === "synced" ? "rgba(16, 185, 129, 0.3)" : "rgba(245, 158, 11, 0.3)",
+              },
+            ]}
           >
-            <Feather name="log-out" size={15} color={colors.mutedForeground} />
-          </TouchableOpacity>
+            <View
+              style={[
+                styles.syncDot,
+                { backgroundColor: syncStatus === "synced" ? "#10B981" : "#F59E0B" },
+              ]}
+            />
+            <Text
+              style={[
+                styles.syncText,
+                { color: syncStatus === "synced" ? "#10B981" : "#F59E0B" },
+              ]}
+              numberOfLines={1}
+            >
+              {syncStatus === "synced" ? "Cloud Sync" : "Syncing..."}
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -1485,6 +1511,90 @@ export default function DashboardScreen() {
           router.push(target as any);
         }}
       />
+
+      {/* ─── Logout Confirmation Modal ─── */}
+      <Modal
+        visible={logoutModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLogoutModalVisible(false)}
+      >
+        <View style={styles.logoutModalOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setLogoutModalVisible(false)}
+          />
+          <View
+            style={[
+              styles.logoutModalCard,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            {/* Red Alert Icon Halo */}
+            <View style={styles.logoutIconHalo}>
+              <View style={styles.logoutIconInner}>
+                <Feather name="log-out" size={24} color="#EF4444" />
+              </View>
+            </View>
+
+            {/* Title & Message */}
+            <Text style={[styles.logoutModalTitle, { color: colors.foreground }]}>
+              Sign Out
+            </Text>
+            <Text style={[styles.logoutModalMsg, { color: colors.mutedForeground }]}>
+              Are you sure you want to log out of{"\n"}
+              <Text style={{ fontFamily: "Inter_700Bold", color: colors.foreground }}>
+                {settings.organizationName || user?.organization || "OFM"}
+              </Text>?
+            </Text>
+
+            {/* Action Buttons Row */}
+            <View style={styles.logoutModalBtnRow}>
+              <TouchableOpacity
+                onPress={() => {
+                  if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setLogoutModalVisible(false);
+                }}
+                style={[
+                  styles.logoutModalBtn,
+                  styles.logoutCancelBtn,
+                  {
+                    backgroundColor: colors.muted + "35",
+                    borderColor: colors.border,
+                  },
+                ]}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.logoutCancelText, { color: colors.foreground }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleConfirmLogout}
+                disabled={isLoggingOut}
+                style={[styles.logoutModalBtn, styles.logoutConfirmBtn]}
+                activeOpacity={0.85}
+              >
+                {isLoggingOut ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Feather name="log-out" size={15} color="#FFFFFF" style={{ marginRight: 6 }} />
+                    <Text style={styles.logoutConfirmText}>
+                      Yes, Log Out
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -1493,14 +1603,206 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: { paddingHorizontal: 16, gap: 12 },
 
+  // Executive 2-Tier Header System
+  headerContainer: {
+    marginBottom: 6,
+    gap: 8,
+  },
+  headerTopBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 8,
+  },
+  orgBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 9,
+    paddingVertical: 4.5,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexShrink: 1,
+    maxWidth: "52%",
+  },
+  orgName: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    flexShrink: 1,
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+  },
+  headerUserBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 2,
+  },
+  userNameWrap: {
+    flex: 1,
+    marginRight: 8,
+  },
+  name: {
+    fontSize: 21,
+    fontFamily: "Inter_800ExtraBold",
+    letterSpacing: -0.4,
+  },
+  syncBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexShrink: 0,
+  },
+  syncDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  syncText: {
+    fontSize: 10.5,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.2,
+  },
+  roleBadge: {
+    paddingHorizontal: 9,
+    paddingVertical: 4.5,
+    borderRadius: 14,
+    borderWidth: 1.2,
+  },
+  roleText: {
+    fontSize: 10,
+    fontFamily: "Inter_800ExtraBold",
+    letterSpacing: 0.6,
+  },
+  iconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  logoutIconBtn: {
+    borderColor: "rgba(239, 68, 68, 0.25)",
+    backgroundColor: "rgba(239, 68, 68, 0.06)",
+  },
+  notifBadge: {
+    position: "absolute",
+    top: -3,
+    right: -3,
+    minWidth: 15,
+    height: 15,
+    borderRadius: 7.5,
+    backgroundColor: "#EF4444",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 2,
+  },
+  notifBadgeText: {
+    fontSize: 8.5,
+    fontFamily: "Inter_800ExtraBold",
+    color: "#FFFFFF",
+  },
+
+  // Legacy header aliases for safety
   headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 2 },
   headerLeft: { gap: 2, flex: 1, marginRight: 12 },
   greeting: { fontSize: 11, fontFamily: "Inter_400Regular", flex: 1 },
-  name: { fontSize: 20, fontFamily: "Inter_700Bold" },
-  headerRight: { flexDirection: "row", alignItems: "center", gap: 8 },
-  roleBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1 },
-  roleText: { fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
-  iconBtn: { padding: 8, borderRadius: 10, borderWidth: 1 },
+
+  // Logout Confirmation Modal
+  logoutModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.72)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+    zIndex: 99999,
+  },
+  logoutModalCard: {
+    width: "100%",
+    maxWidth: 360,
+    borderRadius: 24,
+    padding: 22,
+    alignItems: "center",
+    borderWidth: 1.2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.35,
+    shadowRadius: 24,
+    elevation: 20,
+  },
+  logoutIconHalo: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "rgba(239, 68, 68, 0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
+  },
+  logoutIconInner: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(239, 68, 68, 0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  logoutModalTitle: {
+    fontSize: 19,
+    fontFamily: "Inter_800ExtraBold",
+    marginBottom: 6,
+    textAlign: "center",
+    letterSpacing: -0.3,
+  },
+  logoutModalMsg: {
+    fontSize: 13.5,
+    fontFamily: "Inter_400Regular",
+    textAlign: "center",
+    lineHeight: 19,
+    marginBottom: 20,
+  },
+  logoutModalBtnRow: {
+    flexDirection: "row",
+    gap: 10,
+    width: "100%",
+  },
+  logoutModalBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+  },
+  logoutCancelBtn: {
+    borderWidth: 1.2,
+  },
+  logoutCancelText: {
+    fontSize: 13.5,
+    fontFamily: "Inter_600SemiBold",
+  },
+  logoutConfirmBtn: {
+    backgroundColor: "#EF4444",
+    shadowColor: "#EF4444",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  logoutConfirmText: {
+    color: "#FFFFFF",
+    fontSize: 13.5,
+    fontFamily: "Inter_700Bold",
+  },
 
   // Hero Net Balance Card (Senior UI Design)
   heroBalanceCard: {
