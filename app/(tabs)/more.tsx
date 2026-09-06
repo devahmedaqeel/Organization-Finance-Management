@@ -4,7 +4,9 @@ import { Image } from "expo-image";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -98,6 +100,8 @@ export default function MoreScreen() {
   const [allTxModal, setAllTxModal] = useState(false);
   const [netBalanceModal, setNetBalanceModal] = useState(false);
   const [statementModal, setStatementModal] = useState(false);
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const selectedCurrency = React.useMemo(
     () => WORLD_CURRENCIES.find((c) => c.code === settings.currency),
     [settings.currency]
@@ -130,17 +134,19 @@ export default function MoreScreen() {
 
   const handleLogout = () => {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert("Sign Out", "Are you sure you want to sign out of your organization?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Logout",
-        style: "destructive",
-        onPress: async () => {
-          await logout();
-          router.replace("/login");
-        },
-      },
-    ]);
+    setLogoutModalVisible(true);
+  };
+
+  const handleConfirmLogout = async () => {
+    try {
+      setIsLoggingOut(true);
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setLogoutModalVisible(false);
+      await logout();
+      router.replace("/login");
+    } catch {
+      setIsLoggingOut(false);
+    }
   };
 
   const handleNavigate = (route: string) => {
@@ -376,6 +382,90 @@ export default function MoreScreen() {
         onClose={() => setStatementModal(false)}
         reportOpts={reportOpts}
       />
+
+      {/* ─── Modern Logout Confirmation Modal ─── */}
+      <Modal
+        visible={logoutModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLogoutModalVisible(false)}
+      >
+        <View style={styles.logoutModalOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => setLogoutModalVisible(false)}
+          />
+          <View
+            style={[
+              styles.logoutModalCard,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+              },
+            ]}
+          >
+            {/* Red Alert Icon Halo */}
+            <View style={styles.logoutIconHalo}>
+              <View style={styles.logoutIconInner}>
+                <Feather name="log-out" size={24} color="#EF4444" />
+              </View>
+            </View>
+
+            {/* Title & Message */}
+            <Text style={[styles.logoutModalTitle, { color: colors.foreground }]}>
+              Sign Out
+            </Text>
+            <Text style={[styles.logoutModalMsg, { color: colors.mutedForeground }]}>
+              Are you sure you want to sign out of{"\n"}
+              <Text style={{ fontFamily: "Inter_700Bold", color: colors.foreground }}>
+                {settings.organizationName || user?.organization || "OFM"}
+              </Text>?
+            </Text>
+
+            {/* Action Buttons Row */}
+            <View style={styles.logoutModalBtnRow}>
+              <TouchableOpacity
+                onPress={() => {
+                  if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setLogoutModalVisible(false);
+                }}
+                style={[
+                  styles.logoutModalBtn,
+                  styles.logoutCancelBtn,
+                  {
+                    backgroundColor: colors.muted + "35",
+                    borderColor: colors.border,
+                  },
+                ]}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.logoutCancelText, { color: colors.foreground }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleConfirmLogout}
+                disabled={isLoggingOut}
+                style={[styles.logoutModalBtn, styles.logoutConfirmBtn]}
+                activeOpacity={0.85}
+              >
+                {isLoggingOut ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Feather name="log-out" size={15} color="#FFFFFF" style={{ marginRight: 6 }} />
+                    <Text style={styles.logoutConfirmText}>
+                      Yes, Log Out
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -497,4 +587,91 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   logoutText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+
+  // Modern Logout Confirmation Modal
+  logoutModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.72)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+    zIndex: 99999,
+  },
+  logoutModalCard: {
+    width: "100%",
+    maxWidth: 360,
+    borderRadius: 24,
+    padding: 22,
+    alignItems: "center",
+    borderWidth: 1.2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.35,
+    shadowRadius: 24,
+    elevation: 20,
+  },
+  logoutIconHalo: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: "rgba(239, 68, 68, 0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
+  },
+  logoutIconInner: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(239, 68, 68, 0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  logoutModalTitle: {
+    fontSize: 19,
+    fontFamily: "Inter_800ExtraBold",
+    marginBottom: 6,
+    textAlign: "center",
+    letterSpacing: -0.3,
+  },
+  logoutModalMsg: {
+    fontSize: 13.5,
+    fontFamily: "Inter_400Regular",
+    textAlign: "center",
+    lineHeight: 19,
+    marginBottom: 20,
+  },
+  logoutModalBtnRow: {
+    flexDirection: "row",
+    gap: 10,
+    width: "100%",
+  },
+  logoutModalBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+  },
+  logoutCancelBtn: {
+    borderWidth: 1.2,
+  },
+  logoutCancelText: {
+    fontSize: 13.5,
+    fontFamily: "Inter_600SemiBold",
+  },
+  logoutConfirmBtn: {
+    backgroundColor: "#EF4444",
+    shadowColor: "#EF4444",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  logoutConfirmText: {
+    color: "#FFFFFF",
+    fontSize: 13.5,
+    fontFamily: "Inter_700Bold",
+  },
 });
