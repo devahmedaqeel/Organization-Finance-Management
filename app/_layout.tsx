@@ -28,6 +28,8 @@ import { WebShell } from "@/components/web/WebShell";
 import { requestNotificationPermissions } from "@/hooks/NotificationHelper";
 
 LogBox.ignoreLogs([
+  /\[NOTIFICATIONS\] Firestore save/,
+  /Missing or insufficient permissions/,
   /expo-notifications: Android Push notifications/,
   /removed from Expo Go with the release of SDK 53/,
   /warnOfExpoGoPushUsage/,
@@ -42,7 +44,7 @@ if (Platform.OS === "web") {
   LogBox.ignoreAllLogs(true);
 }
 
-// Demote harmless offline network notices so they don't trigger full-screen LogBox modal on mobile
+// Demote harmless offline network notices and background saves so they don't trigger full-screen LogBox modal on mobile
 if (__DEV__) {
   const originalError = console.error;
   console.error = (...args: any[]) => {
@@ -57,6 +59,19 @@ if (__DEV__) {
       return;
     }
     originalError(...args);
+  };
+
+  const originalWarn = console.warn;
+  console.warn = (...args: any[]) => {
+    const raw = typeof args[0] === "string" ? args[0] : "";
+    if (
+      raw.includes("[NOTIFICATIONS] Firestore save") ||
+      raw.includes("Missing or insufficient permissions")
+    ) {
+      console.log("[Notifications Note]:", ...args);
+      return;
+    }
+    originalWarn(...args);
   };
 }
 

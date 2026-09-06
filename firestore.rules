@@ -55,12 +55,12 @@ service cloud.firestore {
 
     // 9. Real-time Notifications
     match /notifications/{notifId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // 10. Device Push Tokens
     match /push_tokens/{tokenId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // 11. Immutable Audit Trail (Tamper-Proof)

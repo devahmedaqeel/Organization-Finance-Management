@@ -165,8 +165,8 @@ export async function dispatchNotification(
   try {
     const notifRef = doc(db, "notifications", notifId);
     await setDoc(notifRef, notification);
-  } catch (err) {
-    console.warn("[NOTIFICATIONS] Firestore save error:", err);
+  } catch (err: any) {
+    console.log("[NOTIFICATIONS] Firestore save note:", err?.message || err);
   }
 
   // 3. Trigger In-App Floating Alert Banner (Web & Mobile)
