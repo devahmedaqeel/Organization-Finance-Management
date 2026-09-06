@@ -288,19 +288,8 @@ export default function DashboardScreen() {
     ? (currentHeroIsDeficit ? "alert-circle" : "shield")
     : (currentHeroIsDeficit ? "trending-down" : "trending-up");
 
-  const budgetRemainingPct = totalBudgeted > 0 ? Math.max(0, 100 - Math.round((totalExpenses / totalBudgeted) * 100)) : 0;
-  const overBudgetPct = totalBudgeted > 0 && totalExpenses > totalBudgeted ? Math.round(((totalExpenses - totalBudgeted) / totalBudgeted) * 100) : 0;
-  const incomeSavedPct = totalIncome > 0 ? Math.max(0, Math.round(((totalIncome - totalExpenses) / totalIncome) * 100)) : 0;
-  const overIncomePct = totalIncome > 0 && totalExpenses > totalIncome ? Math.round(((totalExpenses - totalIncome) / totalIncome) * 100) : 0;
-
   const heroBadgeText = balanceViewMode === "expenses"
-    ? (totalBudgeted > 0
-        ? (totalExpenses > totalBudgeted
-            ? `+${overBudgetPct}% Over Budget`
-            : `${budgetRemainingPct}% Budget Remaining`)
-        : (totalExpenses > totalIncome
-            ? `+${overIncomePct}% Over Inflow`
-            : `${incomeSavedPct}% Income Saved`))
+    ? null
     : (totalBudgeted > 0
         ? `${isFundingDeficit ? "-" : "+"}${retainedSurplusPct}% Surplus`
         : `${operatingMargin >= 0 ? "+" : ""}${operatingMargin.toFixed(1)}% Margin`);
@@ -790,34 +779,36 @@ export default function DashboardScreen() {
           </TouchableOpacity>
 
           {/* Growth Pill Badge Matching Web */}
-          <TouchableOpacity
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 5,
-              paddingHorizontal: 11,
-              paddingVertical: 6,
-              borderRadius: 18,
-              backgroundColor: heroBadgeBg,
-              borderWidth: 1.5,
-              borderColor: heroBadgeBorder,
-              flexShrink: 0,
-            }}
-            onPress={() => {
-              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setNetModalVisible(true);
-            }}
-            activeOpacity={0.8}
-          >
-            <Feather
-              name={heroBadgeIcon as any}
-              size={12}
-              color={heroBadgeColor}
-            />
-            <Text style={{ color: heroBadgeColor, fontSize: 12, fontFamily: "Inter_700Bold" }}>
-              {heroBadgeText}
-            </Text>
-          </TouchableOpacity>
+          {heroBadgeText ? (
+            <TouchableOpacity
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 5,
+                paddingHorizontal: 11,
+                paddingVertical: 6,
+                borderRadius: 18,
+                backgroundColor: heroBadgeBg,
+                borderWidth: 1.5,
+                borderColor: heroBadgeBorder,
+                flexShrink: 0,
+              }}
+              onPress={() => {
+                if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setNetModalVisible(true);
+              }}
+              activeOpacity={0.8}
+            >
+              <Feather
+                name={heroBadgeIcon as any}
+                size={12}
+                color={heroBadgeColor}
+              />
+              <Text style={{ color: heroBadgeColor, fontSize: 12, fontFamily: "Inter_700Bold" }}>
+                {heroBadgeText}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
 
         {/* Dynamic Cash Flow / Expense Flow Progress Bar & Labels */}

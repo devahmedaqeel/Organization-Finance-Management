@@ -178,19 +178,8 @@ export function WebDashboard({
     ? (currentHeroIsDeficit ? "alert-circle" : "shield")
     : (currentHeroIsDeficit ? "trending-down" : "trending-up");
 
-  const budgetRemainingPct = totalBudgeted > 0 ? Math.max(0, 100 - Math.round((totalExpenses / totalBudgeted) * 100)) : 0;
-  const overBudgetPct = totalBudgeted > 0 && totalExpenses > totalBudgeted ? Math.round(((totalExpenses - totalBudgeted) / totalBudgeted) * 100) : 0;
-  const incomeSavedPct = totalIncome > 0 ? Math.max(0, Math.round(((totalIncome - totalExpenses) / totalIncome) * 100)) : 0;
-  const overIncomePct = totalIncome > 0 && totalExpenses > totalIncome ? Math.round(((totalExpenses - totalIncome) / totalIncome) * 100) : 0;
-
   const heroBadgeText = balanceViewMode === "expenses"
-    ? (totalBudgeted > 0
-        ? (totalExpenses > totalBudgeted
-            ? `+${overBudgetPct}% Over Budget`
-            : `${budgetRemainingPct}% Budget Remaining`)
-        : (totalExpenses > totalIncome
-            ? `+${overIncomePct}% Over Inflow`
-            : `${incomeSavedPct}% Income Saved`))
+    ? null
     : (totalBudgeted > 0
         ? `${isFundingDeficit ? "-" : "+"}${retainedSurplusPct}% Surplus`
         : `${operatingMargin >= 0 ? "+" : ""}${operatingMargin.toFixed(1)}% Margin`);
@@ -504,31 +493,33 @@ export function WebDashboard({
           </TouchableOpacity>
 
           {/* Growth Pill Badge (Matching Pic 1) */}
-          <TouchableOpacity
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 5,
-              paddingHorizontal: isMobile ? 10 : 12,
-              paddingVertical: isMobile ? 5 : 7,
-              borderRadius: isMobile ? 14 : 20,
-              backgroundColor: heroBadgeBg,
-              borderWidth: 1.5,
-              borderColor: heroBadgeBorder,
-              cursor: "pointer" as any,
-            }}
-            onPress={() => setGrowthMode((m) => (m + 1) % 4)}
-            activeOpacity={0.8}
-          >
-            <Feather
-              name={heroBadgeIcon as any}
-              size={12}
-              color={heroBadgeColor}
-            />
-            <Text style={{ color: heroBadgeColor, fontSize: isMobile ? 11.5 : 12, fontFamily: "Inter_700Bold" }}>
-              {heroBadgeText}
-            </Text>
-          </TouchableOpacity>
+          {heroBadgeText ? (
+            <TouchableOpacity
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 5,
+                paddingHorizontal: isMobile ? 10 : 12,
+                paddingVertical: isMobile ? 5 : 7,
+                borderRadius: isMobile ? 14 : 20,
+                backgroundColor: heroBadgeBg,
+                borderWidth: 1.5,
+                borderColor: heroBadgeBorder,
+                cursor: "pointer" as any,
+              }}
+              onPress={() => setGrowthMode((m) => (m + 1) % 4)}
+              activeOpacity={0.8}
+            >
+              <Feather
+                name={heroBadgeIcon as any}
+                size={12}
+                color={heroBadgeColor}
+              />
+              <Text style={{ color: heroBadgeColor, fontSize: isMobile ? 11.5 : 12, fontFamily: "Inter_700Bold" }}>
+                {heroBadgeText}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
 
         {/* Dynamic Cash Flow / Expense Flow Progress Bar & Labels */}
