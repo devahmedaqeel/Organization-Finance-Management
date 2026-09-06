@@ -41,6 +41,11 @@ const testSuites = [
     cmd: "npx",
     args: ["-y", "tsx", "-r", "./services/__tests__/mockReactNative.js", "services/__tests__/pdfService.test.ts"],
   },
+  {
+    name: "7. Mobile Header Organization Name Dynamic Sizing Suite",
+    cmd: "npx",
+    args: ["-y", "tsx", "services/__tests__/orgBadgeHeader.test.ts"],
+  },
 ];
 
 console.log("\n=======================================================");
