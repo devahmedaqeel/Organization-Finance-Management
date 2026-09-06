@@ -756,18 +756,23 @@ export default function DashboardScreen() {
         {/* Dynamic Cash Flow / Expense Flow Progress Bar & Labels */}
         <View style={{ gap: 7, marginTop: 2 }}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-            <Text style={{ color: "#CBD5E1", fontSize: 11, fontFamily: "Inter_500Medium" }}>
+            <Text style={{ color: "#CBD5E1", fontSize: 11, fontFamily: "Inter_500Medium" }} numberOfLines={1}>
               {totalExpenses === 0
                 ? "0% Expenses"
                 : totalIncome > 0
                 ? `${expensePctOfIncome}% Income Spent`
                 : `${clampedSpendRatio}% Pool Spent`}
             </Text>
-            <Text style={{ color: isDeficit ? "#FB7185" : "#34D399", fontSize: 11, fontFamily: "Inter_700Bold" }}>
+            <Text
+              style={{ color: isDeficit ? "#FB7185" : "#34D399", fontSize: 11, fontFamily: "Inter_700Bold" }}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+            >
               {totalIncome === 0 && totalExpenses === 0
                 ? "No Activity"
                 : isDeficit
-                ? `Operating Deficit (-${settings.currency} ${fmt(totalExpenses - totalIncome)})`
+                ? `Deficit (-${settings.currency} ${fmt(totalExpenses - totalIncome)})`
                 : totalExpenses === totalIncome
                 ? "0% Retained (Break-even)"
                 : `${incomeRetainedPct}% Income Retained`}
@@ -800,7 +805,7 @@ export default function DashboardScreen() {
               {
                 backgroundColor: colors.card,
                 borderColor: colors.border,
-                width: Math.max(statCardW, 140),
+                width: Math.max(statCardW, 160),
               },
             ]}
             onPress={() => {
@@ -814,15 +819,15 @@ export default function DashboardScreen() {
                 <Feather name="arrow-up-circle" size={17} color={colors.income} />
               </View>
               <View style={[styles.kpiTag, { backgroundColor: colors.income + "18" }]}>
-                <Text style={[styles.kpiTagText, { color: colors.income }]}>
+                <Text style={[styles.kpiTagText, { color: colors.income }]} numberOfLines={1}>
                   Inflow
                 </Text>
               </View>
             </View>
-            <Text style={[styles.kpiValueText, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit>
+            <Text style={[styles.kpiValueText, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
               +{settings.currency} {fmt(totalIncome)}
             </Text>
-            <Text style={[styles.kpiLabelText, { color: colors.mutedForeground }]}>Total Income</Text>
+            <Text style={[styles.kpiLabelText, { color: colors.mutedForeground }]} numberOfLines={1}>Total Income</Text>
             <Text
               style={{
                 fontSize: 9.5,
@@ -830,11 +835,14 @@ export default function DashboardScreen() {
                 fontFamily: "Inter_600SemiBold",
                 marginTop: -2,
               }}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
             >
               {totalIncome === 0
                 ? "No Income (0%)"
                 : isDeficit
-                ? `Deficit: -${settings.currency} ${fmt(totalExpenses - totalIncome)} (0% Retained)`
+                ? "0% Retained (Deficit)"
                 : totalExpenses === totalIncome
                 ? "0% Retained (Break-even)"
                 : `${incomeRetainedPct}% Retained`}
@@ -858,7 +866,7 @@ export default function DashboardScreen() {
               {
                 backgroundColor: colors.card,
                 borderColor: colors.border,
-                width: Math.max(statCardW, 140),
+                width: Math.max(statCardW, 160),
               },
             ]}
             onPress={() => {
@@ -874,18 +882,18 @@ export default function DashboardScreen() {
               <View
                 style={[
                   styles.kpiTag,
-                  { backgroundColor: (totalExpenses === 0 ? colors.income : isDeficit ? colors.expense : colors.warning) + "18" },
+                  { backgroundColor: (totalExpenses === 0 ? colors.income : isDeficit ? colors.expense : totalExpenses === totalIncome ? colors.warning : colors.primary) + "18" },
                 ]}
               >
-                <Text style={[styles.kpiTagText, { color: totalExpenses === 0 ? colors.income : isDeficit ? colors.expense : colors.warning }]}>
-                  {totalExpenses === 0 ? "No Expenses" : isDeficit ? "Over Inflow" : "Expenses"}
+                <Text style={[styles.kpiTagText, { color: totalExpenses === 0 ? colors.income : isDeficit ? colors.expense : totalExpenses === totalIncome ? colors.warning : colors.primary }]} numberOfLines={1}>
+                  {totalExpenses === 0 ? "No Outflows" : isDeficit ? "Over Inflow" : totalExpenses === totalIncome ? "Break-even" : "Outflows"}
                 </Text>
               </View>
             </View>
-            <Text style={[styles.kpiValueText, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit>
+            <Text style={[styles.kpiValueText, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
               -{settings.currency} {fmt(totalExpenses)}
             </Text>
-            <Text style={[styles.kpiLabelText, { color: colors.mutedForeground }]}>Total Expenses</Text>
+            <Text style={[styles.kpiLabelText, { color: colors.mutedForeground }]} numberOfLines={1}>Total Expenses</Text>
             <Text
               style={{
                 fontSize: 9.5,
@@ -893,12 +901,15 @@ export default function DashboardScreen() {
                 fontFamily: "Inter_600SemiBold",
                 marginTop: -2,
               }}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
             >
               {totalExpenses === 0
-                ? "No Expenses (0%)"
+                ? "0% of Inflows"
                 : totalIncome > 0
-                ? `${expensePctOfIncome}% of Income Spent`
-                : "100% Outflow (No Income)"}
+                ? `${expensePctOfIncome}% of Inflow Spent`
+                : "100% Outflows (No Inflow)"}
             </Text>
             <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 4, overflow: "hidden" }}>
               <View
@@ -919,7 +930,7 @@ export default function DashboardScreen() {
               {
                 backgroundColor: colors.card,
                 borderColor: colors.border,
-                width: Math.max(statCardW, 140),
+                width: Math.max(statCardW, 160),
               },
             ]}
             onPress={() => {
@@ -934,11 +945,13 @@ export default function DashboardScreen() {
                   styles.kpiIconWrap,
                   {
                     backgroundColor:
-                      (budgetUsedPct > 100
+                      (totalBudgeted === 0
+                        ? colors.muted
+                        : budgetUsedPct > 100
                         ? colors.expense
                         : budgetUsedPct > 80
                         ? colors.warning
-                        : colors.income) + "20",
+                        : "#3B82F6") + "20",
                   },
                 ]}
               >
@@ -946,7 +959,9 @@ export default function DashboardScreen() {
                   name="pie-chart"
                   size={17}
                   color={
-                    budgetUsedPct > 100
+                    totalBudgeted === 0
+                      ? colors.mutedForeground
+                      : budgetUsedPct > 100
                       ? colors.expense
                       : budgetUsedPct > 80
                       ? colors.warning
@@ -959,7 +974,9 @@ export default function DashboardScreen() {
                   styles.kpiTag,
                   {
                     backgroundColor:
-                      (budgetUsedPct > 100
+                      (totalBudgeted === 0
+                        ? colors.muted
+                        : budgetUsedPct > 100
                         ? colors.expense
                         : budgetUsedPct > 80
                         ? colors.warning
@@ -972,15 +989,18 @@ export default function DashboardScreen() {
                     styles.kpiTagText,
                     {
                       color:
-                        budgetUsedPct > 100
+                        totalBudgeted === 0
+                          ? colors.mutedForeground
+                          : budgetUsedPct > 100
                           ? colors.expense
                           : budgetUsedPct > 80
                           ? colors.warning
                           : "#3B82F6",
                     },
                   ]}
+                  numberOfLines={1}
                 >
-                  {budgetUsedPct > 100 ? "Over Limit" : `${budgetUsedPct}% Used`}
+                  {totalBudgeted === 0 ? "No Budget" : budgetUsedPct > 100 ? "Over Limit" : `${budgetUsedPct}% Used`}
                 </Text>
               </View>
             </View>
@@ -993,10 +1013,11 @@ export default function DashboardScreen() {
               ]}
               numberOfLines={1}
               adjustsFontSizeToFit
+              minimumFontScale={0.75}
             >
               {settings.currency} {fmt(totalBudgeted)}
             </Text>
-            <Text style={[styles.kpiLabelText, { color: colors.mutedForeground }]}>
+            <Text style={[styles.kpiLabelText, { color: colors.mutedForeground }]} numberOfLines={1}>
               Total Budget
             </Text>
             <Text
@@ -1006,12 +1027,15 @@ export default function DashboardScreen() {
                 fontFamily: "Inter_600SemiBold",
                 marginTop: -2,
               }}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
             >
               {totalBudgeted === 0
-                ? "No Budget Set"
+                ? "No Active Budget"
                 : totalBudgetSpent > totalBudgeted
                 ? `${settings.currency} ${fmt(totalBudgetSpent - totalBudgeted)} Over Limit`
-                : `${budgetUsedPct}% Used · ${settings.currency} ${fmt(netBudgetRemaining)} Available`}
+                : `${settings.currency} ${fmt(netBudgetRemaining)} Available`}
             </Text>
             <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 4, overflow: "hidden" }}>
               <View
@@ -1037,7 +1061,7 @@ export default function DashboardScreen() {
               {
                 backgroundColor: colors.card,
                 borderColor: colors.border,
-                width: Math.max(statCardW, 140),
+                width: Math.max(statCardW, 160),
               },
             ]}
             onPress={() => {
@@ -1051,16 +1075,21 @@ export default function DashboardScreen() {
                 <Feather name="list" size={17} color={colors.primary} />
               </View>
               <View style={[styles.kpiTag, { backgroundColor: (transactions.length > 0 ? colors.primary : colors.muted) + "18" }]}>
-                <Text style={[styles.kpiTagText, { color: transactions.length > 0 ? colors.primary : colors.mutedForeground }]}>
+                <Text style={[styles.kpiTagText, { color: transactions.length > 0 ? colors.primary : colors.mutedForeground }]} numberOfLines={1}>
                   {transactions.length > 0 ? "Active" : "Empty"}
                 </Text>
               </View>
             </View>
-            <Text style={[styles.kpiValueText, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit>
+            <Text style={[styles.kpiValueText, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
               {transactions.length}
             </Text>
-            <Text style={[styles.kpiLabelText, { color: colors.mutedForeground }]}>Transactions</Text>
-            <Text style={{ fontSize: 9.5, color: transactions.length > 0 ? colors.primary : colors.mutedForeground, fontFamily: "Inter_600SemiBold", marginTop: -2 }}>
+            <Text style={[styles.kpiLabelText, { color: colors.mutedForeground }]} numberOfLines={1}>Transactions</Text>
+            <Text
+              style={{ fontSize: 9.5, color: transactions.length > 0 ? colors.primary : colors.mutedForeground, fontFamily: "Inter_600SemiBold", marginTop: -2 }}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+            >
               {transactions.length > 0
                 ? `${transactions.filter(t => t.type === 'income').length} In · ${transactions.filter(t => t.type === 'expense').length} Out`
                 : "No Transactions"}
@@ -1094,7 +1123,7 @@ export default function DashboardScreen() {
               {
                 backgroundColor: colors.card,
                 borderColor: colors.border,
-                width: Math.max(statCardW, 140),
+                width: Math.max(statCardW, 160),
               },
             ]}
             onPress={() => {
@@ -1108,21 +1137,22 @@ export default function DashboardScreen() {
                 <Feather name="users" size={17} color="#8B5CF6" />
               </View>
               <View style={[styles.kpiTag, { backgroundColor: (payroll.length > 0 ? "#8B5CF6" : colors.muted) + "18" }]}>
-                <Text style={[styles.kpiTagText, { color: payroll.length > 0 ? "#8B5CF6" : colors.mutedForeground }]}>
+                <Text style={[styles.kpiTagText, { color: payroll.length > 0 ? "#8B5CF6" : colors.mutedForeground }]} numberOfLines={1}>
                   {payroll.length} Staff
                 </Text>
               </View>
             </View>
-            <Text style={[styles.kpiValueText, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit>
+            <Text style={[styles.kpiValueText, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
               {settings.currency} {fmt(payroll.reduce((s, p) => s + (p.baseSalary || 0) + (p.bonus || 0) - (p.deductions || 0), 0))}
             </Text>
-            <Text style={[styles.kpiLabelText, { color: colors.mutedForeground }]}>Staff Payroll</Text>
-            <Text style={{ fontSize: 9.5, color: payroll.length > 0 ? "#8B5CF6" : colors.mutedForeground, fontFamily: "Inter_600SemiBold", marginTop: -2 }}>
-              {payroll.length === 0
-                ? "No Staff Added"
-                : totalExpenses > 0
-                ? `${Math.round((payroll.reduce((s, p) => s + (p.baseSalary || 0) + (p.bonus || 0) - (p.deductions || 0), 0) / totalExpenses) * 100)}% of Outflows`
-                : "Monthly Pay"}
+            <Text style={[styles.kpiLabelText, { color: colors.mutedForeground }]} numberOfLines={1}>Staff Payroll</Text>
+            <Text
+              style={{ fontSize: 9.5, color: payroll.length > 0 ? "#8B5CF6" : colors.mutedForeground, fontFamily: "Inter_600SemiBold", marginTop: -2 }}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+            >
+              {payroll.length > 0 ? `${payroll.length} Disbursals` : "No Payroll"}
             </Text>
             <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 4, overflow: "hidden" }}>
               <View

@@ -576,8 +576,10 @@ export function WebDashboard({
             <View style={[styles.kpiIconSquare, { backgroundColor: colors.expense + "18" }]}>
               <SvgArrowDownLeft size={18} color={colors.expense} />
             </View>
-            <View style={[styles.kpiTag, { backgroundColor: colors.expense + "15" }]}>
-              <Text style={[styles.kpiTagText, { color: colors.expense }]}>{totalIncome > 0 ? `${expensePctOfIncome}% Spent` : "Outflows"}</Text>
+            <View style={[styles.kpiTag, { backgroundColor: (totalExpenses === 0 ? colors.income : isDeficit ? colors.expense : totalExpenses === totalIncome ? colors.warning : colors.primary) + "18" }]}>
+              <Text style={[styles.kpiTagText, { color: totalExpenses === 0 ? colors.income : isDeficit ? colors.expense : totalExpenses === totalIncome ? colors.warning : colors.primary }]}>
+                {totalExpenses === 0 ? "No Outflows" : isDeficit ? "Over Inflow" : totalExpenses === totalIncome ? "Break-even" : `${expensePctOfIncome}% Spent`}
+              </Text>
             </View>
           </View>
           <WebCountUp
@@ -596,11 +598,13 @@ export function WebDashboard({
           activeOpacity={0.8}
         >
           <View style={styles.kpiCardHeader}>
-            <View style={[styles.kpiIconSquare, { backgroundColor: "#3B82F618" }]}>
-              <SvgPieChart size={18} color="#3B82F6" />
+            <View style={[styles.kpiIconSquare, { backgroundColor: (totalBudgeted === 0 ? colors.mutedForeground : "#3B82F6") + "18" }]}>
+              <SvgPieChart size={18} color={totalBudgeted === 0 ? colors.mutedForeground : "#3B82F6"} />
             </View>
-            <View style={[styles.kpiTag, { backgroundColor: "#3B82F615" }]}>
-              <Text style={[styles.kpiTagText, { color: "#3B82F6" }]}>{budgetUsedPct}% Used</Text>
+            <View style={[styles.kpiTag, { backgroundColor: (totalBudgeted === 0 ? colors.mutedForeground : "#3B82F6") + "15" }]}>
+              <Text style={[styles.kpiTagText, { color: totalBudgeted === 0 ? colors.mutedForeground : "#3B82F6" }]}>
+                {totalBudgeted === 0 ? "No Budget" : budgetUsedPct > 100 ? "Over Limit" : `${budgetUsedPct}% Used`}
+              </Text>
             </View>
           </View>
           <WebCountUp
