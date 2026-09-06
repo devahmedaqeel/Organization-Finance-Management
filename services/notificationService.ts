@@ -28,6 +28,8 @@ import {
   evaluateBudgetEvent,
   evaluateTransactionEvent,
 } from "./notificationRules";
+import { generateFinancialInsights } from "./financialInsightsService";
+import { getPresetPeriod } from "./DatePeriodService";
 import { showFloatingToast } from "@/utils/toast";
 import { triggerLocalNotification } from "@/hooks/NotificationHelper";
 
@@ -191,7 +193,8 @@ export async function syncLedgerNotificationEvents(
   payroll: any[],
   orgId: string,
   currency: string = "PKR",
-  userId?: string
+  userId?: string,
+  departments?: any[]
 ): Promise<void> {
   if (!orgId) return;
 
@@ -279,6 +282,43 @@ export async function syncLedgerNotificationEvents(
       userId
     ).catch(() => {});
   } catch {}
+
+  // 5. Evaluate AI Insights Recommendations & Actionable Advisories
+  try {
+    const currentPeriod = getPresetPeriod("this_month");
+    const aiInsights = generateFinancialInsights(
+      transactions || [],
+      budgets || [],
+      payroll || [],
+      departments || [],
+      currentPeriod,
+      undefined,
+      currency,
+      orgId
+    );
+
+    (aiInsights || []).forEach((insight) => {
+      // Dispatch actionable recommendations and alerts
+      if (insight.isActionable || insight.severity === "CRITICAL" || insight.severity === "WARNING") {
+        const aiNotifKey = `ai_insight_${orgId}_${insight.id}`;
+        dispatchNotification(
+          {
+            type: insight.severity === "CRITICAL" ? "BUDGET_CRITICAL" : insight.severity === "WARNING" ? "BUDGET_WARNING" : "SYSTEM_ALERT",
+            title: `AI Recommendation: ${insight.title}`,
+            message: `${insight.summary} Action: ${insight.recommendedAction}`,
+            severity: insight.severity === "CRITICAL" ? "CRITICAL" : insight.severity === "WARNING" ? "WARNING" : "INFO",
+            actionRoute: insight.actionRoute || "/ai-insights",
+            entityId: insight.id,
+            idempotencyKey: aiNotifKey,
+          },
+          orgId,
+          userId
+        ).catch(() => {});
+      }
+    });
+  } catch (err) {
+    console.warn("[NOTIFICATIONS] AI Insights notification evaluation warning:", err);
+  }
 }
 
 /**

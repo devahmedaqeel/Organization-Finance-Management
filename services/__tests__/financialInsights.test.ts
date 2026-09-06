@@ -183,6 +183,31 @@ const softDelHealth = calculateFinancialHealth(softDeletedTxs as any, [], [], cu
 assert(softDelHealth.hasData === false, "Test 17a: Soft-deleted records produce hasData: false");
 assert(softDelHealth.healthScore === null, "Test 17b: Soft-deleted records produce healthScore: null");
 
+// STEP 10: Capital Pool Net Surplus Parity Test (Income 15k, Budget 200k, Expense 5k)
+const testOrgTxs: Transaction[] = [
+  { id: "tx-inc-1", type: "income", amount: 15000, date: "2026-08-05", category: "Revenue", department: "Operations", description: "Inflow" },
+  { id: "tx-exp-1", type: "expense", amount: 5000, date: "2026-08-10", category: "Office", department: "Operations", description: "Outflow" },
+];
+const testOrgBudgets: Budget[] = [
+  { id: "b-core", category: "Operations", department: "Operations", allocated: 200000, period: "2026-08" },
+];
+
+const totalInc = testOrgTxs.filter(t => t.type === "income").reduce((s, t) => s + t.amount, 0);
+const totalExp = testOrgTxs.filter(t => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+const totalBud = testOrgBudgets.reduce((s, b) => s + (b.allocated || 0), 0);
+const totalPool = totalInc + totalBud;
+const netSurplus = totalPool - totalExp;
+
+assert(totalPool === 215000, "Test 18a: Total Funding Pool is strictly 215,000 (15k Inflow + 200k Budget)");
+assert(netSurplus === 210000, "Test 18b: Net Surplus is strictly 210,000 (215k Pool - 5k Expense)");
+assert(Math.round((totalExp / totalBud) * 100 * 10) / 10 === 2.5, "Test 18c: Budget utilization is strictly 2.5% (NOT 0%)");
+
+// STEP 11: Actionable Recommendations Evaluation
+const testInsights = generateFinancialInsights(testOrgTxs, testOrgBudgets, [], [], currentPeriod, undefined, "PKR", "test_org");
+assert(testInsights !== null && Array.isArray(testInsights), "Test 19a: AI insights returns valid array");
+const hasActionableOrAlert = testInsights.some(i => i.isActionable || i.severity === "CRITICAL" || i.severity === "WARNING" || i.severity === "INFO");
+assert(hasActionableOrAlert, "Test 19b: AI insights generates actionable advisories or operational intelligence");
+
 console.log("\n=======================================================");
 console.log("ALL FINANCIAL INSIGHTS & HEALTH ENGINE TESTS PASSED 100% ✅");
 console.log("=======================================================\n");

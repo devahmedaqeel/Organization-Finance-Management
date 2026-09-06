@@ -248,10 +248,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         payroll,
         activeOrgId,
         settings.currency || "PKR",
-        user?.id || "current_user"
+        user?.id || "current_user",
+        departments
       ).catch(() => {});
     }
-  }, [loaded, activeOrgId, transactions.length, budgets.length, payroll.length, settings.currency, user?.id]);
+  }, [loaded, activeOrgId, transactions.length, budgets.length, payroll.length, departments.length, settings.currency, user?.id]);
 
   // 1. Organization-Scoped Initial Local Cache Load + Instant REST Cloud Sync
   useEffect(() => {

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import {
   StyleSheet,
   Text,
@@ -46,6 +46,7 @@ import {
 } from "@/services/FinancialCalculationEngine";
 import { calculateFinancialHealth } from "@/services/financialHealthService";
 import { generateFinancialInsights } from "@/services/financialInsightsService";
+import { dispatchNotification } from "@/services/notificationService";
 
 const CAT_COLORS = ["#F43F5E", "#F59E0B", "#8B5CF6", "#0EA5E9", "#10B981", "#EC4899"];
 
@@ -75,7 +76,14 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
 
   const { user } = useAuth();
   const { settings } = useSettings();
-  const { transactions, budgets, payroll, departments } = useFinance();
+  const {
+    transactions,
+    budgets,
+    payroll,
+    departments,
+    totalBudgeted: contextTotalBudgeted,
+    totalBudgetSpent: contextBudgetSpent,
+  } = useFinance();
   const [allTxModal, setAllTxModal] = useState(false);
   const [txModalFilter, setTxModalFilter] = useState<"all" | "income" | "expense">("all");
   const [insightFilter, setInsightFilter] = useState<"all" | "positive" | "critical" | "advisories">("all");
@@ -110,6 +118,31 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
     );
   }, [transactions, budgets, payroll, departments, activePeriod, settings.currency, user?.organizationId]);
 
+  // Dispatch critical/warning AI insight alerts & recommendations to Notification Center
+  useEffect(() => {
+    const orgId = user?.organizationId || "default_org";
+    if (actionableInsights && actionableInsights.length > 0) {
+      actionableInsights.forEach((insight) => {
+        if (insight.isActionable || insight.severity === "CRITICAL" || insight.severity === "WARNING") {
+          const aiNotifKey = `ai_insight_${orgId}_${insight.id}`;
+          dispatchNotification(
+            {
+              type: insight.severity === "CRITICAL" ? "BUDGET_CRITICAL" : insight.severity === "WARNING" ? "BUDGET_WARNING" : "SYSTEM_ALERT",
+              title: `AI Recommendation: ${insight.title}`,
+              message: `${insight.summary} Action: ${insight.recommendedAction}`,
+              severity: insight.severity === "CRITICAL" ? "CRITICAL" : insight.severity === "WARNING" ? "WARNING" : "INFO",
+              actionRoute: insight.actionRoute || "/ai-insights",
+              entityId: insight.id,
+              idempotencyKey: aiNotifKey,
+            },
+            orgId,
+            user?.id
+          ).catch(() => {});
+        }
+      });
+    }
+  }, [actionableInsights, user?.organizationId, user?.id]);
+
   // Dynamic real-time chart data points
   const chartPoints = useMemo(() => {
     return aggregateTransactionsByGranularity(transactions, activePeriod);
@@ -138,8 +171,11 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
     return periodTxs;
   }, [selectedPoint, transactions, periodTxs]);
 
-  // Budget allocations & displayed spend
-  const totalAllocatedBudget = useMemo(() => calculateBudgetAllocation(budgets), [budgets]);
+  // Budget allocations & displayed spend (Unified single source of truth)
+  const totalAllocatedBudget = useMemo(() => {
+    if (contextTotalBudgeted !== undefined && contextTotalBudgeted > 0) return contextTotalBudgeted;
+    return calculateBudgetAllocation(budgets, departments);
+  }, [contextTotalBudgeted, budgets, departments]);
 
   // Authoritative real calculation for the displayed scope
   const displayedTxIncome = useMemo(() => calculateTotalIncome(displayedTxs), [displayedTxs]);
@@ -151,12 +187,22 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
   const displayedExpense = useMemo(() => calculateTotalExpenses(displayedTxs), [displayedTxs]);
   const displayedNet = displayedIncome - displayedExpense;
 
+  // Total Funding Pool & Net Balance (Harmonized with Top Dashboard Hero Card)
+  const totalFundingPool = displayedIncome + totalAllocatedBudget;
+  const netSurplus = totalFundingPool - displayedExpense;
+  const authoritativeNetBalance = totalAllocatedBudget > 0 ? netSurplus : displayedNet;
+
   // Real operating surplus margin
   const profitMargin = displayedIncome > 0
     ? (displayedNet / displayedIncome) * 100
     : (displayedExpense > 0 ? -100 : 0);
 
-  // Real expense burn ratio (Outflows as percentage of total funding)
+  // Capital spend ratio (Outflows as percentage of total funding pool)
+  const capitalSpendRatio = totalFundingPool > 0
+    ? (displayedExpense / totalFundingPool) * 100
+    : (displayedExpense > 0 ? 100 : 0);
+
+  // Real expense burn ratio (Outflows as percentage of incoming revenue)
   const expenseRatio = displayedIncome > 0
     ? (displayedExpense / displayedIncome) * 100
     : (displayedExpense > 0 ? 100 : 0);
@@ -183,9 +229,22 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
     return Array.from(map.values());
   }, [budgets]);
 
+  // Raw budget spent matching explicitly assigned budget line-items
+  const rawBudgetSpent = useMemo(() => {
+    return calculateBudgetUsed(displayedTxs, budgets);
+  }, [displayedTxs, budgets]);
+
+  // Authoritative displayed budget spent: incorporates explicit line-item disbursements or approved organizational disbursements against budget pool
   const displayedBudgetSpent = useMemo(() => {
-    return calculateBudgetUsed(displayedTxs, budgets, activePeriod);
-  }, [displayedTxs, budgets, activePeriod]);
+    if (rawBudgetSpent > 0) return rawBudgetSpent;
+    if (contextBudgetSpent !== undefined && contextBudgetSpent > 0 && displayedTxs.length === transactions.length) {
+      return contextBudgetSpent;
+    }
+    if (totalAllocatedBudget > 0 && displayedExpense > 0) {
+      return Math.min(displayedExpense, totalAllocatedBudget);
+    }
+    return 0;
+  }, [rawBudgetSpent, contextBudgetSpent, totalAllocatedBudget, displayedExpense, displayedTxs.length, transactions.length]);
 
   const displayedBudgetRemaining = useMemo(() => {
     return calculateBudgetRemaining(totalAllocatedBudget, displayedBudgetSpent);
@@ -423,11 +482,11 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
             <View style={[styles.healthStats, isMobile && { justifyContent: "center" }]}>
               {[
                 {
-                  label: "Net Balance",
-                  value: displayedTxs.length > 0 || displayedNet !== 0
-                    ? `${displayedNet >= 0 ? "+" : "-"}${settings.currency} ${fmt(Math.abs(displayedNet))}`
+                  label: totalAllocatedBudget > 0 ? "Net Surplus" : "Net Balance",
+                  value: displayedTxs.length > 0 || authoritativeNetBalance !== 0
+                    ? `${authoritativeNetBalance >= 0 ? "+" : "-"}${settings.currency} ${fmt(Math.abs(authoritativeNetBalance))}`
                     : `${settings.currency} 0`,
-                  color: displayedNet >= 0 ? "#10B981" : "#F43F5E",
+                  color: authoritativeNetBalance >= 0 ? "#10B981" : "#F43F5E",
                 },
                 {
                   label: "Profit Margin",
@@ -441,7 +500,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
                 {
                   label: "Budget Used",
                   value: totalAllocatedBudget > 0
-                    ? `${displayedBudgetUtil.toFixed(0)}%`
+                    ? `${displayedBudgetUtil < 10 && displayedBudgetUtil > 0 ? displayedBudgetUtil.toFixed(1) : displayedBudgetUtil.toFixed(0)}%`
                     : "N/A",
                   color: totalAllocatedBudget > 0
                     ? (displayedBudgetUtil <= 75 ? "#10B981" : displayedBudgetUtil <= 100 ? "#F59E0B" : "#F43F5E")
@@ -454,11 +513,15 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
                       color: incomeGrowth >= 0 ? "#10B981" : "#F43F5E",
                     }
                   : {
-                      label: "Burn Rate",
-                      value: (displayedIncome > 0 || displayedExpense > 0)
+                      label: totalAllocatedBudget > 0 ? "Capital Spent" : "Burn Rate",
+                      value: totalAllocatedBudget > 0
+                        ? `${capitalSpendRatio.toFixed(1)}%`
+                        : (displayedIncome > 0 || displayedExpense > 0)
                         ? `${expenseRatio.toFixed(1)}%`
                         : "N/A",
-                      color: (displayedIncome > 0 || displayedExpense > 0)
+                      color: totalAllocatedBudget > 0
+                        ? (capitalSpendRatio <= 50 ? "#10B981" : capitalSpendRatio <= 85 ? "#F59E0B" : "#F43F5E")
+                        : (displayedIncome > 0 || displayedExpense > 0)
                         ? (expenseRatio <= 65 ? "#10B981" : expenseRatio <= 85 ? "#F59E0B" : "#F43F5E")
                         : "#94A3B8",
                     },
@@ -671,7 +734,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
                 </Text>
               </View>
               <Text style={styles.ringValueSub}>
-                {profitMargin >= 0 ? "+" : "-"}{settings.currency} {fmt(Math.abs(displayedNet))}
+                {authoritativeNetBalance >= 0 ? "+" : "-"}{settings.currency} {fmt(Math.abs(authoritativeNetBalance))}
               </Text>
             </View>
 
@@ -679,7 +742,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
             <View style={styles.ringItem}>
               <RingProgress
                 percentage={Math.min(displayedBudgetUtil, 100)}
-                centerLabel={`${displayedBudgetUtil.toFixed(0)}%`}
+                centerLabel={`${displayedBudgetUtil < 10 && displayedBudgetUtil > 0 ? displayedBudgetUtil.toFixed(1) : displayedBudgetUtil.toFixed(0)}%`}
                 size={98}
                 strokeWidth={9}
                 color={displayedBudgetUtil === 0 ? "#64748B" : displayedBudgetUtil <= 75 ? "#3B82F6" : displayedBudgetUtil <= 95 ? "#F59E0B" : "#F43F5E"}
