@@ -28,13 +28,15 @@ export const auth =
     ? getAuth(app)
     : (() => {
         try {
-          return initializeAuth(app, {
-            persistence: getReactNativePersistence(AsyncStorage),
-          });
+          if (typeof getReactNativePersistence === "function") {
+            return initializeAuth(app, {
+              persistence: getReactNativePersistence(AsyncStorage),
+            });
+          }
+          return getAuth(app);
         } catch (e: any) {
-          // If already initialized (hot reload), get existing instance
-          if (e.code === "auth/already-initialized") return getAuth(app);
-          throw e;
+          // If already initialized (hot reload) or persistence fallback needed, get existing/default instance
+          return getAuth(app);
         }
       })();
 
