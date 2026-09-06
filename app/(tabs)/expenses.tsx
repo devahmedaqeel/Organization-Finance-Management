@@ -68,19 +68,6 @@ export default function ExpensesScreen() {
     setModalVisible(true);
   };
 
-  const topCategories = useMemo(() => {
-    const map: Record<string, number> = {};
-    expenses.forEach((t) => {
-      map[t.category] = (map[t.category] ?? 0) + t.amount;
-    });
-    return Object.entries(map)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 4)
-      .map(([name, amount]) => ({ name, amount }));
-  }, [expenses]);
-
-  const EXPENSE_BAR_COLORS = ["#F43F5E", "#F59E0B", "#8B5CF6", "#0EA5E9", "#10B981"];
-
   return (
     <View style={[styles.flex, { backgroundColor: colors.background }]}>
       {/* Header */}
@@ -93,7 +80,7 @@ export default function ExpensesScreen() {
           <View style={styles.headerRight}>
             <View style={[styles.totalBadge, { backgroundColor: colors.expense + "22" }]}>
               <Feather name="trending-down" size={12} color={colors.expense} />
-              <Text style={[styles.totalText, { color: colors.expense }]}>{formatAmt(total)}</Text>
+              <Text style={[styles.totalText, { color: colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{formatAmt(total)}</Text>
             </View>
             {canEdit && (
               <TouchableOpacity
@@ -156,47 +143,6 @@ export default function ExpensesScreen() {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
-        ListHeaderComponent={
-          expenses.length > 0 && filterCat === "All" && !search ? (
-            <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={styles.summaryCardHeader}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  <Feather name="pie-chart" size={14} color={colors.expense} />
-                  <Text style={[styles.summaryCardTitle, { color: colors.foreground }]}>Spending Flow</Text>
-                </View>
-                <Text style={[styles.summaryCardTotal, { color: colors.expense }]}>{formatAmt(total)}</Text>
-              </View>
-              <View style={styles.catBarsWrap}>
-                {topCategories.map((cat, i) => {
-                  const pct = total > 0 ? (cat.amount / total) * 100 : 0;
-                  return (
-                    <View key={cat.name} style={styles.catBarItem}>
-                      <View style={styles.catBarHeader}>
-                        <Text style={[styles.catBarName, { color: colors.foreground, flex: 1, marginRight: 8 }]}>
-                          {cat.name}
-                        </Text>
-                        <Text style={[styles.catBarAmount, { color: colors.mutedForeground }]}>
-                          {formatAmt(cat.amount)} ({pct.toFixed(0)}%)
-                        </Text>
-                      </View>
-                      <View style={[styles.catBarTrack, { backgroundColor: colors.muted }]}>
-                        <View
-                          style={[
-                            styles.catBarFill,
-                            {
-                              width: `${pct > 0 ? Math.min(Math.max(pct, 2), 100) : 0}%`,
-                              backgroundColor: EXPENSE_BAR_COLORS[i % EXPENSE_BAR_COLORS.length],
-                            },
-                          ]}
-                        />
-                      </View>
-                    </View>
-                  );
-                })}
-              </View>
-            </View>
-          ) : null
-        }
         renderItem={({ item }) => (
           <TransactionItem
             item={item}
@@ -267,52 +213,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20,
   },
   emptyAddText: { color: "#fff", fontSize: 14, fontFamily: "Inter_600SemiBold" },
-  summaryCard: {
-    padding: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    marginBottom: 12,
-    gap: 10,
-  },
-  summaryCardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  summaryCardTitle: {
-    fontSize: 13,
-    fontFamily: "Inter_700Bold",
-  },
-  summaryCardTotal: {
-    fontSize: 13,
-    fontFamily: "Inter_700Bold",
-  },
-  catBarsWrap: {
-    gap: 8,
-  },
-  catBarItem: {
-    gap: 4,
-  },
-  catBarHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  catBarName: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
-  },
-  catBarAmount: {
-    fontSize: 11,
-    fontFamily: "Inter_500Medium",
-  },
-  catBarTrack: {
-    height: 6,
-    borderRadius: 3,
-    overflow: "hidden",
-  },
-  catBarFill: {
-    height: "100%",
-    borderRadius: 3,
-  },
 });
