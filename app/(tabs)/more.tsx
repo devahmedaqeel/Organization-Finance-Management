@@ -106,6 +106,15 @@ export default function MoreScreen() {
     () => WORLD_CURRENCIES.find((c) => c.code === settings.currency),
     [settings.currency]
   );
+
+  const visibleFeatures = React.useMemo(() => {
+    return FEATURES.filter((f) => {
+      if ((f.id === "team" || f.id === "settings") && user?.role !== "admin") return false;
+      if ((f.id === "txs" || f.id === "budget" || f.id === "departments" || f.id === "ai") && user?.role === "employee") return false;
+      return true;
+    });
+  }, [user?.role]);
+
   const webTop = Platform.OS === "web" ? 67 : 0;
   const topSafePad = webTop + insets.top + (Platform.OS === "android" ? 22 : 12);
 
@@ -246,19 +255,19 @@ export default function MoreScreen() {
         </View>
         <View style={styles.profileInfo}>
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-            <Text style={[styles.profileName, { color: colors.foreground }]}>
+            <Text style={[styles.profileName, { color: colors.foreground }]} numberOfLines={1}>
               {user?.name || "Administrator"}
             </Text>
             <View style={[styles.rolePill, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "35" }]}>
               <Text style={[styles.roleText, { color: colors.primary }]}>{user?.role?.toUpperCase() || "ADMIN"}</Text>
             </View>
           </View>
-          <Text style={[styles.profileEmail, { color: colors.mutedForeground }]}>
+          <Text style={[styles.profileEmail, { color: colors.mutedForeground }]} numberOfLines={1}>
             {user?.email || "admin@ofm.com"}
           </Text>
           <View style={styles.orgRow}>
             <Text style={{ fontSize: 13 }}>{selectedCurrency?.flag ?? "🌐"}</Text>
-            <Text style={[styles.profileOrg, { color: colors.mutedForeground }]}>
+            <Text style={[styles.profileOrg, { color: colors.mutedForeground, flex: 1 }]} numberOfLines={1}>
               {settings.organizationName || "Organization"}
             </Text>
           </View>
@@ -267,42 +276,109 @@ export default function MoreScreen() {
 
       {/* Feature Modules Grid */}
       <View style={styles.sectionHeaderRow}>
-        <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>MANAGEMENT FEATURES</Text>
-        <Text style={[styles.sectionCountBadge, { color: colors.mutedForeground }]}>6 Active Modules</Text>
+        <View style={styles.sectionHeaderTitleWrap}>
+          <View style={[styles.sectionAccentDot, { backgroundColor: colors.primary }]} />
+          <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>MANAGEMENT FEATURES</Text>
+        </View>
+        <View style={[styles.countBadgePill, { backgroundColor: colors.primary + "16", borderColor: colors.primary + "30" }]}>
+          <Text style={[styles.sectionCountBadge, { color: colors.primary }]}>{visibleFeatures.length} Active Modules</Text>
+        </View>
       </View>
 
       <View style={styles.grid}>
-        {FEATURES.filter((f) => {
-          if ((f.id === "team" || f.id === "settings") && user?.role !== "admin") return false;
-          if ((f.id === "txs" || f.id === "budget" || f.id === "departments" || f.id === "ai") && user?.role === "employee") return false;
-          return true;
-        }).map((f) => (
-          <TouchableOpacity
-            key={f.id}
-            style={[styles.featureCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-            onPress={() => handleNavigate(f.route)}
-            activeOpacity={0.72}
-          >
-            <View style={styles.cardTopRow}>
-              <View style={[styles.featureIcon, { backgroundColor: f.color + "18" }]}>
-                <Feather name={f.icon} size={20} color={f.color} />
+        {visibleFeatures.map((f, index) => {
+          const isLastOdd = index === visibleFeatures.length - 1 && visibleFeatures.length % 2 === 1;
+
+          if (isLastOdd) {
+            return (
+              <TouchableOpacity
+                key={f.id}
+                style={[
+                  styles.featureCardFull,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: colors.border,
+                  },
+                ]}
+                onPress={() => handleNavigate(f.route)}
+                activeOpacity={0.75}
+              >
+                <View style={styles.cardFullLeft}>
+                  <View style={[styles.featureIconFull, { backgroundColor: f.color + "18", borderColor: f.color + "32" }]}>
+                    <Feather name={f.icon} size={20} color={f.color} />
+                  </View>
+                  <View style={styles.cardFullTextWrap}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <Text style={[styles.featureLabel, { color: colors.foreground }]}>{f.label}</Text>
+                      <View style={[styles.cardTagPill, { backgroundColor: f.color + "16", borderColor: f.color + "32" }]}>
+                        <Text style={[styles.cardTagText, { color: f.color }]}>{f.tag}</Text>
+                      </View>
+                    </View>
+                    <Text style={[styles.featureDesc, { color: colors.mutedForeground, marginTop: 2 }]} numberOfLines={1}>
+                      {f.id === "settings" ? "Organization configuration, currency & security preferences" : f.desc}
+                    </Text>
+                  </View>
+                </View>
+                <View style={[styles.cardFullActionCircle, { backgroundColor: colors.muted + "25" }]}>
+                  <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+                </View>
+              </TouchableOpacity>
+            );
+          }
+
+          return (
+            <TouchableOpacity
+              key={f.id}
+              style={[
+                styles.featureCard,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                },
+              ]}
+              onPress={() => handleNavigate(f.route)}
+              activeOpacity={0.75}
+            >
+              {/* Top Row: Squircle Icon + Tag Pill */}
+              <View style={styles.cardTopRow}>
+                <View style={[styles.featureIcon, { backgroundColor: f.color + "18", borderColor: f.color + "30" }]}>
+                  <Feather name={f.icon} size={18} color={f.color} />
+                </View>
+                <View style={[styles.cardTagPill, { backgroundColor: f.color + "16", borderColor: f.color + "30" }]}>
+                  <Text style={[styles.cardTagText, { color: f.color }]}>{f.tag}</Text>
+                </View>
               </View>
-              <Feather name="arrow-up-right" size={14} color={colors.mutedForeground} style={{ opacity: 0.5 }} />
-            </View>
-            <Text style={[styles.featureLabel, { color: colors.foreground }]}>{f.label}</Text>
-            <Text style={[styles.featureDesc, { color: colors.mutedForeground }]}>
-              {f.desc}
-            </Text>
-          </TouchableOpacity>
-        ))}
+
+              {/* Title */}
+              <Text style={[styles.featureLabel, { color: colors.foreground }]} numberOfLines={1}>
+                {f.label}
+              </Text>
+
+              {/* Bottom Row: Description + Arrow */}
+              <View style={styles.cardBottomRow}>
+                <Text style={[styles.featureDesc, { color: colors.mutedForeground, flex: 1 }]} numberOfLines={2}>
+                  {f.desc}
+                </Text>
+                <View style={[styles.cardArrowWrap, { backgroundColor: f.color + "12" }]}>
+                  <Feather name="arrow-up-right" size={12} color={f.color} />
+                </View>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       {/* Interactive Quick Summary Actions (Hidden for Employee) */}
       {user?.role !== "employee" && (
         <>
           <View style={styles.sectionHeaderRow}>
-            <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>FINANCIAL SUMMARY & LEDGERS</Text>
-            <Text style={[styles.sectionCountBadge, { color: colors.mutedForeground }]}>Tap row to open</Text>
+            <View style={styles.sectionHeaderTitleWrap}>
+              <View style={[styles.sectionAccentDot, { backgroundColor: "#8B5CF6" }]} />
+              <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>FINANCIAL SUMMARY & LEDGERS</Text>
+            </View>
+            <View style={[styles.countBadgePill, { backgroundColor: colors.muted + "20", borderColor: colors.border }]}>
+              <Text style={[styles.sectionCountBadge, { color: colors.mutedForeground }]}>Tap row to open</Text>
+            </View>
           </View>
 
           <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -319,12 +395,12 @@ export default function MoreScreen() {
                 onPress={() => handleNavigate(stat.route)}
                 activeOpacity={0.72}
               >
-                <View style={[styles.summaryIcon, { backgroundColor: stat.color + "18" }]}>
+                <View style={[styles.summaryIcon, { backgroundColor: stat.color + "18", borderColor: stat.color + "30" }]}>
                   <Feather name={stat.icon} size={16} color={stat.color} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.summaryLabel, { color: colors.foreground }]}>{stat.label}</Text>
-                  <Text style={[styles.summarySub, { color: colors.mutedForeground }]}>
+                  <Text style={[styles.summaryLabel, { color: colors.foreground }]} numberOfLines={1}>{stat.label}</Text>
+                  <Text style={[styles.summarySub, { color: colors.mutedForeground }]} numberOfLines={1}>
                     {stat.sub}
                   </Text>
                 </View>
@@ -515,17 +591,34 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 6,
+    marginTop: 8,
+    marginBottom: 4,
     paddingHorizontal: 2,
   },
+  sectionHeaderTitleWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+  },
+  sectionAccentDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
   sectionLabel: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontFamily: "Inter_700Bold",
-    letterSpacing: 0.6,
+    letterSpacing: 0.7,
+  },
+  countBadgePill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    borderWidth: 1,
   },
   sectionCountBadge: {
-    fontSize: 10,
-    fontFamily: "Inter_500Medium",
+    fontSize: 10.5,
+    fontFamily: "Inter_600SemiBold",
   },
   grid: {
     flexDirection: "row",
@@ -535,26 +628,97 @@ const styles = StyleSheet.create({
   },
   featureCard: {
     width: "48.2%",
-    padding: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-    gap: 6,
+    padding: 13,
+    borderRadius: 16,
+    borderWidth: 1.2,
+    minHeight: 126,
+    justifyContent: "space-between",
+  },
+  featureCardFull: {
+    width: "100%",
+    padding: 13,
+    borderRadius: 16,
+    borderWidth: 1.2,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   cardTopRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 4,
+    alignItems: "center",
+    marginBottom: 8,
   },
   featureIcon: {
-    width: 40,
-    height: 40,
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  featureIconFull: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cardTagPill: {
+    paddingHorizontal: 6.5,
+    paddingVertical: 2.5,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  cardTagText: {
+    fontSize: 9,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
+  },
+  featureLabel: {
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: -0.2,
+  },
+  cardBottomRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    marginTop: 4,
+    gap: 6,
+  },
+  featureDesc: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 15,
+  },
+  cardArrowWrap: {
+    width: 20,
+    height: 20,
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
   },
-  featureLabel: { fontSize: 14.5, fontFamily: "Inter_700Bold" },
-  featureDesc: { fontSize: 11, fontFamily: "Inter_400Regular" },
+  cardFullLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+    paddingRight: 8,
+  },
+  cardFullTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  cardFullActionCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   summaryCard: {
     borderRadius: 16,
     borderWidth: 1,
@@ -567,9 +731,10 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   summaryIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
   },
