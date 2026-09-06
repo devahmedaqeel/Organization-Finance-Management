@@ -683,7 +683,7 @@ const styles = StyleSheet.create({
   kpiLabel: {
     fontSize: 9,
     fontFamily: "Inter_700Bold",
-    letterSpacing: 0.5,
+    letterSpacing: 0.1,
   },
   kpiVal: {
     fontSize: 15,

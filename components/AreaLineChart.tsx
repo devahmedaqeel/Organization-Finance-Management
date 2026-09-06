@@ -422,7 +422,7 @@ export function AreaLineChart({
         <View style={styles.inspectorHeaderRow}>
           <View style={styles.dateBadgeWrap}>
             <SvgCalendar size={12} color={colors.primary} />
-            <Text style={[styles.inspectorDate, { color: colors.foreground }]} numberOfLines={1}>
+            <Text style={[styles.inspectorDate, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82}>
               {activePoint ? (activePoint.fullDate || activePoint.label) : "-"}
             </Text>
           </View>
@@ -441,6 +441,9 @@ export function AreaLineChart({
                 styles.netSurplusText,
                 { color: isNetPositive ? colors.income : colors.expense },
               ]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.78}
             >
               Net: {isNetPositive ? "+" : "-"}{currency} {fmtAmount(Math.abs(netSurplus))}
             </Text>
@@ -450,21 +453,31 @@ export function AreaLineChart({
         {/* Bottom Badges: Income and Expense */}
         <View style={styles.inspectorBadgesRow}>
           <View style={[styles.statBadge, { backgroundColor: colors.income + "14", borderColor: colors.income + "30" }]}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 }}>
               <View style={[styles.legendDot, { backgroundColor: colors.income }]} />
               <Text style={[styles.statBadgeLabel, { color: colors.income }]}>Income</Text>
             </View>
-            <Text style={[styles.statBadgeValue, { color: colors.income }]}>
+            <Text
+              style={[styles.statBadgeValue, { color: colors.income }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.75}
+            >
               {currency} {fmtAmount(activePoint ? activePoint.income : 0)}
             </Text>
           </View>
 
           <View style={[styles.statBadge, { backgroundColor: colors.expense + "14", borderColor: colors.expense + "30" }]}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 }}>
               <View style={[styles.legendDot, { backgroundColor: colors.expense }]} />
-              <Text style={[styles.statBadgeLabel, { color: colors.expense }]}>Expense</Text>
+              <Text style={[styles.statBadgeLabel, { color: colors.expense }]}>Expenses</Text>
             </View>
-            <Text style={[styles.statBadgeValue, { color: colors.expense }]}>
+            <Text
+              style={[styles.statBadgeValue, { color: colors.expense }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.75}
+            >
               {currency} {fmtAmount(activePoint ? activePoint.expense : 0)}
             </Text>
           </View>
@@ -727,6 +740,9 @@ export function AreaLineChart({
                     { color: isAct ? "#FFFFFF" : colors.foreground },
                     isAct && { fontFamily: "Inter_700Bold" },
                   ]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
                 >
                   {g.charAt(0).toUpperCase() + g.slice(1)}
                 </Text>
@@ -838,14 +854,14 @@ const styles = StyleSheet.create({
   inspectorBadgesRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
   },
   statBadge: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 9,
+    paddingHorizontal: 7,
     paddingVertical: 4.5,
     borderRadius: 8,
     borderWidth: 1,
@@ -856,12 +872,14 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   statBadgeLabel: {
-    fontSize: 10.5,
+    fontSize: 10,
     fontFamily: "Inter_600SemiBold",
   },
   statBadgeValue: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontFamily: "Inter_700Bold",
+    flexShrink: 1,
+    textAlign: "right",
   },
   scrollHintRow: {
     flexDirection: "row",
@@ -915,23 +933,28 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginTop: 4,
     paddingTop: 4,
+    gap: 4,
   },
   granularityTitle: {
-    fontSize: 11,
-    fontFamily: "Inter_700Bold",
+    fontSize: 10.5,
+    fontFamily: "Inter_600SemiBold",
+    flexShrink: 0,
   },
   granPillsRow: {
     flexDirection: "row",
-    gap: 6,
+    gap: 4,
+    flexShrink: 1,
   },
   granPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 7,
     borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
   granPillText: {
-    fontSize: 10.5,
+    fontSize: 10,
     fontFamily: "Inter_600SemiBold",
   },
 });

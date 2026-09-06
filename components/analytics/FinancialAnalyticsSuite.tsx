@@ -88,7 +88,12 @@ export function FinancialAnalyticsSuite({
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <View style={styles.titleWithHelpRow}>
-                  <Text style={[styles.cardTitle, { color: colors.foreground }]} numberOfLines={1}>
+                  <Text
+                    style={[styles.cardTitle, { color: colors.foreground }]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.82}
+                  >
                     Budget Utilization
                   </Text>
                   <TouchableOpacity
@@ -113,7 +118,7 @@ export function FinancialAnalyticsSuite({
               }}
               style={{ flexShrink: 0 }}
             >
-              <Text style={[styles.linkText, { color: colors.primary }]}>View Details →</Text>
+              <Text style={[styles.linkText, { color: colors.primary }]}>View Details</Text>
             </TouchableOpacity>
           </View>
 
@@ -226,7 +231,7 @@ export function FinancialAnalyticsSuite({
               <View style={styles.flowBarLegend}>
                 <View style={styles.flowLegendItem}>
                   <View style={[styles.flowDot, { backgroundColor: colors.expense }]} />
-                  <Text style={[styles.flowLegendText, { color: colors.mutedForeground }]} numberOfLines={1}>
+                  <Text style={[styles.flowLegendText, { color: colors.mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                     Spent:{" "}
                     <Text style={{ color: colors.expense, fontFamily: "Inter_700Bold" }}>
                       {formatCompactCurrency(budget.actualSpending, currency)} ({budget.rawUtilizationPct.toFixed(0)}%)
@@ -235,7 +240,7 @@ export function FinancialAnalyticsSuite({
                 </View>
                 <View style={[styles.flowLegendItem, { justifyContent: "flex-end" }]}>
                   <View style={[styles.flowDot, { backgroundColor: colors.income }]} />
-                  <Text style={[styles.flowLegendText, { color: colors.mutedForeground, textAlign: "right" }]} numberOfLines={1}>
+                  <Text style={[styles.flowLegendText, { color: colors.mutedForeground, textAlign: "right" }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                     Left:{" "}
                     <Text style={{ color: colors.income, fontFamily: "Inter_700Bold" }}>
                       {formatCompactCurrency(budget.remainingAmount, currency)} ({Math.max(0, 100 - budget.rawUtilizationPct).toFixed(0)}%)
@@ -250,7 +255,7 @@ export function FinancialAnalyticsSuite({
           <View style={styles.chipsRow}>
             {[
               { id: "used", label: "% Used" },
-              { id: "spent", label: "Spent Amount" },
+              { id: "spent", label: "Spent" },
               { id: "remaining", label: "Remaining" },
             ].map((opt) => {
               const isSelected = budgetMode === opt.id;
@@ -276,6 +281,9 @@ export function FinancialAnalyticsSuite({
                       { color: isSelected ? "#FFFFFF" : colors.mutedForeground },
                       isSelected && { fontFamily: "Inter_700Bold" },
                     ]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.85}
                   >
                     {opt.label}
                   </Text>
@@ -287,7 +295,14 @@ export function FinancialAnalyticsSuite({
           {/* 3-Metric Structured Bento Box (Pinned to bottom) */}
           <View style={[styles.bentoRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
             <View style={styles.bentoCol}>
-              <Text style={[styles.bentoLabel, { color: colors.mutedForeground }]}>DISBURSED</Text>
+              <Text
+                style={[styles.bentoLabel, { color: colors.mutedForeground }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.72}
+              >
+                DISBURSED
+              </Text>
               <Text
                 style={[styles.bentoVal, { color: colors.expense }]}
                 numberOfLines={1}
@@ -299,7 +314,14 @@ export function FinancialAnalyticsSuite({
             </View>
             <View style={[styles.bentoDivider, { backgroundColor: colors.border }]} />
             <View style={styles.bentoCol}>
-              <Text style={[styles.bentoLabel, { color: colors.mutedForeground }]}>ALLOCATED</Text>
+              <Text
+                style={[styles.bentoLabel, { color: colors.mutedForeground }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.72}
+              >
+                ALLOCATED
+              </Text>
               <Text
                 style={[styles.bentoVal, { color: budget.isValid ? colors.foreground : colors.mutedForeground }]}
                 numberOfLines={1}
@@ -311,7 +333,12 @@ export function FinancialAnalyticsSuite({
             </View>
             <View style={[styles.bentoDivider, { backgroundColor: colors.border }]} />
             <View style={styles.bentoCol}>
-              <Text style={[styles.bentoLabel, { color: colors.mutedForeground }]}>
+              <Text
+                style={[styles.bentoLabel, { color: colors.mutedForeground }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.72}
+              >
                 {budget.isOverBudget ? "OVER BUDGET" : "REMAINING"}
               </Text>
               <Text
@@ -351,7 +378,12 @@ export function FinancialAnalyticsSuite({
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <View style={styles.titleWithHelpRow}>
-                  <Text style={[styles.cardTitle, { color: colors.foreground }]} numberOfLines={1}>
+                  <Text
+                    style={[styles.cardTitle, { color: colors.foreground }]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.82}
+                  >
                     Net Operating Margin
                   </Text>
                   <TouchableOpacity
@@ -374,7 +406,7 @@ export function FinancialAnalyticsSuite({
               }}
               style={{ flexShrink: 0 }}
             >
-              <Text style={[styles.linkText, { color: colors.primary }]}>View Details →</Text>
+              <Text style={[styles.linkText, { color: colors.primary }]}>View Details</Text>
             </TouchableOpacity>
           </View>
 
@@ -527,7 +559,7 @@ export function FinancialAnalyticsSuite({
                 <View style={styles.flowBarLegend}>
                   <View style={styles.flowLegendItem}>
                     <View style={[styles.flowDot, { backgroundColor: colors.income }]} />
-                    <Text style={[styles.flowLegendText, { color: colors.mutedForeground }]} numberOfLines={1}>
+                    <Text style={[styles.flowLegendText, { color: colors.mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                       Income:{" "}
                       <Text style={{ color: colors.income, fontFamily: "Inter_700Bold" }}>
                         +{formatCompactCurrency(rev, currency)} ({inflowPct.toFixed(0)}%)
@@ -536,7 +568,7 @@ export function FinancialAnalyticsSuite({
                   </View>
                   <View style={[styles.flowLegendItem, { justifyContent: "flex-end" }]}>
                     <View style={[styles.flowDot, { backgroundColor: colors.expense }]} />
-                    <Text style={[styles.flowLegendText, { color: colors.mutedForeground, textAlign: "right" }]} numberOfLines={1}>
+                    <Text style={[styles.flowLegendText, { color: colors.mutedForeground, textAlign: "right" }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                       Expenses:{" "}
                       <Text style={{ color: colors.expense, fontFamily: "Inter_700Bold" }}>
                         -{formatCompactCurrency(exp, currency)} ({outflowPct.toFixed(0)}%)
@@ -552,7 +584,7 @@ export function FinancialAnalyticsSuite({
           <View style={styles.chipsRow}>
             {[
               { id: "margin", label: "Profit / Loss" },
-              { id: "outflow", label: "Expenses %" },
+              { id: "outflow", label: "Expenses" },
               { id: "net", label: "Net Surplus" },
             ].map((opt) => {
               const isSelected = marginMode === opt.id;
@@ -587,6 +619,9 @@ export function FinancialAnalyticsSuite({
                       { color: isSelected ? "#FFFFFF" : colors.mutedForeground },
                       isSelected && { fontFamily: "Inter_700Bold" },
                     ]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.85}
                   >
                     {opt.label}
                   </Text>
@@ -598,7 +633,14 @@ export function FinancialAnalyticsSuite({
           {/* 3-Metric Structured Bento Box (Pinned to bottom) */}
           <View style={[styles.bentoRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
             <View style={styles.bentoCol}>
-              <Text style={[styles.bentoLabel, { color: colors.mutedForeground }]}>INCOME</Text>
+              <Text
+                style={[styles.bentoLabel, { color: colors.mutedForeground }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.72}
+              >
+                INCOME
+              </Text>
               <Text
                 style={[styles.bentoVal, { color: colors.income }]}
                 numberOfLines={1}
@@ -610,7 +652,14 @@ export function FinancialAnalyticsSuite({
             </View>
             <View style={[styles.bentoDivider, { backgroundColor: colors.border }]} />
             <View style={styles.bentoCol}>
-              <Text style={[styles.bentoLabel, { color: colors.mutedForeground }]}>EXPENSES</Text>
+              <Text
+                style={[styles.bentoLabel, { color: colors.mutedForeground }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.72}
+              >
+                EXPENSES
+              </Text>
               <Text
                 style={[styles.bentoVal, { color: colors.expense }]}
                 numberOfLines={1}
@@ -622,7 +671,12 @@ export function FinancialAnalyticsSuite({
             </View>
             <View style={[styles.bentoDivider, { backgroundColor: colors.border }]} />
             <View style={styles.bentoCol}>
-              <Text style={[styles.bentoLabel, { color: colors.mutedForeground }]}>
+              <Text
+                style={[styles.bentoLabel, { color: colors.mutedForeground }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.72}
+              >
                 {margin.isLoss ? "NET DEFICIT" : "NET SURPLUS"}
               </Text>
               <Text
@@ -653,7 +707,12 @@ export function FinancialAnalyticsSuite({
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <View style={styles.titleWithHelpRow}>
-                  <Text style={[styles.cardTitle, { color: colors.foreground }]} numberOfLines={1}>
+                  <Text
+                    style={[styles.cardTitle, { color: colors.foreground }]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.82}
+                  >
                     Expense Distribution
                   </Text>
                   <TouchableOpacity
@@ -676,7 +735,7 @@ export function FinancialAnalyticsSuite({
               }}
               style={{ flexShrink: 0 }}
             >
-              <Text style={[styles.linkText, { color: colors.primary }]}>View Outflows →</Text>
+              <Text style={[styles.linkText, { color: colors.primary }]}>View Outflows</Text>
             </TouchableOpacity>
           </View>
 
@@ -760,6 +819,9 @@ export function FinancialAnalyticsSuite({
                       { color: isSelected ? "#FFFFFF" : colors.mutedForeground },
                       isSelected && { fontFamily: "Inter_700Bold" },
                     ]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.85}
                   >
                     {opt.label}
                   </Text>
@@ -889,7 +951,14 @@ export function FinancialAnalyticsSuite({
           {/* Authoritative 3-Metric Bento Box for Card 3 (Completes Symmetry Across All Cards) */}
           <View style={[styles.bentoRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
             <View style={styles.bentoCol}>
-              <Text style={[styles.bentoLabel, { color: colors.mutedForeground }]}>TOP DRIVER</Text>
+              <Text
+                style={[styles.bentoLabel, { color: colors.mutedForeground }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.72}
+              >
+                TOP DRIVER
+              </Text>
               <Text
                 style={[
                   styles.bentoVal,
@@ -904,7 +973,14 @@ export function FinancialAnalyticsSuite({
             </View>
             <View style={[styles.bentoDivider, { backgroundColor: colors.border }]} />
             <View style={styles.bentoCol}>
-              <Text style={[styles.bentoLabel, { color: colors.mutedForeground }]}>TOTAL SPENT</Text>
+              <Text
+                style={[styles.bentoLabel, { color: colors.mutedForeground }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.72}
+              >
+                TOTAL SPENT
+              </Text>
               <Text
                 style={[styles.bentoVal, { color: colors.expense }]}
                 numberOfLines={1}
@@ -916,7 +992,14 @@ export function FinancialAnalyticsSuite({
             </View>
             <View style={[styles.bentoDivider, { backgroundColor: colors.border }]} />
             <View style={styles.bentoCol}>
-              <Text style={[styles.bentoLabel, { color: colors.mutedForeground }]}>COST CENTERS</Text>
+              <Text
+                style={[styles.bentoLabel, { color: colors.mutedForeground }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.72}
+              >
+                COST CENTERS
+              </Text>
               <Text
                 style={[styles.bentoVal, { color: colors.foreground }]}
                 numberOfLines={1}
@@ -1000,9 +1083,10 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   cardTitle: {
-    fontSize: 15,
+    fontSize: 14.5,
     fontFamily: "Inter_700Bold",
-    letterSpacing: -0.3,
+    letterSpacing: -0.2,
+    flexShrink: 1,
   },
   cardSub: {
     fontSize: 11.5,
@@ -1011,7 +1095,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   linkText: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontFamily: "Inter_600SemiBold",
     letterSpacing: 0.1,
     flexShrink: 0,
@@ -1124,7 +1208,7 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   chip: {
-    paddingHorizontal: 9,
+    paddingHorizontal: 8,
     paddingVertical: 4.5,
     borderRadius: 20,
     borderWidth: 1,
@@ -1139,13 +1223,14 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     paddingVertical: 9,
-    paddingHorizontal: 6,
+    paddingHorizontal: 4,
     marginTop: 10,
   },
   bentoCol: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: 2,
     gap: 2,
     minWidth: 0,
   },
@@ -1156,7 +1241,7 @@ const styles = StyleSheet.create({
   bentoLabel: {
     fontSize: 8.5,
     fontFamily: "Inter_700Bold",
-    letterSpacing: 0.4,
+    letterSpacing: 0.1,
     textAlign: "center",
   },
   bentoVal: {
