@@ -28,6 +28,8 @@ import { WebShell } from "@/components/web/WebShell";
 import { requestNotificationPermissions } from "@/hooks/NotificationHelper";
 
 LogBox.ignoreLogs([
+  /Require cycle:/,
+  /Can't perform a React state update/,
   /\[NOTIFICATIONS\] Firestore save/,
   /Missing or insufficient permissions/,
   /expo-notifications: Android Push notifications/,

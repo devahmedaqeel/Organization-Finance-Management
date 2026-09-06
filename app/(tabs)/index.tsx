@@ -1639,13 +1639,11 @@ const styles = StyleSheet.create({
     paddingVertical: 4.5,
     borderRadius: 12,
     borderWidth: 1,
-    flex: 1,
     flexShrink: 1,
-    marginRight: 8,
+    maxWidth: "56%",
   },
   orgName: {
     fontFamily: "Inter_600SemiBold",
-    flex: 1,
     flexShrink: 1,
   },
   headerActions: {
