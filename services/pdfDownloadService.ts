@@ -280,6 +280,39 @@ export async function downloadPayslipPdf(
 }
 
 /**
+ * Exports real vector binary PDF directly on Web or returns payload
+ */
+export function downloadPdfBinaryDirectly(
+  opts: ReportOptions,
+  customFilename?: string
+): { success: boolean; uri: string; filename: string } {
+  const isExpenseOnly = opts.reportMode === "expense";
+  const isIncomeOnly = opts.reportMode === "income";
+  const cleanType = isExpenseOnly ? "Expenses" : isIncomeOnly ? "Income" : "Consolidated_Financial_Statement";
+  const sanitizedOrg = sanitizeFilename(opts.organizationName || "OFM");
+  const filename = customFilename || `OFM_${sanitizedOrg}_${cleanType}_${new Date().toISOString().substring(0, 10)}.pdf`;
+
+  const pdfBinary = buildFinancialPdfBinary(opts);
+  const blob = new Blob([pdfBinary], { type: "application/pdf" });
+  const pdfUrl = URL.createObjectURL(blob);
+
+  if (typeof document !== "undefined") {
+    const link = document.createElement("a");
+    link.href = pdfUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => {
+      try {
+        document.body.removeChild(link);
+      } catch (e) {}
+    }, 100);
+  }
+
+  return { success: true, uri: pdfUrl, filename };
+}
+
+/**
  * Generates and downloads a Financial Statement PDF using HTMLPDF.dev native Base64 mode.
  */
 export async function downloadFinancialReportPdf(
@@ -295,25 +328,52 @@ export async function downloadFinancialReportPdf(
   // 1. Web Platform: Instant Full Multi-Page Printable PDF Dossier with all Charts, Departments & Payroll
   if (Platform.OS === "web") {
     try {
-      const printWindow = window.open("", "_blank");
-      if (printWindow) {
-        printWindow.document.open();
-        printWindow.document.write(html);
-        printWindow.document.close();
+      // Always generate real vector PDF binary blob
+      const pdfBinary = buildFinancialPdfBinary(opts);
+      const blob = new Blob([pdfBinary], { type: "application/pdf" });
+      const pdfUrl = URL.createObjectURL(blob);
+
+      let printWindowOpened = false;
+      try {
+        const printWindow = window.open("", "_blank");
+        if (printWindow) {
+          printWindow.document.open();
+          printWindow.document.write(html);
+          printWindow.document.close();
+          setTimeout(() => {
+            try {
+              printWindow.focus();
+              printWindow.print();
+            } catch (e) {}
+          }, 400);
+          printWindowOpened = true;
+        }
+      } catch (e) {
+        console.log("Web window.open print notice:", e);
+      }
+
+      // If printWindow was blocked (e.g. mobile browser popup blocker), trigger direct PDF file download
+      if (!printWindowOpened && typeof document !== "undefined") {
+        const link = document.createElement("a");
+        link.href = pdfUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
         setTimeout(() => {
           try {
-            printWindow.focus();
-            printWindow.print();
+            document.body.removeChild(link);
           } catch (e) {}
-        }, 400);
-        return {
-          success: true,
-          filename,
-          message: "Official Multi-Page Financial Dossier generated with all graphs, departments, and payroll.",
-        };
+        }, 100);
       }
+
+      return {
+        success: true,
+        uri: pdfUrl,
+        filename,
+        message: "Official Multi-Page Financial Dossier generated with all graphs, departments, and payroll.",
+      };
     } catch (e) {
-      console.log("Web window.open print fallback:", e);
+      console.log("Web PDF generation error:", e);
     }
   }
 

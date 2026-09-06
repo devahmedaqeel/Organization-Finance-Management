@@ -266,6 +266,9 @@ export function WebShell() {
         const normalized = normalizeWebTab(rawTab);
         setActiveTab(normalized);
         setTabHistory(["dashboard", normalized]);
+      } else if (params.get("export") === "dossier" || params.get("auto") === "pdf" || params.get("reportType")) {
+        setActiveTab("reports");
+        setTabHistory(["dashboard", "reports"]);
       }
 
       const handlePopState = (e: PopStateEvent) => {

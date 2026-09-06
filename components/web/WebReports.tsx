@@ -11,8 +11,9 @@ import { RingProgress } from "@/components/RingProgress";
 import { NetOperatingBalanceHealthCard } from "@/components/NetOperatingBalanceHealthCard";
 import { FinancialDrillDownModal, DrillDownType } from "@/components/FinancialDrillDownModal";
 import { DownloadReportModal } from "@/components/DownloadReportModal";
-import { openPdfReport } from "@/services/ReportExportService";
-import { buildEnterpriseReportData, ReportType } from "@/services/reportDataService";
+import { Feather } from "@/components/UniversalIcon";
+import { openPdfReport, generateFinancialHtmlReport, downloadPdfBinaryDirectly } from "@/services/ReportExportService";
+import { buildEnterpriseReportData, EnterpriseReportData, ReportType } from "@/services/reportDataService";
 import {
   NormalizedPeriod,
   getPresetPeriod,
@@ -167,6 +168,9 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
   }, [departments, periodTransactions]);
 
   const [exportModalVisible, setExportModalVisible] = useState(false);
+  const [dossierViewerVisible, setDossierViewerVisible] = useState(false);
+  const [dossierHtml, setDossierHtml] = useState<string>("");
+  const [activeEnterpriseData, setActiveEnterpriseData] = useState<EnterpriseReportData | null>(null);
 
   const handleExportPDF = async () => {
     const reportType: ReportType =
@@ -204,6 +208,10 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
         organization: settings.organizationName || user?.organization,
       }
     );
+    setActiveEnterpriseData(enterpriseData);
+    const html = generateFinancialHtmlReport(enterpriseData);
+    setDossierHtml(html);
+    setDossierViewerVisible(true);
     await openPdfReport(enterpriseData);
   };
 
@@ -247,8 +255,12 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
               organization: settings.organizationName || user?.organization,
             }
           );
+          setActiveEnterpriseData(enterpriseData);
+          const html = generateFinancialHtmlReport(enterpriseData);
+          setDossierHtml(html);
+          setDossierViewerVisible(true);
           openPdfReport(enterpriseData);
-        }, 700);
+        }, 500);
       }
     }
   }, [transactions, budgets, payroll, departments, activePeriod, settings, user]);
@@ -815,6 +827,96 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
         onClose={() => setExportModalVisible(false)}
         activePeriod={activePeriod}
       />
+
+      {/* ─── Full-Screen Official PDF Dossier Viewer & Print Bar ─── */}
+      {Platform.OS === "web" && dossierViewerVisible && (
+        <Modal
+          visible={dossierViewerVisible}
+          transparent={false}
+          animationType="fade"
+          onRequestClose={() => setDossierViewerVisible(false)}
+        >
+          <View style={styles.webViewerOverlay}>
+            <View style={styles.webViewerHeader}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1, minWidth: 200 }}>
+                <View style={[styles.docIconBox, { backgroundColor: "#38BDF820" }]}>
+                  <Feather name="file-text" size={18} color="#38BDF8" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 15, fontWeight: "800", color: "#F8FAFC" }} numberOfLines={1}>
+                    {activeEnterpriseData?.reportTitle || "Official Financial Dossier"}
+                  </Text>
+                  <Text style={{ fontSize: 11.5, color: "#94A3B8" }} numberOfLines={1}>
+                    {settings.organizationName || "DevOrbit Tech Kotli"} · Certified Statement · {activePeriod.label}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <TouchableOpacity
+                  style={[styles.webViewerBtn, { backgroundColor: "#38BDF8" }]}
+                  onPress={() => {
+                    if (activeEnterpriseData) {
+                      downloadPdfBinaryDirectly(activeEnterpriseData as any);
+                    }
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Feather name="download" size={14} color="#0F172A" />
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: "#0F172A" }}>
+                    Download PDF
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.webViewerBtn, { backgroundColor: "#10B981" }]}
+                  onPress={() => {
+                    try {
+                      const iframe = document.getElementById("ofm-dossier-iframe") as HTMLIFrameElement;
+                      if (iframe && iframe.contentWindow) {
+                        iframe.contentWindow.focus();
+                        iframe.contentWindow.print();
+                      } else {
+                        window.print();
+                      }
+                    } catch {
+                      window.print();
+                    }
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Feather name="printer" size={14} color="#FFFFFF" />
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: "#FFFFFF" }}>
+                    Print / Save as PDF
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.webViewerBtn, { backgroundColor: "#334155", paddingHorizontal: 12 }]}
+                  onPress={() => setDossierViewerVisible(false)}
+                  activeOpacity={0.8}
+                >
+                  <Feather name="x" size={16} color="#F8FAFC" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
+              {React.createElement("iframe", {
+                id: "ofm-dossier-iframe",
+                srcDoc: dossierHtml,
+                style: {
+                  width: "100%",
+                  height: "100%",
+                  border: "none",
+                  backgroundColor: "#FFFFFF",
+                },
+                title: "Official Financial Dossier",
+              })}
+            </View>
+          </View>
+        </Modal>
+      )}
     </ScrollView>
   );
 }
@@ -1114,5 +1216,39 @@ const styles = StyleSheet.create({
   deptFill: {
     height: "100%",
     borderRadius: 3,
+  },
+  webViewerOverlay: {
+    flex: 1,
+    backgroundColor: "#0B1120",
+    display: "flex",
+    flexDirection: "column",
+  },
+  webViewerHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: "#0F172A",
+    borderBottomWidth: 1,
+    borderBottomColor: "#1E293B",
+    flexWrap: "wrap",
+    gap: 10,
+    zIndex: 10,
+  },
+  docIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  webViewerBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
   },
 });

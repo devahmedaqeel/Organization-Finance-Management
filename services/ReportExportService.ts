@@ -2,7 +2,7 @@ import { Platform, Share } from "react-native";
 import * as FileSystem from "expo-file-system/legacy";
 import * as WebBrowser from "expo-web-browser";
 import { Transaction, Budget, PayrollEntry, Department } from "@/context/FinanceContext";
-import { sharePdfFile, downloadFinancialReportPdf, PdfExportResult } from "./pdfDownloadService";
+import { sharePdfFile, downloadFinancialReportPdf, downloadPdfBinaryDirectly, PdfExportResult } from "./pdfDownloadService";
 import {
   EnterpriseReportData,
   buildEnterpriseReportData,
@@ -1870,3 +1870,5 @@ export async function sharePdfReport(
 ): Promise<PdfExportResult> {
   return await downloadFinancialReportPdf(opts as any);
 }
+
+export { downloadPdfBinaryDirectly };

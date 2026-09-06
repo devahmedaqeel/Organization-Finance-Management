@@ -2,7 +2,8 @@ import { Feather } from "@/components/UniversalIcon";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import React, { useMemo, useState, useEffect } from "react";
-import { BackHandler, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { BackHandler, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View, Linking } from "react-native";
+import * as WebBrowser from "expo-web-browser";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AreaLineChart } from "@/components/AreaLineChart";
 import { DonutChart } from "@/components/DonutChart";
@@ -187,6 +188,31 @@ export default function ReportsScreen() {
   const budgetUtilPct =
     totalAllocatedBudget > 0 ? ((metrics?.totalExpense || 0) / totalAllocatedBudget) * 100 : 0;
 
+  const handleExportPDF = async () => {
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      const query = new URLSearchParams({
+        tab: "reports",
+        export: "dossier",
+        auto: "pdf",
+        reportType: "consolidated_statement",
+        scope: activePeriod.presetId ? "period" : "custom",
+        startDate: activePeriod.startDate || "",
+        endDate: activePeriod.endDate || "",
+        dept: "all",
+        v: String(Date.now()),
+      });
+      const webUrl = `https://ofmapp-main.web.app/?${query.toString()}`;
+      try {
+        await WebBrowser.openBrowserAsync(webUrl);
+      } catch {
+        await Linking.openURL(webUrl);
+      }
+      return;
+    }
+    setExportModalVisible(true);
+  };
+
   return (
     <View style={[styles.flex, { backgroundColor: colors.background }]}>
       {/* Top Header */}
@@ -214,7 +240,8 @@ export default function ReportsScreen() {
               styles.exportBtn,
               { backgroundColor: colors.primary + "18", borderColor: colors.primary + "35" },
             ]}
-            onPress={() => {
+            onPress={handleExportPDF}
+            onLongPress={() => {
               if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               setExportModalVisible(true);
             }}

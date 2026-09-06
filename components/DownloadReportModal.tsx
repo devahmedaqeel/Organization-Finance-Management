@@ -10,7 +10,9 @@ import {
   TouchableOpacity,
   View,
   ActivityIndicator,
+  Linking,
 } from "react-native";
+import * as WebBrowser from "expo-web-browser";
 import { Feather } from "./UniversalIcon";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -270,6 +272,29 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     }
+
+    if (format === "pdf" && Platform.OS !== "web") {
+      const query = new URLSearchParams({
+        tab: "reports",
+        export: "dossier",
+        auto: "pdf",
+        reportType: selectedType,
+        scope: scope,
+        startDate: scope === "custom" ? customStart : (effectivePeriod?.startDate || ""),
+        endDate: scope === "custom" ? customEnd : (effectivePeriod?.endDate || ""),
+        dept: selectedDept || "all",
+        v: String(Date.now()),
+      });
+      const webUrl = `https://ofmapp-main.web.app/?${query.toString()}`;
+      onClose();
+      try {
+        await WebBrowser.openBrowserAsync(webUrl);
+      } catch {
+        await Linking.openURL(webUrl);
+      }
+      return;
+    }
+
     setGenerating(true);
     setLoadingStep("Collecting authoritative financial data...");
 
@@ -682,8 +707,12 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
                     style={[styles.exportBtn, { backgroundColor: colors.primary }]}
                     onPress={handleExport}
                   >
-                    <Feather name="download" size={16} color="#FFF" />
-                    <Text style={styles.exportBtnText}>Generate & Download {format.toUpperCase()} Dossier</Text>
+                    <Feather name={Platform.OS !== "web" && format === "pdf" ? "external-link" : "download"} size={16} color="#FFF" />
+                    <Text style={styles.exportBtnText}>
+                      {Platform.OS !== "web" && format === "pdf"
+                        ? "Open in Web & Save PDF"
+                        : `Generate & Download ${format.toUpperCase()} Dossier`}
+                    </Text>
                   </TouchableOpacity>
                 </View>
               )}
