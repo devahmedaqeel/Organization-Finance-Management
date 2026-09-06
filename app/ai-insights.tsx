@@ -214,17 +214,14 @@ export default function AIInsightsScreen() {
     return calculateBudgetUsed(displayedTxs, budgets);
   }, [displayedTxs, budgets]);
 
-  // Authoritative displayed budget spent: incorporates explicit line-item disbursements or approved organizational disbursements against budget pool
+  // Authoritative displayed budget spent: strictly uses actual budget disbursements
   const displayedBudgetSpent = useMemo(() => {
     if (rawBudgetSpent > 0) return rawBudgetSpent;
     if (contextBudgetSpent !== undefined && contextBudgetSpent > 0 && displayedTxs.length === transactions.length) {
       return contextBudgetSpent;
     }
-    if (totalAllocatedBudget > 0 && displayedExpense > 0) {
-      return Math.min(displayedExpense, totalAllocatedBudget);
-    }
     return 0;
-  }, [rawBudgetSpent, contextBudgetSpent, totalAllocatedBudget, displayedExpense, displayedTxs.length, transactions.length]);
+  }, [rawBudgetSpent, contextBudgetSpent, displayedTxs.length, transactions.length]);
 
   const displayedBudgetRemaining = useMemo(() => {
     return calculateBudgetRemaining(totalAllocatedBudget, displayedBudgetSpent);

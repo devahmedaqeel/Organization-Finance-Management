@@ -23,6 +23,7 @@ import {
   aggregateTransactionsByGranularity,
 } from "@/services/DatePeriodService";
 import { router } from "expo-router";
+import { calculateBudgetUsed } from "@/services/FinancialCalculationEngine";
 
 interface Props {
   visible: boolean;
@@ -76,9 +77,10 @@ export function NetBalanceBreakdownModal({
   const coverageRatio = totalExpenses > 0 ? totalIncome / totalExpenses : totalIncome > 0 ? 99 : 0;
   const expenseRatio = totalIncome > 0 ? (totalExpenses / totalIncome) * 100 : (totalExpenses > 0 ? 100 : 0);
 
-  // 2. Remaining Operating Budget (Allocated budget minus expenditure)
-  const netBudgetRemaining = totalBudgeted - totalExpenses;
-  const netBudgetUtilization = totalBudgeted > 0 ? (totalExpenses / totalBudgeted) * 100 : 0;
+  // 2. Remaining Operating Budget (Allocated budget minus actual budget expenditure)
+  const totalBudgetSpent = useMemo(() => calculateBudgetUsed(transactions, budgets), [transactions, budgets]);
+  const netBudgetRemaining = totalBudgeted - totalBudgetSpent;
+  const netBudgetUtilization = totalBudgeted > 0 ? (totalBudgetSpent / totalBudgeted) * 100 : 0;
   const isBudgetSafe = netBudgetRemaining >= 0;
 
   // 3. Institutional Capital Pool Surplus (Funding pool minus expenditure)

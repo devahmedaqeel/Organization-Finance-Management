@@ -139,9 +139,9 @@ export function WebDashboard({
 
   // 4. Budget-integrated Expense Ratios
   const budgetExpensePct = totalBudgeted > 0
-    ? Math.round((totalExpenses / totalBudgeted) * 100)
+    ? Math.round((totalBudgetSpent / totalBudgeted) * 100)
     : expensePctOfIncome;
-  const budgetRemainingAmount = Math.max(0, totalBudgeted - totalExpenses);
+  const budgetRemainingAmount = Math.max(0, totalBudgeted - totalBudgetSpent);
 
   // Operating Margin on Inflows (Revenue)
   const operatingMargin = totalIncome > 0
