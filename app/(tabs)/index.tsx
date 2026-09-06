@@ -1011,32 +1011,28 @@ export default function DashboardScreen() {
               minimumFontScale={0.8}
             >
               {totalExpenses === 0
-                ? "0% of Budget"
+                ? "0% Outflow"
                 : totalBudgeted > 0
-                ? totalExpenses > totalBudgeted
-                  ? `${budgetExpensePct}% of Budget (Over)`
-                  : `${budgetExpensePct}% of Budget (${settings.currency} ${fmt(budgetRemainingAmount)} Left)`
+                ? isFundingDeficit
+                  ? `${clampedSpendRatio}% of Capital (Over Pool)`
+                  : `${clampedSpendRatio}% of Capital (${settings.currency} ${fmt(netSurplus)} Left)`
+                : isDeficit
+                ? `${expensePctOfIncome}% of Inflow (Deficit)`
                 : totalIncome > 0
-                ? `${expensePctOfIncome}% of Inflow Spent`
+                ? `${expensePctOfIncome}% of Inflow (${settings.currency} ${fmt(incomeRetainedAmount)} Left)`
                 : "100% Outflows (No Inflow)"}
             </Text>
             <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 4, overflow: "hidden" }}>
               <View
                 style={{
                   height: "100%",
-                  width: `${totalExpenses === 0 ? 0 : Math.min(Math.max(totalBudgeted > 0 ? budgetExpensePct : expensePctOfIncome, 4), 100)}%`,
+                  width: `${totalExpenses === 0 ? 0 : Math.min(Math.max(totalBudgeted > 0 ? clampedSpendRatio : expensePctOfIncome, 4), 100)}%`,
                   backgroundColor:
                     totalExpenses === 0
                       ? colors.income
-                      : totalBudgeted > 0
-                      ? totalExpenses > totalBudgeted
-                        ? colors.expense
-                        : budgetExpensePct > 85
-                        ? colors.warning
-                        : colors.income
-                      : isDeficit
+                      : isEffectiveDeficit
                       ? colors.expense
-                      : expensePctOfIncome > 80
+                      : (totalBudgeted > 0 ? clampedSpendRatio : expensePctOfIncome) > 85
                       ? colors.warning
                       : colors.income,
                   borderRadius: 2,
