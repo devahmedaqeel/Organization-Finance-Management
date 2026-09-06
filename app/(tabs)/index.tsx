@@ -196,6 +196,15 @@ export default function DashboardScreen() {
   const [txSearchQuery, setTxSearchQuery] = useState<string>("");
   const [txTypeFilter, setTxTypeFilter] = useState<"all" | "income" | "expense">("all");
   const selectedCurrency = useMemo(() => WORLD_CURRENCIES.find(c => c.code === settings.currency), [settings.currency]);
+  const orgDisplayName = settings.organizationName || user?.organization || "Organization Finance Management";
+  const dynamicOrgFontSize = useMemo(() => {
+    const len = orgDisplayName.length;
+    if (len <= 14) return 12.5;
+    if (len <= 20) return 11.5;
+    if (len <= 28) return 10.5;
+    if (len <= 38) return 9.5;
+    return 8.5;
+  }, [orgDisplayName]);
   const webTop = Platform.OS === "web" ? 67 : 0;
   const roleColor = ROLE_COLORS[user?.role ?? "admin"];
   const [balanceViewMode, setBalanceViewMode] = useState<"cashflow" | "expenses" | "budget">("cashflow");
@@ -402,10 +411,18 @@ export default function DashboardScreen() {
           <View style={[styles.orgBadge, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={{ fontSize: 13, transform: [{ translateY: Platform.OS === 'ios' ? 0.5 : 0 }] }}>{selectedCurrency?.flag ?? "🌐"}</Text>
             <Text
-              style={[styles.orgName, { color: colors.mutedForeground }]}
+              style={[
+                styles.orgName,
+                {
+                  color: colors.mutedForeground,
+                  fontSize: dynamicOrgFontSize,
+                },
+              ]}
               numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.65}
             >
-              {settings.organizationName || user?.organization || "Organization Finance Management"}
+              {orgDisplayName}
             </Text>
           </View>
 
@@ -1617,23 +1634,25 @@ const styles = StyleSheet.create({
   orgBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 9,
+    gap: 5,
+    paddingHorizontal: 8,
     paddingVertical: 4.5,
     borderRadius: 12,
     borderWidth: 1,
+    flex: 1,
     flexShrink: 1,
-    maxWidth: "52%",
+    marginRight: 8,
   },
   orgName: {
-    fontSize: 12,
     fontFamily: "Inter_600SemiBold",
+    flex: 1,
     flexShrink: 1,
   },
   headerActions: {
     flexDirection: "row",
     alignItems: "center",
     gap: 7,
+    flexShrink: 0,
   },
   headerUserBar: {
     flexDirection: "row",
