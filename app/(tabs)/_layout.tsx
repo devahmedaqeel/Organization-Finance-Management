@@ -77,7 +77,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: isEmployee ? "Portal" : "Dashboard",
-          tabBarIcon: ({ color }) => <Feather name="home" size={20} color={color} />,
+          tabBarIcon: ({ color }) => <Feather name="home" size={20} color={color as string} />,
         }}
       />
       <Tabs.Screen
@@ -85,14 +85,14 @@ export default function TabLayout() {
         options={{
           title: "Income",
           href: isEmployee ? null : "/income",
-          tabBarIcon: ({ color }) => <Feather name="arrow-up-circle" size={20} color={color} />,
+          tabBarIcon: ({ color }) => <Feather name="arrow-up-circle" size={20} color={color as string} />,
         }}
       />
       <Tabs.Screen
         name="expenses"
         options={{
           title: isEmployee ? "Claims" : "Expenses",
-          tabBarIcon: ({ color }) => <Feather name="arrow-down-circle" size={20} color={color} />,
+          tabBarIcon: ({ color }) => <Feather name="arrow-down-circle" size={20} color={color as string} />,
         }}
       />
       <Tabs.Screen
@@ -100,14 +100,14 @@ export default function TabLayout() {
         options={{
           title: "Reports",
           href: isEmployee ? null : "/reports",
-          tabBarIcon: ({ color }) => <Feather name="bar-chart-2" size={20} color={color} />,
+          tabBarIcon: ({ color }) => <Feather name="bar-chart-2" size={20} color={color as string} />,
         }}
       />
       <Tabs.Screen
         name="more"
         options={{
           title: isEmployee ? "My Slip" : "More",
-          tabBarIcon: ({ color }) => <Feather name={isEmployee ? "file-text" : "more-horizontal"} size={20} color={color} />,
+          tabBarIcon: ({ color }) => <Feather name={isEmployee ? "file-text" : "more-horizontal"} size={20} color={color as string} />,
         }}
       />
     </Tabs>

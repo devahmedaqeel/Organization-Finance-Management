@@ -9,11 +9,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "ofm-app",
     "userInterfaceStyle": "automatic",
-    "splash": {
-      "image": "./assets/images/icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.organization.financemanager",
@@ -82,7 +77,14 @@
       ],
       "expo-font",
       "expo-web-browser",
-      "expo-splash-screen",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ],
       "expo-system-ui",
       [
         "expo-notifications",
