@@ -199,11 +199,12 @@ export default function DashboardScreen() {
   const orgDisplayName = settings.organizationName || user?.organization || "Organization Finance Management";
   const dynamicOrgFontSize = useMemo(() => {
     const len = orgDisplayName.length;
-    if (len <= 14) return 12.5;
-    if (len <= 20) return 11.5;
-    if (len <= 28) return 10.5;
-    if (len <= 38) return 9.5;
-    return 8.5;
+    if (len <= 14) return 12;
+    if (len <= 20) return 11;
+    if (len <= 28) return 10;
+    if (len <= 36) return 9;
+    if (len <= 44) return 8.2;
+    return 7.5;
   }, [orgDisplayName]);
   const webTop = Platform.OS === "web" ? 67 : 0;
   const roleColor = ROLE_COLORS[user?.role ?? "admin"];
@@ -416,11 +417,12 @@ export default function DashboardScreen() {
                 {
                   color: colors.mutedForeground,
                   fontSize: dynamicOrgFontSize,
+                  letterSpacing: orgDisplayName.length > 22 ? -0.25 : 0,
                 },
               ]}
               numberOfLines={1}
               adjustsFontSizeToFit
-              minimumFontScale={0.65}
+              minimumFontScale={0.5}
             >
               {orgDisplayName}
             </Text>
@@ -1640,7 +1642,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     flexShrink: 1,
-    maxWidth: "56%",
   },
   orgName: {
     fontFamily: "Inter_600SemiBold",
@@ -1649,7 +1650,7 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 7,
+    gap: 6,
     flexShrink: 0,
   },
   headerUserBar: {
@@ -1700,8 +1701,8 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
   },
   iconBtn: {
-    width: 34,
-    height: 34,
+    width: 32,
+    height: 32,
     borderRadius: 10,
     borderWidth: 1,
     alignItems: "center",
