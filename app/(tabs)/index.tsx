@@ -154,7 +154,7 @@ function AnimatedQuickAction({
 export default function DashboardScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { chartW, statCardW, hPad } = useResponsive();
+  const { width, isTablet, isSmall, chartW, statCardW, hPad } = useResponsive();
   const { user, logout } = useAuth();
   const {
     transactions,
@@ -197,14 +197,31 @@ export default function DashboardScreen() {
   const [txTypeFilter, setTxTypeFilter] = useState<"all" | "income" | "expense">("all");
   const selectedCurrency = useMemo(() => WORLD_CURRENCIES.find(c => c.code === settings.currency), [settings.currency]);
   const orgDisplayName = settings.organizationName || user?.organization || "Organization Finance Management";
+
+  // Dynamic maximum width calculation for the organization badge pill
+  // Hugs short names cleanly; expands for longer names without crowding header controls
+  const maxOrgBadgeWidth = useMemo(() => {
+    const availableHeaderWidth = width - (hPad * 2);
+    // headerActions reserve: bell (32) + gap (6) + roleBadge (~60) + gap (6) + logout (32) + header gap (8) = ~144px
+    const actionsReserve = isSmall ? 138 : 146;
+    const dynamicMax = Math.max(130, availableHeaderWidth - actionsReserve);
+    return isTablet ? Math.min(dynamicMax, 380) : dynamicMax;
+  }, [width, hPad, isSmall, isTablet]);
+
   const dynamicOrgFontSize = useMemo(() => {
     const len = orgDisplayName.length;
     if (len <= 14) return 12;
-    if (len <= 20) return 11;
-    if (len <= 28) return 10;
-    if (len <= 36) return 9;
-    if (len <= 44) return 8.2;
-    return 7.5;
+    if (len <= 22) return 11.5;
+    if (len <= 34) return 10.5;
+    return 9.8;
+  }, [orgDisplayName]);
+
+  const dynamicOrgLineHeight = useMemo(() => {
+    const len = orgDisplayName.length;
+    if (len <= 14) return 15;
+    if (len <= 22) return 14.5;
+    if (len <= 34) return 13.5;
+    return 12.8;
   }, [orgDisplayName]);
   const webTop = Platform.OS === "web" ? 67 : 0;
   const roleColor = ROLE_COLORS[user?.role ?? "admin"];
@@ -437,7 +454,16 @@ export default function DashboardScreen() {
       <View style={styles.headerContainer}>
         {/* Tier 1: Brand / Organization & Action Controls */}
         <View style={styles.headerTopBar}>
-          <View style={[styles.orgBadge, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View
+            style={[
+              styles.orgBadge,
+              {
+                backgroundColor: colors.card,
+                borderColor: colors.border,
+                maxWidth: maxOrgBadgeWidth,
+              },
+            ]}
+          >
             <Text style={{ fontSize: 13, transform: [{ translateY: Platform.OS === 'ios' ? 0.5 : 0 }] }}>{selectedCurrency?.flag ?? "🌐"}</Text>
             <Text
               style={[
@@ -445,12 +471,14 @@ export default function DashboardScreen() {
                 {
                   color: colors.mutedForeground,
                   fontSize: dynamicOrgFontSize,
-                  letterSpacing: orgDisplayName.length > 22 ? -0.25 : 0,
+                  lineHeight: dynamicOrgLineHeight,
+                  letterSpacing: orgDisplayName.length > 24 ? -0.2 : 0,
                 },
+                Platform.OS === "web" && ({ wordBreak: "break-word" } as any),
               ]}
-              numberOfLines={1}
+              numberOfLines={2}
               adjustsFontSizeToFit
-              minimumFontScale={0.5}
+              minimumFontScale={0.75}
             >
               {orgDisplayName}
             </Text>
@@ -1789,15 +1817,13 @@ const styles = StyleSheet.create({
   orgBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 8,
+    gap: 5.5,
+    paddingHorizontal: 9,
     paddingVertical: 4.5,
     borderRadius: 12,
     borderWidth: 1,
-    flex: 1,
-    maxWidth: "54%",
+    flexShrink: 1,
     minWidth: 0,
-    marginRight: 4,
   },
   orgName: {
     fontFamily: "Inter_600SemiBold",
