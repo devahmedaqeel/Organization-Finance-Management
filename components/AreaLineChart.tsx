@@ -67,10 +67,34 @@ interface Props {
 
 function fmtAmount(n: number) {
   const abs = Math.abs(n);
-  if (abs >= 1000000000) return `${(n / 1000000000).toFixed(2)}B`;
-  if (abs >= 1000000) return `${(n / 1000000).toFixed(2)}M`;
-  if (abs >= 1000) return `${(n / 1000).toFixed(0)}K`;
-  return n.toLocaleString();
+  if (abs >= 1000000000) {
+    const v = n / 1000000000;
+    return `${v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)}B`;
+  }
+  if (abs >= 1000000) {
+    const v = n / 1000000;
+    return `${v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)}M`;
+  }
+  if (abs >= 10000) {
+    const v = n / 1000;
+    return `${v % 1 === 0 ? v.toFixed(0) : v.toFixed(1)}K`;
+  }
+  if (abs >= 1000) {
+    const v = n / 1000;
+    return v % 1 === 0 ? `${v.toFixed(0)}K` : `${v.toFixed(1)}K`;
+  }
+  return Number(n || 0).toLocaleString();
+}
+
+function getRangeForPresetId(presetId?: string): string {
+  const p = (presetId || "").toLowerCase().trim();
+  if (p === "last_7d" || p === "1w" || p === "this_week") return "1W";
+  if (p === "last_14d" || p === "2w") return "2W";
+  if (p === "this_month" || p === "1m") return "1M";
+  if (p === "last_3m" || p === "3m") return "3M";
+  if (p === "last_6m" || p === "6m") return "6M";
+  if (p === "this_year" || p === "1y") return "1Y";
+  return "";
 }
 
 function roundToNiceStep(val: number): number {
@@ -123,6 +147,11 @@ export function AreaLineChart({
         ? "this_year"
         : "last_6m"
     );
+
+  const currentSelectedRange =
+    currentPeriod.mode === "presets"
+      ? getRangeForPresetId(currentPeriod.presetId) || activeRange
+      : "";
 
   useEffect(() => {
     if (data && data.length > 0) {
@@ -269,8 +298,8 @@ export function AreaLineChart({
     if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
 
     const matchingGranularity: Granularity =
-      r === "1W" || r === "2W" ? "day" :
-      r === "1M" || r === "3M" ? "week" :
+      r === "1W" || r === "2W" || r === "1M" ? "day" :
+      r === "3M" ? "week" :
       "month";
 
     if (onRangeSelect) onRangeSelect(r);
@@ -300,42 +329,20 @@ export function AreaLineChart({
   const handleGranularityPress = (g: Granularity) => {
     if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
 
-    let targetPreset = activeRange;
-    if (g === "month" && (activeRange === "1W" || activeRange === "2W" || activeRange === "1M")) {
-      targetPreset = "6M";
-    } else if (g === "year" && activeRange !== "1Y") {
-      targetPreset = "1Y";
-    } else if (g === "day" && (activeRange === "6M" || activeRange === "1Y")) {
-      targetPreset = "1W";
-    } else if (g === "week" && (activeRange === "1W" || activeRange === "1Y")) {
-      targetPreset = "1M";
-    }
-
-    if (targetPreset && targetPreset !== activeRange && onRangeSelect) {
-      onRangeSelect(targetPreset);
-    }
-
-    const mappedPreset =
-      targetPreset === "1W"
-        ? "last_7d"
-        : targetPreset === "2W"
-        ? "last_14d"
-        : targetPreset === "1M"
-        ? "this_month"
-        : targetPreset === "3M"
-        ? "last_3m"
-        : targetPreset === "1Y"
-        ? "this_year"
-        : "last_6m";
-
-    const basePeriod = currentPeriod.mode === "presets" ? getPresetPeriod(mappedPreset) : currentPeriod;
-
     if (onGranularityChange) onGranularityChange(g);
+
+    let updatedPeriod = { ...currentPeriod, userGranularityOverride: g };
+
+    if (g === "month" && (currentSelectedRange === "1W" || currentSelectedRange === "2W")) {
+      updatedPeriod = { ...getPresetPeriod("last_6m"), userGranularityOverride: "month" };
+      if (onRangeSelect) onRangeSelect("6M");
+    } else if (g === "year" && currentSelectedRange !== "1Y") {
+      updatedPeriod = { ...getPresetPeriod("this_year"), userGranularityOverride: "year" };
+      if (onRangeSelect) onRangeSelect("1Y");
+    }
+
     if (onPeriodSelect) {
-      onPeriodSelect({
-        ...basePeriod,
-        userGranularityOverride: g,
-      });
+      onPeriodSelect(updatedPeriod);
     }
   };
 
@@ -350,7 +357,7 @@ export function AreaLineChart({
           style={styles.rangeScrollView}
         >
           {ranges.map((r) => {
-            const isSelected = activeRange === r && currentPeriod.mode === "presets";
+            const isSelected = currentSelectedRange === r;
             return (
               <TouchableOpacity
                 key={r}

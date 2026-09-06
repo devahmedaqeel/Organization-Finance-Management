@@ -187,6 +187,9 @@ export default function ReportsScreen() {
   const totalAllocatedBudget = (budgets || []).reduce((s, b) => s + (b.allocated || 0), 0);
   const budgetUtilPct =
     totalAllocatedBudget > 0 ? ((metrics?.totalExpense || 0) / totalAllocatedBudget) * 100 : 0;
+  const totalFundingPool = (metrics?.totalIncome || 0) + totalAllocatedBudget;
+  const netCapitalSurplus = totalFundingPool - (metrics?.totalExpense || 0);
+  const retainedCapitalPct = totalFundingPool > 0 ? (netCapitalSurplus / totalFundingPool) * 100 : 0;
 
   const handleExportPDF = async () => {
     if (Platform.OS !== "web") {
@@ -313,38 +316,87 @@ export default function ReportsScreen() {
           </ScrollView>
         </View>
 
-        <View style={styles.kpiRow}>
-          <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>INCOME</Text>
-            <Text style={[styles.kpiVal, { color: colors.income }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-              {settings.currency} {fmt(metrics.totalIncome)}
-            </Text>
-            <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
-              {metrics.recordCount} Transactions
-            </Text>
-          </View>
+        {totalAllocatedBudget > 0 ? (
+          <View style={{ gap: 8 }}>
+            <View style={styles.kpiRow}>
+              <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>INCOME</Text>
+                <Text style={[styles.kpiVal, { color: colors.income }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  +{settings.currency} {fmt(metrics.totalIncome)}
+                </Text>
+                <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
+                  {metrics.recordCount} Inflows
+                </Text>
+              </View>
 
-          <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>EXPENSES</Text>
-            <Text style={[styles.kpiVal, { color: colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-              {settings.currency} {fmt(metrics.totalExpense)}
-            </Text>
-            <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
-              {metrics.durationDays} Days Period
-            </Text>
-          </View>
+              <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>EXPENSES</Text>
+                <Text style={[styles.kpiVal, { color: colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  -{settings.currency} {fmt(metrics.totalExpense)}
+                </Text>
+                <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
+                  {budgetUtilPct.toFixed(1)}% of Budget Used
+                </Text>
+              </View>
+            </View>
 
-          <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>NET SURPLUS</Text>
-            <Text style={[styles.kpiVal, { color: metrics.netBalance >= 0 ? colors.income : colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
-              {metrics.netBalance >= 0 ? "+" : ""}
-              {settings.currency} {fmt(metrics.netBalance)}
-            </Text>
-            <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
-              {metrics.savingsRate.toFixed(1)}% margin
-            </Text>
+            <View style={styles.kpiRow}>
+              <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>BUDGET ALLOCATED</Text>
+                <Text style={[styles.kpiVal, { color: colors.primary }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  {settings.currency} {fmt(totalAllocatedBudget)}
+                </Text>
+                <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
+                  Pool: {settings.currency} {fmt(totalFundingPool)}
+                </Text>
+              </View>
+
+              <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>NET CAPITAL SURPLUS</Text>
+                <Text style={[styles.kpiVal, { color: netCapitalSurplus >= 0 ? colors.income : colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  {netCapitalSurplus >= 0 ? "+" : "-"}
+                  {settings.currency} {fmt(Math.abs(netCapitalSurplus))}
+                </Text>
+                <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
+                  {retainedCapitalPct.toFixed(0)}% Retained · {metrics.netBalance >= 0 ? "+" : ""}{fmt(metrics.netBalance)} Cash
+                </Text>
+              </View>
+            </View>
           </View>
-        </View>
+        ) : (
+          <View style={styles.kpiRow}>
+            <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>INCOME</Text>
+              <Text style={[styles.kpiVal, { color: colors.income }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                {settings.currency} {fmt(metrics.totalIncome)}
+              </Text>
+              <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
+                {metrics.recordCount} Transactions
+              </Text>
+            </View>
+
+            <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>EXPENSES</Text>
+              <Text style={[styles.kpiVal, { color: colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                {settings.currency} {fmt(metrics.totalExpense)}
+              </Text>
+              <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
+                {metrics.durationDays} Days Period
+              </Text>
+            </View>
+
+            <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>NET SURPLUS</Text>
+              <Text style={[styles.kpiVal, { color: metrics.netBalance >= 0 ? colors.income : colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                {metrics.netBalance >= 0 ? "+" : ""}
+                {settings.currency} {fmt(metrics.netBalance)}
+              </Text>
+              <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
+                {metrics.savingsRate.toFixed(1)}% margin
+              </Text>
+            </View>
+          </View>
+        )}
       </View>
 
       <ScrollView

@@ -3,6 +3,7 @@ import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View, ScrollView,
 import { Transaction, TransactionType, useFinance } from "@/context/FinanceContext";
 import { useColors } from "@/hooks/useColors";
 import { useSettings } from "@/context/SettingsContext";
+import { formatYMD } from "@/services/DatePeriodService";
 import {
   SvgArrowUpRight,
   SvgArrowDownLeft,
@@ -67,7 +68,7 @@ export function WebTransactionModal({
   const [description, setDescription] = useState("");
   const [referenceNumber, setReferenceNumber] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("Electronic Transfer");
-  const [date, setDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState(() => formatYMD(new Date()));
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -82,7 +83,7 @@ export function WebTransactionModal({
         setDescription(transactionToEdit.description || "");
         setReferenceNumber(transactionToEdit.referenceNumber || "");
         setPaymentMethod(transactionToEdit.paymentMethod || "Electronic Transfer");
-        setDate(transactionToEdit.date || new Date().toISOString().split("T")[0]);
+        setDate(transactionToEdit.date || formatYMD(new Date()));
       } else {
         setType(initialType);
         setAmount("");
@@ -92,7 +93,7 @@ export function WebTransactionModal({
         setDescription("");
         setReferenceNumber(`TXN-${Math.random().toString(36).substring(2, 8).toUpperCase()}`);
         setPaymentMethod("Electronic Transfer");
-        setDate(new Date().toISOString().split("T")[0]);
+        setDate(formatYMD(new Date()));
       }
       setError("");
     }

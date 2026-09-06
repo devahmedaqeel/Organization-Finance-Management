@@ -16,6 +16,7 @@ import { Transaction, TransactionType, useFinance } from "@/context/FinanceConte
 import { useColors } from "@/hooks/useColors";
 import { useSettings } from "@/context/SettingsContext";
 import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
+import { formatYMD } from "@/services/DatePeriodService";
 
 const INCOME_CATS = ["Government Grant", "Fee Collection", "Research Grant", "Donation", "Other"];
 const EXPENSE_CATS = ["Salaries", "Utilities", "Equipment", "Research", "Maintenance", "Travel", "Other"];
@@ -62,7 +63,7 @@ export function AddTransactionModal({
   const [department, setDepartment] = useState("");
   const [selectedBudgetId, setSelectedBudgetId] = useState("");
   const [description, setDescription] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState(() => formatYMD(new Date()));
   const [error, setError] = useState("");
 
   // Inline department creation/editing state
@@ -87,7 +88,7 @@ export function AddTransactionModal({
       setDepartment(defaultDept);
       setSelectedBudgetId("");
       setDescription("");
-      setDate(new Date().toISOString().split("T")[0]);
+      setDate(formatYMD(new Date()));
       setError("");
     }
     setIsCreatingDept(false);

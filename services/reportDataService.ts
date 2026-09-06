@@ -209,6 +209,10 @@ export interface EnterpriseReportData {
     budgetSpent: number;
     budgetRemaining: number;
     budgetUtilizationPct: number;
+    totalBudgetAllocated: number;
+    totalFundingPool: number;
+    netCapitalSurplus: number;
+    retainedCapitalPct: number;
     operatingCashBalance: number;
     transactionCount: number;
     employeeCount: number;
@@ -412,18 +416,24 @@ export function buildEnterpriseReportData(
   const budgetRemaining = calculateBudgetRemaining(budgetTotal, budgetSpent);
   const budgetUtilizationPct = budgetTotal > 0 ? (budgetSpent / budgetTotal) * 100 : 0;
 
+  // Authoritative Capital Pool calculations matching Dashboard single-source-of-truth
+  const totalBudgetAllocated = budgetTotal;
+  const totalFundingPool = totalRevenue + totalBudgetAllocated;
+  const netCapitalSurplus = totalFundingPool - totalExpenses;
+  const retainedCapitalPct = totalFundingPool > 0 ? (netCapitalSurplus / totalFundingPool) * 100 : 0;
+
   // 7. Dynamic Financial Health Assessment
   let healthStatus: "excellent" | "healthy" | "watch" | "at_risk" | "critical" = "healthy";
   let healthLabel = "HEALTHY SURPLUS";
   let healthColor = "#10B981";
   let healthScore = 85;
 
-  if (totalRevenue === 0 && totalExpenses === 0) {
+  if (totalRevenue === 0 && totalExpenses === 0 && budgetTotal === 0) {
     healthStatus = "watch";
     healthLabel = "NO FINANCIAL DATA";
     healthColor = "#64748B";
     healthScore = 50;
-  } else if (!isNetPositive) {
+  } else if (!isNetPositive && budgetTotal === 0) {
     if (Math.abs(netOperatingBalance) > totalRevenue) {
       healthStatus = "critical";
       healthLabel = "CRITICAL DEFICIT";
@@ -435,13 +445,18 @@ export function buildEnterpriseReportData(
       healthColor = "#F43F5E";
       healthScore = 45;
     }
+  } else if (budgetTotal > 0 && netCapitalSurplus < 0) {
+    healthStatus = "critical";
+    healthLabel = "CAPITAL POOL OVERRUN";
+    healthColor = "#E11D48";
+    healthScore = 30;
   } else {
-    if (netProfitMarginPct >= 40 && budgetUtilizationPct <= 85) {
+    if (retainedCapitalPct >= 40 || (netProfitMarginPct >= 40 && budgetUtilizationPct <= 85)) {
       healthStatus = "excellent";
       healthLabel = "EXCELLENT SURPLUS";
       healthColor = "#059669";
       healthScore = 95;
-    } else if (netProfitMarginPct >= 15) {
+    } else if (retainedCapitalPct >= 15 || netProfitMarginPct >= 15) {
       healthStatus = "healthy";
       healthLabel = "HEALTHY SURPLUS";
       healthColor = "#10B981";
@@ -454,7 +469,9 @@ export function buildEnterpriseReportData(
     }
   }
 
-  const whyThisMatters = isNetPositive
+  const whyThisMatters = budgetTotal > 0
+    ? `Operating revenue of ${currency} ${formatCompactCurrency(totalRevenue)} plus approved budget of ${currency} ${formatCompactCurrency(budgetTotal)} creates an authorized capital pool of ${currency} ${formatCompactCurrency(totalFundingPool)}. Total disbursements of ${currency} ${formatCompactCurrency(totalExpenses)} leave a net capital surplus of ${currency} ${formatCompactCurrency(netCapitalSurplus)} (${retainedCapitalPct.toFixed(1)}% retained) with an operating cashflow margin of ${netProfitMarginPct.toFixed(1)}%.`
+    : isNetPositive
     ? `Operating revenue of ${currency} ${formatCompactCurrency(totalRevenue)} exceeds expenses of ${currency} ${formatCompactCurrency(totalExpenses)} by ${currency} ${formatCompactCurrency(netOperatingBalance)} (${netProfitMarginPct.toFixed(1)}% operating margin), maintaining strong cash liquidity.`
     : `Operating expenditures (${currency} ${formatCompactCurrency(totalExpenses)}) exceed realized revenues (${currency} ${formatCompactCurrency(totalRevenue)}) by ${currency} ${formatCompactCurrency(Math.abs(netOperatingBalance))}, causing an operating deficit.`;
 
@@ -800,6 +817,10 @@ export function buildEnterpriseReportData(
       budgetSpent,
       budgetRemaining,
       budgetUtilizationPct,
+      totalBudgetAllocated,
+      totalFundingPool,
+      netCapitalSurplus,
+      retainedCapitalPct,
       operatingCashBalance: netOperatingBalance,
       transactionCount: scopedTransactions.length,
       employeeCount: scopedPayroll.length,

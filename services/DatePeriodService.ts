@@ -282,7 +282,7 @@ export function filterTransactionsByPeriod(
     if (!t || !t.date) return false;
     const status = (t as any).status;
     if (status === "deleted" || status === "void" || status === "cancelled") return false;
-    const txDate = t.date.slice(0, 10);
+    const txDate = (t.date || "").trim().slice(0, 10).replace(/\//g, "-");
     return txDate >= startDate && txDate <= endDate;
   });
 }
@@ -680,9 +680,20 @@ export function aggregateTransactionsByGranularity(
     endYear = Math.max(endYear, new Date().getFullYear());
   }
 
+  const txSource =
+    endYear - start.getFullYear() < 3
+      ? transactions.filter((t) => {
+          if (!t || !t.date) return false;
+          const status = (t as any).status;
+          if (status === "deleted" || status === "void" || status === "cancelled") return false;
+          const yr = Number((t.date || "").trim().substring(0, 4));
+          return !isNaN(yr) && yr >= startYear && yr <= endYear;
+        })
+      : filtered;
+
   const yearMap: Record<string, { inc: number; exp: number; count: number }> = {};
-  filtered.forEach((t) => {
-    const yr = (t.date || "").substring(0, 4);
+  txSource.forEach((t) => {
+    const yr = (t.date || "").trim().substring(0, 4);
     const amt = Number(t.amount || 0);
     if (isNaN(amt) || amt <= 0) return;
     if (!yearMap[yr]) yearMap[yr] = { inc: 0, exp: 0, count: 0 };

@@ -765,7 +765,39 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
       </div>
     `;
     } else {
-      kpisHtml = `
+      const hasBudget = (executiveSummary.budgetTotal || 0) > 0;
+      const totalFundingPool = executiveSummary.totalFundingPool || (executiveSummary.totalRevenue + (executiveSummary.budgetTotal || 0));
+      const netCapitalSurplus = executiveSummary.netCapitalSurplus !== undefined ? executiveSummary.netCapitalSurplus : (totalFundingPool - executiveSummary.totalExpenses);
+      const isSurplusPositive = netCapitalSurplus >= 0;
+      const retainedPct = totalFundingPool > 0 ? (netCapitalSurplus / totalFundingPool) * 100 : 0;
+
+      if (hasBudget) {
+        kpisHtml = `
+      <div class="kpi-card">
+        <div class="kpi-label">Total Realized Inflows</div>
+        <div class="kpi-val" style="color: #10B981;">+${currency} ${fmt(executiveSummary.totalRevenue)}</div>
+        <div class="kpi-sub">${revenueAnalysis.transactions.length} Inflow Receipts</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Total Realized Expenses</div>
+        <div class="kpi-val" style="color: #F43F5E;">-${currency} ${fmt(executiveSummary.totalExpenses)}</div>
+        <div class="kpi-sub">${executiveSummary.budgetUtilizationPct.toFixed(1)}% of Budget Used</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Authorized Budget Capacity</div>
+        <div class="kpi-val" style="color: #3B82F6;">${currency} ${fmt(executiveSummary.budgetTotal)}</div>
+        <div class="kpi-sub">${currency} ${fmtShort(totalFundingPool)} Total Available Pool</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Net Capital Surplus</div>
+        <div class="kpi-val" style="color: ${isSurplusPositive ? "#10B981" : "#F43F5E"};">
+          ${isSurplusPositive ? "+" : "-"}${currency} ${fmt(Math.abs(netCapitalSurplus))}
+        </div>
+        <div class="kpi-sub">${retainedPct.toFixed(1)}% Retained · ${currency} ${fmtShort(executiveSummary.netOperatingBalance)} Cashflow</div>
+      </div>
+    `;
+      } else {
+        kpisHtml = `
       <div class="kpi-card">
         <div class="kpi-label">Total Realized Inflows</div>
         <div class="kpi-val" style="color: #10B981;">+${currency} ${fmt(executiveSummary.totalRevenue)}</div>
@@ -791,6 +823,7 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
         <div class="kpi-sub">${currency} ${fmtShort(executiveSummary.budgetRemaining)} Remaining Limit</div>
       </div>
     `;
+      }
     }
   }
 
@@ -1027,6 +1060,67 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
       </div>
     </div>
     ${buildTrendSvg(monthlyTrends.chartPoints, currency)}
+  </div>
+  ` : ""}
+
+  <!-- Executive Statement of Financial Activities & Capital Pool Summary -->
+  ${(isConsolidated || isExecutive) ? `
+  <div class="section-title avoid-break" style="margin-top: 8px;">
+    <span>Executive Statement of Financial Activities & Capital Pool</span>
+    <span class="section-tag">${filters.periodLabel} · Audited Statement</span>
+  </div>
+  <div class="table-wrap avoid-break">
+    <table style="table-layout: fixed; width: 100%;">
+      <thead>
+        <tr>
+          <th style="width: 55%; text-align: left;">Financial Classification / Funding Source</th>
+          <th style="width: 25%; text-align: right;">Audited Amount (${currency})</th>
+          <th style="width: 20%; text-align: center;">Composition & Audit Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="even">
+          <td style="text-align: left; font-weight:700; color:#10B981;">A. Institutional Realized Revenue & Inflows</td>
+          <td class="num" style="color:#10B981; font-weight:700;">+${currency} ${fmt(executiveSummary.totalRevenue)}</td>
+          <td style="text-align: center; color:#10B981;">${revenueAnalysis.byCategory.length} Revenue Streams</td>
+        </tr>
+        ${(executiveSummary.budgetTotal || 0) > 0 ? `
+        <tr>
+          <td style="text-align: left; font-weight:700; color:#3B82F6;">B. Approved Fiscal Budget Capital Allocation</td>
+          <td class="num" style="color:#3B82F6; font-weight:700;">+${currency} ${fmt(executiveSummary.budgetTotal)}</td>
+          <td style="text-align: center; color:#3B82F6;">${departmentFinancials.departments.length} Cost Centers Monitored</td>
+        </tr>
+        <tr style="background:#F1F5F9; font-weight:800;">
+          <td style="text-align: left; color:#0F172A;">TOTAL AUTHORIZED CAPITAL POOL (A + B)</td>
+          <td class="num" style="color:#0F172A; font-weight:800;">${currency} ${fmt(executiveSummary.totalFundingPool || (executiveSummary.totalRevenue + (executiveSummary.budgetTotal || 0)))}</td>
+          <td style="text-align: center; font-weight:800;">100% Capital Pool</td>
+        </tr>
+        ` : ""}
+        <tr class="even">
+          <td style="text-align: left; font-weight:700; color:#F43F5E;">C. Total Realized Operational Expenditures & Outflows</td>
+          <td class="num" style="color:#F43F5E; font-weight:700;">-${currency} ${fmt(executiveSummary.totalExpenses)}</td>
+          <td style="text-align: center; color:#F43F5E;">${expenseAnalysis.byCategory.length} Cost Categories</td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr class="tfoot-row">
+          <td style="text-align: left;">NET OPERATING CASHFLOW (Inflows - Outflows)</td>
+          <td class="num" style="color: ${executiveSummary.isNetPositive ? "#10B981" : "#F43F5E"};">
+            ${executiveSummary.isNetPositive ? "+" : "-"}${currency} ${fmt(Math.abs(executiveSummary.netOperatingBalance))}
+          </td>
+          <td style="text-align: center;">${executiveSummary.netProfitMarginPct.toFixed(1)}% Operating Margin</td>
+        </tr>
+        ${(executiveSummary.budgetTotal || 0) > 0 ? `
+        <tr style="background:#E0F2FE; font-weight:900; border-top:2px solid #0284C7;">
+          <td style="text-align: left; color:#0369A1;">NET CAPITAL SURPLUS REMAINING (Capital Pool - Expenses)</td>
+          <td class="num" style="color:#0369A1; font-weight:900; font-size:10px;">
+            +${currency} ${fmt(executiveSummary.netCapitalSurplus !== undefined ? executiveSummary.netCapitalSurplus : ((executiveSummary.totalRevenue + (executiveSummary.budgetTotal || 0)) - executiveSummary.totalExpenses))}
+          </td>
+          <td style="text-align: center; color:#0369A1; font-weight:800;">${(executiveSummary.retainedCapitalPct || 0).toFixed(1)}% Retained</td>
+        </tr>
+        ` : ""}
+      </tfoot>
+    </table>
   </div>
   ` : ""}
 
@@ -1297,6 +1391,11 @@ export function buildFinancialPdfBinary(input: ReportOptions | EnterpriseReportD
   const totalExpenses = executiveSummary.totalExpenses;
   const netBalance = executiveSummary.netOperatingBalance;
   const isNetPositive = executiveSummary.isNetPositive;
+  const hasBudget = (executiveSummary.budgetTotal || 0) > 0;
+  const totalFundingPool = executiveSummary.totalFundingPool || (totalIncome + (executiveSummary.budgetTotal || 0));
+  const netCapitalSurplus = executiveSummary.netCapitalSurplus !== undefined ? executiveSummary.netCapitalSurplus : (totalFundingPool - totalExpenses);
+  const isSurplusPositive = netCapitalSurplus >= 0;
+  const retainedPct = totalFundingPool > 0 ? (netCapitalSurplus / totalFundingPool) * 100 : 0;
   const orgName = metadata.organizationName;
   const generatedBy = metadata.generatedBy;
   const dateStr = metadata.generatedDate;
@@ -1370,25 +1469,31 @@ export function buildFinancialPdfBinary(input: ReportOptions | EnterpriseReportD
     "ET",
     "BT",
     "/F1 7 Tf 0.45 0.50 0.60 rg",
-    "225 674 Td (Operating Outflows & Payroll) Tj",
+    hasBudget
+      ? `225 674 Td (Budget Cap: ${escapePdfText(currency)} ${escapePdfText(fmtShort(executiveSummary.budgetTotal))}) Tj`
+      : "225 674 Td (Operating Outflows & Payroll) Tj",
     "ET",
 
-    // Card 3: Net Operating Balance
+    // Card 3: Net Operating Balance / Net Capital Surplus
     "0.96 0.97 0.99 rg",
     "390 660 165 65 re f",
-    isNetPositive ? "0.06 0.72 0.50 rg" : "0.94 0.25 0.37 rg",
+    (hasBudget ? isSurplusPositive : isNetPositive) ? "0.06 0.72 0.50 rg" : "0.94 0.25 0.37 rg",
     "390 722 165 3 re f",
     "BT",
     "/F2 7.5 Tf 0.40 0.45 0.55 rg",
-    "400 708 Td (NET OPERATING BALANCE) Tj",
+    `400 708 Td (${hasBudget ? "NET CAPITAL SURPLUS" : "NET OPERATING BALANCE"}) Tj`,
     "ET",
     "BT",
-    `/F2 12 Tf ${isNetPositive ? "0.06 0.72 0.50" : "0.94 0.25 0.37"} rg`,
-    `400 690 Td (${isNetPositive ? "+" : "-"}${escapePdfText(currency)} ${escapePdfText(Math.abs(netBalance).toLocaleString(undefined, { minimumFractionDigits: 2 }))}) Tj`,
+    `/F2 12 Tf ${(hasBudget ? isSurplusPositive : isNetPositive) ? "0.06 0.72 0.50" : "0.94 0.25 0.37"} rg`,
+    hasBudget
+      ? `400 690 Td (${isSurplusPositive ? "+" : "-"}${escapePdfText(currency)} ${escapePdfText(Math.abs(netCapitalSurplus).toLocaleString(undefined, { minimumFractionDigits: 2 }))}) Tj`
+      : `400 690 Td (${isNetPositive ? "+" : "-"}${escapePdfText(currency)} ${escapePdfText(Math.abs(netBalance).toLocaleString(undefined, { minimumFractionDigits: 2 }))}) Tj`,
     "ET",
     "BT",
     "/F1 7 Tf 0.45 0.50 0.60 rg",
-    `400 674 Td (${isNetPositive ? "Operating Surplus Retained" : "Operating Deficit Alert"}) Tj`,
+    hasBudget
+      ? `400 674 Td (${retainedPct.toFixed(0)}% Retained · +${escapePdfText(currency)} ${escapePdfText(fmtShort(netBalance))} Cash) Tj`
+      : `400 674 Td (${isNetPositive ? "Operating Surplus Retained" : "Operating Deficit Alert"}) Tj`,
     "ET",
 
     // ─── 3. FINANCIAL TREND & CASHFLOW VISUAL GRAPH ───
