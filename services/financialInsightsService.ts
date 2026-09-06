@@ -134,24 +134,32 @@ export function generateFinancialInsights(
     });
   } else if (net > 0 && income > 0) {
     const margin = (net / income) * 100;
+    const isBudgetCovered = totalBudgeted > 0;
+    const poolRetainedPct = totalPool > 0 ? (poolNet / totalPool) * 100 : 0;
     insights.push({
       id: `cf-surplus-${currentPeriod.label}`,
       organizationId: orgId,
       type: "OPERATING_SURPLUS",
-      title: "Positive Operating Surplus",
-      summary: `Net surplus of ${currency} ${net.toLocaleString()} achieved with a ${margin.toFixed(1)}% operating margin.`,
-      whyItMatters: "Healthy operating margins maintain liquid capital reserves for planned infrastructure.",
-      recommendedAction: "Maintain current expenditure controls and consider strategic capital reserve allocations.",
+      title: isBudgetCovered ? "Positive Operating Surplus & Capital Pool" : "Positive Operating Surplus",
+      summary: isBudgetCovered
+        ? `Net operating surplus of ${currency} ${net.toLocaleString()} (+${margin.toFixed(1)}% operating margin) achieved. Combined with the approved ${currency} ${totalBudgeted.toLocaleString()} budget, total institutional capital stands at ${currency} ${poolNet.toLocaleString()} (${poolRetainedPct.toFixed(0)}% retained).`
+        : `Net operating surplus of ${currency} ${net.toLocaleString()} achieved with a +${margin.toFixed(1)}% operating margin.`,
+      whyItMatters: isBudgetCovered
+        ? `Operating strictly within recognized revenues preserves 100% of approved budget reserves for scheduled milestones.`
+        : "Healthy operating margins maintain liquid capital reserves for planned infrastructure.",
+      recommendedAction: "Maintain current expenditure controls and review the consolidated statement for capital reserve allocations.",
       severity: "SUCCESS",
       category: "cashflow",
-      metric: `+${currency} ${net.toLocaleString()} (${margin.toFixed(1)}% NOM)`,
-      currentValue: net,
+      metric: isBudgetCovered
+        ? `+${currency} ${poolNet.toLocaleString()} (${poolRetainedPct.toFixed(0)}% Retained)`
+        : `+${currency} ${net.toLocaleString()} (${margin.toFixed(1)}% NOM)`,
+      currentValue: isBudgetCovered ? poolNet : net,
       changePercent: margin,
       period: currentPeriod.label,
-      sourceReference: "Statement of Financial Operations",
+      sourceReference: isBudgetCovered ? "Executive Capital Pool Ledger" : "Statement of Financial Operations",
       actionRoute: "/(tabs)/reports",
       timestamp: nowStr,
-      isActionable: false,
+      isActionable: true,
       confidence: 1.0,
     });
   }
@@ -277,26 +285,35 @@ export function generateFinancialInsights(
     });
 
   const sortedCats = Object.entries(catTotals).sort((a, b) => b[1].amount - a[1].amount);
+  const totalPayroll = calculatePayrollCost(payroll);
+
   if (sortedCats.length > 0 && expense > 0) {
     const [topCat, topData] = sortedCats[0];
     const topPct = (topData.amount / expense) * 100;
-    if (topPct >= 35) {
+    const isPayrollCat = /salary|salaries|payroll|wage|compensation|stipend/i.test(topCat);
+
+    // If this category is payroll/salaries and payroll records exist, skip here to avoid duplicating Section 5
+    if (topPct >= 35 && (!isPayrollCat || totalPayroll === 0)) {
       insights.push({
         id: `cat-concentration-${topCat}`,
         organizationId: orgId,
         type: "CATEGORY_CONCENTRATION",
-        title: `Heavy Outflow Concentration: ${topCat}`,
+        title: isPayrollCat ? `Remuneration Outflow Concentration: ${topCat}` : `Heavy Outflow Concentration: ${topCat}`,
         summary: `${topCat} represents ${topPct.toFixed(1)}% of all period disbursements (${currency} ${topData.amount.toLocaleString()}).`,
-        whyItMatters: "High concentration in a single expense line item reduces overall budgetary flexibility.",
-        recommendedAction: `Inspect individual vendor transactions within ${topCat} to evaluate recurring service contracts.`,
+        whyItMatters: isPayrollCat
+          ? "Fixed staff remuneration requires stable recurring receipts to maintain timely disbursements."
+          : "High concentration in a single expense line item reduces overall budgetary flexibility.",
+        recommendedAction: isPayrollCat
+          ? "Review recurring compensation schedules in Payroll to align upcoming disbursements with revenue milestones."
+          : `Inspect individual vendor disbursements within ${topCat} to evaluate recurring service contracts.`,
         severity: net < 0 && topPct >= 55 ? "WARNING" : "INFO",
-        category: "expense",
+        category: isPayrollCat ? "payroll" : "expense",
         metric: `${topPct.toFixed(1)}% of Total Outflows`,
         currentValue: topData.amount,
         changePercent: topPct,
         period: currentPeriod.label,
         sourceReference: `Expense Category / ${topCat}`,
-        actionRoute: "/(tabs)/expenses",
+        actionRoute: isPayrollCat ? "/payroll" : "/(tabs)/expenses",
         timestamp: nowStr,
         isActionable: true,
         confidence: 0.9,
@@ -362,6 +379,29 @@ export function generateFinancialInsights(
           isActionable: true,
           confidence: 0.95,
         });
+      } else if (spent === 0) {
+        insights.push({
+          id: `budget-unspent-${b.id}`,
+          organizationId: orgId,
+          type: "BUDGET_UNSPENT",
+          title: `Approved Budget Reserves Intact: ${b.category || b.department}`,
+          summary: `Approved budget allocation of ${currency} ${allocated.toLocaleString()} remains 100% intact with zero disbursements recorded.`,
+          whyItMatters: "Operations are presently self-funded from recognized revenue, preserving pre-allocated capital reserves for scheduled initiatives.",
+          recommendedAction: "Review departmental milestones in Budget Allocations to track project execution or deploy capital.",
+          severity: "INFO",
+          category: "budget",
+          metric: `0% Disbursed (${currency} ${allocated.toLocaleString()} Intact)`,
+          currentValue: 0,
+          previousValue: allocated,
+          changeAmount: allocated,
+          changePercent: 0,
+          period: currentPeriod.label,
+          sourceReference: `Budget Control / ${b.category || b.department}`,
+          actionRoute: "/budget",
+          timestamp: nowStr,
+          isActionable: true,
+          confidence: 1.0,
+        });
       }
     }
   });
@@ -369,29 +409,31 @@ export function generateFinancialInsights(
   // ──────────────────────────────────────────────────────────────────────────
   // 5. PAYROLL DISBURSAL WEIGHT
   // ──────────────────────────────────────────────────────────────────────────
-  const totalPayroll = calculatePayrollCost(payroll);
   if (expense > 0 && totalPayroll > 0) {
     const payrollPct = (totalPayroll / expense) * 100;
+    const revPct = income > 0 ? (totalPayroll / income) * 100 : null;
     if (payrollPct >= 45) {
       insights.push({
         id: `payroll-weight-${currentPeriod.label}`,
         organizationId: orgId,
         type: "PAYROLL_WEIGHT",
-        title: "High Remuneration Commitment",
-        summary: `Staff compensation represents ${payrollPct.toFixed(1)}% of total period disbursements (${currency} ${totalPayroll.toLocaleString()}).`,
-        whyItMatters: "Fixed remuneration obligations require stable recurring cash receipts.",
-        recommendedAction: "Align inflow payment milestones prior to monthly payroll disbursement dates.",
+        title: "Staff Compensation Commitment",
+        summary: `Staff compensation represents ${payrollPct.toFixed(1)}% of total period disbursements (${currency} ${totalPayroll.toLocaleString()})${revPct !== null ? `, accounted at ${revPct.toFixed(1)}% of revenue` : ""}.`,
+        whyItMatters: revPct !== null && revPct <= 50
+          ? `Remuneration commitments are well-calibrated against operating revenue (${revPct.toFixed(1)}% of inflows), ensuring stable liquidity.`
+          : "Fixed remuneration obligations require stable recurring cash receipts to ensure timely disbursement.",
+        recommendedAction: "Verify upcoming monthly payroll cycles and ensure scheduled disbursements align with milestone receivables.",
         severity: net < 0 && payrollPct >= 65 ? "WARNING" : "INFO",
         category: "payroll",
-        metric: `${payrollPct.toFixed(1)}% of Total Outflows`,
+        metric: `${payrollPct.toFixed(1)}% of Outflows${revPct !== null ? ` (${revPct.toFixed(1)}% of Inflows)` : ""}`,
         currentValue: totalPayroll,
         changePercent: payrollPct,
         period: currentPeriod.label,
         sourceReference: `Payroll Disbursals (${payroll.length} Staff)`,
         actionRoute: "/payroll",
         timestamp: nowStr,
-        isActionable: false,
-        confidence: 0.9,
+        isActionable: true,
+        confidence: 0.95,
       });
     }
   }

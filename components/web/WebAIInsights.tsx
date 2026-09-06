@@ -1164,7 +1164,19 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
                     👉 {insight.recommendedAction}
                   </Text>
                   {insight.actionRoute && onNavigate && (
-                    <TouchableOpacity onPress={() => onNavigate(insight.actionRoute?.replace("/(tabs)/", "") || "overview")}>
+                    <TouchableOpacity
+                      onPress={() => onNavigate(insight.actionRoute?.replace(/^\/?(\(tabs\)\/)?/, "") || "dashboard")}
+                      style={{
+                        backgroundColor: colors.primary + "18",
+                        borderColor: colors.primary + "44",
+                        borderWidth: 1,
+                        paddingVertical: 5,
+                        paddingHorizontal: 12,
+                        borderRadius: 6,
+                        marginLeft: 12,
+                      }}
+                      activeOpacity={0.7}
+                    >
                       <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: colors.primary }}>
                         Resolve →
                       </Text>

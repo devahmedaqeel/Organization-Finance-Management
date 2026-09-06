@@ -1120,9 +1120,21 @@ export default function AIInsightsScreen() {
                     👉 {insight.recommendedAction}
                   </Text>
                   {insight.actionRoute && (
-                    <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: colors.primary }}>
-                      Resolve →
-                    </Text>
+                    <View
+                      style={{
+                        backgroundColor: colors.primary + "18",
+                        borderColor: colors.primary + "44",
+                        borderWidth: 1,
+                        paddingVertical: 4,
+                        paddingHorizontal: 10,
+                        borderRadius: 6,
+                        marginLeft: 10,
+                      }}
+                    >
+                      <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: colors.primary }}>
+                        Resolve →
+                      </Text>
+                    </View>
                   )}
                 </View>
               )}

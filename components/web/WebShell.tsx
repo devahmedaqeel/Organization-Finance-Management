@@ -168,7 +168,11 @@ const TAB_ALIASES: Record<string, WebTabKey> = {
 
 export function normalizeWebTab(raw: string | null | undefined): WebTabKey {
   if (!raw) return "dashboard";
-  const lower = raw.toLowerCase().trim();
+  const lower = raw
+    .toLowerCase()
+    .trim()
+    .replace(/^\/+/, "")
+    .replace(/^(\(tabs\)\/)?/, "");
   if (TAB_ALIASES[lower]) return TAB_ALIASES[lower];
   if (VALID_TABS.includes(lower as WebTabKey)) return lower as WebTabKey;
   return "dashboard";
