@@ -285,13 +285,17 @@ export default function DashboardScreen() {
   const heroBadgeBg = currentHeroIsDeficit ? "rgba(244, 63, 94, 0.20)" : "rgba(16, 185, 129, 0.20)";
   const heroBadgeBorder = currentHeroIsDeficit ? "rgba(244, 63, 94, 0.50)" : "rgba(16, 185, 129, 0.50)";
   const heroBadgeIcon = balanceViewMode === "expenses"
-    ? (currentHeroIsDeficit ? "alert-triangle" : "check-circle")
+    ? (currentHeroIsDeficit ? "alert-circle" : "shield")
     : (currentHeroIsDeficit ? "trending-down" : "trending-up");
 
   const heroBadgeText = balanceViewMode === "expenses"
     ? (totalBudgeted > 0
-        ? (totalExpenses > totalBudgeted ? `Over Budget (${budgetExpensePct}%)` : `Within Budget (${budgetExpensePct}% Used)`)
-        : (totalExpenses > totalIncome ? `Exceeds Inflows (${expensePctOfIncome}%)` : `Funded (${expensePctOfIncome}% of Inflows)`))
+        ? (totalExpenses > totalBudgeted
+            ? `Over by ${settings.currency} ${fmt(totalExpenses - totalBudgeted)}`
+            : `${settings.currency} ${fmt(budgetRemainingAmount)} Budget Left`)
+        : (totalExpenses > totalIncome
+            ? `Deficit: ${settings.currency} ${fmt(totalExpenses - totalIncome)}`
+            : `${settings.currency} ${fmt(incomeRetainedAmount)} Left`))
     : (totalBudgeted > 0
         ? `${isFundingDeficit ? "-" : "+"}${retainedSurplusPct}% Surplus`
         : `${operatingMargin >= 0 ? "+" : ""}${operatingMargin.toFixed(1)}% Margin`);

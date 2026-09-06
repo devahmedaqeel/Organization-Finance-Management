@@ -160,17 +160,32 @@ export function WebDashboard({
       : balanceViewMode === "budget"
       ? totalBudgeted
       : -totalExpenses;
+
+  const fmt = (n: number) => {
+    const abs = Math.abs(n);
+    if (abs >= 1000000) return `${(n / 1000000).toFixed(2)}M`;
+    if (abs >= 1000) return `${(n / 1000).toFixed(1)}K`;
+    return Number(n || 0).toLocaleString();
+  };
+
   const isHeroExpenseDeficit = totalBudgeted > 0 ? totalExpenses > totalBudgeted : totalExpenses > totalIncome;
   const currentHeroIsDeficit = balanceViewMode === "cashflow" ? isEffectiveDeficit : isHeroExpenseDeficit;
 
   const heroBadgeColor = currentHeroIsDeficit ? "#FB7185" : "#34D399";
   const heroBadgeBg = currentHeroIsDeficit ? "rgba(244, 63, 94, 0.20)" : "rgba(16, 185, 129, 0.20)";
   const heroBadgeBorder = currentHeroIsDeficit ? "rgba(244, 63, 94, 0.50)" : "rgba(16, 185, 129, 0.50)";
+  const heroBadgeIcon = balanceViewMode === "expenses"
+    ? (currentHeroIsDeficit ? "alert-circle" : "shield")
+    : (currentHeroIsDeficit ? "trending-down" : "trending-up");
 
   const heroBadgeText = balanceViewMode === "expenses"
     ? (totalBudgeted > 0
-        ? (totalExpenses > totalBudgeted ? `Over Budget (${budgetExpensePct}%)` : `Within Budget (${budgetExpensePct}% Used)`)
-        : (totalExpenses > totalIncome ? `Exceeds Inflows (${expensePctOfIncome}%)` : `Funded (${expensePctOfIncome}% of Inflows)`))
+        ? (totalExpenses > totalBudgeted
+            ? `Over by ${settings.currency} ${fmt(totalExpenses - totalBudgeted)}`
+            : `${settings.currency} ${fmt(budgetRemainingAmount)} Budget Left`)
+        : (totalExpenses > totalIncome
+            ? `Deficit: ${settings.currency} ${fmt(totalExpenses - totalIncome)}`
+            : `${settings.currency} ${fmt(incomeRetainedAmount)} Left`))
     : (totalBudgeted > 0
         ? `${isFundingDeficit ? "-" : "+"}${retainedSurplusPct}% Surplus`
         : `${operatingMargin >= 0 ? "+" : ""}${operatingMargin.toFixed(1)}% Margin`);
@@ -189,13 +204,6 @@ export function WebDashboard({
     [transactions, curYm]
   );
   const incomeGrowth = prevMonthIncome > 0 ? ((curMonthIncome - prevMonthIncome) / prevMonthIncome) * 100 : (curMonthIncome > 0 ? 100 : 0);
-
-  const fmt = (n: number) => {
-    const abs = Math.abs(n);
-    if (abs >= 1000000) return `${(n / 1000000).toFixed(2)}M`;
-    if (abs >= 1000) return `${(n / 1000).toFixed(1)}K`;
-    return Number(n || 0).toLocaleString();
-  };
 
   const totalPayroll = useMemo(
     () => payroll.reduce((s, p) => s + (p.baseSalary || 0) + (p.bonus || 0) - (p.deductions || 0), 0),
@@ -508,7 +516,7 @@ export function WebDashboard({
             activeOpacity={0.8}
           >
             <Feather
-              name={balanceViewMode === "expenses" ? (currentHeroIsDeficit ? "alert-triangle" : "check-circle") : (currentHeroIsDeficit ? "trending-down" : "trending-up")}
+              name={heroBadgeIcon as any}
               size={12}
               color={heroBadgeColor}
             />
