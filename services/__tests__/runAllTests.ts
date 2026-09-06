@@ -46,6 +46,11 @@ const testSuites = [
     cmd: "npx",
     args: ["-y", "tsx", "services/__tests__/orgBadgeHeader.test.ts"],
   },
+  {
+    name: "8. Web <-> Mobile Cross-Platform Synchronization Suite",
+    cmd: "npx",
+    args: ["-y", "tsx", "services/__tests__/crossPlatformSync.test.ts"],
+  },
 ];
 
 console.log("\n=======================================================");

@@ -17,9 +17,7 @@ import { useColors } from "@/hooks/useColors";
 import { useSettings } from "@/context/SettingsContext";
 import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
 import { formatYMD } from "@/services/DatePeriodService";
-
-const INCOME_CATS = ["Government Grant", "Fee Collection", "Research Grant", "Donation", "Other"];
-const EXPENSE_CATS = ["Salaries", "Utilities", "Equipment", "Research", "Maintenance", "Travel", "Other"];
+import { getUnifiedCategories } from "@/constants/categories";
 
 interface Props {
   visible: boolean;
@@ -42,10 +40,13 @@ export function AddTransactionModal({
   editItem,
 }: Props) {
   const colors = useColors();
-  const { settings } = useSettings();
+  const { settings, addCustomCategory } = useSettings();
   const { departments, addDepartment, updateDepartment, budgets } = useFinance();
   const keyboardHeight = useKeyboardHeight();
-  const cats = type === "income" ? INCOME_CATS : EXPENSE_CATS;
+  
+  const cats = React.useMemo(() => {
+    return getUnifiedCategories(type, settings.customIncomeCategories, settings.customExpenseCategories);
+  }, [type, settings.customIncomeCategories, settings.customExpenseCategories]);
 
   const isEditMode = !!editItem;
 
@@ -65,6 +66,10 @@ export function AddTransactionModal({
   const [description, setDescription] = useState("");
   const [date, setDate] = useState(() => formatYMD(new Date()));
   const [error, setError] = useState("");
+
+  // Inline category creation
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+  const [categoryInputText, setCategoryInputText] = useState("");
 
   // Inline department creation/editing state
   const [isCreatingDept, setIsCreatingDept] = useState(false);
@@ -91,6 +96,8 @@ export function AddTransactionModal({
       setDate(formatYMD(new Date()));
       setError("");
     }
+    setIsCreatingCategory(false);
+    setCategoryInputText("");
     setIsCreatingDept(false);
     setIsEditingDept(false);
     setDeptInputText("");
@@ -190,7 +197,71 @@ export function AddTransactionModal({
                   </Text>
                 </TouchableOpacity>
               ))}
+
+              <TouchableOpacity
+                style={[
+                  styles.chip,
+                  {
+                    backgroundColor: colors.muted + "80",
+                    borderColor: colors.border,
+                  },
+                ]}
+                onPress={() => setIsCreatingCategory(true)}
+              >
+                <Text style={[styles.chipText, { color: accentColor, fontWeight: "600" }]}>
+                  + Add Category
+                </Text>
+              </TouchableOpacity>
             </View>
+
+            {isCreatingCategory && (
+              <View style={{ flexDirection: "row", gap: 8, marginTop: 8, marginBottom: 12, alignItems: "center" }}>
+                <TextInput
+                  style={[
+                    styles.input,
+                    { flex: 1, backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground, marginBottom: 0 },
+                  ]}
+                  placeholder="New category name..."
+                  placeholderTextColor={colors.mutedForeground}
+                  value={categoryInputText}
+                  onChangeText={setCategoryInputText}
+                  autoFocus
+                />
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: accentColor,
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    borderRadius: 8,
+                  }}
+                  onPress={async () => {
+                    const trimmed = categoryInputText.trim();
+                    if (trimmed) {
+                      await addCustomCategory(type, trimmed);
+                      setCategory(trimmed);
+                      setCategoryInputText("");
+                      setIsCreatingCategory(false);
+                    }
+                  }}
+                >
+                  <Text style={{ color: "#fff", fontWeight: "600", fontSize: 13 }}>Save</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: colors.muted,
+                    paddingHorizontal: 10,
+                    paddingVertical: 10,
+                    borderRadius: 8,
+                  }}
+                  onPress={() => {
+                    setIsCreatingCategory(false);
+                    setCategoryInputText("");
+                  }}
+                >
+                  <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             {/* Amount */}
             <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>AMOUNT ({settings.currency})</Text>

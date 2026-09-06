@@ -138,6 +138,7 @@ interface AuthContextValue {
   forgotPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   hasPermission: (permission: keyof RolePermissions) => boolean;
+  updateUserOrganization: (newOrgName: string) => Promise<void>;
 }
 
 const DEMO_USERS: Record<string, { password: string; user: User }> = {
@@ -197,6 +198,7 @@ const AuthContext = createContext<AuthContextValue>({
   forgotPassword: async () => ({ success: false }),
   logout: async () => {},
   hasPermission: () => false,
+  updateUserOrganization: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -781,6 +783,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   };
 
+  const updateUserOrganization = async (newOrgName: string) => {
+    if (!user) return;
+    const updatedUser = { ...user, organization: newOrgName };
+    setUser(updatedUser);
+    try {
+      await AsyncStorage.setItem("ofm_user", JSON.stringify(updatedUser));
+      if (Platform.OS === "web" && typeof localStorage !== "undefined") {
+        localStorage.setItem("ofm_user", JSON.stringify(updatedUser));
+      }
+      if (user.id) {
+        await setDoc(doc(db, "users", user.id), { organization: newOrgName }, { merge: true });
+      }
+    } catch (e) {}
+  };
+
   const authValue = useMemo(
     () => ({
       user,
@@ -792,6 +809,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       forgotPassword,
       logout,
       hasPermission: (permission: keyof RolePermissions) => user?.role ? (ROLE_PERMISSIONS[user.role]?.[permission] ?? false) : false,
+      updateUserOrganization,
     }),
     [user, isLoading, login, loginWithGoogle, loginWithGoogleCredential, signUp, forgotPassword, logout]
   );

@@ -214,6 +214,17 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
   const prevTransactionsRef = useRef<Transaction[]>([]);
   const deletedIdsRef = useRef<Set<string>>(new Set());
+  const hasLiveSnapshotRef = useRef<{
+    transactions: boolean;
+    budgets: boolean;
+    payroll: boolean;
+    departments: boolean;
+  }>({
+    transactions: false,
+    budgets: false,
+    payroll: false,
+    departments: false,
+  });
 
   const activeOrgId = user?.organizationId || "demo-org";
   const cachePrefix = `ofm_cache:${activeOrgId}:`;
@@ -256,6 +267,14 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
   // 1. Organization-Scoped Initial Local Cache Load + Instant REST Cloud Sync
   useEffect(() => {
+    deletedIdsRef.current.clear();
+    hasLiveSnapshotRef.current = {
+      transactions: false,
+      budgets: false,
+      payroll: false,
+      departments: false,
+    };
+
     if (!user) {
       setTransactions([]);
       setBudgets([]);
@@ -305,26 +324,26 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       fetchCollectionREST<Department>("departments", activeOrgId),
       fetchCollectionREST<PayrollEntry>("payroll", activeOrgId),
     ]).then(([restTxs, restBudgets, restDepts, restPayroll]) => {
-      if (restTxs !== null) {
+      if (restTxs !== null && !hasLiveSnapshotRef.current.transactions) {
         const validTxs = restTxs.filter((t) => !deletedIdsRef.current.has(t.id));
         validTxs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         setTransactions(validTxs);
         AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(validTxs)).catch(() => {});
       }
 
-      if (restBudgets !== null) {
+      if (restBudgets !== null && !hasLiveSnapshotRef.current.budgets) {
         const validBudgets = restBudgets.filter((b) => !deletedIdsRef.current.has(b.id));
         setBudgets(validBudgets);
         AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(validBudgets)).catch(() => {});
       }
 
-      if (restDepts !== null) {
+      if (restDepts !== null && !hasLiveSnapshotRef.current.departments) {
         const validDepts = restDepts.filter((d) => !deletedIdsRef.current.has(d.id));
         setDepartments(validDepts);
         AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(validDepts)).catch(() => {});
       }
 
-      if (restPayroll !== null) {
+      if (restPayroll !== null && !hasLiveSnapshotRef.current.payroll) {
         const validPayroll = restPayroll.filter((p) => !deletedIdsRef.current.has(p.id));
         setPayroll(validPayroll);
         AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(validPayroll)).catch(() => {});
@@ -336,7 +355,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     }).catch(() => {});
   }, [activeOrgId, user?.id]);
 
-  // 2. Real-time Firebase Synchronization (Web ↔ Mobile ↔ Desktop)
+  // 2. Real-time Firebase Synchronization (Web <-> Mobile)
   useEffect(() => {
     if (!loaded || !user || !user.organizationId) {
       if (!user) {
@@ -360,16 +379,18 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     const unsubTransactions = onSnapshot(
       qTransactions,
       (snapshot) => {
+        hasLiveSnapshotRef.current.transactions = true;
         setSyncStatus("synced");
-        const remoteItems: Transaction[] = [];
+        const remoteMap = new Map<string, Transaction>();
         snapshot.forEach((d) => {
           if (!deletedIdsRef.current.has(d.id)) {
-            remoteItems.push({ id: d.id, ...d.data() } as Transaction);
+            remoteMap.set(d.id, { id: d.id, ...d.data() } as Transaction);
           } else {
             deleteDoc(doc(db, "transactions", d.id)).catch(() => {});
           }
         });
 
+        const remoteItems = Array.from(remoteMap.values());
         remoteItems.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         setTransactions(remoteItems);
         prevTransactionsRef.current = remoteItems;
@@ -391,15 +412,17 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     const unsubBudgets = onSnapshot(
       qBudgets,
       (snapshot) => {
-        const remoteItems: Budget[] = [];
+        hasLiveSnapshotRef.current.budgets = true;
+        const remoteMap = new Map<string, Budget>();
         snapshot.forEach((d) => {
           if (!deletedIdsRef.current.has(d.id)) {
-            remoteItems.push({ id: d.id, ...d.data() } as Budget);
+            remoteMap.set(d.id, { id: d.id, ...d.data() } as Budget);
           } else {
             deleteDoc(doc(db, "budgets", d.id)).catch(() => {});
           }
         });
 
+        const remoteItems = Array.from(remoteMap.values());
         setBudgets(remoteItems);
         AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(remoteItems)).catch(() => {});
       },
@@ -419,15 +442,17 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     const unsubPayroll = onSnapshot(
       qPayroll,
       (snapshot) => {
-        const remoteItems: PayrollEntry[] = [];
+        hasLiveSnapshotRef.current.payroll = true;
+        const remoteMap = new Map<string, PayrollEntry>();
         snapshot.forEach((d) => {
           if (!deletedIdsRef.current.has(d.id)) {
-            remoteItems.push({ id: d.id, ...d.data() } as PayrollEntry);
+            remoteMap.set(d.id, { id: d.id, ...d.data() } as PayrollEntry);
           } else {
             deleteDoc(doc(db, "payroll", d.id)).catch(() => {});
           }
         });
 
+        const remoteItems = Array.from(remoteMap.values());
         setPayroll(remoteItems);
         AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(remoteItems)).catch(() => {});
       },
@@ -447,15 +472,17 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     const unsubDepartments = onSnapshot(
       qDepartments,
       (snapshot) => {
-        const remoteItems: Department[] = [];
+        hasLiveSnapshotRef.current.departments = true;
+        const remoteMap = new Map<string, Department>();
         snapshot.forEach((d) => {
           if (!deletedIdsRef.current.has(d.id)) {
-            remoteItems.push({ id: d.id, ...d.data() } as Department);
+            remoteMap.set(d.id, { id: d.id, ...d.data() } as Department);
           } else {
             deleteDoc(doc(db, "departments", d.id)).catch(() => {});
           }
         });
 
+        const remoteItems = Array.from(remoteMap.values());
         setDepartments(remoteItems);
         AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(remoteItems)).catch(() => {});
       },
@@ -509,8 +536,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
     const id = generateSafeId("transactions");
     const now = new Date().toISOString();
-    const orgName = user?.organization || "OFM — Organization Finance Management";
-    const orgId = user?.organizationId || "default_org";
+    const orgName = settings.organizationName || user?.organization || "OFM — Organization Finance Management";
+    const orgId = user?.organizationId || activeOrgId || "default_org";
 
     const newTx: Transaction = {
       ...t,
@@ -712,8 +739,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
     const id = generateSafeId("budgets");
     const now = new Date().toISOString();
-    const orgName = user?.organization || "OFM — Organization Finance Management";
-    const orgId = user?.organizationId || "default_org";
+    const orgName = settings.organizationName || user?.organization || "OFM — Organization Finance Management";
+    const orgId = user?.organizationId || activeOrgId || "default_org";
 
     const newBudget: Budget = {
       ...b,
@@ -839,8 +866,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
     const id = generateSafeId("payroll");
     const now = new Date().toISOString();
-    const orgName = user?.organization || "OFM — Organization Finance Management";
-    const orgId = activeOrgId;
+    const orgName = settings.organizationName || user?.organization || "OFM — Organization Finance Management";
+    const orgId = user?.organizationId || activeOrgId || "default_org";
     const netSalary = safeNumber(p.baseSalary, 0) + safeNumber(p.bonus, 0) - safeNumber(p.deductions, 0);
 
     const newPayroll: PayrollEntry = {
@@ -1093,8 +1120,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
     const id = generateSafeId("departments");
     const now = new Date().toISOString();
-    const orgName = user?.organization || "OFM — Organization Finance Management";
-    const orgId = user?.organizationId || "default_org";
+    const orgName = settings.organizationName || user?.organization || "OFM — Organization Finance Management";
+    const orgId = user?.organizationId || activeOrgId || "default_org";
 
     const newDept: Department = {
       ...d,

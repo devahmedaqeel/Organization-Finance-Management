@@ -13,28 +13,7 @@ import {
   SvgShield,
 } from "../SvgIcons";
 
-const INCOME_CATEGORIES = [
-  "Government Grant",
-  "Fee Collection",
-  "Research Grant",
-  "Donation",
-  "Investment Return",
-  "Service Charges",
-  "Other Income",
-];
-
-const EXPENSE_CATEGORIES = [
-  "Salaries",
-  "Utilities",
-  "Equipment",
-  "Research",
-  "Maintenance",
-  "Travel",
-  "Marketing",
-  "Software Licenses",
-  "Office Supplies",
-  "Other Expense",
-];
+import { getUnifiedCategories } from "@/constants/categories";
 
 const PAYMENT_METHODS = ["Electronic Transfer", "Cash", "Cheque", "Credit Card", "Direct Debit"];
 
@@ -55,7 +34,7 @@ export function WebTransactionModal({
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
 
-  const { settings } = useSettings();
+  const { settings, addCustomCategory } = useSettings();
   const { addTransaction, updateTransaction, departments, budgets } = useFinance();
 
   const isEditing = Boolean(transactionToEdit);
@@ -71,6 +50,12 @@ export function WebTransactionModal({
   const [date, setDate] = useState(() => formatYMD(new Date()));
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [newCatInput, setNewCatInput] = useState("");
+
+  const categories = React.useMemo(() => {
+    return getUnifiedCategories(type, settings.customIncomeCategories, settings.customExpenseCategories);
+  }, [type, settings.customIncomeCategories, settings.customExpenseCategories]);
 
   useEffect(() => {
     if (visible) {
@@ -85,9 +70,10 @@ export function WebTransactionModal({
         setPaymentMethod(transactionToEdit.paymentMethod || "Electronic Transfer");
         setDate(transactionToEdit.date || formatYMD(new Date()));
       } else {
+        const defaultCats = getUnifiedCategories(initialType, settings.customIncomeCategories, settings.customExpenseCategories);
         setType(initialType);
         setAmount("");
-        setCategory(initialType === "income" ? INCOME_CATEGORIES[0] : EXPENSE_CATEGORIES[0]);
+        setCategory(defaultCats[0] || (initialType === "income" ? "Government Grant" : "Salaries"));
         setDepartment(departments.length > 0 ? departments[0].name : "Software Engineering");
         setSelectedBudgetId("");
         setDescription("");
@@ -95,11 +81,11 @@ export function WebTransactionModal({
         setPaymentMethod("Electronic Transfer");
         setDate(formatYMD(new Date()));
       }
+      setIsAddingCategory(false);
+      setNewCatInput("");
       setError("");
     }
   }, [visible, initialType, transactionToEdit, departments]);
-
-  const categories = type === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
 
   const handleSubmit = async () => {
     setError("");
@@ -210,7 +196,8 @@ export function WebTransactionModal({
                     ]}
                     onPress={() => {
                       setType("income");
-                      setCategory(INCOME_CATEGORIES[0]);
+                      const incomeCats = getUnifiedCategories("income", settings.customIncomeCategories, settings.customExpenseCategories);
+                      setCategory(incomeCats[0] || "Government Grant");
                     }}
                   >
                     <SvgArrowUpRight size={14} color={type === "income" ? colors.income : colors.mutedForeground} />
@@ -230,7 +217,8 @@ export function WebTransactionModal({
                     ]}
                     onPress={() => {
                       setType("expense");
-                      setCategory(EXPENSE_CATEGORIES[0]);
+                      const expenseCats = getUnifiedCategories("expense", settings.customIncomeCategories, settings.customExpenseCategories);
+                      setCategory(expenseCats[0] || "Salaries");
                     }}
                   >
                     <SvgArrowDownLeft size={14} color={type === "expense" ? colors.expense : colors.mutedForeground} />
@@ -306,8 +294,83 @@ export function WebTransactionModal({
                       </Text>
                     </TouchableOpacity>
                   ))}
+
+                  <TouchableOpacity
+                    style={[
+                      styles.chip,
+                      {
+                        backgroundColor: colors.background,
+                        borderColor: colors.border,
+                        borderStyle: "dashed",
+                      },
+                    ]}
+                    onPress={() => setIsAddingCategory((prev) => !prev)}
+                  >
+                    <Text style={[styles.chipText, { color: type === "income" ? colors.income : colors.expense, fontWeight: "600" }]}>
+                      + Add Category
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               </ScrollView>
+
+              {isAddingCategory && (
+                <View style={{ flexDirection: "row", gap: 8, marginTop: 8, alignItems: "center" }}>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        flex: 1,
+                        backgroundColor: colors.background,
+                        borderColor: colors.border,
+                        borderWidth: 1,
+                        borderRadius: 8,
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        color: colors.foreground,
+                        fontSize: 13,
+                      },
+                    ]}
+                    placeholder="New category name..."
+                    placeholderTextColor={colors.mutedForeground + "80"}
+                    value={newCatInput}
+                    onChangeText={setNewCatInput}
+                    autoFocus
+                  />
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: type === "income" ? colors.income : colors.expense,
+                      paddingHorizontal: 14,
+                      paddingVertical: 9,
+                      borderRadius: 8,
+                    }}
+                    onPress={async () => {
+                      const trimmed = newCatInput.trim();
+                      if (trimmed) {
+                        await addCustomCategory(type, trimmed);
+                        setCategory(trimmed);
+                        setNewCatInput("");
+                        setIsAddingCategory(false);
+                      }
+                    }}
+                  >
+                    <Text style={{ color: "#FFFFFF", fontWeight: "600", fontSize: 13 }}>Save</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: colors.border + "40",
+                      paddingHorizontal: 10,
+                      paddingVertical: 9,
+                      borderRadius: 8,
+                    }}
+                    onPress={() => {
+                      setIsAddingCategory(false);
+                      setNewCatInput("");
+                    }}
+                  >
+                    <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>Cancel</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
 
             {/* Department */}

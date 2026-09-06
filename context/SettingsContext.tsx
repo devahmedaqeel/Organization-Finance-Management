@@ -6,7 +6,7 @@ import { useAuth } from "./AuthContext";
 
 export type AppTheme = "system" | "light" | "dark";
 
-interface Settings {
+export interface Settings {
   organizationName: string;
   organizationAddress: string;
   organizationEmail: string;
@@ -19,6 +19,8 @@ interface Settings {
   emailjsTemplateId?: string;
   emailjsPublicKey?: string;
   theme?: AppTheme;
+  customIncomeCategories?: string[];
+  customExpenseCategories?: string[];
 }
 
 const DEFAULT_SETTINGS: Settings = {
@@ -34,24 +36,28 @@ const DEFAULT_SETTINGS: Settings = {
   emailjsTemplateId: "",
   emailjsPublicKey: "",
   theme: "system",
+  customIncomeCategories: [],
+  customExpenseCategories: [],
 };
 
 interface SettingsContextValue {
   settings: Settings;
   updateSettings: (patch: Partial<Settings>) => Promise<void>;
+  addCustomCategory: (type: "income" | "expense", category: string) => Promise<void>;
   isLoading: boolean;
 }
 
 const SettingsContext = createContext<SettingsContextValue>({
   settings: DEFAULT_SETTINGS,
   updateSettings: async () => {},
+  addCustomCategory: async () => {},
   isLoading: false,
 });
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
-  const { user } = useAuth();
+  const { user, updateUserOrganization } = useAuth();
 
   // Load from AsyncStorage on mount
   useEffect(() => {
@@ -79,6 +85,15 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
             AsyncStorage.setItem("ofm_settings", JSON.stringify(merged));
             return merged;
           });
+
+          // Sync organization name with user auth profile if updated remotely
+          if (
+            firebaseSettings.organizationName &&
+            firebaseSettings.organizationName !== user.organization &&
+            updateUserOrganization
+          ) {
+            updateUserOrganization(firebaseSettings.organizationName).catch(() => {});
+          }
         }
       },
       (err) => {
@@ -89,7 +104,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     );
 
     return () => unsub();
-  }, [user]);
+  }, [user?.id, user?.organizationId, user?.organization]);
 
   const updateSettings = useCallback(async (patch: Partial<Settings>) => {
     let nextSettings: Settings = DEFAULT_SETTINGS;
@@ -105,11 +120,27 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       console.log("Settings cloud write notice (saved offline):", err);
     }
-  }, [user?.organizationId, user?.organization]);
+
+    if (patch.organizationName && updateUserOrganization) {
+      updateUserOrganization(patch.organizationName).catch(() => {});
+    }
+  }, [user?.organizationId, user?.organization, updateUserOrganization]);
+
+  const addCustomCategory = useCallback(async (type: "income" | "expense", category: string) => {
+    const cleanCat = category.trim();
+    if (!cleanCat) return;
+
+    const key = type === "income" ? "customIncomeCategories" : "customExpenseCategories";
+    const currentList = settings[key] || [];
+    if (currentList.includes(cleanCat)) return;
+
+    const updatedList = [...currentList, cleanCat];
+    await updateSettings({ [key]: updatedList });
+  }, [settings, updateSettings]);
 
   const value = useMemo(
-    () => ({ settings, updateSettings, isLoading }),
-    [settings, updateSettings, isLoading]
+    () => ({ settings, updateSettings, addCustomCategory, isLoading }),
+    [settings, updateSettings, addCustomCategory, isLoading]
   );
 
   return (
