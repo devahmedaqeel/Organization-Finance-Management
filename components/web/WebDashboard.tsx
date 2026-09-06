@@ -514,9 +514,9 @@ export function WebDashboard({
         </View>
       </LinearGradient>
 
-      {/* ─── Executive Multi-Metric Financial KPI Summary Grid ─── */}
+      {/* ─── 4 Multi-Metric KPI Cards Row ─── */}
       <View style={styles.kpiGrid}>
-        {/* Card 1: Total Income (Inflows) */}
+        {/* Card 1: Inflows */}
         <TouchableOpacity
           style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}
           onPress={() => onNavigate("income")}
@@ -536,33 +536,10 @@ export function WebDashboard({
             formatter={fmt}
             style={[styles.kpiBigNumber, { color: colors.foreground }]}
           />
-          <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>Total Income</Text>
+          <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>Institutional Revenue</Text>
         </TouchableOpacity>
 
-        {/* Card 2: Total Budget */}
-        <TouchableOpacity
-          style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-          onPress={() => onNavigate("budgets")}
-          activeOpacity={0.8}
-        >
-          <View style={styles.kpiCardHeader}>
-            <View style={[styles.kpiIconSquare, { backgroundColor: "#3B82F618" }]}>
-              <SvgPieChart size={18} color="#3B82F6" />
-            </View>
-            <View style={[styles.kpiTag, { backgroundColor: "#3B82F615" }]}>
-              <Text style={[styles.kpiTagText, { color: "#3B82F6" }]}>{budgets.length} Budgets</Text>
-            </View>
-          </View>
-          <WebCountUp
-            value={totalBudgeted}
-            prefix={`${settings.currency} `}
-            formatter={fmt}
-            style={[styles.kpiBigNumber, { color: colors.foreground }]}
-          />
-          <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>Total Budget</Text>
-        </TouchableOpacity>
-
-        {/* Card 3: Total Expense (Outflows) */}
+        {/* Card 2: Outflows */}
         <TouchableOpacity
           style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}
           onPress={() => onNavigate("expenses")}
@@ -573,7 +550,7 @@ export function WebDashboard({
               <SvgArrowDownLeft size={18} color={colors.expense} />
             </View>
             <View style={[styles.kpiTag, { backgroundColor: colors.expense + "15" }]}>
-              <Text style={[styles.kpiTagText, { color: colors.expense }]}>{clampedSpendRatio}% Spend</Text>
+              <Text style={[styles.kpiTagText, { color: colors.expense }]}>Outflows</Text>
             </View>
           </View>
           <WebCountUp
@@ -582,82 +559,48 @@ export function WebDashboard({
             formatter={fmt}
             style={[styles.kpiBigNumber, { color: colors.foreground }]}
           />
-          <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>Total Expense</Text>
+          <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>Operational Expenses</Text>
         </TouchableOpacity>
 
-        {/* Card 4: Budget Used */}
+        {/* Card 3: Total Budget Allocated */}
         <TouchableOpacity
           style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}
           onPress={() => onNavigate("budgets")}
           activeOpacity={0.8}
         >
           <View style={styles.kpiCardHeader}>
-            <View style={[styles.kpiIconSquare, { backgroundColor: "#F59E0B18" }]}>
-              <SvgTarget size={18} color="#F59E0B" />
+            <View style={[styles.kpiIconSquare, { backgroundColor: "#3B82F618" }]}>
+              <SvgPieChart size={18} color="#3B82F6" />
             </View>
-            <View style={[styles.kpiTag, { backgroundColor: (netBudgetUtilization > 100 ? colors.expense : "#F59E0B") + "15" }]}>
-              <Text style={[styles.kpiTagText, { color: netBudgetUtilization > 100 ? colors.expense : "#F59E0B" }]}>
-                {netBudgetUtilization.toFixed(0)}% Used
-              </Text>
+            <View style={[styles.kpiTag, { backgroundColor: "#3B82F615" }]}>
+              <Text style={[styles.kpiTagText, { color: "#3B82F6" }]}>{budgetUtilization.toFixed(0)}% Used</Text>
             </View>
           </View>
           <WebCountUp
-            value={totalBudgetSpent}
+            value={totalBudgeted}
             prefix={`${settings.currency} `}
             formatter={fmt}
             style={[styles.kpiBigNumber, { color: colors.foreground }]}
           />
-          <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>Budget Used</Text>
+          <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>Total Budget Allocated</Text>
         </TouchableOpacity>
 
-        {/* Card 5: Remaining Budget */}
+        {/* Card 4: Monitored Units */}
         <TouchableOpacity
           style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-          onPress={() => onNavigate("budgets")}
+          onPress={() => onNavigate("departments")}
           activeOpacity={0.8}
         >
           <View style={styles.kpiCardHeader}>
-            <View style={[styles.kpiIconSquare, { backgroundColor: (netBudgetRemaining >= 0 ? "#10B981" : colors.expense) + "18" }]}>
-              <SvgCheckCircle size={18} color={netBudgetRemaining >= 0 ? "#10B981" : colors.expense} />
+            <View style={[styles.kpiIconSquare, { backgroundColor: "#8B5CF618" }]}>
+              <SvgLayers size={18} color="#8B5CF6" />
             </View>
-            <View style={[styles.kpiTag, { backgroundColor: (netBudgetRemaining >= 0 ? "#10B981" : colors.expense) + "15" }]}>
-              <Text style={[styles.kpiTagText, { color: netBudgetRemaining >= 0 ? "#10B981" : colors.expense }]}>
-                {netBudgetRemaining >= 0 ? "Available" : "Exceeded"}
-              </Text>
+            <View style={[styles.kpiTag, { backgroundColor: "#8B5CF615" }]}>
+              <Text style={[styles.kpiTagText, { color: "#8B5CF6" }]}>{departments.length} Units</Text>
             </View>
           </View>
-          <WebCountUp
-            value={netBudgetRemaining}
-            prefix={`${settings.currency} `}
-            formatter={fmt}
-            style={[styles.kpiBigNumber, { color: colors.foreground }]}
-          />
-          <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>Remaining Budget</Text>
-        </TouchableOpacity>
-
-        {/* Card 6: Net Operating Balance */}
-        <TouchableOpacity
-          style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-          onPress={() => setNetModalVisible(true)}
-          activeOpacity={0.8}
-        >
-          <View style={styles.kpiCardHeader}>
-            <View style={[styles.kpiIconSquare, { backgroundColor: (netBalance >= 0 ? "#6366F1" : colors.expense) + "18" }]}>
-              <SvgDollar size={18} color={netBalance >= 0 ? "#6366F1" : colors.expense} />
-            </View>
-            <View style={[styles.kpiTag, { backgroundColor: (netBalance >= 0 ? "#6366F1" : colors.expense) + "15" }]}>
-              <Text style={[styles.kpiTagText, { color: netBalance >= 0 ? "#6366F1" : colors.expense }]}>
-                {netBalance >= 0 ? "Surplus" : "Deficit"}
-              </Text>
-            </View>
-          </View>
-          <WebCountUp
-            value={netBalance}
-            prefix={`${netBalance >= 0 ? "+" : "-"}${settings.currency} `}
-            formatter={(v) => fmt(Math.abs(v))}
-            style={[styles.kpiBigNumber, { color: netBalance >= 0 ? "#10B981" : colors.expense }]}
-          />
-          <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>Net Operating Balance</Text>
+          <Text style={[styles.kpiBigNumber, { color: colors.foreground }]}>{departments.length} Depts</Text>
+          <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>Monitored Cost Centers</Text>
         </TouchableOpacity>
       </View>
 
