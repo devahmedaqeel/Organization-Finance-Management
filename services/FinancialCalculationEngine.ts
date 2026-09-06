@@ -381,7 +381,7 @@ export function calculateBudgetSpentForCategory(
       const tDept = (t.department || "").trim().toLowerCase();
       const tCat = (t.category || "").trim().toLowerCase();
       const deptMatch = !bDept || bDept === "all" || !tDept || tDept === "all" || tDept === bDept;
-      const catMatch = bCat.length > 0 && tCat === bCat;
+      const catMatch = !bCat || bCat === "all" || (bCat.length > 0 && (tCat === bCat || (tCat === "salaries" && bCat === "payroll") || (tCat === "payroll" && bCat === "salaries")));
 
       if (deptMatch && catMatch) {
         seenTxIds.add(t.id);
@@ -435,7 +435,7 @@ export function calculateBudgetUsed(
         const bDept = (b.department || "").trim().toLowerCase();
         const bCat = (b.category || "").trim().toLowerCase();
         const deptMatch = !bDept || bDept === "all" || !tDept || tDept === "all" || tDept === bDept;
-        const catMatch = bCat.length > 0 && tCat === bCat;
+        const catMatch = !bCat || bCat === "all" || (bCat.length > 0 && (tCat === bCat || (tCat === "salaries" && bCat === "payroll") || (tCat === "payroll" && bCat === "salaries")));
         return deptMatch && catMatch;
       });
 
@@ -600,15 +600,42 @@ export function calculateNetOperatingMargin(
   expensesRaw: number,
   currency: string = "PKR",
   previousRevenueRaw?: number,
-  previousExpensesRaw?: number
+  previousExpensesRaw?: number,
+  totalBudgetCapRaw?: number
 ): ValidatedOperatingMarginAnalytics {
   const operatingRevenue = Math.max(0, safeNumber(revenueRaw, 0));
   const operatingExpenses = Math.max(0, safeNumber(expensesRaw, 0));
+  const budgetCap = Math.max(0, safeNumber(totalBudgetCapRaw, 0));
   const operatingIncome = operatingRevenue - operatingExpenses;
-  const isLoss = operatingIncome < 0;
+  const totalFundingCap = operatingRevenue + budgetCap;
+  const totalSurplus = totalFundingCap - operatingExpenses;
+  const isCoveredByBudget = budgetCap > 0 && totalSurplus >= 0;
+  const isLoss = isCoveredByBudget ? false : (budgetCap > 0 ? totalSurplus < 0 : operatingIncome < 0);
   const hasRevenue = operatingRevenue > 0;
 
   if (!hasRevenue) {
+    if (budgetCap > 0) {
+      const budgetSurplus = budgetCap - operatingExpenses;
+      const isBudgetLoss = budgetSurplus < 0;
+      return {
+        operatingRevenue: 0,
+        operatingExpenses,
+        operatingIncome: budgetSurplus,
+        operatingMarginPct: null,
+        rawMarginPct: budgetCap > 0 ? ((budgetSurplus / budgetCap) * 100) : 0,
+        displayMargin: isBudgetLoss ? "-100%" : `${Math.round((budgetSurplus / budgetCap) * 100)}%`,
+        expenseRatioPct: budgetCap > 0 ? (operatingExpenses / budgetCap) * 100 : 0,
+        displayExpenseRatio: `${Math.round(budgetCap > 0 ? (operatingExpenses / budgetCap) * 100 : 0)}%`,
+        status: isBudgetLoss ? "critical" : "healthy",
+        statusLabel: isBudgetLoss ? "Operating Loss" : "Healthy Surplus",
+        statusColor: isBudgetLoss ? "#F43F5E" : "#10B981",
+        isLoss: isBudgetLoss,
+        hasRevenue: false,
+        explanationText: isBudgetLoss
+          ? `Disbursements exceed budget capital by ${formatCurrencySafe(Math.abs(budgetSurplus), currency)}.`
+          : `Disbursements fully covered by approved budget capital (${formatCurrencySafe(budgetSurplus, currency)} remaining).`,
+      };
+    }
     return {
       operatingRevenue: 0,
       operatingExpenses,
@@ -636,7 +663,11 @@ export function calculateNetOperatingMargin(
   let statusLabel: "Healthy Surplus" | "Operating Margin Watch" | "Operating Loss" = "Healthy Surplus";
   let statusColor = "#10B981";
 
-  if (isLoss) {
+  if (isCoveredByBudget) {
+    status = "healthy";
+    statusLabel = "Healthy Surplus";
+    statusColor = "#10B981";
+  } else if (isLoss) {
     status = "critical";
     statusLabel = "Operating Loss";
     statusColor = "#F43F5E";
@@ -689,7 +720,9 @@ export function calculateNetOperatingMargin(
     statusColor,
     isLoss,
     hasRevenue: true,
-    explanationText: isLoss
+    explanationText: isCoveredByBudget
+      ? `Operating disbursements fully covered by approved budget capital pool (${formatCurrencySafe(totalSurplus, currency)} surplus).`
+      : isLoss
       ? `Operational shortfall of ${formatCurrencySafe(Math.abs(operatingIncome), currency)}.`
       : `Operating surplus of ${formatCurrencySafe(operatingIncome, currency)} (${rawMarginPct.toFixed(1)}% margin).`,
     previousPeriodRevenue,
@@ -804,9 +837,10 @@ export function buildAuthoritativeFinancialModel(
   const netBalance = calculateNetOperatingResult(filteredTxs);
   const totalBudgetCap = calculateBudgetAllocation(budgets, departments);
   const actualBudgetSpending = calculateBudgetUsed(filteredTxs, budgets, period);
-
   const budget = calculateBudgetUtilization(actualBudgetSpending, totalBudgetCap, currency);
-  const margin = calculateNetOperatingMargin(totalIncome, totalExpenses, currency);
+  const prevIncome = previousPeriodTransactions ? calculateTotalIncome(filterTransactionsByPeriod(previousPeriodTransactions, period)) : undefined;
+  const prevExpenses = previousPeriodTransactions ? calculateTotalExpenses(filterTransactionsByPeriod(previousPeriodTransactions, period)) : undefined;
+  const margin = calculateNetOperatingMargin(totalIncome, totalExpenses, currency, prevIncome, prevExpenses, totalBudgetCap);
   const distribution = calculateExpenseDistribution(filteredTxs, previousPeriodTransactions);
 
   const resolvedPeriod: NormalizedPeriod = period || {

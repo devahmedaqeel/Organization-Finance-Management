@@ -193,6 +193,8 @@ export function RingProgress({
             },
           ]}
           numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.7}
         >
           {label || "Budget"}
         </Text>
@@ -238,7 +240,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 6,
+    paddingHorizontal: 4,
   },
   pct: {
     fontFamily: "Inter_800ExtraBold",

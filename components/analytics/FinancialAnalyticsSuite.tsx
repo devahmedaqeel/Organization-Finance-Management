@@ -173,9 +173,9 @@ export function FinancialAnalyticsSuite({
 
               const label =
                 budgetMode === "spent"
-                  ? "Total Disbursed"
+                  ? "Disbursed"
                   : budgetMode === "remaining"
-                  ? "Available Buffer"
+                  ? "Remaining"
                   : "Budget Used";
 
               const sublabel =

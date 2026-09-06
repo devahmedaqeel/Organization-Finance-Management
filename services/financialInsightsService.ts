@@ -95,25 +95,38 @@ export function generateFinancialInsights(
   // ──────────────────────────────────────────────────────────────────────────
   // 1. CASH FLOW & OPERATING RESULT INSIGHTS
   // ──────────────────────────────────────────────────────────────────────────
+  const totalBudgeted = calculateBudgetAllocation(budgets, departments);
+  const totalPool = income + totalBudgeted;
+  const poolNet = totalPool - expense;
+
   if (net < 0 && expense > 0) {
+    const isBudgetCovered = totalBudgeted > 0 && poolNet >= 0;
     const burnRatio = income > 0 ? (expense / income) * 100 : 100;
     const excessOverRevenue = income > 0 ? ((expense - income) / income) * 100 : 100;
     insights.push({
       id: `cf-deficit-${currentPeriod.label}`,
       organizationId: orgId,
       type: "OPERATING_DEFICIT",
-      title: "Operating Deficit Notice",
-      summary: `Disbursements exceed recognized institutional inflows by ${currency} ${Math.abs(net).toLocaleString()} during ${currentPeriod.label}.`,
-      whyItMatters: income > 0
+      title: isBudgetCovered ? "Operating Deficit (Budget-Covered)" : "Operating Deficit Notice",
+      summary: isBudgetCovered
+        ? `Disbursements exceed recognized inflows by ${currency} ${Math.abs(net).toLocaleString()} during ${currentPeriod.label}, but remain fully funded by the approved budget capital pool (${currency} ${poolNet.toLocaleString()} surplus remaining).`
+        : `Disbursements exceed recognized institutional inflows by ${currency} ${Math.abs(net).toLocaleString()} during ${currentPeriod.label}.`,
+      whyItMatters: isBudgetCovered
+        ? `Disbursements exceed incoming revenue by ${excessOverRevenue.toFixed(1)}%, but are authorized and funded by pre-allocated institutional budget capital (${currency} ${poolNet.toLocaleString()} surplus remaining).`
+        : income > 0
         ? `Disbursements exceed incoming revenue by ${excessOverRevenue.toFixed(1)}% (total spending is ${burnRatio.toFixed(1)}% of inflows), creating a deficit that degrades treasury reserves.`
         : `Operating with zero incoming revenue (${currency} ${expense.toLocaleString()} disbursed), which depletes cash reserves.`,
-      recommendedAction: "Review discretionary disbursements in Expenses and pause non-essential requisitions.",
+      recommendedAction: isBudgetCovered
+        ? "Continue planned budget execution while tracking category disbursements against department caps."
+        : "Review discretionary disbursements in Expenses and pause non-essential requisitions.",
       severity: "CRITICAL",
       category: "cashflow",
-      metric: `-${currency} ${Math.abs(net).toLocaleString()} (-${excessOverRevenue.toFixed(1)}% Deficit)`,
-      currentValue: net,
+      metric: isBudgetCovered
+        ? `+${currency} ${poolNet.toLocaleString()} (Pool Surplus)`
+        : `-${currency} ${Math.abs(net).toLocaleString()} (-${excessOverRevenue.toFixed(1)}% Deficit)`,
+      currentValue: isBudgetCovered ? poolNet : net,
       period: currentPeriod.label,
-      sourceReference: "Executive Cash Flow Ledger",
+      sourceReference: isBudgetCovered ? "Executive Capital Pool Ledger" : "Executive Cash Flow Ledger",
       actionRoute: "/(tabs)/expenses",
       timestamp: nowStr,
       isActionable: true,

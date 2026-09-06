@@ -222,6 +222,7 @@ export default function DashboardScreen() {
   const realNetOperatingResult = netSurplus;
   const isDeficit = totalExpenses > totalIncome;
   const isFundingDeficit = netSurplus < 0;
+  const isEffectiveDeficit = totalBudgeted > 0 ? isFundingDeficit : isDeficit;
 
   // 1. Kitni Income Retain: percentage of actual income retained after operating expenses
   const incomeRetainedAmount = totalIncome - totalExpenses;
@@ -236,6 +237,12 @@ export default function DashboardScreen() {
 
   // 3. Kitna Percent Budget Used: authoritative budget utilization percentage
   const budgetUsedPct = Math.round(netBudgetUtilization);
+
+  // 4. Budget-integrated Expense Ratios
+  const budgetExpensePct = totalBudgeted > 0
+    ? Math.round((totalExpenses / totalBudgeted) * 100)
+    : expensePctOfIncome;
+  const budgetRemainingAmount = Math.max(0, totalBudgeted - totalExpenses);
 
   // Operating Margin on Inflows (Revenue)
   const operatingMargin = totalIncome > 0
@@ -254,7 +261,7 @@ export default function DashboardScreen() {
       : balanceViewMode === "budget"
       ? totalBudgeted
       : -totalExpenses;
-  const currentHeroIsDeficit = currentHeroBalance < 0;
+  const currentHeroIsDeficit = balanceViewMode === "cashflow" ? isEffectiveDeficit : currentHeroBalance < 0;
 
   // Filtered transactions for the modal viewer
   const filteredTransactions = useMemo(() => {
@@ -750,13 +757,15 @@ export default function DashboardScreen() {
             activeOpacity={0.8}
           >
             <Feather
-              name={isDeficit ? "trending-down" : "trending-up"}
+              name={currentHeroIsDeficit ? "trending-down" : "trending-up"}
               size={12}
-              color={isDeficit ? "#FB7185" : "#34D399"}
+              color={currentHeroIsDeficit ? "#FB7185" : "#34D399"}
             />
-            <Text style={{ color: isDeficit ? "#FB7185" : "#34D399", fontSize: 12, fontFamily: "Inter_700Bold" }}>
+            <Text style={{ color: currentHeroIsDeficit ? "#FB7185" : "#34D399", fontSize: 12, fontFamily: "Inter_700Bold" }}>
               {balanceViewMode === "expenses"
-                ? `${expensePctOfIncome}% of Inflows`
+                ? `${totalBudgeted > 0 ? budgetExpensePct : expensePctOfIncome}% of ${totalBudgeted > 0 ? "Budget" : "Inflows"}`
+                : totalBudgeted > 0
+                ? `${isFundingDeficit ? "-" : "+"}${retainedSurplusPct}% Surplus`
                 : `${operatingMargin >= 0 ? "+" : ""}${operatingMargin.toFixed(1)}% Margin`}
             </Text>
           </TouchableOpacity>
@@ -767,19 +776,25 @@ export default function DashboardScreen() {
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
             <Text style={{ color: "#CBD5E1", fontSize: 11, fontFamily: "Inter_500Medium" }} numberOfLines={1}>
               {totalExpenses === 0
-                ? "0% Expenses"
+                ? "0% Outflows"
+                : totalBudgeted > 0
+                ? `${clampedSpendRatio}% Capital Spent`
                 : totalIncome > 0
                 ? `${expensePctOfIncome}% Income Spent`
                 : `${clampedSpendRatio}% Pool Spent`}
             </Text>
             <Text
-              style={{ color: isDeficit ? "#FB7185" : "#34D399", fontSize: 11, fontFamily: "Inter_700Bold" }}
+              style={{ color: isEffectiveDeficit ? "#FB7185" : "#34D399", fontSize: 11, fontFamily: "Inter_700Bold" }}
               numberOfLines={1}
               adjustsFontSizeToFit
               minimumFontScale={0.8}
             >
-              {totalIncome === 0 && totalExpenses === 0
+              {totalIncome === 0 && totalExpenses === 0 && totalBudgeted === 0
                 ? "No Activity"
+                : totalBudgeted > 0
+                ? isFundingDeficit
+                  ? `Deficit (-${settings.currency} ${fmt(Math.abs(netSurplus))})`
+                  : `+${settings.currency} ${fmt(netSurplus)} Surplus (${retainedSurplusPct}% Retained)`
                 : isDeficit
                 ? `Deficit (-${settings.currency} ${fmt(totalExpenses - totalIncome)})`
                 : totalExpenses === totalIncome
@@ -791,8 +806,8 @@ export default function DashboardScreen() {
             <View
               style={{
                 height: "100%",
-                width: `${totalExpenses === 0 ? 0 : Math.min(Math.max(totalIncome > 0 ? expensePctOfIncome : clampedSpendRatio, 2), 100)}%`,
-                backgroundColor: isDeficit ? "#FB7185" : "#38BDF8",
+                width: `${totalExpenses === 0 ? 0 : Math.min(Math.max(totalBudgeted > 0 ? clampedSpendRatio : (totalIncome > 0 ? expensePctOfIncome : clampedSpendRatio), 2), 100)}%`,
+                backgroundColor: isEffectiveDeficit ? "#FB7185" : "#38BDF8",
                 borderRadius: 3,
               }}
             />
@@ -840,7 +855,7 @@ export default function DashboardScreen() {
             <Text
               style={{
                 fontSize: 9.5,
-                color: isDeficit ? colors.expense : colors.income,
+                color: isEffectiveDeficit ? colors.expense : colors.income,
                 fontFamily: "Inter_600SemiBold",
                 marginTop: -2,
               }}
@@ -850,6 +865,8 @@ export default function DashboardScreen() {
             >
               {totalIncome === 0
                 ? "No Income (0%)"
+                : totalBudgeted > 0
+                ? `${retainedSurplusPct}% Capital Retained`
                 : isDeficit
                 ? "0% Retained (Deficit)"
                 : totalExpenses === totalIncome
@@ -860,8 +877,8 @@ export default function DashboardScreen() {
               <View
                 style={{
                   height: "100%",
-                  width: `${totalIncome === 0 ? 0 : isDeficit ? 0 : Math.min(Math.max(incomeRetainedPct, 2), 100)}%`,
-                  backgroundColor: isDeficit ? colors.expense : colors.income,
+                  width: `${totalIncome === 0 ? 0 : isEffectiveDeficit ? 0 : Math.min(Math.max(totalBudgeted > 0 ? retainedSurplusPct : incomeRetainedPct, 2), 100)}%`,
+                  backgroundColor: isEffectiveDeficit ? colors.expense : colors.income,
                   borderRadius: 2,
                 }}
               />
@@ -891,11 +908,53 @@ export default function DashboardScreen() {
               <View
                 style={[
                   styles.kpiTag,
-                  { backgroundColor: (totalExpenses === 0 ? colors.income : isDeficit ? colors.expense : totalExpenses === totalIncome ? colors.warning : colors.primary) + "18" },
+                  {
+                    backgroundColor:
+                      (totalExpenses === 0
+                        ? colors.income
+                        : totalBudgeted > 0
+                        ? totalExpenses > totalBudgeted
+                          ? colors.expense
+                          : colors.primary
+                        : isDeficit
+                        ? colors.expense
+                        : totalExpenses === totalIncome
+                        ? colors.warning
+                        : colors.primary) + "18",
+                  },
                 ]}
               >
-                <Text style={[styles.kpiTagText, { color: totalExpenses === 0 ? colors.income : isDeficit ? colors.expense : totalExpenses === totalIncome ? colors.warning : colors.primary }]} numberOfLines={1}>
-                  {totalExpenses === 0 ? "No Outflows" : isDeficit ? "Over Inflow" : totalExpenses === totalIncome ? "Break-even" : "Outflows"}
+                <Text
+                  style={[
+                    styles.kpiTagText,
+                    {
+                      color:
+                        totalExpenses === 0
+                          ? colors.income
+                          : totalBudgeted > 0
+                          ? totalExpenses > totalBudgeted
+                            ? colors.expense
+                            : colors.primary
+                          : isDeficit
+                          ? colors.expense
+                          : totalExpenses === totalIncome
+                          ? colors.warning
+                          : colors.primary,
+                    },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {totalExpenses === 0
+                    ? "No Outflows"
+                    : totalBudgeted > 0
+                    ? totalExpenses > totalBudgeted
+                      ? "Over Budget"
+                      : "Within Budget"
+                    : isDeficit
+                    ? "Over Inflow"
+                    : totalExpenses === totalIncome
+                    ? "Break-even"
+                    : "Outflows"}
                 </Text>
               </View>
             </View>
@@ -906,7 +965,16 @@ export default function DashboardScreen() {
             <Text
               style={{
                 fontSize: 9.5,
-                color: totalExpenses === 0 ? colors.income : isDeficit ? colors.expense : colors.foreground,
+                color:
+                  totalExpenses === 0
+                    ? colors.income
+                    : totalBudgeted > 0
+                    ? totalExpenses > totalBudgeted
+                      ? colors.expense
+                      : colors.income
+                    : isDeficit
+                    ? colors.expense
+                    : colors.foreground,
                 fontFamily: "Inter_600SemiBold",
                 marginTop: -2,
               }}
@@ -915,7 +983,11 @@ export default function DashboardScreen() {
               minimumFontScale={0.8}
             >
               {totalExpenses === 0
-                ? "0% of Inflows"
+                ? "0% of Budget"
+                : totalBudgeted > 0
+                ? totalExpenses > totalBudgeted
+                  ? `${budgetExpensePct}% of Budget (Over)`
+                  : `${budgetExpensePct}% of Budget (${settings.currency} ${fmt(budgetRemainingAmount)} Left)`
                 : totalIncome > 0
                 ? `${expensePctOfIncome}% of Inflow Spent`
                 : "100% Outflows (No Inflow)"}
@@ -924,8 +996,21 @@ export default function DashboardScreen() {
               <View
                 style={{
                   height: "100%",
-                  width: `${totalExpenses === 0 ? 0 : Math.min(Math.max(expensePctOfIncome, 4), 100)}%`,
-                  backgroundColor: totalExpenses === 0 ? colors.income : isDeficit ? colors.expense : expensePctOfIncome > 80 ? colors.warning : colors.income,
+                  width: `${totalExpenses === 0 ? 0 : Math.min(Math.max(totalBudgeted > 0 ? budgetExpensePct : expensePctOfIncome, 4), 100)}%`,
+                  backgroundColor:
+                    totalExpenses === 0
+                      ? colors.income
+                      : totalBudgeted > 0
+                      ? totalExpenses > totalBudgeted
+                        ? colors.expense
+                        : budgetExpensePct > 85
+                        ? colors.warning
+                        : colors.income
+                      : isDeficit
+                      ? colors.expense
+                      : expensePctOfIncome > 80
+                      ? colors.warning
+                      : colors.income,
                   borderRadius: 2,
                 }}
               />
