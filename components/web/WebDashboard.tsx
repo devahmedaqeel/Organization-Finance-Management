@@ -115,12 +115,33 @@ export function WebDashboard({
   const netBudgetRemaining = calculateBudgetRemaining(totalBudgeted, totalBudgetSpent);
   const netBudgetUtilization = totalBudgeted > 0 ? (totalBudgetSpent / totalBudgeted) * 100 : 0;
 
-  // Net Surplus incorporates Institutional Income and Budget Allocated minus Outflows
-  const netSurplus = (totalIncome + totalBudgeted) - totalExpenses;
+  // Total Funding Pool & Real-time Authoritative Balance
   const totalFundingPool = totalIncome + totalBudgeted;
+  const netSurplus = totalFundingPool - totalExpenses;
   const realNetOperatingResult = netSurplus;
-  const isDeficit = realNetOperatingResult < 0;
-  const netMargin = totalFundingPool > 0 ? ((realNetOperatingResult / totalFundingPool) * 100) : (totalExpenses > 0 ? -100 : 0);
+  const isDeficit = totalExpenses > totalIncome;
+  const isFundingDeficit = netSurplus < 0;
+
+  // 1. Kitni Income Retain: percentage of actual income retained after operating expenses
+  const incomeRetainedAmount = totalIncome - totalExpenses;
+  const incomeRetainedPct = totalIncome > 0
+    ? Math.max(0, Math.round((incomeRetainedAmount / totalIncome) * 100))
+    : 0;
+
+  // 2. Kitna Percent Expense: percentage of income consumed by expenses
+  const expensePctOfIncome = totalIncome > 0
+    ? Math.round((totalExpenses / totalIncome) * 100)
+    : (totalExpenses > 0 ? 100 : 0);
+
+  // 3. Kitna Percent Budget Used: authoritative budget utilization percentage
+  const budgetUsedPct = Math.round(netBudgetUtilization);
+
+  // Operating Margin on Inflows (Revenue)
+  const operatingMargin = totalIncome > 0
+    ? ((incomeRetainedAmount / totalIncome) * 100)
+    : (totalExpenses > 0 ? -100 : 0);
+
+  // Capital Pool Ratios
   const rawSpendRatio = totalFundingPool > 0 ? (totalExpenses / totalFundingPool) * 100 : (totalExpenses > 0 ? 100 : 0);
   const clampedSpendRatio = Math.min(Math.round(rawSpendRatio), 100);
   const retainedSurplusPct = Math.max(0, Math.round(100 - rawSpendRatio));
@@ -466,31 +487,37 @@ export function WebDashboard({
             onPress={() => setGrowthMode((m) => (m + 1) % 4)}
             activeOpacity={0.8}
           >
-            {currentHeroIsDeficit ? (
+            {isDeficit ? (
               <SvgTrendingDown size={12} color="#FB7185" />
             ) : (
               <SvgTrendingUp size={12} color="#34D399" />
             )}
-            <Text style={{ color: currentHeroIsDeficit ? "#FB7185" : "#34D399", fontSize: isMobile ? 11.5 : 12, fontFamily: "Inter_700Bold" }}>
+            <Text style={{ color: isDeficit ? "#FB7185" : "#34D399", fontSize: isMobile ? 11.5 : 12, fontFamily: "Inter_700Bold" }}>
               {balanceViewMode === "expenses"
-                ? `${clampedSpendRatio}% Outflow`
-                : `${netMargin >= 0 ? "+" : ""}${netMargin.toFixed(1)}% Margin`}
+                ? `${expensePctOfIncome}% of Inflows`
+                : `${operatingMargin >= 0 ? "+" : ""}${operatingMargin.toFixed(1)}% Margin`}
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* Dynamic Cash Flow / Budget Retention Progress Bar & Labels */}
+        {/* Dynamic Cash Flow / Expense Flow Progress Bar & Labels */}
         <View style={{ gap: 7, marginTop: 2 }}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
             <Text style={{ color: "#CBD5E1", fontSize: isMobile ? 11 : 11.5, fontFamily: "Inter_500Medium" }}>
-              {isDeficit
-                ? `${Math.round(rawSpendRatio)}% Overspent`
-                : `${clampedSpendRatio}% Total Spent`}
+              {totalExpenses === 0
+                ? "0% Expenses"
+                : totalIncome > 0
+                ? `${expensePctOfIncome}% Income Spent`
+                : `${clampedSpendRatio}% Pool Spent`}
             </Text>
-            <Text style={{ color: currentHeroIsDeficit ? "#FB7185" : "#34D399", fontSize: isMobile ? 11 : 11.5, fontFamily: "Inter_700Bold" }}>
-              {isDeficit
-                ? "Operating Deficit"
-                : `${retainedSurplusPct}% Net Surplus`}
+            <Text style={{ color: isDeficit ? "#FB7185" : "#34D399", fontSize: isMobile ? 11 : 11.5, fontFamily: "Inter_700Bold" }}>
+              {totalIncome === 0 && totalExpenses === 0
+                ? "No Activity"
+                : isDeficit
+                ? `Operating Deficit (-${settings.currency} ${fmt(totalExpenses - totalIncome)})`
+                : totalExpenses === totalIncome
+                ? "0% Retained (Break-even)"
+                : `${incomeRetainedPct}% Income Retained`}
             </Text>
           </View>
           <View style={{ height: 6, borderRadius: 3, backgroundColor: "rgba(255, 255, 255, 0.12)", overflow: "hidden" }}>
@@ -498,14 +525,14 @@ export function WebDashboard({
               style={{
                 height: "100%",
                 borderRadius: 3,
-                width: `${isDeficit ? 100 : Math.max(clampedSpendRatio, 2.5)}%`,
-                backgroundColor: currentHeroIsDeficit ? "#FB7185" : "#38BDF8",
-                shadowColor: currentHeroIsDeficit ? "#FB7185" : "#38BDF8",
+                width: `${totalExpenses === 0 ? 0 : Math.min(Math.max(totalIncome > 0 ? expensePctOfIncome : clampedSpendRatio, 2.5), 100)}%`,
+                backgroundColor: isDeficit ? "#FB7185" : "#38BDF8",
+                shadowColor: isDeficit ? "#FB7185" : "#38BDF8",
                 shadowOffset: { width: 0, height: 0 },
                 shadowOpacity: 0.9,
                 shadowRadius: 8,
                 // @ts-ignore
-                boxShadow: currentHeroIsDeficit
+                boxShadow: isDeficit
                   ? "0 0 10px rgba(251, 113, 133, 0.75)"
                   : "0 0 10px rgba(56, 189, 248, 0.75)",
               }}
@@ -527,7 +554,7 @@ export function WebDashboard({
               <SvgArrowUpRight size={18} color={colors.income} />
             </View>
             <View style={[styles.kpiTag, { backgroundColor: colors.income + "15" }]}>
-              <Text style={[styles.kpiTagText, { color: colors.income }]}>Inflows</Text>
+              <Text style={[styles.kpiTagText, { color: colors.income }]}>{totalIncome > 0 ? `${incomeRetainedPct}% Retained` : "Inflows"}</Text>
             </View>
           </View>
           <WebCountUp
@@ -550,7 +577,7 @@ export function WebDashboard({
               <SvgArrowDownLeft size={18} color={colors.expense} />
             </View>
             <View style={[styles.kpiTag, { backgroundColor: colors.expense + "15" }]}>
-              <Text style={[styles.kpiTagText, { color: colors.expense }]}>Outflows</Text>
+              <Text style={[styles.kpiTagText, { color: colors.expense }]}>{totalIncome > 0 ? `${expensePctOfIncome}% Spent` : "Outflows"}</Text>
             </View>
           </View>
           <WebCountUp
@@ -573,7 +600,7 @@ export function WebDashboard({
               <SvgPieChart size={18} color="#3B82F6" />
             </View>
             <View style={[styles.kpiTag, { backgroundColor: "#3B82F615" }]}>
-              <Text style={[styles.kpiTagText, { color: "#3B82F6" }]}>{budgetUtilization.toFixed(0)}% Used</Text>
+              <Text style={[styles.kpiTagText, { color: "#3B82F6" }]}>{budgetUsedPct}% Used</Text>
             </View>
           </View>
           <WebCountUp
