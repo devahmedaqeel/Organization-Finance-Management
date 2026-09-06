@@ -178,14 +178,19 @@ export function WebDashboard({
     ? (currentHeroIsDeficit ? "alert-circle" : "shield")
     : (currentHeroIsDeficit ? "trending-down" : "trending-up");
 
+  const budgetRemainingPct = totalBudgeted > 0 ? Math.max(0, 100 - Math.round((totalExpenses / totalBudgeted) * 100)) : 0;
+  const overBudgetPct = totalBudgeted > 0 && totalExpenses > totalBudgeted ? Math.round(((totalExpenses - totalBudgeted) / totalBudgeted) * 100) : 0;
+  const incomeSavedPct = totalIncome > 0 ? Math.max(0, Math.round(((totalIncome - totalExpenses) / totalIncome) * 100)) : 0;
+  const overIncomePct = totalIncome > 0 && totalExpenses > totalIncome ? Math.round(((totalExpenses - totalIncome) / totalIncome) * 100) : 0;
+
   const heroBadgeText = balanceViewMode === "expenses"
     ? (totalBudgeted > 0
         ? (totalExpenses > totalBudgeted
-            ? `Over by ${settings.currency} ${fmt(totalExpenses - totalBudgeted)}`
-            : `${settings.currency} ${fmt(budgetRemainingAmount)} Budget Left`)
+            ? `+${overBudgetPct}% Over Budget`
+            : `${budgetRemainingPct}% Budget Remaining`)
         : (totalExpenses > totalIncome
-            ? `Deficit: ${settings.currency} ${fmt(totalExpenses - totalIncome)}`
-            : `${settings.currency} ${fmt(incomeRetainedAmount)} Left`))
+            ? `+${overIncomePct}% Over Inflow`
+            : `${incomeSavedPct}% Income Saved`))
     : (totalBudgeted > 0
         ? `${isFundingDeficit ? "-" : "+"}${retainedSurplusPct}% Surplus`
         : `${operatingMargin >= 0 ? "+" : ""}${operatingMargin.toFixed(1)}% Margin`);
