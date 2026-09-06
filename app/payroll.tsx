@@ -146,7 +146,7 @@ export default function PayrollScreen() {
     setModalVisible(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const sal = parseFloat(salary);
     if (!name.trim()) {
       setError("Please enter employee name");
@@ -167,15 +167,19 @@ export default function PayrollScreen() {
       month: month || defaultMonth,
     };
 
-    if (editingEntry) {
-      updatePayroll(editingEntry.id, payload);
-    } else {
-      addPayroll(payload);
-    }
+    try {
+      if (editingEntry) {
+        await updatePayroll(editingEntry.id, payload);
+      } else {
+        await addPayroll(payload);
+      }
 
-    setModalVisible(false);
-    setEditingEntry(null);
-    if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setModalVisible(false);
+      setEditingEntry(null);
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (e: any) {
+      setError(e?.message || "Failed to save payroll record");
+    }
   };
 
   const [isSharingPdf, setIsSharingPdf] = useState(false);

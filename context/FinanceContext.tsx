@@ -27,6 +27,7 @@ import {
 import { recordAuditLog } from "@/services/auditService";
 import { can } from "@/services/permissionService";
 import {
+  safeNumber,
   calculateTotalIncome,
   calculateTotalExpenses,
   calculateNetOperatingResult,
@@ -641,6 +642,19 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     const aliasId = `tx_${id}_${orgKey}`;
     const targetIds = [id, aliasId];
 
+    // If deleting a salary transaction, also clean up linked payroll record
+    if (id.startsWith("tx_pay_")) {
+      const payId = id.replace("tx_pay_", "");
+      targetIds.push(payId);
+      deleteDoc(doc(db, "payroll", payId)).catch(() => {});
+      deleteDocREST("payroll", payId).catch(() => {});
+      setPayroll((prev) => {
+        const remaining = prev.filter((p) => p.id !== payId);
+        AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(remaining)).catch(() => {});
+        return remaining;
+      });
+    }
+
     // 1. Authoritative Firestore and REST deletion with verified success
     let deleteSucceeded = false;
     let failureReason: any = null;
@@ -825,8 +839,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     const id = generateSafeId("payroll");
     const now = new Date().toISOString();
     const orgName = user?.organization || "OFM — Organization Finance Management";
-    const orgId = user?.organizationId || "default_org";
-    const netSalary = p.baseSalary + (p.bonus || 0) - (p.deductions || 0);
+    const orgId = activeOrgId;
+    const netSalary = safeNumber(p.baseSalary, 0) + safeNumber(p.bonus, 0) - safeNumber(p.deductions, 0);
 
     const newPayroll: PayrollEntry = {
       ...p,
@@ -872,8 +886,10 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     });
 
     try {
-      await setDoc(doc(db, "payroll", id), newPayroll);
-      await setDoc(doc(db, "transactions", txId), salaryTx).catch(() => {});
+      await Promise.all([
+        setDoc(doc(db, "payroll", id), newPayroll),
+        setDoc(doc(db, "transactions", txId), salaryTx).catch(() => {}),
+      ]);
       saveDocREST("payroll", id, newPayroll).catch(() => {});
       saveDocREST("transactions", txId, salaryTx).catch(() => {});
       recordAuditLog({
@@ -933,21 +949,49 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
     // Also update linked transaction in transactions list
     const txId = `tx_pay_${id}`;
+    const salaryTitle = updates.employeeName ? `Salary — ${updates.employeeName} (${updates.month || "Current"})` : undefined;
+    const salaryDesc = updates.employeeName ? `Staff payroll disbursement for ${updates.employeeName} (${updates.employeeId || "Staff"})` : undefined;
+
     setTransactions((prev) => {
-      const updated = prev.map((t) => {
-        if (t.id === txId) {
-          return {
-            ...t,
-            amount: updatedNetSalary ?? t.amount,
-            department: updates.department ?? t.department,
-            title: updates.employeeName ? `Salary — ${updates.employeeName} (${updates.month || "Current"})` : t.title,
-            updatedAt: new Date().toISOString(),
-          };
-        }
-        return t;
-      });
-      AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(updated)).catch(() => {});
-      return updated;
+      const exists = prev.some((t) => t.id === txId);
+      if (exists) {
+        const updated = prev.map((t) => {
+          if (t.id === txId) {
+            return {
+              ...t,
+              amount: updatedNetSalary ?? t.amount,
+              department: updates.department ?? t.department,
+              title: salaryTitle ?? t.title,
+              description: salaryDesc ?? t.description,
+              updatedAt: new Date().toISOString(),
+            };
+          }
+          return t;
+        });
+        AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(updated)).catch(() => {});
+        return updated;
+      } else {
+        const salaryTx: Transaction = {
+          id: txId,
+          type: "expense",
+          amount: updatedNetSalary || 0,
+          category: "Salaries",
+          department: updates.department || "General",
+          date: updates.month ? `${updates.month}-01` : new Date().toISOString().split("T")[0],
+          title: salaryTitle || `Salary — Staff (${updates.month || "Current"})`,
+          description: salaryDesc || "Staff payroll disbursement",
+          addedBy: user?.name || user?.email || "Payroll System",
+          organizationId: activeOrgId,
+          organization: user?.organization || "Organization Finance Management",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          paymentMethod: "Bank Transfer",
+          status: "completed",
+        };
+        const updated = [salaryTx, ...prev];
+        AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(updated)).catch(() => {});
+        return updated;
+      }
     });
 
     try {
@@ -957,7 +1001,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         const txUpdates = {
           amount: updatedNetSalary,
           department: updates.department,
-          title: updates.employeeName ? `Salary — ${updates.employeeName} (${updates.month || "Current"})` : undefined,
+          title: salaryTitle,
+          description: salaryDesc,
           updatedAt: new Date().toISOString(),
         };
         await setDoc(doc(db, "transactions", txId), txUpdates, { merge: true }).catch(() => {});
@@ -1165,17 +1210,73 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     }).catch(() => {});
   };
 
+  // Authoritative Unified Transactions: guarantees every valid, non-deleted payroll disbursement
+  // is reliably integrated into the expense ledger even across cold starts, offline mode, or cloud sync.
+  const unifiedTransactions = useMemo(() => {
+    const txMap = new Map<string, Transaction>();
+
+    // 1. Ingest all non-deleted standard transactions
+    for (const t of transactions) {
+      if (!deletedIdsRef.current.has(t.id)) {
+        txMap.set(t.id, t);
+      }
+    }
+
+    // 2. Guarantee every active payroll record has an authoritative ledger transaction
+    for (const p of payroll) {
+      if (!p || !p.id) continue;
+      if (deletedIdsRef.current.has(p.id) || deletedIdsRef.current.has(`tx_pay_${p.id}`)) continue;
+      if ((p as any).paymentStatus === "failed") continue;
+
+      const netSalary = safeNumber(
+        p.netSalary,
+        safeNumber(p.baseSalary, 0) + safeNumber(p.bonus, 0) - safeNumber(p.deductions, 0)
+      );
+      if (netSalary <= 0) continue;
+
+      const txId = `tx_pay_${p.id}`;
+      const existing = txMap.get(txId) || txMap.get(p.id);
+
+      if (!existing) {
+        const salaryTx: Transaction = {
+          id: txId,
+          type: "expense",
+          amount: netSalary,
+          category: "Salaries",
+          department: p.department || "General",
+          date: p.month ? `${p.month}-01` : (p.createdAt ? p.createdAt.split("T")[0] : new Date().toISOString().split("T")[0]),
+          title: `Salary — ${p.employeeName} (${p.month || "Current"})`,
+          description: `Staff payroll disbursement for ${p.employeeName} (${p.employeeId || "Staff"}). Base: ${p.baseSalary}, Bonus: ${p.bonus || 0}, Deductions: ${p.deductions || 0}`,
+          addedBy: "Payroll System",
+          organizationId: activeOrgId,
+          organization: p.organization || user?.organization || "Organization Finance Management",
+          createdAt: p.createdAt || new Date().toISOString(),
+          updatedAt: p.updatedAt || new Date().toISOString(),
+          paymentMethod: "Bank Transfer",
+          status: "completed",
+        };
+        txMap.set(txId, salaryTx);
+      } else if (existing.type === "expense" && existing.amount !== netSalary) {
+        txMap.set(existing.id, { ...existing, amount: netSalary, category: "Salaries" });
+      }
+    }
+
+    const result = Array.from(txMap.values());
+    result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return result;
+  }, [transactions, payroll, activeOrgId, user?.organization]);
+
   // Authoritative Central Financial Calculations (FinancialCalculationEngine)
-  const totalIncome = useMemo(() => calculateTotalIncome(transactions), [transactions]);
-  const totalExpenses = useMemo(() => calculateTotalExpenses(transactions), [transactions]);
-  const netBalance = useMemo(() => calculateNetOperatingResult(transactions), [transactions]);
+  const totalIncome = useMemo(() => calculateTotalIncome(unifiedTransactions), [unifiedTransactions]);
+  const totalExpenses = useMemo(() => calculateTotalExpenses(unifiedTransactions), [unifiedTransactions]);
+  const netBalance = useMemo(() => calculateNetOperatingResult(unifiedTransactions), [unifiedTransactions]);
 
   const budgetsWithSpent = useMemo(() => {
     return budgets.map((b) => {
-      const spent = calculateBudgetSpentForCategory(b, transactions);
+      const spent = calculateBudgetSpentForCategory(b, unifiedTransactions);
       return { ...b, spent };
     });
-  }, [budgets, transactions]);
+  }, [budgets, unifiedTransactions]);
 
   const totalLineBudgeted = useMemo(() => {
     return calculateBudgetAllocation(budgets);
@@ -1186,10 +1287,10 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   }, [departments]);
 
   const totalBudgeted = totalLineBudgeted > 0 ? totalLineBudgeted : totalDeptBudgeted;
-  const actualCash = useMemo(() => calculateActualCash(transactions), [transactions]);
+  const actualCash = useMemo(() => calculateActualCash(unifiedTransactions), [unifiedTransactions]);
   const totalBudgetSpent = useMemo(() => {
-    return calculateBudgetUsed(transactions, budgets);
-  }, [transactions, budgets]);
+    return calculateBudgetUsed(unifiedTransactions, budgets);
+  }, [unifiedTransactions, budgets]);
   const totalBudgetRemaining = useMemo(() => calculateBudgetRemaining(totalBudgeted, totalBudgetSpent), [totalBudgeted, totalBudgetSpent]);
   const budgetUtilization = useMemo(() => totalBudgeted > 0 ? (totalBudgetSpent / totalBudgeted) * 100 : 0, [totalBudgeted, totalBudgetSpent]);
   const totalAvailableFunds = useMemo(() => {
@@ -1245,7 +1346,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   }, [cachePrefix, activeOrgId]);
 
   const financeValue = useMemo(() => ({
-    transactions,
+    transactions: unifiedTransactions,
     budgets: budgetsWithSpent,
     payroll,
     departments,
@@ -1278,7 +1379,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     totalBudgetRemaining,
     totalAvailableFunds,
   }), [
-    transactions,
+    unifiedTransactions,
     budgetsWithSpent,
     payroll,
     departments,

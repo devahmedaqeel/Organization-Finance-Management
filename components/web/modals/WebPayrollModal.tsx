@@ -85,7 +85,7 @@ export function WebPayrollModal({ visible, onClose, entryToEdit }: WebPayrollMod
 
     try {
       if (isEditing && entryToEdit) {
-        updatePayroll(entryToEdit.id, {
+        await updatePayroll(entryToEdit.id, {
           employeeName: employeeName.trim(),
           employeeId: employeeId.trim(),
           department,
@@ -99,7 +99,7 @@ export function WebPayrollModal({ visible, onClose, entryToEdit }: WebPayrollMod
           bankAccountNumber: bankAccountNumber.trim(),
         });
       } else {
-        addPayroll({
+        await addPayroll({
           employeeName: employeeName.trim(),
           employeeId: employeeId.trim(),
           department,

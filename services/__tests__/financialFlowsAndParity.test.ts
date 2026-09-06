@@ -522,6 +522,91 @@ fundBudgets = [];
 const emptyFunds = calculateTotalAvailableFunds(0, 0, 0);
 assert(emptyFunds === 0, "EMPTY LEDGER: Total Funds is 0");
 
+// ============================================================================
+// SCENARIO 32: STAFF SALARY DISBURSEMENT DEDUCTION FROM BALANCE
+// ============================================================================
+console.log("--- SCENARIO 32: Staff Salary Disbursement Flow ---");
+
+const salaryOrgInc = 100000;
+const salaryOrgBud = 50000;
+let salaryTxs: Transaction[] = [
+  { id: "inc-seed", type: "income", category: "Tuition", amount: salaryOrgInc, date: "2026-09-01", department: "Academics" }
+];
+let salaryBudgets: Budget[] = [
+  { id: "b-sal", category: "Salaries", department: "Operations", allocated: salaryOrgBud, period: "2026-09" }
+];
+
+// Baseline before paying salary
+let sTotalInc = calculateTotalIncome(salaryTxs);
+let sTotalExp = calculateTotalExpenses(salaryTxs);
+let sNetSurplus = calculateTotalAvailableFunds(sTotalInc, salaryOrgBud, sTotalExp);
+assert(sTotalInc === 100000, "Initial Revenue is 100,000");
+assert(sTotalExp === 0, "Initial Total Expenses is 0");
+assert(sNetSurplus === 150000, "Initial Total Balance is 150,000 (100k inc + 50k bud - 0 exp)");
+
+// Disburse Staff Salary 1: 30,000 net (Base: 25k, Bonus: 7k, Deductions: 2k)
+const staffNet1 = 25000 + 7000 - 2000; // 30,000
+const salaryTx1: Transaction = {
+  id: "tx_pay_p1",
+  type: "expense",
+  amount: staffNet1,
+  category: "Salaries",
+  department: "Operations",
+  date: "2026-09-05",
+  title: "Salary — John Doe (2026-09)",
+  description: "Staff payroll disbursement",
+};
+salaryTxs.push(salaryTx1);
+
+sTotalExp = calculateTotalExpenses(salaryTxs);
+sNetSurplus = calculateTotalAvailableFunds(sTotalInc, salaryOrgBud, sTotalExp);
+const netOperatingResult1 = calculateNetOperatingResult(salaryTxs);
+const salBudgetSpent1 = calculateBudgetSpentForCategory(salaryBudgets[0], salaryTxs);
+
+assert(sTotalExp === 30000, "Disburse Salary 30k -> Total Expenses immediately increases to 30,000");
+assert(sNetSurplus === 120000, "Disburse Salary 30k -> Total Balance immediately drops from 150k to 120,000 (-30,000)");
+assert(netOperatingResult1 === 70000, "Net Operating Result drops from 100k to 70,000 (100k inc - 30k salary)");
+assert(salBudgetSpent1 === 30000, "Salaries Budget spent immediately registers 30,000");
+
+// Disburse Staff Salary 2: 20,000 net
+const salaryTx2: Transaction = {
+  id: "tx_pay_p2",
+  type: "expense",
+  amount: 20000,
+  category: "Salaries",
+  department: "Operations",
+  date: "2026-09-06",
+  title: "Salary — Jane Smith (2026-09)",
+  description: "Staff payroll disbursement",
+};
+salaryTxs.push(salaryTx2);
+
+sTotalExp = calculateTotalExpenses(salaryTxs);
+sNetSurplus = calculateTotalAvailableFunds(sTotalInc, salaryOrgBud, sTotalExp);
+const netOperatingResult2 = calculateNetOperatingResult(salaryTxs);
+assert(sTotalExp === 50000, "Disburse 2nd Salary 20k -> Total Expenses is 50,000 (30k + 20k)");
+assert(sNetSurplus === 100000, "Disburse 2nd Salary 20k -> Total Balance drops further to 100,000 (-20,000)");
+assert(netOperatingResult2 === 50000, "Net Operating Result drops to 50,000");
+
+// ============================================================================
+// SCENARIO 33: STAFF SALARY DELETION REVERSAL
+// ============================================================================
+console.log("--- SCENARIO 33: Staff Salary Deletion Reversal ---");
+
+// Delete Salary 1 (30,000)
+salaryTxs = salaryTxs.filter((t) => t.id !== "tx_pay_p1");
+sTotalExp = calculateTotalExpenses(salaryTxs);
+sNetSurplus = calculateTotalAvailableFunds(sTotalInc, salaryOrgBud, sTotalExp);
+assert(sTotalExp === 20000, "Delete Salary 1 -> Total Expenses drops to 20,000");
+assert(sNetSurplus === 130000, "Delete Salary 1 -> Total Balance recovers by +30k to 130,000");
+
+// Delete Salary 2 (20,000)
+salaryTxs = salaryTxs.filter((t) => t.id !== "tx_pay_p2");
+sTotalExp = calculateTotalExpenses(salaryTxs);
+sNetSurplus = calculateTotalAvailableFunds(sTotalInc, salaryOrgBud, sTotalExp);
+assert(sTotalExp === 0, "Delete Salary 2 -> Total Expenses returns to 0");
+assert(sNetSurplus === 150000, "Delete Salary 2 -> Total Balance returns to full 150,000");
+
 console.log("\n=======================================================");
 console.log("ALL AUTHORITATIVE FINANCIAL FLOW, PARITY, RESURRECTION & ACCEPTANCE TESTS PASSED 100% ✅");
 console.log("=======================================================\n");
