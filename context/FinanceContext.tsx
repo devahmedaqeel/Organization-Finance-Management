@@ -1286,7 +1286,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     return calculateBudgetAllocation([], departments);
   }, [departments]);
 
-  const totalBudgeted = totalLineBudgeted > 0 ? totalLineBudgeted : totalDeptBudgeted;
+  const totalBudgeted = totalLineBudgeted;
   const actualCash = useMemo(() => calculateActualCash(unifiedTransactions), [unifiedTransactions]);
   const totalBudgetSpent = useMemo(() => {
     return calculateBudgetUsed(unifiedTransactions, budgets);

@@ -322,10 +322,11 @@ export function isExpenseBudgetLinked(
  * Deduplicates by budget ID to guarantee zero double-counting.
  */
 export function calculateBudgetAllocation(
-  budgets: Budget[],
+  budgets?: Budget[] | null,
   departments?: Department[]
 ): number {
-  if (budgets && budgets.length > 0) {
+  if (budgets !== undefined && budgets !== null) {
+    if (budgets.length === 0) return 0;
     const seenBudgetIds = new Set<string>();
     return budgets.reduce((s, b) => {
       if (!b || !b.id || seenBudgetIds.has(b.id)) return s;

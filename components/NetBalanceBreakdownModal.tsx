@@ -63,7 +63,7 @@ export function NetBalanceBreakdownModal({
 
   const totalLineBudgeted = budgets.reduce((s, b) => s + (b.allocated || 0), 0);
   const totalDeptBudgeted = departments.reduce((s, d) => s + (d.budgetAllocated || 0), 0);
-  const totalBudgeted = totalLineBudgeted > 0 ? totalLineBudgeted : totalDeptBudgeted;
+  const totalBudgeted = totalLineBudgeted;
   const netBudgetRemaining = totalBudgeted - totalExpenses;
   const netBudgetUtilization = totalBudgeted > 0 ? (totalExpenses / totalBudgeted) * 100 : 0;
   const currentModalBalance = (modalBalanceMode === "budget" && totalBudgeted > 0) ? netBudgetRemaining : netBalance;
