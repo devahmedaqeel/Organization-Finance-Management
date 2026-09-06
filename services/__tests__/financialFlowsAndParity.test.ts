@@ -607,6 +607,97 @@ sNetSurplus = calculateTotalAvailableFunds(sTotalInc, salaryOrgBud, sTotalExp);
 assert(sTotalExp === 0, "Delete Salary 2 -> Total Expenses returns to 0");
 assert(sNetSurplus === 150000, "Delete Salary 2 -> Total Balance returns to full 150,000");
 
+// ============================================================================
+// SCENARIO 34: MASTER PROMPT SECTION 19 COMPREHENSIVE EXAMPLE
+// ============================================================================
+console.log("\n--- SCENARIO 34: Master Prompt Section 19 Verification ---");
+
+// Income: £20,000, Budget: £15,000, Expenses: £5,000, Payroll: £3,000
+const s34Income: Transaction[] = [
+  { id: "s34-inc-1", type: "income", category: "Revenue", amount: 20000, date: "2026-09-01", department: "Operations" },
+];
+const s34Budgets: Budget[] = [
+  { id: "s34-b-ops", category: "Operations", department: "Operations", allocated: 15000, period: "2026-09" },
+];
+const s34Expenses: Transaction[] = [
+  { id: "s34-exp-1", type: "expense", category: "Operations", amount: 5000, date: "2026-09-02", department: "Operations" },
+  // Staff payroll integrated into disbursements ledger
+  { id: "tx_pay_s34", type: "expense", category: "Operations", amount: 3000, date: "2026-09-03", department: "Operations" },
+];
+
+const s34AllTxs = [...s34Income, ...s34Expenses];
+const s34TotalIncome = calculateTotalIncome(s34AllTxs);
+const s34TotalSpending = calculateTotalExpenses(s34AllTxs);
+const s34TotalBudget = calculateBudgetAllocation(s34Budgets);
+const s34IncomeSpentPct = (s34TotalSpending / s34TotalIncome) * 100;
+const s34RemainingIncome = s34TotalIncome - s34TotalSpending;
+const s34BudgetUsed = calculateBudgetUsed(s34AllTxs, s34Budgets);
+const s34BudgetRemaining = calculateBudgetRemaining(s34TotalBudget, s34BudgetUsed);
+const s34BudgetUtilization = (s34BudgetUsed / s34TotalBudget) * 100;
+
+assert(s34TotalIncome === 20000, "Section 19: Total Income is exactly 20,000");
+assert(s34TotalBudget === 15000, "Section 19: Total Budget is exactly 15,000");
+assert(s34TotalSpending === 8000, "Section 19: Total Spending is exactly 8,000 (5k expense + 3k payroll)");
+assert(s34IncomeSpentPct === 40, "Section 19: Income Spent % is exactly 40% (8k / 20k * 100)");
+assert(s34RemainingIncome === 12000, "Section 19: Remaining Income is exactly 12,000 (20k - 8k)");
+assert(s34BudgetUsed === 8000, "Section 19: Budget Used is exactly 8,000");
+assert(s34BudgetRemaining === 7000, "Section 19: Budget Remaining is exactly 7,000 (15k - 8k)");
+assert(Math.abs(s34BudgetUtilization - 53.33) < 0.01, `Section 19: Budget Utilization is exactly 53.33% (got ${s34BudgetUtilization.toFixed(2)}%)`);
+
+// ============================================================================
+// SCENARIO 35: MASTER PROMPT SECTION 62 FINAL ACCEPTANCE TEST
+// ============================================================================
+console.log("\n--- SCENARIO 35: Master Prompt Section 62 Final Acceptance Test ---");
+
+// Step 1: Start
+// Income = 10,000, Budget = 8,000, Expense = 2,000, Payroll = 1,000
+let s62Txs: Transaction[] = [
+  { id: "s62-inc-1", type: "income", category: "Sales", amount: 10000, date: "2026-09-01", department: "General" },
+  { id: "s62-exp-1", type: "expense", category: "Operations", amount: 2000, date: "2026-09-01", department: "General" },
+  { id: "tx_pay_s62_1", type: "expense", category: "Operations", amount: 1000, date: "2026-09-01", department: "General" },
+];
+let s62Budgets: Budget[] = [
+  { id: "s62-b-1", category: "Operations", department: "General", allocated: 8000, period: "2026-09" },
+];
+
+assert(calculateTotalIncome(s62Txs) === 10000, "Section 62 Initial: Income = 10,000");
+assert(calculateBudgetAllocation(s62Budgets) === 8000, "Section 62 Initial: Budget = 8,000");
+assert(calculateTotalExpenses(s62Txs) === 3000, "Section 62 Initial: Spending = 3,000");
+
+// Step 2: Add Income = 5,000
+s62Txs.push({ id: "s62-inc-2", type: "income", category: "Consulting", amount: 5000, date: "2026-09-02", department: "General" });
+assert(calculateTotalIncome(s62Txs) === 15000, "Section 62 Step 2: Total Income immediately updates to 15,000 (10k + 5k)");
+
+// Step 3: Add Budget = 2,000
+s62Budgets.push({ id: "s62-b-2", category: "Marketing", department: "General", allocated: 2000, period: "2026-09" });
+assert(calculateBudgetAllocation(s62Budgets) === 10000, "Section 62 Step 3: Total Budget immediately updates to 10,000 (8k + 2k)");
+
+// Step 4: Add Expense = 500
+s62Txs.push({ id: "s62-exp-2", type: "expense", category: "Operations", amount: 500, date: "2026-09-03", department: "General" });
+const s62SpendStep4 = calculateTotalExpenses(s62Txs);
+const s62IncSpentStep4 = (s62SpendStep4 / calculateTotalIncome(s62Txs)) * 100;
+const s62RemIncStep4 = calculateTotalIncome(s62Txs) - s62SpendStep4;
+const s62BudUsedStep4 = calculateBudgetUsed(s62Txs, s62Budgets);
+const s62BudRemStep4 = calculateBudgetRemaining(calculateBudgetAllocation(s62Budgets), s62BudUsedStep4);
+const s62BudUtilStep4 = (s62BudUsedStep4 / calculateBudgetAllocation(s62Budgets)) * 100;
+
+assert(s62SpendStep4 === 3500, "Section 62 Step 4: Total Spending = 3,500");
+assert(s62BudUsedStep4 === 3500, "Section 62 Step 4: Budget Used = 3,500");
+assert(s62BudRemStep4 === 6500, "Section 62 Step 4: Budget Remaining = 6,500 (10k - 3.5k)");
+assert(s62BudUtilStep4 === 35, "Section 62 Step 4: Budget Utilization = 35% (3.5k / 10k * 100)");
+assert(Math.abs(s62IncSpentStep4 - 23.33) < 0.01, `Section 62 Step 4: Income Spent % = 23.33% (got ${s62IncSpentStep4.toFixed(2)}%)`);
+assert(s62RemIncStep4 === 11500, "Section 62 Step 4: Remaining Income = 11,500 (15k - 3.5k)");
+
+// Step 5: Process Payroll = 1,500 (Applied exactly once)
+s62Txs.push({ id: "tx_pay_s62_2", type: "expense", category: "Operations", amount: 1500, date: "2026-09-04", department: "General" });
+const s62SpendStep5 = calculateTotalExpenses(s62Txs);
+const s62BudUsedStep5 = calculateBudgetUsed(s62Txs, s62Budgets);
+const s62NetResultStep5 = calculateNetOperatingResult(s62Txs);
+
+assert(s62SpendStep5 === 5000, "Section 62 Step 5: Process Payroll 1,500 -> Total Spending is 5,000 (3.5k + 1.5k, exactly once)");
+assert(s62BudUsedStep5 === 5000, "Section 62 Step 5: Budget Used is 5,000");
+assert(s62NetResultStep5 === 10000, "Section 62 Step 5: Net Result is 10,000 (15k income - 5k spending)");
+
 console.log("\n=======================================================");
 console.log("ALL AUTHORITATIVE FINANCIAL FLOW, PARITY, RESURRECTION & ACCEPTANCE TESTS PASSED 100% ✅");
 console.log("=======================================================\n");
