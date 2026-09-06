@@ -187,6 +187,11 @@ export default function AIInsightsScreen() {
     ? (displayedExpense / displayedIncome) * 100
     : (displayedExpense > 0 ? 100 : 0);
 
+  const retainedSurplusPct = totalFundingPool > 0 ? Math.max(0, Math.round(100 - capitalSpendRatio)) : 0;
+  const isFundingDeficit = netSurplus < 0;
+  const displayedSurplusPct = totalAllocatedBudget > 0 ? (isFundingDeficit ? -Math.round(capitalSpendRatio - 100) : retainedSurplusPct) : profitMargin;
+  const displayedOutflowPct = totalAllocatedBudget > 0 ? Math.min(Math.round(capitalSpendRatio), 100) : Math.min(Math.round(expenseRatio), 100);
+
   // Consolidated unique budgets (aggregating multiple allocations for the same category & department)
   const consolidatedBudgets = useMemo(() => {
     const map = new Map<string, { id: string; category: string; department?: string; allocated: number }>();
@@ -712,36 +717,36 @@ export default function AIInsightsScreen() {
           {/* Ring 1: Operating Surplus / Margin */}
           <View style={styles.ringItem}>
             <RingProgress
-              percentage={displayedIncome === 0 && displayedExpense === 0 ? 0 : Math.min(Math.max(profitMargin >= 0 ? profitMargin : Math.abs(profitMargin), 0), 100)}
-              centerLabel={`${profitMargin >= 0 ? "+" : "-"}${Math.abs(profitMargin).toFixed(0)}%`}
+              percentage={displayedIncome === 0 && displayedExpense === 0 ? 0 : Math.min(Math.max(displayedSurplusPct >= 0 ? displayedSurplusPct : Math.abs(displayedSurplusPct), 0), 100)}
+              centerLabel={`${displayedSurplusPct >= 0 ? "+" : "-"}${Math.abs(displayedSurplusPct).toFixed(0)}%`}
               size={98}
               strokeWidth={9}
-              color={displayedIncome === 0 && displayedExpense === 0 ? "#64748B" : profitMargin >= 20 ? "#10B981" : profitMargin >= 0 ? "#0EA5E9" : "#F43F5E"}
+              color={displayedIncome === 0 && displayedExpense === 0 ? "#64748B" : displayedSurplusPct >= 20 ? "#10B981" : displayedSurplusPct >= 0 ? "#0EA5E9" : "#F43F5E"}
               label="Operating"
-              sublabel={profitMargin >= 0 ? "SURPLUS" : "DEFICIT"}
+              sublabel={displayedSurplusPct >= 0 ? "SURPLUS" : "DEFICIT"}
             />
             <View
               style={[
                 styles.ringStatusPill,
                 {
-                  backgroundColor: (displayedIncome === 0 && displayedExpense === 0 ? "#64748B" : profitMargin >= 20 ? "#10B981" : profitMargin >= 0 ? "#0EA5E9" : "#F43F5E") + "18",
-                  borderColor: (displayedIncome === 0 && displayedExpense === 0 ? "#64748B" : profitMargin >= 20 ? "#10B981" : profitMargin >= 0 ? "#0EA5E9" : "#F43F5E") + "44",
+                  backgroundColor: (displayedIncome === 0 && displayedExpense === 0 ? "#64748B" : displayedSurplusPct >= 20 ? "#10B981" : displayedSurplusPct >= 0 ? "#0EA5E9" : "#F43F5E") + "18",
+                  borderColor: (displayedIncome === 0 && displayedExpense === 0 ? "#64748B" : displayedSurplusPct >= 20 ? "#10B981" : displayedSurplusPct >= 0 ? "#0EA5E9" : "#F43F5E") + "44",
                 },
               ]}
             >
               <Text
                 style={[
                   styles.ringStatusText,
-                  { color: displayedIncome === 0 && displayedExpense === 0 ? "#64748B" : profitMargin >= 20 ? "#10B981" : profitMargin >= 0 ? "#0EA5E9" : "#F43F5E" },
+                  { color: displayedIncome === 0 && displayedExpense === 0 ? "#64748B" : displayedSurplusPct >= 20 ? "#10B981" : displayedSurplusPct >= 0 ? "#0EA5E9" : "#F43F5E" },
                 ]}
               >
                 {displayedIncome === 0 && displayedExpense === 0
                   ? "No Activity"
-                  : profitMargin >= 25
+                  : displayedSurplusPct >= 25
                   ? "Healthy Surplus"
-                  : profitMargin > 0
+                  : displayedSurplusPct > 0
                   ? "Surplus Margin"
-                  : profitMargin === 0
+                  : displayedSurplusPct === 0
                   ? "Balanced"
                   : "Operating Deficit"}
               </Text>
@@ -794,36 +799,36 @@ export default function AIInsightsScreen() {
           {/* Ring 3: Operational Expense Burn Rate */}
           <View style={styles.ringItem}>
             <RingProgress
-              percentage={Math.min(expenseRatio, 100)}
-              centerLabel={`${expenseRatio.toFixed(0)}%`}
+              percentage={Math.min(displayedOutflowPct, 100)}
+              centerLabel={`${displayedOutflowPct.toFixed(0)}%`}
               size={98}
               strokeWidth={9}
-              color={expenseRatio === 0 ? "#64748B" : expenseRatio <= 40 ? "#8B5CF6" : expenseRatio <= 75 ? "#F59E0B" : "#F43F5E"}
+              color={displayedOutflowPct === 0 ? "#64748B" : displayedOutflowPct <= 40 ? "#8B5CF6" : displayedOutflowPct <= 75 ? "#F59E0B" : "#F43F5E"}
               label="Outflow"
-              sublabel="BURN RATE"
+              sublabel={totalAllocatedBudget > 0 ? "CAPITAL SPENT" : "BURN RATE"}
             />
             <View
               style={[
                 styles.ringStatusPill,
                 {
-                  backgroundColor: (expenseRatio === 0 ? "#64748B" : expenseRatio <= 40 ? "#8B5CF6" : expenseRatio <= 75 ? "#F59E0B" : "#F43F5E") + "18",
-                  borderColor: (expenseRatio === 0 ? "#64748B" : expenseRatio <= 40 ? "#8B5CF6" : expenseRatio <= 75 ? "#F59E0B" : "#F43F5E") + "44",
+                  backgroundColor: (displayedOutflowPct === 0 ? "#64748B" : displayedOutflowPct <= 40 ? "#8B5CF6" : displayedOutflowPct <= 75 ? "#F59E0B" : "#F43F5E") + "18",
+                  borderColor: (displayedOutflowPct === 0 ? "#64748B" : displayedOutflowPct <= 40 ? "#8B5CF6" : displayedOutflowPct <= 75 ? "#F59E0B" : "#F43F5E") + "44",
                 },
               ]}
             >
               <Text
                 style={[
                   styles.ringStatusText,
-                  { color: expenseRatio === 0 ? "#64748B" : expenseRatio <= 40 ? "#8B5CF6" : expenseRatio <= 75 ? "#F59E0B" : "#F43F5E" },
+                  { color: displayedOutflowPct === 0 ? "#64748B" : displayedOutflowPct <= 40 ? "#8B5CF6" : displayedOutflowPct <= 75 ? "#F59E0B" : "#F43F5E" },
                 ]}
               >
-                {expenseRatio === 0
+                {displayedOutflowPct === 0
                   ? "Zero Outflow"
-                  : expenseRatio <= 25
+                  : displayedOutflowPct <= 25
                   ? "Low Burn (Safe)"
-                  : expenseRatio <= 60
+                  : displayedOutflowPct <= 60
                   ? "Optimal Burn"
-                  : expenseRatio <= 85
+                  : displayedOutflowPct <= 85
                   ? "Moderate Outflow"
                   : "High Burn Alert"}
               </Text>
