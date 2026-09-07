@@ -201,12 +201,12 @@ export function WebDepartmentStaffModal({
                 )}
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.modalTitle, { color: colors.foreground }]} numberOfLines={1}>
+                <Text style={[styles.modalTitle, { color: colors.foreground }]} numberOfLines={2}>
                   {isAllSelected
                     ? "All Cost Centers — Staff & Roster"
                     : `${activeDept?.name || "Department"} — Staff & Roster`}
                 </Text>
-                <Text style={[styles.modalSubtitle, { color: colors.mutedForeground }]} numberOfLines={1}>
+                <Text style={[styles.modalSubtitle, { color: colors.mutedForeground }]} numberOfLines={3}>
                   {isAllSelected
                     ? `${totalHeadcount} Total Personnel Assigned • ${payroll.length} Payroll Profiles (All Units)`
                     : `${totalHeadcount} Total Personnel Assigned • ${registeredCount} Payroll Profiles`}
@@ -536,7 +536,7 @@ export function WebDepartmentStaffModal({
                     </Text>
                     <Text
                       style={[styles.staffMeta, { color: colors.mutedForeground }]}
-                      numberOfLines={1}
+                      numberOfLines={2}
                     >
                       {staff.employeeId} • {staff.designation || "Staff Member"}
                     </Text>

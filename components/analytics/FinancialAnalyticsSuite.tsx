@@ -656,7 +656,7 @@ export function FinancialAnalyticsSuite({
           {/* Contextual Status Strip (Uniform 46px minHeight across all cards) */}
           <View style={[styles.statusStrip, { backgroundColor: activeBudgetView.statusColor + "14", borderColor: activeBudgetView.statusColor + "30" }]}>
             <View style={[styles.statusDot, { backgroundColor: activeBudgetView.statusColor }]} />
-            <Text style={[styles.statusStripText, { color: activeBudgetView.statusColor }]} numberOfLines={2}>
+            <Text style={[styles.statusStripText, { color: activeBudgetView.statusColor }]} numberOfLines={4}>
               {activeBudgetView.statusLabel} · {activeBudgetView.remainingText}
             </Text>
             {activeBudgetView.isDept && (
@@ -1081,7 +1081,7 @@ export function FinancialAnalyticsSuite({
           {/* Contextual Status Strip with Trend (Uniform 46px minHeight across all cards) */}
           <View style={[styles.statusStrip, { backgroundColor: margin.statusColor + "14", borderColor: margin.statusColor + "30" }]}>
             <View style={[styles.statusDot, { backgroundColor: margin.statusColor }]} />
-            <Text style={[styles.statusStripText, { color: margin.statusColor, flex: 1 }]} numberOfLines={2}>
+            <Text style={[styles.statusStripText, { color: margin.statusColor, flex: 1 }]} numberOfLines={4}>
               {margin.explanationText}
             </Text>
             {margin.marginChangeVsPrevious !== null && margin.marginChangeVsPrevious !== undefined && (
@@ -1410,7 +1410,7 @@ export function FinancialAnalyticsSuite({
           {/* Contextual Status Strip (Uniform 46px minHeight across all cards) */}
           <View style={[styles.statusStrip, { backgroundColor: (activeDistView.isDept ? "#3B82F6" : "#8B5CF6") + "14", borderColor: (activeDistView.isDept ? "#3B82F6" : "#8B5CF6") + "30" }]}>
             <View style={[styles.statusDot, { backgroundColor: activeDistView.isDept ? "#3B82F6" : "#8B5CF6" }]} />
-            <Text style={[styles.statusStripText, { color: activeDistView.isDept ? "#3B82F6" : "#8B5CF6" }]} numberOfLines={2}>
+            <Text style={[styles.statusStripText, { color: activeDistView.isDept ? "#3B82F6" : "#8B5CF6" }]} numberOfLines={4}>
               {activeDistView.explanation}
             </Text>
           </View>
@@ -1628,7 +1628,7 @@ export function FinancialAnalyticsSuite({
                             fontFamily: isSelected ? "Inter_700Bold" : "Inter_600SemiBold",
                           },
                         ]}
-                        numberOfLines={1}
+                        numberOfLines={2}
                       >
                         {item.name}
                       </Text>
@@ -1686,7 +1686,7 @@ export function FinancialAnalyticsSuite({
                         styles.distItemSubtext,
                         { color: isSelected ? colors.foreground : colors.mutedForeground },
                       ]}
-                      numberOfLines={1}
+                      numberOfLines={3}
                     >
                       {item.originText || (activeDistView.isDept ? "Operational Unit" : "Expense Driver")}
                     </Text>
@@ -2048,12 +2048,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    flexWrap: "wrap",
+    gap: 6,
     paddingTop: 8,
     marginTop: 4,
     borderTopWidth: 1,
   },
   deptSubMetaText: {
     fontSize: 10.5,
+    flex: 1,
+    minWidth: 170,
   },
   uncappedNotice: {
     padding: 8,
@@ -2248,19 +2252,23 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 2,
+    flexWrap: "wrap",
+    gap: 4,
+    marginTop: 3,
     paddingTop: 1,
   },
   distItemSubtext: {
-    fontSize: 10,
+    fontSize: 10.5,
     fontFamily: "Inter_500Medium",
     flex: 1,
-    marginRight: 6,
+    minWidth: 160,
+    lineHeight: 14.5,
   },
   distItemLink: {
     fontSize: 10,
     fontFamily: "Inter_700Bold",
     flexShrink: 0,
+    alignSelf: "center",
   },
   clearFilterChip: {
     paddingHorizontal: 8,
