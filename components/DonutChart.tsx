@@ -352,6 +352,7 @@ export function DonutChart({
             ]}
             onPress={() => {
               setEffectiveIndex(null);
+              onSelectLabel?.(null);
               if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
             }}
             activeOpacity={0.8}
@@ -366,7 +367,7 @@ export function DonutChart({
                   numberOfLines={1}
                   adjustsFontSizeToFit
                 >
-                  {currency} {Number(activeSegment.value || 0).toLocaleString()}
+                  {centerLabel ? centerLabel : `${currency} ${Number(activeSegment.value || 0).toLocaleString()}`}
                 </Text>
                 <Text
                   style={[

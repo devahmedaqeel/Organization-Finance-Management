@@ -334,6 +334,13 @@ export function FinancialAnalyticsSuite({
         null;
       const categoriesBreakdown = catEntry?.categories || [];
 
+      let originText = "Active Operational Cost Center";
+      if (categoriesBreakdown.length > 0) {
+        originText = `🏷️ Spend: ${categoriesBreakdown.map((c) => `${c.name} (${c.pct.toFixed(0)}%)`).join(" · ")}`;
+      } else if (d.allocated > 0) {
+        originText = `Cap: ${formatCompactCurrency(d.allocated, currency)} (${d.utilizationPct.toFixed(0)}% Used)`;
+      }
+
       return {
         id: d.id,
         name: d.name,
@@ -341,10 +348,7 @@ export function FinancialAnalyticsSuite({
         pct,
         displayPct: `${pct.toFixed(1)}%`,
         count: d.payrollHeadcount > 0 ? `${d.payrollHeadcount} Staff` : undefined,
-        categoriesBreakdown,
-        sublabel: d.allocated > 0
-          ? `Cap: ${formatCompactCurrency(d.allocated, currency)} (${d.utilizationPct.toFixed(0)}% Used)`
-          : "Active Operational Cost Center",
+        originText,
         color: palette[idx % palette.length],
       };
     });
@@ -452,15 +456,7 @@ export function FinancialAnalyticsSuite({
             pct,
             displayPct: `${pct.toFixed(1)}%`,
             count: data.count > 0 ? `${data.count} disbursement${data.count > 1 ? "s" : ""}` : undefined,
-            deptsBreakdown: [
-              {
-                name: distDeptFilter,
-                amount: data.amount,
-                pct: 100,
-              },
-            ],
-            categoriesBreakdown: undefined,
-            sublabel: `Department: ${distDeptFilter} · ${pct.toFixed(0)}% of department spending`,
+            originText: `🏢 ${distDeptFilter} Unit · ${pct.toFixed(0)}% of department spend`,
             color: palette[idx % palette.length],
           };
         });
@@ -512,14 +508,13 @@ export function FinancialAnalyticsSuite({
         const deptEntry = categoryToDeptsMap[c.category.toLowerCase()] || null;
         const deptsBreakdown = deptEntry?.depts || [];
 
-        let sublabel = "Operational Expense Category";
+        let originText = "Operational Expense Category";
         if (deptsBreakdown.length === 1) {
-          sublabel = `Department Origin: ${deptsBreakdown[0].name} (100% of this cost)`;
+          originText = `🏢 Incurred by: ${deptsBreakdown[0].name} (100%)`;
         } else if (deptsBreakdown.length > 1) {
-          const topContrib = deptsBreakdown[0];
-          sublabel = `Top Origin: ${topContrib.name} (${topContrib.pct.toFixed(0)}%) · ${deptsBreakdown.length} Departments`;
+          originText = `🏢 Incurred by: ${deptsBreakdown.map((d) => `${d.name} (${d.pct.toFixed(0)}%)`).join(" · ")}`;
         } else if (c.category.toLowerCase().includes("salary") || c.category.toLowerCase().includes("payroll")) {
-          sublabel = "Fixed Staff Compensation & Payroll";
+          originText = "Fixed Staff Compensation & Payroll";
         }
 
         return {
@@ -529,9 +524,7 @@ export function FinancialAnalyticsSuite({
           pct: c.pct,
           displayPct: c.displayPct,
           count: c.count > 0 ? `${c.count} disbursement${c.count > 1 ? "s" : ""}` : undefined,
-          deptsBreakdown,
-          categoriesBreakdown: undefined,
-          sublabel,
+          originText,
           color: c.color,
         };
       });
@@ -1501,7 +1494,7 @@ export function FinancialAnalyticsSuite({
           {distributionDimension === "category" && effectiveDeptMetrics.length > 0 && (
             <View style={styles.deptFilterSection}>
               <Text style={[styles.deptFilterLabel, { color: colors.mutedForeground }]}>
-                🏢 Dept:
+                Filter:
               </Text>
               <ScrollView
                 horizontal
@@ -1576,7 +1569,7 @@ export function FinancialAnalyticsSuite({
             </View>
           )}
 
-          {/* Ranked Category / Department List with Integrated Proportion Bars (No Duplicate Clutter) */}
+          {/* Ranked Category / Department List (Clean, Sleek 3-Line Layout) */}
           <View style={styles.categoryRankedList}>
             {(showAllCategories || distributionMode === "all"
               ? activeDistView.items
@@ -1674,79 +1667,16 @@ export function FinancialAnalyticsSuite({
                     />
                   </View>
 
-                  {/* Line 3: Department Origin Badges (Category) OR Category Breakdown Badges (Department) */}
-                  {item.deptsBreakdown && item.deptsBreakdown.length > 0 && (
-                    <View style={styles.breakdownBadgesRow}>
-                      <Text style={[styles.breakdownOriginPrefix, { color: colors.mutedForeground }]}>
-                        🏢 {item.deptsBreakdown.length === 1 ? "Dept:" : "Depts:"}
-                      </Text>
-                      <View style={styles.breakdownBadgesWrap}>
-                        {item.deptsBreakdown.map((d: any) => (
-                          <View
-                            key={d.name}
-                            style={[
-                              styles.breakdownBadgePill,
-                              {
-                                backgroundColor: item.color + "16",
-                                borderColor: item.color + "38",
-                              },
-                            ]}
-                          >
-                            <Text
-                              style={[
-                                styles.breakdownBadgeName,
-                                { color: isSelected ? item.color : colors.foreground },
-                              ]}
-                            >
-                              {d.name}
-                            </Text>
-                            <Text style={[styles.breakdownBadgeAmount, { color: item.color }]}>
-                              {formatCompactCurrency(d.amount, currency)} ({d.pct.toFixed(0)}%)
-                            </Text>
-                          </View>
-                        ))}
-                      </View>
-                    </View>
-                  )}
-
-                  {item.categoriesBreakdown && item.categoriesBreakdown.length > 0 && (
-                    <View style={styles.breakdownBadgesRow}>
-                      <Text style={[styles.breakdownOriginPrefix, { color: colors.mutedForeground }]}>
-                        🏷️ Spend:
-                      </Text>
-                      <View style={styles.breakdownBadgesWrap}>
-                        {item.categoriesBreakdown.map((c: any) => (
-                          <View
-                            key={c.name}
-                            style={[
-                              styles.breakdownBadgePill,
-                              {
-                                backgroundColor: item.color + "16",
-                                borderColor: item.color + "38",
-                              },
-                            ]}
-                          >
-                            <Text
-                              style={[
-                                styles.breakdownBadgeName,
-                                { color: isSelected ? item.color : colors.foreground },
-                              ]}
-                            >
-                              {c.name}
-                            </Text>
-                            <Text style={[styles.breakdownBadgeAmount, { color: item.color }]}>
-                              {formatCompactCurrency(c.amount, currency)} ({c.pct.toFixed(0)}%)
-                            </Text>
-                          </View>
-                        ))}
-                      </View>
-                    </View>
-                  )}
-
-                  {/* Line 4: Informative Subtitle & Quick Outflows Action */}
+                  {/* Line 3: Clear Origin Subtitle (Left) & Direct Drill-Down Action (Right) */}
                   <View style={styles.distItemBottomRow}>
-                    <Text style={[styles.distItemSubtext, { color: colors.mutedForeground }]} numberOfLines={1}>
-                      {item.sublabel || (activeDistView.isDept ? "Active Operational Unit" : "Expense Category")}
+                    <Text
+                      style={[
+                        styles.distItemSubtext,
+                        { color: isSelected ? colors.foreground : colors.mutedForeground },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {item.originText || (activeDistView.isDept ? "Operational Unit" : "Expense Driver")}
                     </Text>
                     <TouchableOpacity
                       onPress={(e) => {
@@ -2301,42 +2231,6 @@ const styles = StyleSheet.create({
   distBarFill: {
     height: "100%",
     borderRadius: 2.25,
-  },
-  breakdownBadgesRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: 5,
-    marginTop: 2,
-    marginBottom: 2,
-  },
-  breakdownOriginPrefix: {
-    fontSize: 9.5,
-    fontFamily: "Inter_700Bold",
-  },
-  breakdownBadgesWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: 4,
-    flex: 1,
-  },
-  breakdownBadgePill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3.5,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    borderWidth: 1,
-  },
-  breakdownBadgeName: {
-    fontSize: 9.5,
-    fontFamily: "Inter_600SemiBold",
-  },
-  breakdownBadgeAmount: {
-    fontSize: 9,
-    fontFamily: "Inter_700Bold",
   },
   distItemBottomRow: {
     flexDirection: "row",
