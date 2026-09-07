@@ -656,7 +656,7 @@ export function WebShell() {
         <OpenInAppBanner />
 
         {/* Top Header Bar */}
-        <View style={[styles.topBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        <View style={[styles.topBar, { backgroundColor: colors.card, borderBottomColor: colors.border }, isMobile && { paddingHorizontal: 12, height: 56 }]}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
             {/* Mobile Brand / Current Tab Title */}
             {isMobile ? (
@@ -709,7 +709,7 @@ export function WebShell() {
                   )}
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={[styles.breadcrumbCurrent, { color: colors.foreground, fontSize: 14 }]} numberOfLines={1}>
+                  <Text style={[styles.breadcrumbCurrent, { color: colors.foreground, fontSize: 13.5 }]} numberOfLines={1}>
                     {NAV_ITEMS.find((n) => n.id === activeTab)?.label || "Overview"}
                   </Text>
                   <Text style={{ color: colors.mutedForeground, fontSize: 9.5, fontFamily: "Inter_500Medium" }} numberOfLines={1}>
@@ -732,20 +732,20 @@ export function WebShell() {
           </View>
 
           {/* Quick Header Right Actions */}
-          <View style={styles.topRightActions}>
+          <View style={[styles.topRightActions, isMobile && { gap: 6 }]}>
             {/* Live 2-Way Cloud Sync Indicator */}
             <View
               style={{
                 flexDirection: "row",
                 alignItems: "center",
-                gap: 5.5,
+                gap: 5,
                 backgroundColor: "rgba(16, 185, 129, 0.12)",
                 borderColor: "rgba(16, 185, 129, 0.35)",
                 borderWidth: 1,
-                paddingHorizontal: 10,
+                paddingHorizontal: isMobile ? 7 : 10,
                 paddingVertical: 4.5,
                 borderRadius: 14,
-                marginRight: isMobile ? 4 : 8,
+                marginRight: isMobile ? 3 : 8,
                 flexShrink: 0,
               }}
             >
@@ -758,47 +758,51 @@ export function WebShell() {
                   flexShrink: 0,
                 }}
               />
-              <Text
-                style={{
-                  fontSize: 11,
-                  fontFamily: "Inter_700Bold",
-                  color: "#10B981",
-                  letterSpacing: 0.2,
-                }}
-                numberOfLines={1}
-              >
-                Cloud Sync
-              </Text>
+              {width >= 420 && (
+                <Text
+                  style={{
+                    fontSize: 10.5,
+                    fontFamily: "Inter_700Bold",
+                    color: "#10B981",
+                    letterSpacing: 0.2,
+                  }}
+                  numberOfLines={1}
+                >
+                  Cloud Sync
+                </Text>
+              )}
             </View>
 
             {/* Header User Role Badge (ADMIN / etc.) */}
-            <View
-              style={{
-                paddingHorizontal: 9,
-                paddingVertical: 4,
-                borderRadius: 12,
-                borderWidth: 1.2,
-                backgroundColor: (user?.role === "admin" ? "#6366F1" : user?.role === "accountant" ? "#0EA5E9" : user?.role === "manager" ? "#10B981" : "#F59E0B") + "18",
-                borderColor: (user?.role === "admin" ? "#6366F1" : user?.role === "accountant" ? "#0EA5E9" : user?.role === "manager" ? "#10B981" : "#F59E0B") + "45",
-                marginRight: isMobile ? 4 : 8,
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-              }}
-            >
-              <Text
+            {width >= 390 && (
+              <View
                 style={{
-                  fontSize: 10,
-                  fontFamily: "Inter_800ExtraBold",
-                  color: user?.role === "admin" ? "#6366F1" : user?.role === "accountant" ? "#0EA5E9" : user?.role === "manager" ? "#10B981" : "#F59E0B",
-                  letterSpacing: 0.4,
-                  textAlign: "center",
+                  paddingHorizontal: isMobile ? 6 : 9,
+                  paddingVertical: 4,
+                  borderRadius: 12,
+                  borderWidth: 1.2,
+                  backgroundColor: (user?.role === "admin" ? "#6366F1" : user?.role === "accountant" ? "#0EA5E9" : user?.role === "manager" ? "#10B981" : "#F59E0B") + "18",
+                  borderColor: (user?.role === "admin" ? "#6366F1" : user?.role === "accountant" ? "#0EA5E9" : user?.role === "manager" ? "#10B981" : "#F59E0B") + "45",
+                  marginRight: isMobile ? 3 : 8,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
                 }}
-                numberOfLines={1}
               >
-                {(user?.role || "admin").toUpperCase()}
-              </Text>
-            </View>
+                <Text
+                  style={{
+                    fontSize: 9.5,
+                    fontFamily: "Inter_800ExtraBold",
+                    color: user?.role === "admin" ? "#6366F1" : user?.role === "accountant" ? "#0EA5E9" : user?.role === "manager" ? "#10B981" : "#F59E0B",
+                    letterSpacing: 0.3,
+                    textAlign: "center",
+                  }}
+                  numberOfLines={1}
+                >
+                  {(user?.role || "admin").toUpperCase()}
+                </Text>
+              </View>
+            )}
 
 
 

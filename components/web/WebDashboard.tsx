@@ -586,10 +586,10 @@ export function WebDashboard({
       </LinearGradient>
 
       {/* ─── 5 Multi-Metric KPI Cards Row (Exact Mobile App Parity) ─── */}
-      <View style={styles.kpiGrid}>
+      <View style={[styles.kpiGrid, isMobile && { gap: 8 }]}>
         {/* Card 1: Total Income */}
         <TouchableOpacity
-          style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+          style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }, isMobile && { minWidth: 140, padding: 11 }]}
           onPress={() => onNavigate("income")}
           activeOpacity={0.8}
         >
@@ -639,7 +639,7 @@ export function WebDashboard({
 
         {/* Card 2: Total Expenses */}
         <TouchableOpacity
-          style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+          style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }, isMobile && { minWidth: 140, padding: 11 }]}
           onPress={() => onNavigate("expenses")}
           activeOpacity={0.8}
         >
@@ -750,7 +750,7 @@ export function WebDashboard({
 
         {/* Card 3: Total Budget */}
         <TouchableOpacity
-          style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+          style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }, isMobile && { minWidth: 140, padding: 11 }]}
           onPress={() => onNavigate("budgets")}
           activeOpacity={0.8}
         >
@@ -860,7 +860,7 @@ export function WebDashboard({
 
         {/* Card 4: Transactions */}
         <TouchableOpacity
-          style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+          style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }, isMobile && { minWidth: 140, padding: 11 }]}
           onPress={() => onNavigate("transactions")}
           activeOpacity={0.8}
         >
@@ -908,7 +908,7 @@ export function WebDashboard({
 
         {/* Card 5: Staff Payroll */}
         <TouchableOpacity
-          style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+          style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }, isMobile && { minWidth: "100%", padding: 11 }]}
           onPress={() => onNavigate("payroll")}
           activeOpacity={0.8}
         >
