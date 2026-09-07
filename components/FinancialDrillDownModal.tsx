@@ -69,15 +69,6 @@ export function FinancialDrillDownModal({
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedDepartment, setSelectedDepartment] = useState<string>("ALL");
 
-  React.useEffect(() => {
-    if (visible) {
-      setSelectedDepartment(initialDepartment || "ALL");
-      setSelectedCategory(null);
-    }
-  }, [visible, initialDepartment]);
-
-  const isDeptFilter = selectedDepartment !== "ALL";
-
   const allAvailableDepts = useMemo(() => {
     const set = new Set<string>();
     (departments || []).forEach((d) => {
@@ -88,6 +79,30 @@ export function FinancialDrillDownModal({
     });
     return Array.from(set);
   }, [departments, budgets]);
+
+  React.useEffect(() => {
+    if (visible) {
+      if (initialDepartment && initialDepartment !== "ALL") {
+        const isDept = allAvailableDepts.some(
+          (d) => d.trim().toLowerCase() === initialDepartment.trim().toLowerCase()
+        );
+        if (isDept) {
+          setSelectedDepartment(initialDepartment);
+          setSelectedCategory(null);
+        } else {
+          // Category drill-down
+          setSelectedDepartment("ALL");
+          setSelectedCategory(initialDepartment);
+          setActiveTab("breakdown");
+        }
+      } else {
+        setSelectedDepartment("ALL");
+        setSelectedCategory(null);
+      }
+    }
+  }, [visible, initialDepartment, allAvailableDepts]);
+
+  const isDeptFilter = selectedDepartment !== "ALL";
 
   // Authoritative Fallback Safe Health Pipeline
   const effectiveNobHealth: NetOperatingBalanceHealth = useMemo(() => {
@@ -180,12 +195,12 @@ export function FinancialDrillDownModal({
 
   const expenseTxs = useMemo(() => {
     let txs = periodTxs.filter((t) => t.type === "expense");
-    if (type === "budget" && isDeptFilter) {
+    if (isDeptFilter) {
       const target = selectedDepartment.trim().toLowerCase();
       txs = txs.filter((t) => (t.department || "").trim().toLowerCase() === target);
     }
     return txs;
-  }, [periodTxs, type, isDeptFilter, selectedDepartment]);
+  }, [periodTxs, isDeptFilter, selectedDepartment]);
 
   const filteredExpenseLedger = useMemo(() => {
     if (!selectedCategory) return expenseTxs;

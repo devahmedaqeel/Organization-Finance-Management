@@ -19,6 +19,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ProgressBar } from "@/components/ProgressBar";
 import { ConfirmDeleteModal } from "@/components/ConfirmDeleteModal";
+import { WebDepartmentStaffModal } from "@/components/web/modals/WebDepartmentStaffModal";
 import { useAuth } from "@/context/AuthContext";
 import { useFinance, Department } from "@/context/FinanceContext";
 import {
@@ -49,6 +50,8 @@ export default function DepartmentsScreen() {
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editingDept, setEditingDept] = useState<Department | null>(null);
+  const [staffModalVisible, setStaffModalVisible] = useState(false);
+  const [staffModalDept, setStaffModalDept] = useState<Department | null>(null);
   const [deptToDelete, setDeptToDelete] = useState<{ id: string; name: string; headCount?: number; budgetAllocated?: number } | null>(null);
   const [name, setName] = useState("");
   const [headCount, setHeadCount] = useState("");
@@ -213,6 +216,16 @@ export default function DepartmentsScreen() {
 
   useEffect(() => {
     const onBackPress = () => {
+      if (staffModalVisible) {
+        setStaffModalVisible(false);
+        setStaffModalDept(null);
+        return true;
+      }
+      if (modalVisible) {
+        setModalVisible(false);
+        setEditingDept(null);
+        return true;
+      }
       if (router.canGoBack()) {
         router.back();
       } else {
@@ -287,15 +300,23 @@ export default function DepartmentsScreen() {
               </View>
 
               {/* Box 2: Headcount */}
-              <View style={[styles.statBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <TouchableOpacity
+                activeOpacity={0.75}
+                onPress={() => {
+                  if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setStaffModalDept(null);
+                  setStaffModalVisible(true);
+                }}
+                style={[styles.statBox, { backgroundColor: colors.card, borderColor: colors.border }]}
+              >
                 <View style={[styles.statIconWrap, { backgroundColor: "#8B5CF618" }]}>
                   <Feather name="users" size={15} color="#8B5CF6" />
                 </View>
                 <View style={styles.statContentWrap}>
                   <Text style={[styles.statVal, { color: colors.foreground }]}>{totalEmployees}</Text>
-                  <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Total Staff</Text>
+                  <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Total Staff →</Text>
                 </View>
-              </View>
+              </TouchableOpacity>
 
               {/* Box 3: Total Budget */}
               <View style={[styles.statBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -384,7 +405,15 @@ export default function DepartmentsScreen() {
           const statusText = isOver ? "OVER BUDGET" : item.utilPct > 75 ? "NEAR LIMIT" : "ON TRACK";
 
           return (
-            <View style={[styles.deptCard, { backgroundColor: colors.card, borderColor: colors.border, borderLeftColor: accentColor }]}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => {
+                if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setStaffModalDept(item);
+                setStaffModalVisible(true);
+              }}
+              style={[styles.deptCard, { backgroundColor: colors.card, borderColor: colors.border, borderLeftColor: accentColor }]}
+            >
               {/* Top Row: Name + Headcount + Status */}
               <View style={styles.deptTop}>
                 <View style={[styles.deptIcon, { backgroundColor: accentColor + "22" }]}>
@@ -459,7 +488,20 @@ export default function DepartmentsScreen() {
                 color={accentColor}
                 formatValue={fmt}
               />
-            </View>
+
+              {/* Tap Indicator / Action Footer */}
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 8, paddingTop: 6, borderTopWidth: 1, borderTopColor: colors.border + "60" }}>
+                <Text style={{ fontSize: 11, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
+                  Staff Roster & Breakdown
+                </Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                  <Text style={{ fontSize: 11, color: accentColor, fontFamily: "Inter_700Bold" }}>
+                    View Roster
+                  </Text>
+                  <Feather name="chevron-right" size={13} color={accentColor} />
+                </View>
+              </View>
+            </TouchableOpacity>
           );
         }}
         ListEmptyComponent={
@@ -581,6 +623,20 @@ export default function DepartmentsScreen() {
             await deleteDepartment(d.id);
             showFloatingToast("Department Deleted", `${d.name} was permanently removed.`);
           }
+        }}
+      />
+
+      {/* ─── Department Staff & Roster Modal ─── */}
+      <WebDepartmentStaffModal
+        visible={staffModalVisible}
+        onClose={() => {
+          setStaffModalVisible(false);
+          setStaffModalDept(null);
+        }}
+        department={staffModalDept}
+        onEditDepartment={(dept) => {
+          setStaffModalVisible(false);
+          handleOpenEdit(dept);
         }}
       />
     </View>

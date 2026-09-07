@@ -13,7 +13,8 @@ import { DownloadReportModal } from "@/components/DownloadReportModal";
 import { DatePeriodSelectorModal } from "@/components/DatePeriodSelectorModal";
 import { NetOperatingBalanceHealthCard } from "@/components/NetOperatingBalanceHealthCard";
 import { FinancialDrillDownModal, DrillDownType } from "@/components/FinancialDrillDownModal";
-import { useFinance } from "@/context/FinanceContext";
+import { useFinance, Department } from "@/context/FinanceContext";
+import { WebDepartmentStaffModal } from "@/components/web/modals/WebDepartmentStaffModal";
 import { useSettings } from "@/context/SettingsContext";
 import { useColors } from "@/hooks/useColors";
 import { useResponsive } from "@/hooks/useResponsive";
@@ -55,6 +56,8 @@ export default function ReportsScreen() {
   const [exportModalVisible, setExportModalVisible] = useState(false);
   const [drillDownModal, setDrillDownModal] = useState<DrillDownType | null>(null);
   const [drillDownDept, setDrillDownDept] = useState<string | undefined>(undefined);
+  const [staffModalVisible, setStaffModalVisible] = useState(false);
+  const [selectedStaffDept, setSelectedStaffDept] = useState<Department | null>(null);
   const webTop = Platform.OS === "web" ? 67 : 0;
   const chartWidth = chartW;
 
@@ -65,6 +68,11 @@ export default function ReportsScreen() {
 
   useEffect(() => {
     const onBackPress = () => {
+      if (staffModalVisible) {
+        setStaffModalVisible(false);
+        setSelectedStaffDept(null);
+        return true;
+      }
       if (drillDownModal !== null) {
         setDrillDownModal(null);
         setDrillDownDept(undefined);
@@ -458,6 +466,17 @@ export default function ReportsScreen() {
             setDrillDownModal(type);
             setDrillDownDept(dept);
           }}
+          onOpenDepartmentStaff={(dept) => {
+            if (dept.id === "ALL") {
+              setSelectedStaffDept(null);
+            } else {
+              const matched = departments.find(
+                (d) => d.id === dept.id || d.name.trim().toLowerCase() === dept.name.trim().toLowerCase()
+              ) || { id: dept.id, name: dept.name, headCount: 0, budgetAllocated: 0 };
+              setSelectedStaffDept(matched as Department);
+            }
+            setStaffModalVisible(true);
+          }}
         />
 
         {/* ─── 4. Department Spending Breakdown (Horizontal Bar) ─── */}
@@ -527,6 +546,20 @@ export default function ReportsScreen() {
               ? "/(tabs)/expenses"
               : route;
           router.push(target as any);
+        }}
+      />
+
+      {/* ─── Department Staff & Roster Modal ─── */}
+      <WebDepartmentStaffModal
+        visible={staffModalVisible}
+        onClose={() => {
+          setStaffModalVisible(false);
+          setSelectedStaffDept(null);
+        }}
+        department={selectedStaffDept}
+        onEditDepartment={(dept) => {
+          setStaffModalVisible(false);
+          router.push("/departments");
         }}
       />
     </View>

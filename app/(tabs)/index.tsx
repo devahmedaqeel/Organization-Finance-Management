@@ -31,7 +31,8 @@ import { NetBalanceBreakdownModal } from "@/components/NetBalanceBreakdownModal"
 import { NetOperatingBalanceHealthCard } from "@/components/NetOperatingBalanceHealthCard";
 import { FinancialDrillDownModal, DrillDownType } from "@/components/FinancialDrillDownModal";
 import { useAuth } from "@/context/AuthContext";
-import { useFinance } from "@/context/FinanceContext";
+import { useFinance, Department } from "@/context/FinanceContext";
+import { WebDepartmentStaffModal } from "@/components/web/modals/WebDepartmentStaffModal";
 import { useSettings } from "@/context/SettingsContext";
 import { useColors } from "@/hooks/useColors";
 import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
@@ -313,6 +314,8 @@ export default function DashboardScreen() {
   const [mobileNobMode, setMobileNobMode] = useState<"margin" | "inflows" | "net">("margin");
   const [mobileDrillDown, setMobileDrillDown] = useState<DrillDownType | null>(null);
   const [mobileDrillDownDept, setMobileDrillDownDept] = useState<string | undefined>(undefined);
+  const [staffModalVisible, setStaffModalVisible] = useState(false);
+  const [selectedStaffDept, setSelectedStaffDept] = useState<Department | null>(null);
   const [customSelection, setCustomSelection] = useState<any | null>(null);
   const [activePeriod, setActivePeriod] = useState<NormalizedPeriod>(() =>
     getPresetPeriod("last_6m")
@@ -321,6 +324,11 @@ export default function DashboardScreen() {
   // Hardware Back button handling on Android
   useEffect(() => {
     const onBackPress = () => {
+      if (staffModalVisible) {
+        setStaffModalVisible(false);
+        setSelectedStaffDept(null);
+        return true;
+      }
       if (mobileDrillDown !== null) {
         setMobileDrillDown(null);
         setMobileDrillDownDept(undefined);
@@ -1338,6 +1346,17 @@ export default function DashboardScreen() {
           setMobileDrillDown(type);
           setMobileDrillDownDept(dept);
         }}
+        onOpenDepartmentStaff={(dept) => {
+          if (dept.id === "ALL") {
+            setSelectedStaffDept(null);
+          } else {
+            const matched = departments.find(
+              (d) => d.id === dept.id || d.name.trim().toLowerCase() === dept.name.trim().toLowerCase()
+            ) || { id: dept.id, name: dept.name, headCount: 0, budgetAllocated: 0 };
+            setSelectedStaffDept(matched as Department);
+          }
+          setStaffModalVisible(true);
+        }}
       />
 
       {/* Top Department Cost Centers Card */}
@@ -1370,12 +1389,27 @@ export default function DashboardScreen() {
               const cleanName = dept.department || "General";
 
               return (
-                <View key={dept.department} style={{ gap: 5 }}>
+                <TouchableOpacity
+                  key={dept.department}
+                  style={{ gap: 5 }}
+                  activeOpacity={0.75}
+                  onPress={() => {
+                    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    const matched = departments.find(
+                      (d) => d.name.trim().toLowerCase() === cleanName.trim().toLowerCase()
+                    ) || { id: cleanName, name: cleanName, headCount: 0, budgetAllocated: 0 };
+                    setSelectedStaffDept(matched as Department);
+                    setStaffModalVisible(true);
+                  }}
+                >
                   <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1, marginRight: 6 }}>
                       <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: itemColor }} />
                       <Text style={{ fontSize: 11.5, fontFamily: "Inter_600SemiBold", color: colors.foreground, flex: 1 }}>
                         {cleanName}
+                      </Text>
+                      <Text style={{ fontSize: 10, color: "#0EA5E9", fontFamily: "Inter_500Medium" }}>
+                        View Roster →
                       </Text>
                     </View>
                     <Text style={{ fontSize: 11.5, fontFamily: "Inter_700Bold", color: colors.foreground }}>
@@ -1394,7 +1428,7 @@ export default function DashboardScreen() {
                       }}
                     />
                   </View>
-                </View>
+                </TouchableOpacity>
               );
             })}
           </View>
@@ -1708,6 +1742,20 @@ export default function DashboardScreen() {
               ? "/(tabs)/expenses"
               : route;
           router.push(target as any);
+        }}
+      />
+
+      {/* ─── Department Staff & Roster Modal ─── */}
+      <WebDepartmentStaffModal
+        visible={staffModalVisible}
+        onClose={() => {
+          setStaffModalVisible(false);
+          setSelectedStaffDept(null);
+        }}
+        department={selectedStaffDept}
+        onEditDepartment={(dept) => {
+          setStaffModalVisible(false);
+          router.push("/departments");
         }}
       />
 

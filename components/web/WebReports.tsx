@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { StyleSheet, Text, TouchableOpacity, View, ScrollView, useWindowDimensions, Modal, TextInput, Platform } from "react-native";
-import { useFinance } from "@/context/FinanceContext";
+import { useFinance, Department } from "@/context/FinanceContext";
+import { WebDepartmentStaffModal } from "./modals/WebDepartmentStaffModal";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
 import { useColors } from "@/hooks/useColors";
@@ -73,6 +74,8 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
   const [customEnd, setCustomEnd] = useState(() => activePeriod.endDate || "2026-09-01");
   const [drillDownType, setDrillDownType] = useState<DrillDownType | null>(null);
   const [drillDownDept, setDrillDownDept] = useState<string | undefined>(undefined);
+  const [staffModalDept, setStaffModalDept] = useState<Department | null>(null);
+  const [staffModalVisible, setStaffModalVisible] = useState(false);
   const [chartContainerWidth, setChartContainerWidth] = useState<number>(0);
 
   const fmt = (n: number) => {
@@ -664,6 +667,17 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
               setDrillDownType(type);
               setDrillDownDept(dept);
             }}
+            onOpenDepartmentStaff={(dept) => {
+              if (dept.id === "ALL") {
+                setStaffModalDept(null);
+              } else {
+                const matched = departments.find(
+                  (d) => d.id === dept.id || d.name.trim().toLowerCase() === dept.name.trim().toLowerCase()
+                ) || { id: dept.id, name: dept.name, headCount: 0, budgetAllocated: 0 };
+                setStaffModalDept(matched as Department);
+              }
+              setStaffModalVisible(true);
+            }}
           />
 
           {/* Historical Trend Curve */}
@@ -1049,6 +1063,20 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
           onNavigate={onNavigate}
         />
       )}
+
+      {/* ─── Department Staff & Roster Modal ─── */}
+      <WebDepartmentStaffModal
+        visible={staffModalVisible}
+        onClose={() => {
+          setStaffModalVisible(false);
+          setStaffModalDept(null);
+        }}
+        department={staffModalDept}
+        onEditDepartment={(dept) => {
+          setStaffModalVisible(false);
+          onNavigate?.("departments");
+        }}
+      />
 
       {/* ─── Enterprise Export Modal ─── */}
       <DownloadReportModal

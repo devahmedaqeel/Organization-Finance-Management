@@ -792,7 +792,7 @@ export function FinancialAnalyticsSuite({
                 <Text style={[styles.deptOptionsLabel, { color: colors.mutedForeground }]}>
                   SELECT DEPARTMENT OPTION:
                 </Text>
-                {activeBudgetView.isDept && (
+                {activeBudgetView.isDept ? (
                   <TouchableOpacity
                     onPress={() => {
                       if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -804,7 +804,19 @@ export function FinancialAnalyticsSuite({
                       Show All Units
                     </Text>
                   </TouchableOpacity>
-                )}
+                ) : onOpenDepartmentStaff ? (
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      onOpenDepartmentStaff({ id: "ALL", name: "All Units" });
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.resetDeptText, { color: "#0EA5E9" }]}>
+                      Staff Roster (All) →
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
               </View>
               <ScrollView
                 horizontal
@@ -984,7 +996,7 @@ export function FinancialAnalyticsSuite({
           </View>
 
           {/* Department Spending Composition Note */}
-          {activeBudgetView.isDept && (activeBudgetView.payrollSpending > 0 || activeBudgetView.otherSpending > 0) && (
+          {activeBudgetView.isDept && (
             <View style={[styles.deptSubMetaRow, { borderColor: colors.border }]}>
               <Text style={[styles.deptSubMetaText, { color: colors.mutedForeground }]}>
                 Payroll: <Text style={{ color: "#8B5CF6", fontFamily: "Inter_700Bold" }}>{formatCompactCurrency(activeBudgetView.payrollSpending, currency)}</Text>
