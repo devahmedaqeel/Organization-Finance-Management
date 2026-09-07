@@ -23,7 +23,7 @@ export function WebDepartments() {
 
   const { user } = useAuth();
   const { settings } = useSettings();
-  const { departments, transactions, deleteDepartment, budgets } = useFinance();
+  const { departments, transactions, deleteDepartment, budgets, payroll = [] } = useFinance();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editingDept, setEditingDept] = useState<Department | null>(null);
@@ -126,7 +126,7 @@ export function WebDepartments() {
         </View>
 
         <TouchableOpacity
-          style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 200 }]}
+          style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 240 }]}
           onPress={() => {
             setStaffModalDept(null);
             setStaffModalVisible(true);
@@ -137,9 +137,67 @@ export function WebDepartments() {
             <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>TOTAL STAFF HEADCOUNT</Text>
             <SvgUsers size={14} color="#0EA5E9" />
           </View>
-          <Text style={[styles.metricValue, { color: colors.foreground }]}>{totalHeadcount} Personnel</Text>
-          <Text style={[styles.metricSub, { color: "#0EA5E9" }]}>
-            Across all active units • Click to view roster
+          <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
+            <Text style={[styles.metricValue, { color: colors.foreground }]}>{totalHeadcount} Personnel</Text>
+            {payroll.length > 0 && (
+              <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#0EA5E9" }}>
+                ({payroll.length} registered)
+              </Text>
+            )}
+          </View>
+
+          {/* Available Employees with Departments Preview */}
+          {payroll.length > 0 ? (
+            <View style={styles.kpiStaffWrap}>
+              <Text style={[styles.kpiStaffTitle, { color: colors.mutedForeground }]}>
+                AVAILABLE EMPLOYEES:
+              </Text>
+              <View style={styles.kpiStaffChips}>
+                {payroll.slice(0, 4).map((p) => (
+                  <View
+                    key={p.id}
+                    style={[
+                      styles.kpiEmpChip,
+                      { backgroundColor: colors.background, borderColor: colors.border },
+                    ]}
+                  >
+                    <View style={styles.kpiEmpAvatar}>
+                      <Text style={styles.kpiEmpAvatarText}>
+                        {p.employeeName ? p.employeeName.trim()[0].toUpperCase() : "E"}
+                      </Text>
+                    </View>
+                    <Text style={[styles.kpiEmpName, { color: colors.foreground }]} numberOfLines={1}>
+                      {p.employeeName}
+                    </Text>
+                    <View style={styles.kpiDeptBadge}>
+                      <Text style={styles.kpiDeptBadgeText} numberOfLines={1}>
+                        {p.department || "General"}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+                {payroll.length > 4 && (
+                  <View
+                    style={[
+                      styles.kpiMoreBadge,
+                      { borderColor: colors.border, backgroundColor: colors.background },
+                    ]}
+                  >
+                    <Text style={[styles.kpiMoreText, { color: "#0EA5E9" }]}>
+                      +{payroll.length - 4} more
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          ) : (
+            <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
+              No registered employee profiles yet
+            </Text>
+          )}
+
+          <Text style={[styles.metricSub, { color: "#0EA5E9", marginTop: 4 }]}>
+            Across all active units • Click to view roster →
           </Text>
         </TouchableOpacity>
 
@@ -292,6 +350,63 @@ export function WebDepartments() {
                     </Text>
                   </View>
                 </View>
+
+                {/* Assigned Employees */}
+                {(() => {
+                  const deptStaff = payroll.filter(
+                    (p) => (p.department || "").trim().toLowerCase() === dept.name.trim().toLowerCase()
+                  );
+                  if (deptStaff.length === 0) return null;
+                  return (
+                    <View
+                      style={[
+                        styles.deptEmployeesBox,
+                        { backgroundColor: colors.background, borderColor: colors.border },
+                      ]}
+                    >
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                        }}
+                      >
+                        <Text style={[styles.deptEmployeesLabel, { color: colors.mutedForeground }]}>
+                          ASSIGNED PERSONNEL ({deptStaff.length}):
+                        </Text>
+                        <Text style={{ fontSize: 10, color: "#0EA5E9", fontFamily: "Inter_600SemiBold" }}>
+                          Active
+                        </Text>
+                      </View>
+                      <View style={styles.deptEmployeesList}>
+                        {deptStaff.slice(0, 3).map((emp) => (
+                          <View key={emp.id} style={styles.deptEmpItem}>
+                            <View style={styles.deptEmpDot} />
+                            <Text
+                              style={[styles.deptEmpName, { color: colors.foreground }]}
+                              numberOfLines={1}
+                            >
+                              {emp.employeeName}
+                            </Text>
+                            {emp.designation ? (
+                              <Text
+                                style={[styles.deptEmpRole, { color: colors.mutedForeground }]}
+                                numberOfLines={1}
+                              >
+                                • {emp.designation}
+                              </Text>
+                            ) : null}
+                          </View>
+                        ))}
+                        {deptStaff.length > 3 && (
+                          <Text style={[styles.deptEmpMore, { color: "#0EA5E9" }]}>
+                            +{deptStaff.length - 3} more
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  );
+                })()}
 
                 {/* Actions */}
                 <View style={styles.cardActions}>
@@ -621,5 +736,109 @@ const styles = StyleSheet.create({
   breakdownDivider: {
     height: 1,
     width: "100%",
+  },
+  kpiStaffWrap: {
+    marginTop: 8,
+    gap: 6,
+  },
+  kpiStaffTitle: {
+    fontSize: 9.5,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.5,
+  },
+  kpiStaffChips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  kpiEmpChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 3.5,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  kpiEmpAvatar: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#0EA5E920",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  kpiEmpAvatarText: {
+    color: "#0EA5E9",
+    fontSize: 10,
+    fontFamily: "Inter_700Bold",
+  },
+  kpiEmpName: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    maxWidth: 120,
+  },
+  kpiDeptBadge: {
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+    backgroundColor: "#0EA5E915",
+  },
+  kpiDeptBadgeText: {
+    color: "#0EA5E9",
+    fontSize: 9.5,
+    fontFamily: "Inter_700Bold",
+  },
+  kpiMoreBadge: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  kpiMoreText: {
+    fontSize: 10,
+    fontFamily: "Inter_600SemiBold",
+  },
+  deptEmployeesBox: {
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 6,
+  },
+  deptEmployeesLabel: {
+    fontSize: 9.5,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.5,
+  },
+  deptEmployeesList: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 8,
+  },
+  deptEmpItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  deptEmpDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: "#0EA5E9",
+  },
+  deptEmpName: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+  },
+  deptEmpRole: {
+    fontSize: 10.5,
+    fontFamily: "Inter_400Regular",
+  },
+  deptEmpMore: {
+    fontSize: 10.5,
+    fontFamily: "Inter_600SemiBold",
   },
 });
