@@ -202,25 +202,180 @@ export function FinancialAnalyticsSuite({
   const [budgetMode, setBudgetMode] = useState<"used" | "spent" | "remaining">("used");
   const [marginMode, setMarginMode] = useState<"margin" | "outflow" | "net">("margin");
   const [distributionMode, setDistributionMode] = useState<"drivers" | "share" | "all">("drivers");
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [distributionDimension, setDistributionDimension] = useState<"category" | "department">("category");
+  const [selectedDistributionItem, setSelectedDistributionItem] = useState<string | null>(null);
   const [showTooltip, setShowTooltip] = useState<"budget" | "margin" | "distribution" | null>(null);
   const [showAllCategories, setShowAllCategories] = useState(false);
 
-  // Selected category data for interactive donut
-  const activeCategoryData = useMemo(() => {
-    if (!selectedCategory || !distribution?.categories?.length) return null;
-    return (distribution.categories || []).find((c) => c.category === selectedCategory) || null;
-  }, [selectedCategory, distribution?.categories]);
+  // Department-level expense distribution
+  const deptDistribution = useMemo(() => {
+    const total = effectiveDeptMetrics.reduce((sum, d) => sum + d.spent, 0);
+    if (total <= 0) {
+      return {
+        hasExpenses: false,
+        totalExpenses: 0,
+        departments: [] as {
+          id: string;
+          name: string;
+          amount: number;
+          pct: number;
+          displayPct: string;
+          count?: string;
+          color: string;
+        }[],
+        chartSegments: [] as {
+          label: string;
+          value: number;
+          color: string;
+          pct: number;
+        }[],
+        topDept: null as any,
+        explanation: "No department disbursements recorded in this period.",
+      };
+    }
 
-  // Donut chart segments formatted
-  const donutSegments = useMemo(() => {
-    return (distribution?.chartSegments || []).map((seg) => ({
-      label: seg.category,
-      value: seg.amount,
-      color: seg.color,
-      pct: seg.pct,
-    }));
-  }, [distribution?.chartSegments]);
+    const sorted = [...effectiveDeptMetrics]
+      .filter((d) => d.spent > 0)
+      .sort((a, b) => b.spent - a.spent);
+
+    const palette = ["#3B82F6", "#8B5CF6", "#EC4899", "#10B981", "#F59E0B", "#06B6D4", "#6366F1", "#64748B"];
+
+    const fullDepts = sorted.map((d, idx) => {
+      const pct = (d.spent / total) * 100;
+      return {
+        id: d.id,
+        name: d.name,
+        amount: d.spent,
+        pct,
+        displayPct: `${pct.toFixed(1)}%`,
+        count: d.payrollHeadcount > 0 ? `${d.payrollHeadcount} Staff` : undefined,
+        color: palette[idx % palette.length],
+      };
+    });
+
+    const topDept = fullDepts[0] || null;
+
+    let explanation = "Departmental disbursement breakdown.";
+    if (topDept) {
+      if (fullDepts.length === 1) {
+        explanation = `100% of spending is concentrated in ${topDept.name}. Single active cost center.`;
+      } else {
+        explanation = `${topDept.name} is the primary cost center, consuming ${topDept.displayPct} of all departmental disbursements.`;
+      }
+    }
+
+    return {
+      hasExpenses: true,
+      totalExpenses: total,
+      departments: fullDepts,
+      chartSegments: fullDepts.map((d) => ({
+        label: d.name,
+        value: d.amount,
+        color: d.color,
+        pct: d.pct,
+      })),
+      topDept,
+      explanation,
+    };
+  }, [effectiveDeptMetrics]);
+
+  // Unified Active View for Card 3 (Category or Department)
+  const activeDistView = useMemo(() => {
+    if (distributionDimension === "department") {
+      const totalExp = deptDistribution.totalExpenses;
+      const items = deptDistribution.departments;
+      const chartSegs = deptDistribution.chartSegments;
+      const topItem = deptDistribution.topDept
+        ? {
+            name: deptDistribution.topDept.name,
+            amount: deptDistribution.topDept.amount,
+            displayPct: deptDistribution.topDept.displayPct,
+            color: deptDistribution.topDept.color,
+          }
+        : null;
+
+      const selectedData = selectedDistributionItem
+        ? items.find(
+            (i) => i.name.trim().toLowerCase() === selectedDistributionItem.trim().toLowerCase()
+          ) || null
+        : null;
+
+      return {
+        isDept: true,
+        titleSubtitle: `${items.length} Cost Center${items.length === 1 ? "" : "s"} Active`,
+        hasExpenses: deptDistribution.hasExpenses,
+        totalExpenses: totalExp,
+        items,
+        chartSegments: chartSegs,
+        topItem,
+        selectedData,
+        explanation: deptDistribution.explanation,
+        bentoCol1Label: "TOP COST CENTER",
+        bentoCol1Val: topItem ? topItem.name : "None",
+        bentoCol1Color: topItem ? topItem.color : "#3B82F6",
+        bentoCol3Label: "COST CENTERS",
+        bentoCol3Val: `${items.length} Active`,
+      };
+    } else {
+      // By Category
+      const totalExp = distribution?.totalExpenses || 0;
+      const items = (distribution?.categories || []).map((c) => ({
+        id: c.category,
+        name: c.category,
+        amount: c.amount,
+        pct: c.pct,
+        displayPct: c.displayPct,
+        count: c.count > 0 ? `${c.count} disbursement${c.count > 1 ? "s" : ""}` : undefined,
+        color: c.color,
+      }));
+
+      const chartSegs = (distribution?.chartSegments || []).map((seg) => ({
+        label: seg.category,
+        value: seg.amount,
+        color: seg.color,
+        pct: seg.pct,
+      }));
+
+      const topItem = distribution?.topCategory
+        ? {
+            name: distribution.topCategory.category,
+            amount: distribution.topCategory.amount,
+            displayPct: distribution.topCategory.displayPct,
+            color: distribution.topCategory.color,
+          }
+        : null;
+
+      const selectedData = selectedDistributionItem
+        ? items.find(
+            (i) => i.name.trim().toLowerCase() === selectedDistributionItem.trim().toLowerCase()
+          ) || null
+        : null;
+
+      let explanation = distribution?.explanation || "";
+      if (topItem && items.length === 1) {
+        explanation = `100% of outflows are concentrated in ${topItem.name}. All disbursements are fixed in payroll.`;
+      } else if (topItem && topItem.displayPct && parseFloat(topItem.displayPct) >= 70) {
+        explanation = `⚡ Dominant Cost Driver: ${topItem.name} represents ${topItem.displayPct} of all spending.`;
+      }
+
+      return {
+        isDept: false,
+        titleSubtitle: `${items.length} Cost Driver${items.length === 1 ? "" : "s"} Categorized`,
+        hasExpenses: distribution?.hasExpenses ?? false,
+        totalExpenses: totalExp,
+        items,
+        chartSegments: chartSegs,
+        topItem,
+        selectedData,
+        explanation,
+        bentoCol1Label: "TOP COST DRIVER",
+        bentoCol1Val: topItem ? topItem.name : "None",
+        bentoCol1Color: topItem ? topItem.color : "#8B5CF6",
+        bentoCol3Label: "COST DRIVERS",
+        bentoCol3Val: `${items.length} Active`,
+      };
+    }
+  }, [distributionDimension, deptDistribution, distribution, selectedDistributionItem]);
 
   return (
     <View style={styles.container}>
@@ -979,8 +1134,8 @@ export function FinancialAnalyticsSuite({
           {/* Header */}
           <View style={styles.cardHeader}>
             <View style={styles.headerTitleRow}>
-              <View style={[styles.iconBadge, { backgroundColor: "#8B5CF616" }]}>
-                <SvgPieChart size={18} color="#8B5CF6" />
+              <View style={[styles.iconBadge, { backgroundColor: activeDistView.isDept ? "#3B82F618" : "#8B5CF618" }]}>
+                <SvgPieChart size={18} color={activeDistView.isDept ? "#3B82F6" : "#8B5CF6"} />
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <View style={styles.titleWithHelpRow}>
@@ -1000,7 +1155,7 @@ export function FinancialAnalyticsSuite({
                   </TouchableOpacity>
                 </View>
                 <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>
-                  {distribution?.categories?.length || 0} Cost Drivers Categorized
+                  {activeDistView.titleSubtitle}
                 </Text>
               </View>
             </View>
@@ -1008,7 +1163,7 @@ export function FinancialAnalyticsSuite({
             <TouchableOpacity
               onPress={() => {
                 if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                onOpenDrillDown("expense");
+                onOpenDrillDown("expense", selectedDistributionItem || undefined);
               }}
               style={{ flexShrink: 0 }}
             >
@@ -1020,40 +1175,44 @@ export function FinancialAnalyticsSuite({
           {showTooltip === "distribution" && (
             <View style={[styles.tooltipBanner, { backgroundColor: colors.primary + "12", borderColor: colors.primary + "30" }]}>
               <Text style={[styles.tooltipText, { color: colors.foreground }]}>
-                📐 <Text style={{ fontFamily: "Inter_700Bold" }}>Formula:</Text> Category Expense ÷ Total Expenses × 100
+                📐 <Text style={{ fontFamily: "Inter_700Bold" }}>Formula:</Text> {activeDistView.isDept ? "Department Spend ÷ Total Expenses × 100" : "Category Spend ÷ Total Expenses × 100"}
               </Text>
               <Text style={[styles.tooltipSub, { color: colors.mutedForeground }]}>
-                All displayed percentages derive from authoritative raw sums and total ~100%.
+                All percentage shares derive from authoritative period disbursements and total exactly 100%.
               </Text>
             </View>
           )}
 
           {/* Contextual Status Strip (Uniform 46px minHeight across all cards) */}
-          <View style={[styles.statusStrip, { backgroundColor: "#8B5CF614", borderColor: "#8B5CF630" }]}>
-            <View style={[styles.statusDot, { backgroundColor: "#8B5CF6" }]} />
-            <Text style={[styles.statusStripText, { color: "#8B5CF6" }]} numberOfLines={2}>
-              {distribution?.explanation || ""}
+          <View style={[styles.statusStrip, { backgroundColor: (activeDistView.isDept ? "#3B82F6" : "#8B5CF6") + "14", borderColor: (activeDistView.isDept ? "#3B82F6" : "#8B5CF6") + "30" }]}>
+            <View style={[styles.statusDot, { backgroundColor: activeDistView.isDept ? "#3B82F6" : "#8B5CF6" }]} />
+            <Text style={[styles.statusStripText, { color: activeDistView.isDept ? "#3B82F6" : "#8B5CF6" }]} numberOfLines={2}>
+              {activeDistView.explanation}
             </Text>
           </View>
 
           {/* Interactive Donut Chart */}
-          {distribution?.hasExpenses ? (
+          {activeDistView.hasExpenses ? (
             <View style={styles.donutWrap}>
               <DonutChart
-                segments={donutSegments}
+                segments={activeDistView.chartSegments}
                 size={128}
                 strokeWidth={11}
                 centerLabel={
-                  activeCategoryData
-                    ? formatCompactCurrency(activeCategoryData.amount, currency)
-                    : formatCompactCurrency(distribution?.totalExpenses || 0, currency)
+                  activeDistView.selectedData
+                    ? formatCompactCurrency(activeDistView.selectedData.amount, currency)
+                    : formatCompactCurrency(activeDistView.totalExpenses, currency)
                 }
-                centerSub={activeCategoryData ? activeCategoryData.category.toUpperCase() : "TOTAL SPENT"}
+                centerSub={
+                  activeDistView.selectedData
+                    ? `${activeDistView.selectedData.name.toUpperCase()} (${activeDistView.selectedData.displayPct})`
+                    : "TOTAL SPENT"
+                }
                 currency={currency}
                 showChips={false}
                 showLegend={false}
-                selectedLabel={selectedCategory}
-                onSelectLabel={(cat) => setSelectedCategory(cat)}
+                selectedLabel={selectedDistributionItem}
+                onSelectLabel={(lbl) => setSelectedDistributionItem(lbl)}
               />
             </View>
           ) : (
@@ -1064,102 +1223,140 @@ export function FinancialAnalyticsSuite({
             </View>
           )}
 
-          {/* Segmented Option Controls for Card 3 */}
-          <View style={styles.chipsRow}>
-            {[
-              { id: "drivers", label: "Top Drivers" },
-              { id: "share", label: "% Share" },
-              { id: "all", label: `All (${distribution?.categories?.length || 0})` },
-            ].map((opt) => {
-              const isSelected = distributionMode === opt.id;
+          {/* Primary View Dimension Switcher: By Category vs By Department */}
+          <View style={styles.dimensionToggleRow}>
+            <TouchableOpacity
+              style={[
+                styles.dimensionTab,
+                {
+                  backgroundColor: distributionDimension === "category" ? "#8B5CF6" : (colors.cardAlt ?? colors.muted) + "30",
+                  borderColor: distributionDimension === "category" ? "#8B5CF6" : colors.border,
+                },
+              ]}
+              onPress={() => {
+                if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setDistributionDimension("category");
+                setSelectedDistributionItem(null);
+              }}
+              activeOpacity={0.75}
+            >
+              <Text
+                style={[
+                  styles.dimensionTabText,
+                  { color: distributionDimension === "category" ? "#FFFFFF" : colors.mutedForeground },
+                  distributionDimension === "category" && { fontFamily: "Inter_700Bold" },
+                ]}
+              >
+                🏷️ By Category
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.dimensionTab,
+                {
+                  backgroundColor: distributionDimension === "department" ? "#3B82F6" : (colors.cardAlt ?? colors.muted) + "30",
+                  borderColor: distributionDimension === "department" ? "#3B82F6" : colors.border,
+                },
+              ]}
+              onPress={() => {
+                if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setDistributionDimension("department");
+                setSelectedDistributionItem(null);
+              }}
+              activeOpacity={0.75}
+            >
+              <Text
+                style={[
+                  styles.dimensionTabText,
+                  { color: distributionDimension === "department" ? "#FFFFFF" : colors.mutedForeground },
+                  distributionDimension === "department" && { fontFamily: "Inter_700Bold" },
+                ]}
+              >
+                🏢 By Department
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Selected Item Interactive Inspection Card */}
+          {activeDistView.selectedData && (
+            <View style={[styles.inspectorCard, { backgroundColor: activeDistView.selectedData.color + "14", borderColor: activeDistView.selectedData.color + "45" }]}>
+              <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <View style={[styles.catColorDot, { backgroundColor: activeDistView.selectedData.color }]} />
+                  <Text style={[styles.inspectorTitle, { color: colors.foreground }]} numberOfLines={1}>
+                    {activeDistView.selectedData.name}
+                  </Text>
+                  <View style={[styles.itemPctBadge, { backgroundColor: activeDistView.selectedData.color + "25", borderColor: activeDistView.selectedData.color + "50" }]}>
+                    <Text style={[styles.itemPctBadgeText, { color: activeDistView.selectedData.color }]}>
+                      {activeDistView.selectedData.displayPct}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={[styles.inspectorSub, { color: colors.mutedForeground }]}>
+                  Disbursed: <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold" }}>{currency} {formatCompactCurrency(activeDistView.selectedData.amount, currency)}</Text>
+                  {activeDistView.selectedData.count ? ` · ${activeDistView.selectedData.count}` : ""}
+                </Text>
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                <TouchableOpacity
+                  style={[styles.inspectLinkBtn, { backgroundColor: activeDistView.selectedData.color + "22", borderColor: activeDistView.selectedData.color + "50" }]}
+                  onPress={() => {
+                    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    onOpenDrillDown("expense", activeDistView.selectedData?.name);
+                  }}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.inspectLinkText, { color: activeDistView.selectedData.color }]}>
+                    Drill Down →
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setSelectedDistributionItem(null)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={[styles.inspectCloseBtn, { borderColor: colors.border }]}
+                >
+                  <Text style={{ fontSize: 11, color: colors.mutedForeground, fontFamily: "Inter_700Bold" }}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {/* Ranked Category / Department List with Integrated Proportion Bars */}
+          <View style={styles.categoryRankedList}>
+            {(showAllCategories || distributionMode === "all"
+              ? activeDistView.items
+              : activeDistView.items.slice(0, 3)
+            ).map((item, idx) => {
+              const isSelected = selectedDistributionItem?.trim().toLowerCase() === item.name.trim().toLowerCase();
+              const isAnySelected = selectedDistributionItem !== null;
+
               return (
                 <TouchableOpacity
-                  key={opt.id}
+                  key={item.id || item.name}
                   style={[
-                    styles.chip,
+                    styles.distItemCard,
                     {
-                      backgroundColor: isSelected ? "#8B5CF6" : (colors.cardAlt ?? colors.muted) + "30",
-                      borderColor: isSelected ? "#8B5CF6" : colors.border,
+                      backgroundColor: isSelected ? item.color + "16" : (colors.cardAlt ?? colors.muted) + "18",
+                      borderColor: isSelected ? item.color : colors.border,
+                      borderWidth: isSelected ? 1.5 : 1,
+                      opacity: isAnySelected ? (isSelected ? 1.0 : 0.6) : 1.0,
                     },
                   ]}
                   onPress={() => {
                     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setDistributionMode(opt.id as any);
-                    if (opt.id === "all") setShowAllCategories(true);
-                    else setShowAllCategories(false);
+                    setSelectedDistributionItem(isSelected ? null : item.name);
                   }}
-                  activeOpacity={0.75}
+                  activeOpacity={0.7}
                 >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      { color: isSelected ? "#FFFFFF" : colors.mutedForeground },
-                      isSelected && { fontFamily: "Inter_700Bold" },
-                    ]}
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.85}
-                  >
-                    {opt.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {/* Proportional Share Bars Mode */}
-          {distributionMode === "share" ? (
-            <View style={styles.shareBarsWrap}>
-              {(showAllCategories ? (distribution?.categories || []) : (distribution?.categories || []).slice(0, 2)).map((cat) => (
-                <View key={cat.category} style={styles.shareBarRow}>
-                  <View style={styles.shareBarHeader}>
-                    <Text style={[styles.shareBarName, { color: colors.foreground }]} numberOfLines={1}>
-                      {cat.category}
-                    </Text>
-                    <Text style={[styles.shareBarPct, { color: cat.color }]}>
-                      {cat.displayPct} ({formatCompactCurrency(cat.amount, currency)})
-                    </Text>
-                  </View>
-                  <View style={[styles.shareBarTrack, { backgroundColor: (colors.cardAlt ?? colors.muted) + "50" }]}>
-                    <View style={[styles.shareBarFill, { width: `${Math.max(3, Math.min(100, cat.pct))}%`, backgroundColor: cat.color }]} />
-                  </View>
-                </View>
-              ))}
-            </View>
-          ) : (
-            /* Ranked Category List with Zero-Overlap Layout */
-            <View style={styles.categoryRankedList}>
-              {(distributionMode === "all" || showAllCategories
-                ? (distribution?.categories || [])
-                : (distribution?.categories || []).slice(0, 2)
-              ).map((cat) => {
-                const isSelected = selectedCategory?.trim().toLowerCase() === cat.category.trim().toLowerCase();
-                const isAnySelected = selectedCategory !== null;
-
-                return (
-                  <TouchableOpacity
-                    key={cat.category}
-                    style={[
-                      styles.rankedRow,
-                      {
-                        backgroundColor: isSelected ? cat.color + "16" : (colors.cardAlt ?? colors.muted) + "18",
-                        borderColor: isSelected ? cat.color : colors.border,
-                        borderWidth: isSelected ? 1.5 : 1,
-                        opacity: isAnySelected ? (isSelected ? 1.0 : 0.6) : 1.0,
-                      },
-                    ]}
-                    onPress={() => {
-                      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      setSelectedCategory(isSelected ? null : cat.category);
-                    }}
-                    activeOpacity={0.7}
-                  >
+                  {/* Top Line: Dot + Rank + Name + Count (Left) | Amount + % Badge (Right) */}
+                  <View style={styles.distItemTopRow}>
                     <View style={styles.rankedLeft}>
                       <View
                         style={[
                           styles.catColorDot,
                           {
-                            backgroundColor: cat.color,
+                            backgroundColor: item.color,
                             transform: [{ scale: isSelected ? 1.35 : 1.0 }],
                           },
                         ]}
@@ -1168,15 +1365,19 @@ export function FinancialAnalyticsSuite({
                         style={[
                           styles.rankedCatName,
                           {
-                            color: isSelected ? cat.color : colors.foreground,
+                            color: isSelected ? item.color : colors.foreground,
                             fontFamily: isSelected ? "Inter_700Bold" : "Inter_600SemiBold",
                           },
                         ]}
                         numberOfLines={1}
-                        ellipsizeMode="tail"
                       >
-                        {cat.category}
+                        {item.name}
                       </Text>
+                      {item.count && (
+                        <View style={[styles.itemCountBadge, { backgroundColor: item.color + "18" }]}>
+                          <Text style={[styles.itemCountText, { color: item.color }]}>{item.count}</Text>
+                        </View>
+                      )}
                     </View>
 
                     <View style={styles.rankedRight}>
@@ -1190,40 +1391,66 @@ export function FinancialAnalyticsSuite({
                         ]}
                         numberOfLines={1}
                       >
-                        {formatCompactCurrency(cat.amount, currency)}
+                        {formatCompactCurrency(item.amount, currency)}
                       </Text>
-                      <Text
-                        style={[
-                          styles.rankedPct,
-                          {
-                            color: isSelected ? cat.color : colors.mutedForeground,
-                            fontFamily: isSelected ? "Inter_700Bold" : "Inter_600SemiBold",
-                          },
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {cat.displayPct}
-                      </Text>
+                      <View style={[styles.itemPctBadge, { backgroundColor: item.color + "22", borderColor: item.color + "45" }]}>
+                        <Text
+                          style={[
+                            styles.itemPctBadgeText,
+                            { color: item.color },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {item.displayPct}
+                        </Text>
+                      </View>
                     </View>
-                  </TouchableOpacity>
-                );
-              })}
+                  </View>
 
-              {(distribution?.categories?.length || 0) > 2 && distributionMode !== "all" && !showAllCategories && (
-                <TouchableOpacity
-                  style={styles.expandRow}
-                  onPress={() => {
-                    setDistributionMode("all");
-                    setShowAllCategories(true);
-                  }}
-                >
-                  <Text style={[styles.expandText, { color: colors.primary }]}>
-                    +{(distribution?.categories?.length || 0) - 2} More Cost Drivers ▼
-                  </Text>
+                  {/* Bottom Line: Sleek Proportion Progress Bar */}
+                  <View style={[styles.distBarTrack, { backgroundColor: (colors.cardAlt ?? colors.muted) + "50" }]}>
+                    <View
+                      style={[
+                        styles.distBarFill,
+                        {
+                          width: `${Math.max(3, Math.min(100, item.pct))}%`,
+                          backgroundColor: item.color,
+                        },
+                      ]}
+                    />
+                  </View>
                 </TouchableOpacity>
-              )}
-            </View>
-          )}
+              );
+            })}
+
+            {activeDistView.items.length > 3 && !showAllCategories && distributionMode !== "all" && (
+              <TouchableOpacity
+                style={styles.expandRow}
+                onPress={() => {
+                  setShowAllCategories(true);
+                  setDistributionMode("all");
+                }}
+              >
+                <Text style={[styles.expandText, { color: colors.primary }]}>
+                  +{activeDistView.items.length - 3} More {activeDistView.isDept ? "Cost Centers" : "Cost Drivers"} ▼
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {showAllCategories && activeDistView.items.length > 3 && (
+              <TouchableOpacity
+                style={styles.expandRow}
+                onPress={() => {
+                  setShowAllCategories(false);
+                  setDistributionMode("drivers");
+                }}
+              >
+                <Text style={[styles.expandText, { color: colors.primary }]}>
+                  ▲ Show Top 3 Only
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
 
           {/* Authoritative 3-Metric Bento Box for Card 3 (Completes Symmetry Across All Cards) */}
           <View style={[styles.bentoRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
@@ -1234,18 +1461,18 @@ export function FinancialAnalyticsSuite({
                 adjustsFontSizeToFit
                 minimumFontScale={0.72}
               >
-                TOP DRIVER
+                {activeDistView.bentoCol1Label}
               </Text>
               <Text
                 style={[
                   styles.bentoVal,
-                  { color: distribution?.topCategory?.color || "#8B5CF6" },
+                  { color: activeDistView.bentoCol1Color },
                 ]}
                 numberOfLines={1}
                 adjustsFontSizeToFit
                 minimumFontScale={0.75}
               >
-                {distribution?.topCategory?.category || "None"}
+                {activeDistView.bentoCol1Val}
               </Text>
             </View>
             <View style={[styles.bentoDivider, { backgroundColor: colors.border }]} />
@@ -1264,7 +1491,7 @@ export function FinancialAnalyticsSuite({
                 adjustsFontSizeToFit
                 minimumFontScale={0.75}
               >
-                -{formatCompactCurrency(distribution?.totalExpenses || 0, currency)}
+                -{formatCompactCurrency(activeDistView.totalExpenses, currency)}
               </Text>
             </View>
             <View style={[styles.bentoDivider, { backgroundColor: colors.border }]} />
@@ -1275,7 +1502,7 @@ export function FinancialAnalyticsSuite({
                 adjustsFontSizeToFit
                 minimumFontScale={0.72}
               >
-                COST CENTERS
+                {activeDistView.bentoCol3Label}
               </Text>
               <Text
                 style={[styles.bentoVal, { color: colors.foreground }]}
@@ -1283,7 +1510,7 @@ export function FinancialAnalyticsSuite({
                 adjustsFontSizeToFit
                 minimumFontScale={0.75}
               >
-                {distribution?.categories?.length || 0} Active
+                {activeDistView.bentoCol3Val}
               </Text>
             </View>
           </View>
@@ -1605,8 +1832,105 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   categoryRankedList: {
-    gap: 5,
+    gap: 6,
     marginVertical: 4,
+  },
+  dimensionToggleRow: {
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    marginVertical: 4,
+  },
+  dimensionTab: {
+    paddingHorizontal: 12,
+    paddingVertical: 5.5,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  dimensionTabText: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+  },
+  inspectorCard: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 8,
+    marginVertical: 2,
+  },
+  inspectorTitle: {
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
+  },
+  inspectorSub: {
+    fontSize: 10.5,
+    fontFamily: "Inter_500Medium",
+  },
+  inspectLinkBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  inspectLinkText: {
+    fontSize: 10,
+    fontFamily: "Inter_700Bold",
+  },
+  inspectCloseBtn: {
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  distItemCard: {
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 9,
+    borderWidth: 1,
+    gap: 5,
+  },
+  distItemTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  itemCountBadge: {
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 6,
+  },
+  itemCountText: {
+    fontSize: 9,
+    fontFamily: "Inter_700Bold",
+  },
+  itemPctBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 8,
+    borderWidth: 1,
+    minWidth: 42,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  itemPctBadgeText: {
+    fontSize: 9.5,
+    fontFamily: "Inter_700Bold",
+  },
+  distBarTrack: {
+    height: 4.5,
+    borderRadius: 2.25,
+    overflow: "hidden",
+  },
+  distBarFill: {
+    height: "100%",
+    borderRadius: 2.25,
   },
   rankedRow: {
     flexDirection: "row",
