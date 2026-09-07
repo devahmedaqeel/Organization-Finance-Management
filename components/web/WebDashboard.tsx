@@ -546,7 +546,7 @@ export function WebDashboard({
               numberOfLines={1}
             >
               {totalAllocatedBudget > 0
-                ? (isMobile ? `To Allocate: ${settings.currency} ${fmt(availableToAllocate)}` : `Available to Allocate: ${settings.currency} ${fmt(availableToAllocate)}`)
+                ? `Available to Allocate: ${settings.currency} ${fmt(availableToAllocate)}`
                 : totalExpenses === 0
                 ? "0% Outflows"
                 : (isMobile ? `${expensePctOfIncome}% Spent` : `${expensePctOfIncome}% Income Spent`)}
@@ -557,12 +557,12 @@ export function WebDashboard({
                 fontSize: isMobile ? 10.5 : 11.5,
                 fontFamily: "Inter_700Bold",
                 textAlign: "right",
-                flexShrink: 0,
+                flexShrink: isMobile ? 1 : 0,
               }}
               numberOfLines={1}
             >
               {totalAllocatedBudget > 0
-                ? (isMobile ? `Remaining: ${settings.currency} ${fmt(netBudgetRemaining)} (${budgetUsedPct}%)` : `Allocated: ${settings.currency} ${fmt(totalAllocatedBudget)} · Remaining Budget: ${settings.currency} ${fmt(netBudgetRemaining)} (${budgetUsedPct}% Spent)`)
+                ? (isMobile ? `Allocated: ${settings.currency} ${fmt(totalAllocatedBudget)} · Remaining: ${settings.currency} ${fmt(netBudgetRemaining)} (${budgetUsedPct}%)` : `Allocated: ${settings.currency} ${fmt(totalAllocatedBudget)} · Remaining Budget: ${settings.currency} ${fmt(netBudgetRemaining)} (${budgetUsedPct}% Spent)`)
                 : isDeficit
                 ? (isMobile ? `Deficit (-${settings.currency} ${fmt(totalExpenses - totalIncome)})` : `Operating Deficit (-${settings.currency} ${fmt(totalExpenses - totalIncome)})`)
                 : `${incomeRetainedPct}% Retained`}

@@ -93,18 +93,39 @@ export function WebPayroll() {
       currency: settings.currency || "PKR",
       fiscalYear: settings.fiscalYear || "2025-2026",
     };
-    if (Platform.OS === "web") {
-      const html = buildPayslipHtml(emp, orgInfo);
-      const printWindow = window.open("", "_blank");
-      if (printWindow) {
-        printWindow.document.open();
-        printWindow.document.write(html);
-        printWindow.document.close();
-      }
-    } else {
-      await downloadPayslipPDF(emp, orgInfo);
-    }
+    await downloadPayslipPDF(emp, orgInfo);
   };
+
+  const hasAutoDownloadedRef = React.useRef(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && !hasAutoDownloadedRef.current && payroll.length > 0) {
+      const params = new URLSearchParams(window.location.search);
+      const isExportPayslip =
+        params.get("export") === "payslip" ||
+        params.get("export") === "slip" ||
+        (params.get("auto") === "pdf" && params.get("tab") === "payroll");
+
+      if (isExportPayslip) {
+        hasAutoDownloadedRef.current = true;
+        const targetPayrollId = params.get("payrollId");
+        const targetEmpId = params.get("empId");
+        const targetEmpName = params.get("employeeName")?.toLowerCase();
+
+        const matchedEmp =
+          payroll.find((p) => targetPayrollId && p.id === targetPayrollId) ||
+          payroll.find((p) => targetEmpId && (p.employeeId === targetEmpId || p.id === targetEmpId)) ||
+          payroll.find((p) => targetEmpName && p.employeeName?.toLowerCase().includes(targetEmpName)) ||
+          payroll[0];
+
+        if (matchedEmp) {
+          setTimeout(() => {
+            handleExportEmployeeSlip(matchedEmp);
+          }, 400);
+        }
+      }
+    }
+  }, [payroll, settings, user]);
 
   const handleExportPDF = async () => {
     const orgEmail = (settings.organizationEmail && !settings.organizationEmail.includes("ofm-cloud.com"))

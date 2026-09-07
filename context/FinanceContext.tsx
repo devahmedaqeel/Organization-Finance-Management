@@ -1630,8 +1630,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const totalBudgetRemaining = useMemo(() => calculateBudgetRemaining(totalAllocatedBudget, totalBudgetSpent), [totalAllocatedBudget, totalBudgetSpent]);
   const budgetUtilization = useMemo(() => totalAllocatedBudget > 0 ? (totalBudgetSpent / totalAllocatedBudget) * 100 : 0, [totalAllocatedBudget, totalBudgetSpent]);
   const unallocatedFunds = useMemo(() => {
-    return calculateUnallocatedFunds(totalIncome, totalAllocatedBudget);
-  }, [totalIncome, totalAllocatedBudget]);
+    return Math.max(0, netBalance - totalAllocatedBudget);
+  }, [netBalance, totalAllocatedBudget]);
   const totalAvailableFunds = unallocatedFunds;
 
   const departmentMetrics = useMemo(() => {

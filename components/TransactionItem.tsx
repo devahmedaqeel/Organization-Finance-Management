@@ -80,7 +80,7 @@ export function TransactionItem(props: TransactionItemProps) {
       {/* Info */}
       <View style={styles.info}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-          <Text style={[styles.category, { color: colors.foreground }]}>
+          <Text style={[styles.category, { color: colors.foreground, flexShrink: 1 }]} numberOfLines={2}>
             {tx.title || tx.category}
           </Text>
           {(tx.expenseSource === "payroll" || tx.payrollId) && (
@@ -95,7 +95,7 @@ export function TransactionItem(props: TransactionItemProps) {
           {tx.department || "General"} · {formatDate(tx.date)}
         </Text>
         {tx.description ? (
-          <Text style={[styles.desc, { color: colors.mutedForeground }]}>
+          <Text style={[styles.desc, { color: colors.mutedForeground }]} numberOfLines={2}>
             {tx.description}
           </Text>
         ) : null}
@@ -103,7 +103,7 @@ export function TransactionItem(props: TransactionItemProps) {
 
       {/* Amount + Actions */}
       <View style={styles.right}>
-        <Text style={[styles.amount, { color: amountColor }]}>
+        <Text style={[styles.amount, { color: amountColor }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
           {isIncome ? "+" : "-"}{settings.currency} {formatAmountVal(tx.amount)}
         </Text>
 

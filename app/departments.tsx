@@ -432,17 +432,19 @@ export default function DepartmentsScreen() {
                 <View style={[styles.deptIcon, { backgroundColor: accentColor + "22" }]}>
                   <Feather name="layers" size={17} color={accentColor} />
                 </View>
-                <View style={styles.deptInfo}>
-                  <Text style={[styles.deptName, { color: colors.foreground }]}>{item.name}</Text>
-                  <Text style={[styles.deptMeta, { color: colors.mutedForeground }]}>
+                <View style={[styles.deptInfo, { flex: 1, minWidth: 0, marginRight: 6 }]}>
+                  <Text style={[styles.deptName, { color: colors.foreground }]} numberOfLines={2}>
+                    {item.name}
+                  </Text>
+                  <Text style={[styles.deptMeta, { color: colors.mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                     {item.headCount} Employees · Avg: {settings.currency} {fmtShort(item.headCount > 0 ? item.budgetAllocated / item.headCount : 0)}/head
                   </Text>
                 </View>
-                <View style={[styles.statusBadge, { backgroundColor: statusBg, borderColor: statusTextColor + "44" }]}>
+                <View style={[styles.statusBadge, { backgroundColor: statusBg, borderColor: statusTextColor + "44", flexShrink: 0 }]}>
                   <Text style={[styles.statusBadgeText, { color: statusTextColor }]}>{statusText}</Text>
                 </View>
                 {canEdit && (
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 0 }}>
                     <TouchableOpacity
                       onPress={() => handleOpenEdit(item)}
                       hitSlop={10}
@@ -465,29 +467,37 @@ export default function DepartmentsScreen() {
               <View style={[styles.deptFiscalStrip, { flexWrap: "wrap", gap: 6 }]}>
                 <View style={[styles.deptFiscalBox, { backgroundColor: colors.background, borderColor: colors.border, minWidth: "30%", flex: 1 }]}>
                   <Text style={[styles.deptFiscalLabel, { color: colors.mutedForeground }]}>Allocated</Text>
-                  <Text style={[styles.deptFiscalVal, { color: colors.foreground }]}>{fmt(item.budgetAllocated)}</Text>
+                  <Text style={[styles.deptFiscalVal, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                    {fmt(item.budgetAllocated)}
+                  </Text>
                 </View>
                 <View style={[styles.deptFiscalBox, { backgroundColor: colors.background, borderColor: colors.border, minWidth: "30%", flex: 1 }]}>
                   <Text style={[styles.deptFiscalLabel, { color: "#8B5CF6" }]}>Payroll Spend</Text>
-                  <Text style={[styles.deptFiscalVal, { color: "#8B5CF6" }]}>{fmt(item.payrollSpending || 0)}</Text>
+                  <Text style={[styles.deptFiscalVal, { color: "#8B5CF6" }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                    {fmt(item.payrollSpending || 0)}
+                  </Text>
                 </View>
                 <View style={[styles.deptFiscalBox, { backgroundColor: colors.background, borderColor: colors.border, minWidth: "30%", flex: 1 }]}>
                   <Text style={[styles.deptFiscalLabel, { color: colors.mutedForeground }]}>Other Exp</Text>
-                  <Text style={[styles.deptFiscalVal, { color: colors.mutedForeground }]}>{fmt(item.otherSpending || 0)}</Text>
+                  <Text style={[styles.deptFiscalVal, { color: colors.mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                    {fmt(item.otherSpending || 0)}
+                  </Text>
                 </View>
                 <View style={[styles.deptFiscalBox, { backgroundColor: colors.background, borderColor: colors.border, minWidth: "30%", flex: 1 }]}>
                   <Text style={[styles.deptFiscalLabel, { color: colors.mutedForeground }]}>Total Spend</Text>
-                  <Text style={[styles.deptFiscalVal, { color: colors.expense }]}>{fmt(item.spent)}</Text>
+                  <Text style={[styles.deptFiscalVal, { color: colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                    {fmt(item.spent)}
+                  </Text>
                 </View>
                 <View style={[styles.deptFiscalBox, { backgroundColor: colors.background, borderColor: colors.border, minWidth: "30%", flex: 1 }]}>
                   <Text style={[styles.deptFiscalLabel, { color: colors.mutedForeground }]}>Remaining</Text>
-                  <Text style={[styles.deptFiscalVal, { color: item.remaining >= 0 ? colors.income : colors.expense }]}>
+                  <Text style={[styles.deptFiscalVal, { color: item.remaining >= 0 ? colors.income : colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                     {item.remaining >= 0 ? "+" : "-"}{fmt(Math.abs(item.remaining))}
                   </Text>
                 </View>
                 <View style={[styles.deptFiscalBox, { backgroundColor: colors.background, borderColor: colors.border, minWidth: "30%", flex: 1 }]}>
                   <Text style={[styles.deptFiscalLabel, { color: colors.mutedForeground }]}>Utilization</Text>
-                  <Text style={[styles.deptFiscalVal, { color: statusTextColor }]}>
+                  <Text style={[styles.deptFiscalVal, { color: statusTextColor }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                     {item.utilPct.toFixed(1)}%
                   </Text>
                 </View>

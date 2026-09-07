@@ -458,14 +458,14 @@ export default function SettingsScreen() {
           <View style={[styles.currencyFlagBadge, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "35" }]}>
             <Text style={styles.currencyFlagText}>{selectedCurrency?.flag ?? "🌐"}</Text>
           </View>
-          <View style={styles.currencyTriggerInfo}>
+          <View style={[styles.currencyTriggerInfo, { flex: 1, minWidth: 0 }]}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <Text style={[styles.currencyCodeHero, { color: colors.foreground }]}>{form.currency}</Text>
               <View style={[styles.symbolBadge, { backgroundColor: colors.muted }]}>
                 <Text style={[styles.symbolBadgeText, { color: colors.primary }]}>{selectedCurrency?.symbol}</Text>
               </View>
             </View>
-            <Text style={[styles.currencyNameHero, { color: colors.mutedForeground }]} numberOfLines={1}>
+            <Text style={[styles.currencyNameHero, { color: colors.mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
               {selectedCurrency?.name} · {selectedCurrency?.country}
             </Text>
           </View>

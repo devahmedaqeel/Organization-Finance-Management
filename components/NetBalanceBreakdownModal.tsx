@@ -87,12 +87,11 @@ export function NetBalanceBreakdownModal({
   const isBudgetSafe = netBudgetRemaining >= 0;
 
   // 3. Authoritative Core Financial Flow:
-  // Income -> Available Funds -> Department Budget -> Expense -> Remaining Budget
-  // Unallocated Funds = Math.max(0, totalIncome - totalBudgeted)
-  const unallocatedFunds = calculateUnallocatedFunds(totalIncome, totalBudgeted);
+  // Available to Allocate is strictly gated by Available Net Cash!
+  const unallocatedFunds = Math.max(0, actualCashflowNet - totalBudgeted);
   const authoritativeNetSurplus = actualCashflowNet;
   const isCapitalSurplus = authoritativeNetSurplus >= 0;
-  const unallocatedPct = totalIncome > 0 ? (unallocatedFunds / totalIncome) * 100 : 0;
+  const unallocatedPct = actualCashflowNet > 0 ? (unallocatedFunds / actualCashflowNet) * 100 : 0;
 
   // Dynamic active balance based on selected mode
   const currentModalBalance =
@@ -519,7 +518,7 @@ export function NetBalanceBreakdownModal({
                           ? "UNALLOCATED AVAILABLE FUNDS"
                           : "NET OPERATING CASHFLOW"}
                       </Text>
-                      <Text style={[styles.heroValue, { color: isCurrentModalSurplus ? colors.income : colors.expense }]}>
+                      <Text style={[styles.heroValue, { color: isCurrentModalSurplus ? colors.income : colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                         {modalBalanceMode === "surplus" ? "" : isCurrentModalSurplus ? "+" : "-"}
                         {settings.currency} {fmt(Math.abs(currentModalBalance))}
                       </Text>

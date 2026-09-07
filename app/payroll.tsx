@@ -34,6 +34,7 @@ import {
 import { PdfSuccessModal } from "@/components/PdfSuccessModal";
 import { ConfirmDeleteModal } from "@/components/ConfirmDeleteModal";
 import { showFloatingToast } from "@/utils/toast";
+import { redirectMobileToWebPayslipPdf } from "@/services/mobileWebPdfRedirectService";
 
 const DEPARTMENTS = ["Software Engineering", "Administration", "Research & Development", "Finance"];
 
@@ -297,20 +298,13 @@ export default function PayrollScreen() {
     try {
       if (Platform.OS !== "web") {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        const query = new URLSearchParams({
-          tab: "payroll",
-          export: "payslip",
+        await redirectMobileToWebPayslipPdf({
+          payrollId: emp.id,
           empId: emp.employeeId || emp.id,
-          v: String(Date.now()),
+          employeeName: emp.employeeName,
+          month: emp.month,
+          department: emp.department,
         });
-        const webUrl = `https://ofmapp-main.web.app/?${query.toString()}`;
-        const { Linking } = require("react-native");
-        try {
-          const WebBrowser = require("expo-web-browser");
-          await WebBrowser.openBrowserAsync(webUrl);
-        } catch {
-          await Linking.openURL(webUrl);
-        }
         return;
       }
 

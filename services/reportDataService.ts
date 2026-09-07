@@ -421,7 +421,7 @@ export function buildEnterpriseReportData(
   // Authoritative Core Financial Flow:
   // Income -> Available Funds -> Department Budget -> Expense -> Remaining Budget
   const totalBudgetAllocated = budgetTotal;
-  const unallocatedFunds = calculateUnallocatedFunds(totalRevenue, totalBudgetAllocated);
+  const unallocatedFunds = Math.max(0, netOperatingBalance - totalBudgetAllocated);
   const netCapitalSurplus = netOperatingBalance;
   const totalFundingPool = totalRevenue;
   const retainedCapitalPct = totalRevenue > 0 ? (Math.max(0, netOperatingBalance) / totalRevenue) * 100 : 0;

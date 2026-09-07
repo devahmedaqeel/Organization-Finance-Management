@@ -124,13 +124,13 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
     return authFinancialModel.budget.totalAllocated || calculateBudgetAllocation(budgets, departments);
   }, [authFinancialModel, budgets, departments]);
 
-  const unallocatedFunds = useMemo(() => {
-    return calculateUnallocatedFunds(metrics.totalIncome, totalBudgetAllocated);
-  }, [metrics.totalIncome, totalBudgetAllocated]);
-
   const netCash = useMemo(() => {
     return metrics.totalIncome - metrics.totalExpense;
   }, [metrics.totalIncome, metrics.totalExpense]);
+
+  const unallocatedFunds = useMemo(() => {
+    return Math.max(0, netCash - totalBudgetAllocated);
+  }, [netCash, totalBudgetAllocated]);
 
   const netCapitalSurplus = netCash;
 
@@ -263,10 +263,13 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
     await openPdfReport(enterpriseData);
   };
 
+  const hasAutoExportedRef = React.useRef(false);
+
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && !hasAutoExportedRef.current) {
       const params = new URLSearchParams(window.location.search);
-      if (params.get("export") === "dossier" || params.get("auto") === "pdf") {
+      if (params.get("export") === "dossier" || (params.get("auto") === "pdf" && params.get("tab") !== "payroll")) {
+        hasAutoExportedRef.current = true;
         const reportType = (params.get("reportType") || "consolidated_statement") as any;
         const scope = (params.get("scope") || "period") as any;
         const dept = params.get("dept") || "all";

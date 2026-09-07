@@ -633,9 +633,9 @@ ${orgName}`;
               </View>
 
               {/* Information */}
-              <View style={styles.memberInfo}>
+              <View style={[styles.memberInfo, { flex: 1, minWidth: 0, marginRight: 8 }]}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  <Text style={[styles.memberName, { color: colors.foreground }]}>
+                  <Text style={[styles.memberName, { color: colors.foreground, flexShrink: 1 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
                     {item.name}
                   </Text>
                   {isCurrentUser && (
@@ -644,13 +644,13 @@ ${orgName}`;
                     </View>
                   )}
                 </View>
-                <Text style={[styles.memberEmail, { color: colors.mutedForeground }]}>
+                <Text style={[styles.memberEmail, { color: colors.mutedForeground }]} numberOfLines={1}>
                   {item.email}
                 </Text>
               </View>
 
               {/* Role badge */}
-              <View style={[styles.roleBadge, { backgroundColor: badge.color + "14", borderColor: badge.color + "30" }]}>
+              <View style={[styles.roleBadge, { backgroundColor: badge.color + "14", borderColor: badge.color + "30", flexShrink: 0 }]}>
                 <View style={[styles.roleDot, { backgroundColor: badge.color }]} />
                 <Text style={[styles.roleBadgeText, { color: badge.color }]}>{badge.label}</Text>
               </View>

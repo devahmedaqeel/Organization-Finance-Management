@@ -293,7 +293,7 @@ export default function BudgetScreen() {
               <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>TOTAL INCOME</Text>
               <Feather name="trending-up" size={12} color={colors.income} />
             </View>
-            <Text style={[styles.kpiVal, { color: colors.income }]}>
+            <Text style={[styles.kpiVal, { color: colors.income }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
               {settings.currency} {fmtNum(totalIncome)}
             </Text>
           </View>
@@ -304,7 +304,7 @@ export default function BudgetScreen() {
               <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>ALLOCATED</Text>
               <Feather name="pie-chart" size={12} color={colors.primary} />
             </View>
-            <Text style={[styles.kpiVal, { color: colors.foreground }]}>
+            <Text style={[styles.kpiVal, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
               {settings.currency} {fmtNum(totalAllocated)}
             </Text>
           </View>
@@ -315,7 +315,7 @@ export default function BudgetScreen() {
               <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>AVAILABLE</Text>
               <Feather name="check-circle" size={12} color={availableToAllocate > 0 ? colors.income : colors.warning} />
             </View>
-            <Text style={[styles.kpiVal, { color: availableToAllocate > 0 ? colors.income : colors.warning }]}>
+            <Text style={[styles.kpiVal, { color: availableToAllocate > 0 ? colors.income : colors.warning }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
               {settings.currency} {fmtNum(availableToAllocate)}
             </Text>
           </View>
@@ -326,7 +326,7 @@ export default function BudgetScreen() {
               <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>SPENDING</Text>
               <Feather name="arrow-up-right" size={12} color={colors.expense} />
             </View>
-            <Text style={[styles.kpiVal, { color: colors.expense }]}>
+            <Text style={[styles.kpiVal, { color: colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
               {settings.currency} {fmtNum(totalSpent)}
             </Text>
           </View>
@@ -337,7 +337,7 @@ export default function BudgetScreen() {
               <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>REMAINING</Text>
               <Feather name="shield" size={12} color={totalRemaining >= 0 ? colors.primary : colors.expense} />
             </View>
-            <Text style={[styles.kpiVal, { color: totalRemaining >= 0 ? colors.income : colors.expense }]}>
+            <Text style={[styles.kpiVal, { color: totalRemaining >= 0 ? colors.income : colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
               {settings.currency} {fmtNum(totalRemaining)}
             </Text>
           </View>
@@ -524,21 +524,21 @@ export default function BudgetScreen() {
               <View style={[styles.deptMetricsRow, { borderColor: colors.border, backgroundColor: colors.background }]}>
                 <View style={styles.deptMetricItem}>
                   <Text style={[styles.deptMetricLabel, { color: colors.mutedForeground }]}>ALLOCATED</Text>
-                  <Text style={[styles.deptMetricVal, { color: colors.foreground }]}>
+                  <Text style={[styles.deptMetricVal, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                     {settings.currency} {fmtNum(dm.allocated)}
                   </Text>
                 </View>
                 <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
                 <View style={styles.deptMetricItem}>
                   <Text style={[styles.deptMetricLabel, { color: colors.mutedForeground }]}>SPENT</Text>
-                  <Text style={[styles.deptMetricVal, { color: colors.expense }]}>
+                  <Text style={[styles.deptMetricVal, { color: colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                     {settings.currency} {fmtNum(dm.spent)}
                   </Text>
                 </View>
                 <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
                 <View style={styles.deptMetricItem}>
                   <Text style={[styles.deptMetricLabel, { color: colors.mutedForeground }]}>REMAINING</Text>
-                  <Text style={[styles.deptMetricVal, { color: dm.remaining >= 0 ? colors.income : colors.expense }]}>
+                  <Text style={[styles.deptMetricVal, { color: dm.remaining >= 0 ? colors.income : colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                     {settings.currency} {fmtNum(dm.remaining)}
                   </Text>
                 </View>

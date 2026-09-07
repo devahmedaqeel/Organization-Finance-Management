@@ -255,10 +255,10 @@ export default function MoreScreen() {
         </View>
         <View style={styles.profileInfo}>
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-            <Text style={[styles.profileName, { color: colors.foreground }]} numberOfLines={1}>
+            <Text style={[styles.profileName, { color: colors.foreground, flex: 1, minWidth: 0, marginRight: 8 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
               {user?.name || "Administrator"}
             </Text>
-            <View style={[styles.rolePill, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "35" }]}>
+            <View style={[styles.rolePill, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "35", flexShrink: 0 }]}>
               <Text style={[styles.roleText, { color: colors.primary }]}>{user?.role?.toUpperCase() || "ADMIN"}</Text>
             </View>
           </View>
@@ -308,13 +308,13 @@ export default function MoreScreen() {
                     <Feather name={f.icon} size={20} color={f.color} />
                   </View>
                   <View style={styles.cardFullTextWrap}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                      <Text style={[styles.featureLabel, { color: colors.foreground }]}>{f.label}</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      <Text style={[styles.featureLabel, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{f.label}</Text>
                       <View style={[styles.cardTagPill, { backgroundColor: f.color + "16", borderColor: f.color + "32" }]}>
                         <Text style={[styles.cardTagText, { color: f.color }]}>{f.tag}</Text>
                       </View>
                     </View>
-                    <Text style={[styles.featureDesc, { color: colors.mutedForeground, marginTop: 2 }]} numberOfLines={1}>
+                    <Text style={[styles.featureDesc, { color: colors.mutedForeground, marginTop: 2 }]} numberOfLines={2}>
                       {f.id === "settings" ? "Organization configuration, currency & security preferences" : f.desc}
                     </Text>
                   </View>
@@ -350,7 +350,7 @@ export default function MoreScreen() {
               </View>
 
               {/* Title */}
-              <Text style={[styles.featureLabel, { color: colors.foreground }]} numberOfLines={1}>
+              <Text style={[styles.featureLabel, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
                 {f.label}
               </Text>
 

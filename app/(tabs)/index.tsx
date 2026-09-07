@@ -634,7 +634,7 @@ export default function DashboardScreen() {
               minimumFontScale={0.8}
             >
               {balanceViewMode === "cashflow"
-                ? "AVAILABLE CASH"
+                ? "NET CASH / AVAILABLE CASH"
                 : "OUTFLOW AUDIT"}
             </Text>
             <TouchableOpacity
@@ -672,7 +672,7 @@ export default function DashboardScreen() {
           >
             <Feather name="bar-chart-2" size={10} color="#38BDF8" />
             <Text style={{ color: "#FFFFFF", fontSize: 10.5, fontFamily: "Inter_700Bold", letterSpacing: 0.2 }}>
-              Dossier →
+              Fiscal Dossier →
             </Text>
           </TouchableOpacity>
         </View>
@@ -819,15 +819,15 @@ export default function DashboardScreen() {
 
         {/* Dynamic Cash Flow / Budget Status Bar & Labels */}
         <View style={{ gap: 7, marginTop: 2 }}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
             <Text
-              style={{ color: "#CBD5E1", fontSize: 10.5, fontFamily: "Inter_500Medium", flexShrink: 1 }}
+              style={{ color: "#CBD5E1", fontSize: 10.5, fontFamily: "Inter_600SemiBold", flexShrink: 1 }}
               numberOfLines={1}
               adjustsFontSizeToFit
-              minimumFontScale={0.8}
+              minimumFontScale={0.75}
             >
               {totalAllocatedBudget > 0
-                ? `To Allocate: ${settings.currency} ${fmt(availableToAllocate)}`
+                ? `Available to Allocate: ${settings.currency} ${fmt(availableToAllocate)}`
                 : totalExpenses === 0
                 ? "0% Outflows"
                 : `${expensePctOfIncome}% Spent`}
@@ -838,14 +838,14 @@ export default function DashboardScreen() {
                 fontSize: 10.5,
                 fontFamily: "Inter_700Bold",
                 textAlign: "right",
-                flexShrink: 0,
+                flexShrink: 1,
               }}
               numberOfLines={1}
               adjustsFontSizeToFit
-              minimumFontScale={0.8}
+              minimumFontScale={0.75}
             >
               {totalAllocatedBudget > 0
-                ? `Remaining: ${settings.currency} ${fmt(netBudgetRemaining)} (${budgetUsedPct}%)`
+                ? `Allocated: ${settings.currency} ${fmt(totalAllocatedBudget)} · Remaining: ${settings.currency} ${fmt(netBudgetRemaining)} (${budgetUsedPct}% Spent)`
                 : isDeficit
                 ? `Deficit (-${settings.currency} ${fmt(totalExpenses - totalIncome)})`
                 : `${incomeRetainedPct}% Retained`}

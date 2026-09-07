@@ -35,6 +35,7 @@ import {
 import { FinancialStatementViewerModal } from "./FinancialStatementViewerModal";
 import { PdfSuccessModal } from "./PdfSuccessModal";
 import { showFloatingToast } from "@/app/_layout";
+import { redirectMobileToWebReportPdf } from "@/services/mobileWebPdfRedirectService";
 
 interface Props {
   visible: boolean;
@@ -319,6 +320,18 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
             Alert.alert("Export Error", res.message || "Failed to generate CSV file.");
           }
         } else {
+          if (Platform.OS !== "web") {
+            setGenerating(false);
+            onClose();
+            await redirectMobileToWebReportPdf({
+              reportType: selectedType,
+              scope,
+              startDate: scope === "custom" ? customStart : (activePeriod?.startDate || ""),
+              endDate: scope === "custom" ? customEnd : (activePeriod?.endDate || ""),
+              dept: selectedDept,
+            });
+            return;
+          }
           const res = await downloadPdfReport(compiledEnterpriseData as any);
           setGenerating(false);
           if (res.success) {

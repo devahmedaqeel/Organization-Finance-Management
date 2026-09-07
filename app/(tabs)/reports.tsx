@@ -15,6 +15,7 @@ import { NetOperatingBalanceHealthCard } from "@/components/NetOperatingBalanceH
 import { FinancialDrillDownModal, DrillDownType } from "@/components/FinancialDrillDownModal";
 import { useFinance, Department } from "@/context/FinanceContext";
 import { WebDepartmentStaffModal } from "@/components/web/modals/WebDepartmentStaffModal";
+import { redirectMobileToWebReportPdf } from "@/services/mobileWebPdfRedirectService";
 import { useSettings } from "@/context/SettingsContext";
 import { useColors } from "@/hooks/useColors";
 import { useResponsive } from "@/hooks/useResponsive";
@@ -203,31 +204,21 @@ export default function ReportsScreen() {
   const totalBudgetSpent = calculateBudgetUsed(periodTransactions, budgets, undefined, departments);
   const budgetUtilPct =
     totalAllocatedBudget > 0 ? (totalBudgetSpent / totalAllocatedBudget) * 100 : 0;
-  const unallocatedFunds = calculateUnallocatedFunds(metrics?.totalIncome || 0, totalAllocatedBudget);
   const netCash = (metrics?.totalIncome || 0) - (metrics?.totalExpense || 0);
+  const unallocatedFunds = Math.max(0, netCash - totalAllocatedBudget);
   const netCapitalSurplus = netCash;
   const retainedCapitalPct = (metrics?.totalIncome || 0) > 0 ? (Math.max(0, netCash) / (metrics?.totalIncome || 1)) * 100 : 0;
 
   const handleExportPDF = async () => {
     if (Platform.OS !== "web") {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      const query = new URLSearchParams({
-        tab: "reports",
-        export: "dossier",
-        auto: "pdf",
+      await redirectMobileToWebReportPdf({
         reportType: "consolidated_statement",
         scope: activePeriod.presetId ? "period" : "custom",
         startDate: activePeriod.startDate || "",
         endDate: activePeriod.endDate || "",
         dept: "all",
-        v: String(Date.now()),
       });
-      const webUrl = `https://ofmapp-main.web.app/?${query.toString()}`;
-      try {
-        await WebBrowser.openBrowserAsync(webUrl);
-      } catch {
-        await Linking.openURL(webUrl);
-      }
       return;
     }
     setExportModalVisible(true);

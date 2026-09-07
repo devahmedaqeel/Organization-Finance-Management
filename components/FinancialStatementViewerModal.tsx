@@ -24,6 +24,7 @@ import {
   sharePdfReport,
 } from "@/services/ReportExportService";
 import { PdfSuccessModal } from "@/components/PdfSuccessModal";
+import { redirectMobileToWebReportPdf } from "@/services/mobileWebPdfRedirectService";
 
 interface Props {
   visible: boolean;
@@ -164,8 +165,17 @@ export function FinancialStatementViewerModal({
       onPrintDownload();
       return;
     }
+    if (Platform.OS !== "web") {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      await redirectMobileToWebReportPdf({
+        reportType: reportOpts.reportMode || "consolidated_statement",
+        scope: "period",
+        startDate: reportOpts.periodLabel,
+        dept: "all",
+      });
+      return;
+    }
     setIsExportingPdf(true);
-    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       const res = await downloadPdfReport(reportOpts);
       if (res.success) {

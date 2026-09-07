@@ -768,7 +768,7 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
       const hasBudget = (executiveSummary.budgetTotal || 0) > 0;
       const unallocatedFunds = executiveSummary.unallocatedFunds !== undefined
         ? executiveSummary.unallocatedFunds
-        : Math.max(0, executiveSummary.totalRevenue - (executiveSummary.budgetTotal || 0));
+        : Math.max(0, executiveSummary.netOperatingBalance - (executiveSummary.budgetTotal || 0));
       const netCash = executiveSummary.netOperatingBalance;
       const isNetPositive = executiveSummary.isNetPositive;
 
@@ -1092,8 +1092,8 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
           <td style="text-align: center; color:#3B82F6;">${departmentFinancials.departments.length} Cost Centers Monitored</td>
         </tr>
         <tr style="background:#F1F5F9; font-weight:800;">
-          <td style="text-align: left; color:#0F172A;">UNALLOCATED AVAILABLE FUNDS (Income − Budget)</td>
-          <td class="num" style="color:#0F172A; font-weight:800;">${currency} ${fmt(executiveSummary.unallocatedFunds !== undefined ? executiveSummary.unallocatedFunds : Math.max(0, executiveSummary.totalRevenue - (executiveSummary.budgetTotal || 0)))}</td>
+          <td style="text-align: left; color:#0F172A;">UNALLOCATED AVAILABLE FUNDS (Net Cash − Budget)</td>
+          <td class="num" style="color:#0F172A; font-weight:800;">${currency} ${fmt(executiveSummary.unallocatedFunds !== undefined ? executiveSummary.unallocatedFunds : Math.max(0, executiveSummary.netOperatingBalance - (executiveSummary.budgetTotal || 0)))}</td>
           <td style="text-align: center; font-weight:800;">Liquid Reserve</td>
         </tr>
         ` : ""}
@@ -1395,7 +1395,7 @@ export function buildFinancialPdfBinary(input: ReportOptions | EnterpriseReportD
   const hasBudget = (executiveSummary.budgetTotal || 0) > 0;
   const unallocatedFunds = executiveSummary.unallocatedFunds !== undefined
     ? executiveSummary.unallocatedFunds
-    : Math.max(0, totalIncome - (executiveSummary.budgetTotal || 0));
+    : Math.max(0, netBalance - (executiveSummary.budgetTotal || 0));
   const netCapitalSurplus = netBalance;
   const isSurplusPositive = isNetPositive;
   const retainedPct = totalIncome > 0 ? (Math.max(0, netBalance) / totalIncome) * 100 : 0;

@@ -266,11 +266,15 @@ export function WebShell() {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const rawTab = params.get("tab");
+      const exportType = params.get("export");
       if (rawTab) {
         const normalized = normalizeWebTab(rawTab);
         setActiveTab(normalized);
         setTabHistory(["dashboard", normalized]);
-      } else if (params.get("export") === "dossier" || params.get("auto") === "pdf" || params.get("reportType")) {
+      } else if (exportType === "payslip" || exportType === "slip" || params.get("payrollId") || params.get("empId")) {
+        setActiveTab("payroll");
+        setTabHistory(["dashboard", "payroll"]);
+      } else if (exportType === "dossier" || params.get("auto") === "pdf" || params.get("reportType")) {
         setActiveTab("reports");
         setTabHistory(["dashboard", "reports"]);
       }
