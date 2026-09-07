@@ -44,6 +44,7 @@ import {
   calculateBudgetUsed,
   calculateBudgetRemaining,
   calculateUnallocatedFunds,
+  isAllCategoryBudget,
 } from "@/services/FinancialCalculationEngine";
 import { calculateFinancialHealth } from "@/services/financialHealthService";
 import { generateFinancialInsights } from "@/services/financialInsightsService";
@@ -243,9 +244,11 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
   const displayedSurplusPct = profitMargin;
   const displayedOutflowPct = Math.min(Math.round(expenseRatio), 100);
 
-  // Consolidated unique budgets (aggregating multiple allocations for the same category & department)
+  // Consolidated unique budgets (aggregating line-item budgets and active department-level allocations)
   const consolidatedBudgets = useMemo(() => {
-    const map = new Map<string, { id: string; category: string; department?: string; allocated: number }>();
+    const map = new Map<string, { id: string; category: string; department?: string; allocated: number; isDepartmentPool?: boolean }>();
+
+    // 1. Ingest explicit category budgets from `budgets` collection
     budgets.forEach((b) => {
       const cat = (b.category || "General").trim();
       const dept = (b.department && b.department !== "All" && b.department !== "General") ? b.department.trim() : "All";
@@ -259,11 +262,46 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
           category: cat,
           department: dept === "All" ? undefined : dept,
           allocated: Number(b.allocated || 0),
+          isDepartmentPool: false,
         });
       }
     });
+
+    // 2. Ingest department-level budget ceilings from `departments` collection
+    departments.forEach((d) => {
+      const dName = (d.name || "").trim();
+      const dAlloc = Number(d.budgetAllocated || 0);
+      if (dAlloc <= 0 || !dName) return;
+
+      const dNameLower = dName.toLowerCase();
+      let lineItemSum = 0;
+      for (const item of map.values()) {
+        if (item.department && item.department.toLowerCase() === dNameLower) {
+          lineItemSum += item.allocated;
+        }
+      }
+
+      if (lineItemSum === 0) {
+        map.set(`dept:::${dNameLower}`, {
+          id: `dept_${d.id || dNameLower}`,
+          category: dName,
+          department: dName,
+          allocated: dAlloc,
+          isDepartmentPool: true,
+        });
+      } else if (dAlloc > lineItemSum) {
+        map.set(`dept_pool:::${dNameLower}`, {
+          id: `dept_pool_${d.id || dNameLower}`,
+          category: "General Pool",
+          department: dName,
+          allocated: dAlloc - lineItemSum,
+          isDepartmentPool: true,
+        });
+      }
+    });
+
     return Array.from(map.values());
-  }, [budgets]);
+  }, [budgets, departments]);
 
   // Raw budget spent matching explicitly assigned budget line-items + departments
   const rawBudgetSpent = useMemo(() => {
@@ -354,16 +392,37 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
     return consolidatedBudgets
       .map((b) => {
         const spent = targetTxs
-          .filter(
-            (t) =>
-              t.type === "expense" &&
-              (t.category || "").toLowerCase() === (b.category || "").toLowerCase() &&
-              (!b.department || b.department === "All" || b.department === "General" || (t.department || "").toLowerCase() === (b.department || "").toLowerCase())
-          )
+          .filter((t) => {
+            if (!t || t.type !== "expense" || Number(t.amount || 0) <= 0) return false;
+            if (t.status === "failed" || (t as any).status === "deleted" || (t as any).status === "void" || (t as any).status === "cancelled") return false;
+
+            const tDept = (t.department || "").trim().toLowerCase();
+            const bDept = (b.department || "").trim().toLowerCase();
+            const tCat = (t.category || "").trim().toLowerCase();
+            const bCat = (b.category || "").trim().toLowerCase();
+
+            if (b.isDepartmentPool) {
+              return bDept.length > 0 && tDept === bDept;
+            }
+
+            const deptMatch = !bDept || bDept === "all" || !tDept || tDept === "all" || tDept === bDept;
+            const isAllCat = isAllCategoryBudget(b.category);
+            const catMatch = isAllCat || (bCat.length > 0 && (
+              tCat === bCat ||
+              (tCat === "salaries" && bCat === "payroll") ||
+              (tCat === "payroll" && bCat === "salaries")
+            ));
+
+            return deptMatch && catMatch;
+          })
           .reduce((s, t) => s + Number(t.amount || 0), 0);
-        const label = b.department && b.department !== "All" && b.department !== "General"
-          ? `${b.category} · ${b.department}`
-          : b.category;
+
+        const label = b.isDepartmentPool
+          ? (b.department || b.category)
+          : (b.department && b.department !== "All" && b.department !== "General"
+              ? `${b.category} · ${b.department}`
+              : b.category);
+
         return {
           label,
           value: spent,

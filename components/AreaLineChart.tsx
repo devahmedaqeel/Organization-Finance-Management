@@ -178,9 +178,6 @@ export function AreaLineChart({
         bestIdx = data.length - 1;
       }
       setSelectedIndex(bestIdx);
-      if (onPointSelect && data[bestIdx]) {
-        onPointSelect(data[bestIdx]);
-      }
     }
   }, [data]);
 

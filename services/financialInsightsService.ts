@@ -100,7 +100,7 @@ export function generateFinancialInsights(
   const totalBudgeted = calculateBudgetAllocation(budgets, departments);
   const totalBudgetSpent = calculateBudgetUsed(currentTxs, budgets, undefined, departments);
   const netBudgetRemaining = calculateBudgetRemaining(totalBudgeted, totalBudgetSpent);
-  const unallocatedFunds = calculateUnallocatedFunds(income, totalBudgeted);
+  const unallocatedFunds = Math.max(0, net - totalBudgeted);
 
   if (net < 0 && expense > 0) {
     const isBudgetCovered = totalBudgeted > 0 && totalBudgetSpent <= totalBudgeted;
@@ -138,23 +138,23 @@ export function generateFinancialInsights(
   } else if (net > 0 && income > 0) {
     const margin = (net / income) * 100;
     const isBudgetCovered = totalBudgeted > 0;
-    const unallocatedPct = income > 0 ? (unallocatedFunds / income) * 100 : 0;
+    const unallocatedPct = net > 0 ? (unallocatedFunds / net) * 100 : 0;
     insights.push({
       id: `cf-surplus-${currentPeriod.label}`,
       organizationId: orgId,
       type: "OPERATING_SURPLUS",
       title: isBudgetCovered ? "Positive Operating Cashflow & Budget Allocation" : "Positive Operating Surplus",
       summary: isBudgetCovered
-        ? `Net operating cashflow of ${currency} ${net.toLocaleString()} (+${margin.toFixed(1)}% margin) achieved. Department budgets allocated: ${currency} ${totalBudgeted.toLocaleString()} (${currency} ${unallocatedFunds.toLocaleString()} unallocated funds remaining).`
+        ? `Net operating cashflow of ${currency} ${net.toLocaleString()} (+${margin.toFixed(1)}% margin) achieved. Department budgets allocated: ${currency} ${totalBudgeted.toLocaleString()} (${currency} ${unallocatedFunds.toLocaleString()} available to allocate).`
         : `Net operating surplus of ${currency} ${net.toLocaleString()} achieved with a +${margin.toFixed(1)}% operating margin.`,
       whyItMatters: isBudgetCovered
-        ? `Operating with positive cashflow ensures liquidity while maintaining ${currency} ${unallocatedFunds.toLocaleString()} (${unallocatedPct.toFixed(0)}%) in unallocated reserve funds.`
+        ? `Operating with positive cashflow ensures liquidity while maintaining ${currency} ${unallocatedFunds.toLocaleString()} (${unallocatedPct.toFixed(0)}%) in unallocated reserve funds available to allocate.`
         : "Healthy operating margins maintain liquid capital reserves for planned infrastructure.",
       recommendedAction: "Maintain current expenditure controls and review the consolidated statement for capital reserve allocations.",
       severity: "SUCCESS",
       category: "cashflow",
       metric: isBudgetCovered
-        ? `+${currency} ${net.toLocaleString()} (${currency} ${unallocatedFunds.toLocaleString()} Unallocated)`
+        ? `+${currency} ${net.toLocaleString()} (${currency} ${unallocatedFunds.toLocaleString()} Available)`
         : `+${currency} ${net.toLocaleString()} (${margin.toFixed(1)}% NOM)`,
       currentValue: net,
       changePercent: margin,
@@ -327,9 +327,56 @@ export function generateFinancialInsights(
   // ──────────────────────────────────────────────────────────────────────────
   // 4. BUDGET LIMITS, UTILIZATION & VELOCITY FORECAST
   // ──────────────────────────────────────────────────────────────────────────
+  const budgetInspectionList: { id: string; category: string; department?: string; allocated: number; isDepartmentPool?: boolean }[] = [];
   budgets.forEach((b) => {
+    budgetInspectionList.push({
+      id: b.id,
+      category: b.category || "General",
+      department: b.department,
+      allocated: safeNumber(b.allocated, 0),
+      isDepartmentPool: false,
+    });
+  });
+
+  departments.forEach((d) => {
+    const dName = (d.name || "").trim();
+    const dAlloc = safeNumber(d.budgetAllocated, 0);
+    if (dAlloc <= 0 || !dName) return;
+    const dNameLower = dName.toLowerCase();
+    const lineItemSum = budgetInspectionList
+      .filter((b) => (b.department || "").trim().toLowerCase() === dNameLower)
+      .reduce((s, b) => s + b.allocated, 0);
+
+    if (lineItemSum === 0) {
+      budgetInspectionList.push({
+        id: `dept_${d.id || dNameLower}`,
+        category: dName,
+        department: dName,
+        allocated: dAlloc,
+        isDepartmentPool: true,
+      });
+    } else if (dAlloc > lineItemSum) {
+      budgetInspectionList.push({
+        id: `dept_pool_${d.id || dNameLower}`,
+        category: "Department Pool",
+        department: dName,
+        allocated: dAlloc - lineItemSum,
+        isDepartmentPool: true,
+      });
+    }
+  });
+
+  budgetInspectionList.forEach((b) => {
     const allocated = safeNumber(b.allocated, 0);
-    const spent = calculateBudgetSpentForCategory(b, currentTxs, currentPeriod);
+    let spent = 0;
+    if (b.isDepartmentPool) {
+      const bDept = (b.department || "").trim().toLowerCase();
+      spent = currentTxs
+        .filter((t) => t.type === "expense" && (t.department || "").trim().toLowerCase() === bDept && t.status !== "failed")
+        .reduce((s, t) => s + safeNumber(t.amount, 0), 0);
+    } else {
+      spent = calculateBudgetSpentForCategory(b as any, currentTxs, currentPeriod);
+    }
     if (allocated > 0) {
       const util = (spent / allocated) * 100;
       const remaining = calculateBudgetRemaining(allocated, spent);
