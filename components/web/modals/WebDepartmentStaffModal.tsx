@@ -115,8 +115,6 @@ export function WebDepartmentStaffModal({
     });
   }, [deptStaff, searchQuery]);
 
-  if (!visible) return null;
-
   // Compute stats
   const totalMonthlyPayroll = deptStaff.reduce(
     (sum, p) => sum + (p.netSalary || p.baseSalary || 0),
