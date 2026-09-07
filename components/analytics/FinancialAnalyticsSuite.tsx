@@ -203,9 +203,94 @@ export function FinancialAnalyticsSuite({
   const [marginMode, setMarginMode] = useState<"margin" | "outflow" | "net">("margin");
   const [distributionMode, setDistributionMode] = useState<"drivers" | "share" | "all">("drivers");
   const [distributionDimension, setDistributionDimension] = useState<"category" | "department">("category");
+  const [distDeptFilter, setDistDeptFilter] = useState<string>("ALL");
   const [selectedDistributionItem, setSelectedDistributionItem] = useState<string | null>(null);
   const [showTooltip, setShowTooltip] = useState<"budget" | "margin" | "distribution" | null>(null);
   const [showAllCategories, setShowAllCategories] = useState(false);
+
+  // Authoritative valid expense transactions
+  const validExpenseTxs = useMemo(() => {
+    return (effectiveTransactions || []).filter(
+      (t: any) =>
+        t &&
+        t.type === "expense" &&
+        Number(t.amount || 0) > 0 &&
+        t.status !== "failed" &&
+        t.status !== "deleted"
+    );
+  }, [effectiveTransactions]);
+
+  // Map each category to the departments that incurred it
+  const categoryToDeptsMap = useMemo(() => {
+    const map: Record<string, { total: number; depts: { name: string; amount: number; pct: number }[] }> = {};
+    validExpenseTxs.forEach((t: any) => {
+      const cat = (t.category || "General").trim();
+      const rawDept = (t.department || "General").trim();
+      const matchedDept = effectiveDeptMetrics.find(
+        (dm) => dm.id === rawDept || dm.name.trim().toLowerCase() === rawDept.toLowerCase()
+      );
+      const deptName = matchedDept ? matchedDept.name : rawDept;
+
+      const catKey = cat.toLowerCase();
+      if (!map[catKey]) {
+        map[catKey] = { total: 0, depts: [] };
+      }
+      const entry = map[catKey];
+      entry.total += Number(t.amount || 0);
+
+      const existing = entry.depts.find((d) => d.name.toLowerCase() === deptName.toLowerCase());
+      if (existing) {
+        existing.amount += Number(t.amount || 0);
+      } else {
+        entry.depts.push({ name: deptName, amount: Number(t.amount || 0), pct: 0 });
+      }
+    });
+
+    Object.values(map).forEach((entry) => {
+      entry.depts.sort((a, b) => b.amount - a.amount);
+      entry.depts.forEach((d) => {
+        d.pct = entry.total > 0 ? (d.amount / entry.total) * 100 : 0;
+      });
+    });
+
+    return map;
+  }, [validExpenseTxs, effectiveDeptMetrics]);
+
+  // Map each department to the categories it incurred
+  const deptToCategoriesMap = useMemo(() => {
+    const map: Record<string, { total: number; categories: { name: string; amount: number; pct: number }[] }> = {};
+    validExpenseTxs.forEach((t: any) => {
+      const cat = (t.category || "General").trim();
+      const rawDept = (t.department || "General").trim();
+      const matchedDept = effectiveDeptMetrics.find(
+        (dm) => dm.id === rawDept || dm.name.trim().toLowerCase() === rawDept.toLowerCase()
+      );
+      const deptName = matchedDept ? matchedDept.name : rawDept;
+
+      const key = deptName.toLowerCase();
+      if (!map[key]) {
+        map[key] = { total: 0, categories: [] };
+      }
+      const entry = map[key];
+      entry.total += Number(t.amount || 0);
+
+      const existing = entry.categories.find((c) => c.name.toLowerCase() === cat.toLowerCase());
+      if (existing) {
+        existing.amount += Number(t.amount || 0);
+      } else {
+        entry.categories.push({ name: cat, amount: Number(t.amount || 0), pct: 0 });
+      }
+    });
+
+    Object.values(map).forEach((entry) => {
+      entry.categories.sort((a, b) => b.amount - a.amount);
+      entry.categories.forEach((c) => {
+        c.pct = entry.total > 0 ? (c.amount / entry.total) * 100 : 0;
+      });
+    });
+
+    return map;
+  }, [validExpenseTxs, effectiveDeptMetrics]);
 
   // Department-level expense distribution
   const deptDistribution = useMemo(() => {
@@ -221,6 +306,7 @@ export function FinancialAnalyticsSuite({
           pct: number;
           displayPct: string;
           count?: string;
+          categoriesBreakdown?: { name: string; amount: number; pct: number }[];
           color: string;
         }[],
         chartSegments: [] as {
@@ -242,6 +328,12 @@ export function FinancialAnalyticsSuite({
 
     const fullDepts = sorted.map((d, idx) => {
       const pct = (d.spent / total) * 100;
+      const catEntry =
+        deptToCategoriesMap[d.name.toLowerCase()] ||
+        deptToCategoriesMap[d.id.toLowerCase()] ||
+        null;
+      const categoriesBreakdown = catEntry?.categories || [];
+
       return {
         id: d.id,
         name: d.name,
@@ -249,6 +341,7 @@ export function FinancialAnalyticsSuite({
         pct,
         displayPct: `${pct.toFixed(1)}%`,
         count: d.payrollHeadcount > 0 ? `${d.payrollHeadcount} Staff` : undefined,
+        categoriesBreakdown,
         sublabel: d.allocated > 0
           ? `Cap: ${formatCompactCurrency(d.allocated, currency)} (${d.utilizationPct.toFixed(0)}% Used)`
           : "Active Operational Cost Center",
@@ -262,6 +355,8 @@ export function FinancialAnalyticsSuite({
     if (topDept) {
       if (fullDepts.length === 1) {
         explanation = `100% of spending is in ${topDept.name} (${formatCompactCurrency(topDept.amount, currency)}). Single active cost center.`;
+      } else if (fullDepts.length >= 2 && Math.abs(fullDepts[0].pct - fullDepts[1].pct) < 0.1) {
+        explanation = `⚖️ Equal Cost Distribution: Outflows are evenly split between ${fullDepts[0].name} (${fullDepts[0].displayPct}) and ${fullDepts[1].name} (${fullDepts[1].displayPct}).`;
       } else {
         explanation = `${topDept.name} is the primary cost center, consuming ${topDept.displayPct} of all departmental disbursements.`;
       }
@@ -280,7 +375,7 @@ export function FinancialAnalyticsSuite({
       topDept,
       explanation,
     };
-  }, [effectiveDeptMetrics, currency]);
+  }, [effectiveDeptMetrics, deptToCategoriesMap, currency]);
 
   // Unified Active View for Card 3 (Category or Department)
   const activeDistView = useMemo(() => {
@@ -303,6 +398,8 @@ export function FinancialAnalyticsSuite({
           ) || null
         : null;
 
+      const isTied = items.length >= 2 && Math.abs(items[0].pct - items[1].pct) < 0.1;
+
       return {
         isDept: true,
         titleSubtitle: `${items.length} Cost Center${items.length === 1 ? "" : "s"} Active`,
@@ -313,27 +410,131 @@ export function FinancialAnalyticsSuite({
         topItem,
         selectedData,
         explanation: deptDistribution.explanation,
-        bentoCol1Label: "TOP COST CENTER",
-        bentoCol1Val: topItem ? topItem.name : "None",
+        bentoCol1Label: isTied ? "TOP COST CENTERS" : "TOP COST CENTER",
+        bentoCol1Val: isTied && items.length >= 2 ? `${items[0].name} & ${items[1].name} (Tied)` : topItem ? topItem.name : "None",
         bentoCol1Color: topItem ? topItem.color : "#3B82F6",
         bentoCol3Label: "COST CENTERS",
         bentoCol3Val: `${items.length} Active`,
       };
     } else {
-      // By Category
+      // By Category: Check if filtered to a specific department
+      if (distDeptFilter !== "ALL") {
+        const deptTxs = validExpenseTxs.filter((t: any) => {
+          const rawDept = (t.department || "General").trim();
+          const matchedDept = effectiveDeptMetrics.find(
+            (dm) => dm.id === rawDept || dm.name.trim().toLowerCase() === rawDept.toLowerCase()
+          );
+          const dName = matchedDept ? matchedDept.name : rawDept;
+          return (
+            dName.toLowerCase() === distDeptFilter.toLowerCase() ||
+            (matchedDept && matchedDept.id === distDeptFilter)
+          );
+        });
+
+        const totalExp = deptTxs.reduce((s: number, t: any) => s + Number(t.amount || 0), 0);
+        const catMap: Record<string, { amount: number; count: number }> = {};
+        deptTxs.forEach((t: any) => {
+          const cat = (t.category || "General").trim();
+          if (!catMap[cat]) catMap[cat] = { amount: 0, count: 0 };
+          catMap[cat].amount += Number(t.amount || 0);
+          catMap[cat].count += 1;
+        });
+
+        const sorted = Object.entries(catMap).sort((a, b) => b[1].amount - a[1].amount);
+        const palette = ["#8B5CF6", "#3B82F6", "#EC4899", "#10B981", "#F59E0B", "#06B6D4", "#6366F1"];
+
+        const items = sorted.map(([category, data], idx) => {
+          const pct = totalExp > 0 ? (data.amount / totalExp) * 100 : 0;
+          return {
+            id: category,
+            name: category,
+            amount: data.amount,
+            pct,
+            displayPct: `${pct.toFixed(1)}%`,
+            count: data.count > 0 ? `${data.count} disbursement${data.count > 1 ? "s" : ""}` : undefined,
+            deptsBreakdown: [
+              {
+                name: distDeptFilter,
+                amount: data.amount,
+                pct: 100,
+              },
+            ],
+            categoriesBreakdown: undefined,
+            sublabel: `Department: ${distDeptFilter} · ${pct.toFixed(0)}% of department spending`,
+            color: palette[idx % palette.length],
+          };
+        });
+
+        const chartSegs = items.map((i) => ({
+          label: i.name,
+          value: i.amount,
+          color: i.color,
+          pct: i.pct,
+        }));
+
+        const topItem = items[0] || null;
+        let explanation = `Showing ${distDeptFilter} departmental costs: ${formatCompactCurrency(totalExp, currency)} total across ${items.length} categories.`;
+        if (items.length === 1 && topItem) {
+          explanation = `100% of ${distDeptFilter}'s spending is in ${topItem.name} (${formatCompactCurrency(topItem.amount, currency)}).`;
+        } else if (items.length >= 2 && Math.abs(items[0].pct - items[1].pct) < 0.1) {
+          explanation = `⚖️ Equal Cost Distribution: ${distDeptFilter} expenses are evenly split between ${items[0].name} and ${items[1].name}.`;
+        } else if (topItem && topItem.pct >= 70) {
+          explanation = `⚡ Dominant Cost Driver for ${distDeptFilter}: ${topItem.name} accounts for ${topItem.displayPct} of department spend.`;
+        }
+
+        const selectedData = selectedDistributionItem
+          ? items.find(
+              (i) => i.name.trim().toLowerCase() === selectedDistributionItem.trim().toLowerCase()
+            ) || null
+          : null;
+
+        return {
+          isDept: false,
+          titleSubtitle: `${items.length} Category Cost Driver${items.length === 1 ? "" : "s"} (${distDeptFilter})`,
+          hasExpenses: totalExp > 0,
+          totalExpenses: totalExp,
+          items,
+          chartSegments: chartSegs,
+          topItem,
+          selectedData,
+          explanation,
+          bentoCol1Label: `TOP ${distDeptFilter.toUpperCase().slice(0, 8)} DRIVER`,
+          bentoCol1Val: topItem ? topItem.name : "None",
+          bentoCol1Color: topItem ? topItem.color : "#8B5CF6",
+          bentoCol3Label: "COST DRIVERS",
+          bentoCol3Val: `${items.length} Active`,
+        };
+      }
+
+      // All Departments View for Categories
       const totalExp = distribution?.totalExpenses || 0;
-      const items = (distribution?.categories || []).map((c) => ({
-        id: c.category,
-        name: c.category,
-        amount: c.amount,
-        pct: c.pct,
-        displayPct: c.displayPct,
-        count: c.count > 0 ? `${c.count} disbursement${c.count > 1 ? "s" : ""}` : undefined,
-        sublabel: c.category.toLowerCase().includes("salary") || c.category.toLowerCase().includes("payroll")
-          ? "Fixed Staff Compensation & Payroll"
-          : "Operational Expense Category",
-        color: c.color,
-      }));
+      const items = (distribution?.categories || []).map((c) => {
+        const deptEntry = categoryToDeptsMap[c.category.toLowerCase()] || null;
+        const deptsBreakdown = deptEntry?.depts || [];
+
+        let sublabel = "Operational Expense Category";
+        if (deptsBreakdown.length === 1) {
+          sublabel = `Department Origin: ${deptsBreakdown[0].name} (100% of this cost)`;
+        } else if (deptsBreakdown.length > 1) {
+          const topContrib = deptsBreakdown[0];
+          sublabel = `Top Origin: ${topContrib.name} (${topContrib.pct.toFixed(0)}%) · ${deptsBreakdown.length} Departments`;
+        } else if (c.category.toLowerCase().includes("salary") || c.category.toLowerCase().includes("payroll")) {
+          sublabel = "Fixed Staff Compensation & Payroll";
+        }
+
+        return {
+          id: c.category,
+          name: c.category,
+          amount: c.amount,
+          pct: c.pct,
+          displayPct: c.displayPct,
+          count: c.count > 0 ? `${c.count} disbursement${c.count > 1 ? "s" : ""}` : undefined,
+          deptsBreakdown,
+          categoriesBreakdown: undefined,
+          sublabel,
+          color: c.color,
+        };
+      });
 
       const chartSegs = (distribution?.chartSegments || []).map((seg) => ({
         label: seg.category,
@@ -360,6 +561,8 @@ export function FinancialAnalyticsSuite({
       let explanation = distribution?.explanation || "";
       if (topItem && items.length === 1) {
         explanation = `100% of spending is in ${topItem.name} (${formatCompactCurrency(topItem.amount, currency)}). All current outflows represent payroll disbursements.`;
+      } else if (items.length >= 2 && Math.abs(items[0].pct - items[1].pct) < 0.1) {
+        explanation = `⚖️ Equal Cost Distribution: Outflows are evenly split between ${items[0].name} and ${items[1].name}.`;
       } else if (topItem && topItem.displayPct && parseFloat(topItem.displayPct) >= 70) {
         explanation = `⚡ Dominant Cost Driver: ${topItem.name} represents ${topItem.displayPct} of all spending.`;
       }
@@ -381,7 +584,17 @@ export function FinancialAnalyticsSuite({
         bentoCol3Val: `${items.length} Active`,
       };
     }
-  }, [distributionDimension, deptDistribution, distribution, selectedDistributionItem, currency]);
+  }, [
+    distributionDimension,
+    distDeptFilter,
+    validExpenseTxs,
+    categoryToDeptsMap,
+    deptDistribution,
+    distribution,
+    selectedDistributionItem,
+    effectiveDeptMetrics,
+    currency,
+  ]);
 
   return (
     <View style={styles.container}>
@@ -1284,6 +1497,85 @@ export function FinancialAnalyticsSuite({
             </TouchableOpacity>
           </View>
 
+          {/* Department Quick Filter for Category View */}
+          {distributionDimension === "category" && effectiveDeptMetrics.length > 0 && (
+            <View style={styles.deptFilterSection}>
+              <Text style={[styles.deptFilterLabel, { color: colors.mutedForeground }]}>
+                🏢 Dept:
+              </Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.deptFilterScroll}
+              >
+                <TouchableOpacity
+                  style={[
+                    styles.deptFilterChip,
+                    {
+                      backgroundColor:
+                        distDeptFilter === "ALL"
+                          ? "#8B5CF6"
+                          : (colors.cardAlt ?? colors.muted) + "25",
+                      borderColor: distDeptFilter === "ALL" ? "#8B5CF6" : colors.border,
+                    },
+                  ]}
+                  onPress={() => {
+                    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setDistDeptFilter("ALL");
+                    setSelectedDistributionItem(null);
+                  }}
+                  activeOpacity={0.75}
+                >
+                  <Text
+                    style={[
+                      styles.deptFilterChipText,
+                      { color: distDeptFilter === "ALL" ? "#FFFFFF" : colors.foreground },
+                      distDeptFilter === "ALL" && { fontFamily: "Inter_700Bold" },
+                    ]}
+                  >
+                    All Units
+                  </Text>
+                </TouchableOpacity>
+
+                {effectiveDeptMetrics.map((dm) => {
+                  const isSelected =
+                    distDeptFilter.toLowerCase() === dm.name.toLowerCase() ||
+                    distDeptFilter.toLowerCase() === dm.id.toLowerCase();
+                  return (
+                    <TouchableOpacity
+                      key={dm.id}
+                      style={[
+                        styles.deptFilterChip,
+                        {
+                          backgroundColor: isSelected
+                            ? "#3B82F6"
+                            : (colors.cardAlt ?? colors.muted) + "25",
+                          borderColor: isSelected ? "#3B82F6" : colors.border,
+                        },
+                      ]}
+                      onPress={() => {
+                        if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        setDistDeptFilter(isSelected ? "ALL" : dm.name);
+                        setSelectedDistributionItem(null);
+                      }}
+                      activeOpacity={0.75}
+                    >
+                      <Text
+                        style={[
+                          styles.deptFilterChipText,
+                          { color: isSelected ? "#FFFFFF" : colors.foreground },
+                          isSelected && { fontFamily: "Inter_700Bold" },
+                        ]}
+                      >
+                        🏢 {dm.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+
           {/* Ranked Category / Department List with Integrated Proportion Bars (No Duplicate Clutter) */}
           <View style={styles.categoryRankedList}>
             {(showAllCategories || distributionMode === "all"
@@ -1382,7 +1674,76 @@ export function FinancialAnalyticsSuite({
                     />
                   </View>
 
-                  {/* Line 3: Informative Subtitle & Quick Outflows Action */}
+                  {/* Line 3: Department Origin Badges (Category) OR Category Breakdown Badges (Department) */}
+                  {item.deptsBreakdown && item.deptsBreakdown.length > 0 && (
+                    <View style={styles.breakdownBadgesRow}>
+                      <Text style={[styles.breakdownOriginPrefix, { color: colors.mutedForeground }]}>
+                        🏢 {item.deptsBreakdown.length === 1 ? "Dept:" : "Depts:"}
+                      </Text>
+                      <View style={styles.breakdownBadgesWrap}>
+                        {item.deptsBreakdown.map((d: any) => (
+                          <View
+                            key={d.name}
+                            style={[
+                              styles.breakdownBadgePill,
+                              {
+                                backgroundColor: item.color + "16",
+                                borderColor: item.color + "38",
+                              },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.breakdownBadgeName,
+                                { color: isSelected ? item.color : colors.foreground },
+                              ]}
+                            >
+                              {d.name}
+                            </Text>
+                            <Text style={[styles.breakdownBadgeAmount, { color: item.color }]}>
+                              {formatCompactCurrency(d.amount, currency)} ({d.pct.toFixed(0)}%)
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+
+                  {item.categoriesBreakdown && item.categoriesBreakdown.length > 0 && (
+                    <View style={styles.breakdownBadgesRow}>
+                      <Text style={[styles.breakdownOriginPrefix, { color: colors.mutedForeground }]}>
+                        🏷️ Spend:
+                      </Text>
+                      <View style={styles.breakdownBadgesWrap}>
+                        {item.categoriesBreakdown.map((c: any) => (
+                          <View
+                            key={c.name}
+                            style={[
+                              styles.breakdownBadgePill,
+                              {
+                                backgroundColor: item.color + "16",
+                                borderColor: item.color + "38",
+                              },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.breakdownBadgeName,
+                                { color: isSelected ? item.color : colors.foreground },
+                              ]}
+                            >
+                              {c.name}
+                            </Text>
+                            <Text style={[styles.breakdownBadgeAmount, { color: item.color }]}>
+                              {formatCompactCurrency(c.amount, currency)} ({c.pct.toFixed(0)}%)
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Line 4: Informative Subtitle & Quick Outflows Action */}
                   <View style={styles.distItemBottomRow}>
                     <Text style={[styles.distItemSubtext, { color: colors.mutedForeground }]} numberOfLines={1}>
                       {item.sublabel || (activeDistView.isDept ? "Active Operational Unit" : "Expense Category")}
@@ -1833,6 +2194,34 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: "Inter_600SemiBold",
   },
+  deptFilterSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginVertical: 4,
+    paddingHorizontal: 2,
+  },
+  deptFilterLabel: {
+    fontSize: 10,
+    fontFamily: "Inter_700Bold",
+    flexShrink: 0,
+  },
+  deptFilterScroll: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 2,
+  },
+  deptFilterChip: {
+    paddingHorizontal: 9,
+    paddingVertical: 3.5,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  deptFilterChipText: {
+    fontSize: 10,
+    fontFamily: "Inter_600SemiBold",
+  },
   inspectorCard: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1912,6 +2301,42 @@ const styles = StyleSheet.create({
   distBarFill: {
     height: "100%",
     borderRadius: 2.25,
+  },
+  breakdownBadgesRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 5,
+    marginTop: 2,
+    marginBottom: 2,
+  },
+  breakdownOriginPrefix: {
+    fontSize: 9.5,
+    fontFamily: "Inter_700Bold",
+  },
+  breakdownBadgesWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 4,
+    flex: 1,
+  },
+  breakdownBadgePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3.5,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  breakdownBadgeName: {
+    fontSize: 9.5,
+    fontFamily: "Inter_600SemiBold",
+  },
+  breakdownBadgeAmount: {
+    fontSize: 9,
+    fontFamily: "Inter_700Bold",
   },
   distItemBottomRow: {
     flexDirection: "row",
