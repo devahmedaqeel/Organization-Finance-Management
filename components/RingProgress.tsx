@@ -216,7 +216,8 @@ export function RingProgress({
               styles.sublabel,
               {
                 color: ringColor,
-                fontSize: size >= 135 ? 8.5 : 7.5,
+                fontSize: size >= 135 ? 8.5 : (sublabel && sublabel.length > 8 ? 6.5 : 7.5),
+                letterSpacing: 0.2,
               },
             ]}
             numberOfLines={1}

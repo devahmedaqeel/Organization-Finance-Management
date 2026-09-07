@@ -802,8 +802,11 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
                     : "Operating Deficit"}
                 </Text>
               </View>
-              <Text style={styles.ringValueSub}>
+              <Text style={styles.ringValueSub} numberOfLines={1}>
                 {authoritativeNetBalance >= 0 ? "+" : "-"}{settings.currency} {fmt(Math.abs(authoritativeNetBalance))}
+              </Text>
+              <Text style={{ fontSize: 10, color: colors.mutedForeground, marginTop: 1, fontFamily: "Inter_500Medium" }} numberOfLines={1}>
+                Net Cash Balance
               </Text>
             </View>
 
@@ -842,8 +845,11 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
                     : "Over Budget"}
                 </Text>
               </View>
-              <Text style={styles.ringValueSub}>
+              <Text style={styles.ringValueSub} numberOfLines={1}>
                 {settings.currency} {fmt(displayedBudgetSpent)} of {fmt(totalAllocatedBudget)}
+              </Text>
+              <Text style={{ fontSize: 10, color: colors.mutedForeground, marginTop: 1, fontFamily: "Inter_500Medium" }} numberOfLines={1}>
+                {settings.currency} {fmt(displayedBudgetRemaining)} Remaining
               </Text>
             </View>
 
@@ -856,7 +862,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
                 strokeWidth={9}
                 color={displayedOutflowPct === 0 ? "#64748B" : displayedOutflowPct <= 40 ? "#8B5CF6" : displayedOutflowPct <= 75 ? "#F59E0B" : "#F43F5E"}
                 label="Outflow"
-                sublabel={totalAllocatedBudget > 0 ? "CAPITAL SPENT" : "BURN RATE"}
+                sublabel="BURN RATE"
               />
               <View
                 style={[
@@ -884,8 +890,11 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
                     : "High Burn Alert"}
                 </Text>
               </View>
-              <Text style={styles.ringValueSub}>
-                {settings.currency} {fmt(displayedExpense)} spent
+              <Text style={styles.ringValueSub} numberOfLines={1}>
+                {settings.currency} {fmt(displayedExpense)} of {fmt(displayedIncome)}
+              </Text>
+              <Text style={{ fontSize: 10, color: colors.mutedForeground, marginTop: 1, fontFamily: "Inter_500Medium" }} numberOfLines={1}>
+                Outflows of Inflow
               </Text>
             </View>
           </View>
