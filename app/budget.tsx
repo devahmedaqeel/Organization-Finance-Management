@@ -115,8 +115,9 @@ export default function BudgetScreen() {
   }, [transactions]);
 
   const availableToAllocate = useMemo(() => {
-    return Math.max(0, netCash - totalAllocatedBudget);
-  }, [netCash, totalAllocatedBudget]);
+    const unspentBudgetCommitments = Math.max(0, totalAllocatedBudget - totalBudgetSpent);
+    return Math.max(0, Math.min(unallocatedFunds, netCash - unspentBudgetCommitments));
+  }, [unallocatedFunds, netCash, totalAllocatedBudget, totalBudgetSpent]);
 
   const unallocatedNetCash = availableToAllocate;
 

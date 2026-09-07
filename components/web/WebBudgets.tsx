@@ -73,8 +73,9 @@ export function WebBudgets() {
   }, [transactions]);
 
   const availableToAllocate = useMemo(() => {
-    return Math.max(0, netOperatingCash - totalAllocatedBudget);
-  }, [netOperatingCash, totalAllocatedBudget]);
+    const unspentBudgetCommitments = Math.max(0, totalAllocatedBudget - totalBudgetSpent);
+    return Math.max(0, Math.min(unallocatedFunds, netOperatingCash - unspentBudgetCommitments));
+  }, [unallocatedFunds, netOperatingCash, totalAllocatedBudget, totalBudgetSpent]);
 
   // Calculate actual spend for each budget item from live transactions
   const budgetsWithLiveSpend = useMemo(() => {
@@ -304,7 +305,7 @@ export function WebBudgets() {
             {settings.currency} {availableToAllocate.toLocaleString()}
           </Text>
           <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
-            Net Cash Buffer · {settings.currency} {unallocatedFunds.toLocaleString()} Rev Res
+            Net Cash Buffer · {settings.currency} {unallocatedFunds.toLocaleString()} Available
           </Text>
         </View>
 

@@ -243,7 +243,9 @@ export default function DashboardScreen() {
   const isEffectiveDeficit = isDeficit;
 
   // Section 8 & Master Calculation Engine: Available to Allocate is strictly gated by Available Net Cash!
-  const availableToAllocate = Math.max(0, netCash - totalAllocatedBudget);
+  const unspentBudgetCommitments = Math.max(0, totalAllocatedBudget - totalBudgetSpent);
+  const unallocatedRevFunds = Math.max(0, totalIncome - totalAllocatedBudget);
+  const availableToAllocate = Math.max(0, Math.min(unallocatedRevFunds, netCash - unspentBudgetCommitments));
   const unallocatedFunds = availableToAllocate;
 
   // 1. Kitni Income Retain: percentage of actual income retained after operating expenses
