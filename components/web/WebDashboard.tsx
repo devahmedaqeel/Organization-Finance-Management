@@ -365,25 +365,34 @@ export function WebDashboard({
 
         {/* Top Row: Title + Privacy Eye + Fiscal Dossier Button */}
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 7 }}>
-            <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: "rgba(56, 189, 248, 0.18)", alignItems: "center", justifyContent: "center" }}>
-              <SvgShield size={12} color="#38BDF8" />
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1, minWidth: 0, marginRight: 8 }}>
+            <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: "rgba(56, 189, 248, 0.18)", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <SvgShield size={11} color="#38BDF8" />
             </View>
-            <Text style={{ color: "#FFFFFF", fontSize: isMobile ? 12 : 13, fontFamily: "Inter_800ExtraBold", letterSpacing: 1.0 }}>
+            <Text
+              style={{
+                color: "#FFFFFF",
+                fontSize: isMobile ? 11 : 13,
+                fontFamily: "Inter_800ExtraBold",
+                letterSpacing: isMobile ? 0.5 : 1.0,
+                flexShrink: 1,
+              }}
+              numberOfLines={1}
+            >
               {balanceViewMode === "cashflow"
-                ? "NET CASH / AVAILABLE CASH"
-                : "TOTAL DISBURSEMENTS"}
+                ? (isMobile ? "AVAILABLE CASH" : "NET CASH / AVAILABLE CASH")
+                : (isMobile ? "OUTFLOW AUDIT" : "TOTAL DISBURSEMENTS")}
             </Text>
             <TouchableOpacity
               onPress={() => setHideBalance(!hideBalance)}
-              style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: "rgba(255, 255, 255, 0.12)", alignItems: "center", justifyContent: "center" }}
+              style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: "rgba(255, 255, 255, 0.12)", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               activeOpacity={0.7}
             >
               {hideBalance ? (
-                <SvgEyeOff size={12} color="#FFFFFF" />
+                <SvgEyeOff size={11} color="#FFFFFF" />
               ) : (
-                <SvgEye size={12} color="#FFFFFF" />
+                <SvgEye size={11} color="#FFFFFF" />
               )}
             </TouchableOpacity>
           </View>
@@ -393,21 +402,22 @@ export function WebDashboard({
             style={{
               flexDirection: "row",
               alignItems: "center",
-              gap: 5,
+              gap: 4,
               backgroundColor: "rgba(255, 255, 255, 0.10)",
-              paddingHorizontal: isMobile ? 10 : 14,
-              paddingVertical: isMobile ? 5 : 7,
+              paddingHorizontal: isMobile ? 8 : 14,
+              paddingVertical: isMobile ? 4.5 : 7,
               borderRadius: 20,
               borderWidth: 1,
               borderColor: "rgba(255, 255, 255, 0.22)",
               cursor: "pointer" as any,
+              flexShrink: 0,
             }}
             onPress={() => setNetModalVisible(true)}
             activeOpacity={0.8}
           >
-            <SvgChart size={12} color="#38BDF8" />
-            <Text style={{ color: "#FFFFFF", fontSize: isMobile ? 11 : 12, fontFamily: "Inter_700Bold", letterSpacing: 0.3 }}>
-              Fiscal Dossier →
+            <SvgChart size={11} color="#38BDF8" />
+            <Text style={{ color: "#FFFFFF", fontSize: isMobile ? 10.5 : 12, fontFamily: "Inter_700Bold", letterSpacing: 0.2 }}>
+              {isMobile ? "Dossier →" : "Fiscal Dossier →"}
             </Text>
           </TouchableOpacity>
         </View>
@@ -525,19 +535,36 @@ export function WebDashboard({
 
         {/* Dynamic Cash Flow / Budget Status Bar & Labels */}
         <View style={{ gap: 7, marginTop: 2 }}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-            <Text style={{ color: "#CBD5E1", fontSize: isMobile ? 11 : 11.5, fontFamily: "Inter_500Medium" }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+            <Text
+              style={{
+                color: "#CBD5E1",
+                fontSize: isMobile ? 10.5 : 11.5,
+                fontFamily: "Inter_500Medium",
+                flexShrink: 1,
+              }}
+              numberOfLines={1}
+            >
               {totalAllocatedBudget > 0
-                ? `Available to Allocate: ${settings.currency} ${fmt(availableToAllocate)}`
+                ? (isMobile ? `To Allocate: ${settings.currency} ${fmt(availableToAllocate)}` : `Available to Allocate: ${settings.currency} ${fmt(availableToAllocate)}`)
                 : totalExpenses === 0
                 ? "0% Outflows"
-                : `${expensePctOfIncome}% Income Spent`}
+                : (isMobile ? `${expensePctOfIncome}% Spent` : `${expensePctOfIncome}% Income Spent`)}
             </Text>
-            <Text style={{ color: isEffectiveDeficit ? "#FB7185" : "#34D399", fontSize: isMobile ? 11 : 11.5, fontFamily: "Inter_700Bold" }}>
+            <Text
+              style={{
+                color: isEffectiveDeficit ? "#FB7185" : "#34D399",
+                fontSize: isMobile ? 10.5 : 11.5,
+                fontFamily: "Inter_700Bold",
+                textAlign: "right",
+                flexShrink: 0,
+              }}
+              numberOfLines={1}
+            >
               {totalAllocatedBudget > 0
-                ? `Remaining Budget: ${settings.currency} ${fmt(netBudgetRemaining)} (${budgetUsedPct}% Spent)`
+                ? (isMobile ? `Remaining: ${settings.currency} ${fmt(netBudgetRemaining)} (${budgetUsedPct}%)` : `Remaining Budget: ${settings.currency} ${fmt(netBudgetRemaining)} (${budgetUsedPct}% Spent)`)
                 : isDeficit
-                ? `Operating Deficit (-${settings.currency} ${fmt(totalExpenses - totalIncome)})`
+                ? (isMobile ? `Deficit (-${settings.currency} ${fmt(totalExpenses - totalIncome)})` : `Operating Deficit (-${settings.currency} ${fmt(totalExpenses - totalIncome)})`)
                 : `${incomeRetainedPct}% Retained`}
             </Text>
           </View>
