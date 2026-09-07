@@ -27,6 +27,7 @@ import {
 import {
   buildAuthoritativeFinancialModel,
   calculateBudgetAllocation,
+  calculateUnallocatedFunds,
 } from "@/services/FinancialCalculationEngine";
 import { FinancialAnalyticsSuite } from "@/components/analytics/FinancialAnalyticsSuite";
 import {
@@ -116,17 +117,19 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
     return authFinancialModel.budget.totalAllocated || calculateBudgetAllocation(budgets, departments);
   }, [authFinancialModel, budgets, departments]);
 
-  const totalFundingPool = useMemo(() => {
-    return metrics.totalIncome + totalBudgetAllocated;
+  const unallocatedFunds = useMemo(() => {
+    return calculateUnallocatedFunds(metrics.totalIncome, totalBudgetAllocated);
   }, [metrics.totalIncome, totalBudgetAllocated]);
 
-  const netCapitalSurplus = useMemo(() => {
-    return totalFundingPool - metrics.totalExpense;
-  }, [totalFundingPool, metrics.totalExpense]);
+  const netCash = useMemo(() => {
+    return metrics.totalIncome - metrics.totalExpense;
+  }, [metrics.totalIncome, metrics.totalExpense]);
+
+  const netCapitalSurplus = netCash;
 
   const retainedCapitalPct = useMemo(() => {
-    return totalFundingPool > 0 ? (netCapitalSurplus / totalFundingPool) * 100 : 0;
-  }, [netCapitalSurplus, totalFundingPool]);
+    return metrics.totalIncome > 0 ? (Math.max(0, netCash) / metrics.totalIncome) * 100 : 0;
+  }, [netCash, metrics.totalIncome]);
 
   // Chart aggregated points for AreaLineChart
   const chartPoints = useMemo(
@@ -430,23 +433,23 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
         {totalBudgetAllocated > 0 ? (
           <>
             <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 180 }]}>
-              <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>BUDGET ALLOCATION (CAPACITY)</Text>
+              <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>DEPARTMENT BUDGET</Text>
               <Text style={[styles.metricValue, { color: colors.primary }]}>
                 {settings.currency} {fmtShort(totalBudgetAllocated)}
               </Text>
               <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
-                {settings.currency} {fmtShort(totalFundingPool)} Total Available Pool
+                {settings.currency} {fmtShort(unallocatedFunds)} Unallocated Funds
               </Text>
             </View>
 
             <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 180 }]}>
-              <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>NET CAPITAL SURPLUS</Text>
+              <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>NET CASH POSITION</Text>
               <Text style={[styles.metricValue, { color: netCapitalSurplus >= 0 ? colors.income : colors.expense }]}>
                 {netCapitalSurplus >= 0 ? "+" : "-"}
                 {settings.currency} {fmtShort(Math.abs(netCapitalSurplus))}
               </Text>
               <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
-                {retainedCapitalPct.toFixed(1)}% Retained · +{settings.currency} {fmtShort(metrics.netBalance)} Cashflow
+                {retainedCapitalPct.toFixed(1)}% Income Retained
               </Text>
             </View>
           </>
@@ -566,18 +569,11 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
               </Text>
             </View>
 
-            {/* Capital Pool & Budget Allocation Reconciliation */}
+            {/* Department Budget & Unallocated Funds Reconciliation */}
             {totalBudgetAllocated > 0 && (
               <View style={{ gap: 8, marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.border }}>
-                <Text style={[styles.sectionHeading, { color: colors.primary }]}>CAPITAL POOL & BUDGET CAPACITY RECONCILIATION</Text>
+                <Text style={[styles.sectionHeading, { color: colors.primary }]}>DEPARTMENT BUDGET & UNALLOCATED FUNDS RECONCILIATION</Text>
                 
-                <View style={[styles.statementRow, { borderBottomColor: colors.border }]}>
-                  <Text style={[styles.statementLabel, { color: colors.foreground }]}>Approved Fiscal Budget Allocation</Text>
-                  <Text style={[styles.statementAmount, { color: colors.primary }]}>
-                    +{settings.currency} {fmt(totalBudgetAllocated)}
-                  </Text>
-                </View>
-
                 <View style={[styles.statementRow, { borderBottomColor: colors.border }]}>
                   <Text style={[styles.statementLabel, { color: colors.foreground }]}>Recognized Revenue Inflows</Text>
                   <Text style={[styles.statementAmount, { color: colors.income }]}>
@@ -585,10 +581,17 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
                   </Text>
                 </View>
 
+                <View style={[styles.statementRow, { borderBottomColor: colors.border }]}>
+                  <Text style={[styles.statementLabel, { color: colors.foreground }]}>Approved Department Budget Allocation</Text>
+                  <Text style={[styles.statementAmount, { color: colors.primary }]}>
+                    {settings.currency} {fmt(totalBudgetAllocated)}
+                  </Text>
+                </View>
+
                 <View style={[styles.statementTotalRow, { backgroundColor: colors.primary + "12", borderColor: colors.primary + "30" }]}>
-                  <Text style={[styles.statementTotalLabel, { color: colors.primary }]}>Total Available Capital Pool</Text>
+                  <Text style={[styles.statementTotalLabel, { color: colors.primary }]}>Unallocated Available Funds (Income - Budget)</Text>
                   <Text style={[styles.statementTotalVal, { color: colors.primary }]}>
-                    {settings.currency} {fmt(totalFundingPool)}
+                    {settings.currency} {fmt(unallocatedFunds)}
                   </Text>
                 </View>
 
@@ -601,19 +604,19 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
 
                 <View style={[styles.netSurplusBox, { backgroundColor: colors.income + "15", borderColor: colors.income + "40" }]}>
                   <View>
-                    <Text style={[styles.netSurplusLabel, { color: colors.foreground, fontSize: 11 }]}>NET CAPITAL SURPLUS REMAINING</Text>
+                    <Text style={[styles.netSurplusLabel, { color: colors.foreground, fontSize: 11 }]}>NET CASH POSITION (INCOME - EXPENSES)</Text>
                     <Text style={{ fontSize: 11, color: colors.mutedForeground, marginTop: 2 }}>
-                      {retainedCapitalPct.toFixed(1)}% of Capital Pool Retained · +{settings.currency} {fmt(metrics.netBalance)} Cashflow
+                      {retainedCapitalPct.toFixed(1)}% of Revenue Retained · {netCash >= 0 ? "+" : "-"}{settings.currency} {fmt(Math.abs(netCash))} Cashflow
                     </Text>
                   </View>
                   <Text
                     style={[
                       styles.netSurplusValue,
-                      { color: netCapitalSurplus >= 0 ? colors.income : colors.expense, fontSize: 18 },
+                      { color: netCash >= 0 ? colors.income : colors.expense, fontSize: 18 },
                     ]}
                   >
-                    {netCapitalSurplus >= 0 ? "+" : "-"}
-                    {settings.currency} {fmt(Math.abs(netCapitalSurplus))}
+                    {netCash >= 0 ? "+" : "-"}
+                    {settings.currency} {fmt(Math.abs(netCash))}
                   </Text>
                 </View>
               </View>

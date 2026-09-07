@@ -51,7 +51,7 @@ export function WebExpenses({ onOpenReport }: WebExpensesProps) {
 
   // Categories list
   const categories = useMemo(() => {
-    const defaultCats = ["All", "Salaries", "Utilities", "Equipment", "Research", "Maintenance", "Travel", "Other"];
+    const defaultCats = ["All", "Salary / Payroll", "Salaries", "Utilities", "Equipment", "Research", "Maintenance", "Travel", "Other"];
     const dynamicCats = expenseTransactions.map((t) => t.category).filter(Boolean);
     return Array.from(new Set([...defaultCats, ...dynamicCats]));
   }, [expenseTransactions]);
@@ -78,6 +78,7 @@ export function WebExpenses({ onOpenReport }: WebExpensesProps) {
         (t.category || "").toLowerCase().includes(search.toLowerCase()) ||
         (t.description || "").toLowerCase().includes(search.toLowerCase()) ||
         (t.department && (t.department || "").toLowerCase().includes(search.toLowerCase())) ||
+        (t.employeeName && (t.employeeName || "").toLowerCase().includes(search.toLowerCase())) ||
         (t.referenceNumber && (t.referenceNumber || "").toLowerCase().includes(search.toLowerCase()));
 
       const matchCat = selectedCategory === "All" || selectedCategory === "all" || t.category === selectedCategory;
@@ -316,9 +317,18 @@ export function WebExpenses({ onOpenReport }: WebExpensesProps) {
                   </Text>
                 </View>
 
-                <Text style={[styles.mobileDesc, { color: colors.foreground }]}>
-                  {tx.description || "No description provided"}
-                </Text>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                  <Text style={[styles.mobileDesc, { color: colors.foreground }]}>
+                    {tx.description || "No description provided"}
+                  </Text>
+                  {(tx.expenseSource === "payroll" || tx.payrollId) && (
+                    <View style={[styles.payrollBadge, { backgroundColor: "#8B5CF618", borderColor: "#8B5CF630" }]}>
+                      <Text style={[styles.payrollBadgeText, { color: "#8B5CF6" }]}>
+                        💼 Payroll · {tx.employeeName || "Staff"}
+                      </Text>
+                    </View>
+                  )}
+                </View>
 
                 <View style={styles.mobileCardMeta}>
                   <Text style={[styles.mobileMetaText, { color: colors.mutedForeground }]}>
@@ -445,9 +455,18 @@ export function WebExpenses({ onOpenReport }: WebExpensesProps) {
                     </View>
 
                     <View style={[styles.tdCol, { flex: 1, minWidth: 120, paddingHorizontal: 6, overflow: "hidden" }]}>
-                      <Text style={[styles.descText, { color: colors.foreground }]} numberOfLines={1}>
-                        {tx.description || "No description provided"}
-                      </Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        <Text style={[styles.descText, { color: colors.foreground }]} numberOfLines={1}>
+                          {tx.description || "No description provided"}
+                        </Text>
+                        {(tx.expenseSource === "payroll" || tx.payrollId) && (
+                          <View style={[styles.payrollBadge, { backgroundColor: "#8B5CF618", borderColor: "#8B5CF630" }]}>
+                            <Text style={[styles.payrollBadgeText, { color: "#8B5CF6" }]}>
+                              💼 Payroll · {tx.employeeName || "Staff"}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
                       <Text style={[styles.refText, { color: colors.mutedForeground }]} numberOfLines={1}>
                         {tx.referenceNumber || `TXN-${tx.id.slice(-6).toUpperCase()}`}
                       </Text>
@@ -811,5 +830,15 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     fontFamily: "Inter_400Regular",
     textAlign: "center",
+  },
+  payrollBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 4,
+    borderWidth: 1,
+  },
+  payrollBadgeText: {
+    fontSize: 10,
+    fontFamily: "Inter_700Bold",
   },
 });

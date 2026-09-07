@@ -17,6 +17,7 @@ const CATEGORY_ICONS: Record<string, string> = {
   "Fee Collection": "dollar-sign",
   "Research Grant": "book-open",
   Donation: "heart",
+  "Salary / Payroll": "users",
   Salaries: "users",
   Utilities: "zap",
   Equipment: "monitor",
@@ -78,9 +79,18 @@ export function TransactionItem(props: TransactionItemProps) {
 
       {/* Info */}
       <View style={styles.info}>
-        <Text style={[styles.category, { color: colors.foreground }]}>
-          {tx.title || tx.category}
-        </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+          <Text style={[styles.category, { color: colors.foreground }]}>
+            {tx.title || tx.category}
+          </Text>
+          {(tx.expenseSource === "payroll" || tx.payrollId) && (
+            <View style={{ backgroundColor: "#8B5CF618", borderColor: "#8B5CF630", borderWidth: 1, paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4 }}>
+              <Text style={{ fontSize: 9.5, color: "#8B5CF6", fontFamily: "Inter_700Bold" }}>
+                💼 Payroll{tx.employeeName ? ` · ${tx.employeeName}` : ""}
+              </Text>
+            </View>
+          )}
+        </View>
         <Text style={[styles.dept, { color: colors.mutedForeground }]}>
           {tx.department || "General"} · {formatDate(tx.date)}
         </Text>

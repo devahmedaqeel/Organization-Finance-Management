@@ -1,14 +1,22 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View, ScrollView, useWindowDimensions, Platform } from "react-native";
 import { Budget, useFinance } from "@/context/FinanceContext";
 import { useColors } from "@/hooks/useColors";
 import { useSettings } from "@/context/SettingsContext";
+import {
+  calculateTotalIncome,
+  calculateTotalExpenses,
+  calculateBudgetAllocation,
+  validateBudgetAllocationAgainstNetCash,
+} from "@/services/FinancialCalculationEngine";
 import {
   SvgPieChart,
   SvgPlus,
   SvgCheck,
   SvgX,
 } from "../SvgIcons";
+
+export const ALL_CATEGORIES_BUDGET = "All Categories (Department Pool)";
 
 const BUDGET_CATEGORIES = [
   "Salaries",
@@ -27,20 +35,35 @@ interface WebBudgetModalProps {
   visible: boolean;
   onClose: () => void;
   budgetToEdit?: Budget | null;
+  initialDepartment?: string;
 }
 
-export function WebBudgetModal({ visible, onClose, budgetToEdit }: WebBudgetModalProps) {
+export function WebBudgetModal({ visible, onClose, budgetToEdit, initialDepartment }: WebBudgetModalProps) {
   const colors = useColors();
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
 
-  const { settings } = useSettings();
-  const { addBudget, updateBudget, departments } = useFinance();
+  const { settings, addCustomCategory } = useSettings();
+  const { addBudget, updateBudget, departments, transactions, budgets, updateDepartment } = useFinance();
 
   const isEditing = Boolean(budgetToEdit);
 
+  const netCash = useMemo(() => {
+    return calculateTotalIncome(transactions) - calculateTotalExpenses(transactions);
+  }, [transactions]);
+
+  const totalAllocated = useMemo(() => {
+    return calculateBudgetAllocation(budgets, departments);
+  }, [budgets, departments]);
+
+  const unallocatedNetCash = useMemo(() => {
+    return Math.max(0, netCash - totalAllocated);
+  }, [netCash, totalAllocated]);
+
   const [department, setDepartment] = useState("");
-  const [category, setCategory] = useState(BUDGET_CATEGORIES[0]);
+  const [category, setCategory] = useState(ALL_CATEGORIES_BUDGET);
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [newCatInput, setNewCatInput] = useState("");
   const [allocated, setAllocated] = useState("");
   const [period, setPeriod] = useState(new Date().toISOString().substring(0, 7)); // YYYY-MM
   const [alertThreshold, setAlertThreshold] = useState("80");
@@ -49,24 +72,93 @@ export function WebBudgetModal({ visible, onClose, budgetToEdit }: WebBudgetModa
   const [submitting, setSubmitting] = useState(false);
   const [focusedField, setFocusedField] = useState<"allocated" | "period" | "notes" | null>(null);
 
+  const availableCategories = useMemo(() => {
+    const list: string[] = [ALL_CATEGORIES_BUDGET];
+    const seen = new Set<string>([ALL_CATEGORIES_BUDGET.toLowerCase()]);
+
+    // 1. Matched department's configured categories
+    const matchedDept = departments.find(
+      (d) => d.name && d.name.trim().toLowerCase() === department.trim().toLowerCase()
+    );
+    if (matchedDept?.categories && Array.isArray(matchedDept.categories)) {
+      matchedDept.categories.forEach((c) => {
+        if (c && !seen.has(c.trim().toLowerCase())) {
+          seen.add(c.trim().toLowerCase());
+          list.push(c.trim());
+        }
+      });
+    }
+
+    // 2. Standard budget categories
+    BUDGET_CATEGORIES.forEach((c) => {
+      if (!seen.has(c.toLowerCase())) {
+        seen.add(c.toLowerCase());
+        list.push(c);
+      }
+    });
+
+    // 3. Organization custom categories
+    if (settings.customExpenseCategories && Array.isArray(settings.customExpenseCategories)) {
+      settings.customExpenseCategories.forEach((c) => {
+        if (c && !seen.has(c.trim().toLowerCase())) {
+          seen.add(c.trim().toLowerCase());
+          list.push(c.trim());
+        }
+      });
+    }
+
+    // 4. Current category if not in list
+    if (category && !seen.has(category.trim().toLowerCase())) {
+      list.push(category.trim());
+    }
+
+    return list;
+  }, [department, departments, settings.customExpenseCategories, category]);
+
   useEffect(() => {
     if (budgetToEdit) {
       setDepartment(budgetToEdit.department);
-      setCategory(budgetToEdit.category);
+      setCategory(budgetToEdit.category || ALL_CATEGORIES_BUDGET);
       setAllocated(String(budgetToEdit.allocated));
       setPeriod(budgetToEdit.period || new Date().toISOString().substring(0, 7));
       setAlertThreshold(String(budgetToEdit.alertThreshold || 80));
       setNotes(budgetToEdit.notes || "");
     } else {
-      setDepartment(departments[0]?.name || "Software Engineering");
-      setCategory(BUDGET_CATEGORIES[0]);
+      setDepartment(initialDepartment || departments[0]?.name || "Software Engineering");
+      setCategory(ALL_CATEGORIES_BUDGET);
       setAllocated("");
       setPeriod(new Date().toISOString().substring(0, 7));
       setAlertThreshold("80");
       setNotes("");
     }
+    setIsAddingCategory(false);
+    setNewCatInput("");
     setError("");
-  }, [budgetToEdit, visible, departments]);
+  }, [budgetToEdit, visible, departments, initialDepartment]);
+
+  const handleSaveCustomCategory = async () => {
+    const trimmed = newCatInput.trim();
+    if (!trimmed) return;
+    try {
+      await addCustomCategory("expense", trimmed);
+      const matchedDept = departments.find(
+        (d) => d.name && d.name.trim().toLowerCase() === department.trim().toLowerCase()
+      );
+      if (matchedDept) {
+        const existingCats = matchedDept.categories || [];
+        if (!existingCats.map((c) => c.toLowerCase()).includes(trimmed.toLowerCase())) {
+          await updateDepartment(matchedDept.id, {
+            categories: [...existingCats, trimmed],
+          });
+        }
+      }
+      setCategory(trimmed);
+      setNewCatInput("");
+      setIsAddingCategory(false);
+    } catch (e: any) {
+      console.error("Failed to add custom category:", e);
+    }
+  };
 
   const handleSubmit = async () => {
     setError("");
@@ -82,8 +174,27 @@ export function WebBudgetModal({ visible, onClose, budgetToEdit }: WebBudgetModa
 
     setSubmitting(true);
     try {
+      const validation = validateBudgetAllocationAgainstNetCash(
+        parsedAmount,
+        transactions,
+        budgets,
+        departments,
+        {
+          type: "budget",
+          editingBudgetId: budgetToEdit?.id,
+          targetDepartmentName: department,
+          currency: settings.currency || "PKR",
+        }
+      );
+
+      if (!validation.isValid) {
+        setError(validation.errorMessage || "Allocation exceeds Available Net Cash.");
+        setSubmitting(false);
+        return;
+      }
+
       if (isEditing && budgetToEdit) {
-        updateBudget(budgetToEdit.id, {
+        await updateBudget(budgetToEdit.id, {
           department,
           category,
           allocated: parsedAmount,
@@ -92,7 +203,7 @@ export function WebBudgetModal({ visible, onClose, budgetToEdit }: WebBudgetModa
           notes,
         });
       } else {
-        addBudget({
+        await addBudget({
           department,
           category,
           allocated: parsedAmount,
@@ -135,6 +246,38 @@ export function WebBudgetModal({ visible, onClose, budgetToEdit }: WebBudgetModa
 
           {/* Body */}
           <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
+            {/* Available Net Cash Status Banner */}
+            <View
+              style={[
+                styles.netCashBanner,
+                {
+                  backgroundColor: netCash <= 0 ? "#EF444415" : "#10B98115",
+                  borderColor: netCash <= 0 ? "#EF444440" : "#10B98140",
+                },
+              ]}
+            >
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <Text style={[styles.netCashBannerTitle, { color: netCash <= 0 ? "#EF4444" : "#10B981" }]}>
+                  {netCash <= 0 ? "⚠️ AVAILABLE NET CASH: INSUFFICIENT" : "✓ AVAILABLE NET CASH"}
+                </Text>
+                <Text style={[styles.netCashBannerAmount, { color: netCash <= 0 ? "#EF4444" : "#10B981" }]}>
+                  {settings.currency || "PKR"} {netCash.toLocaleString()}
+                </Text>
+              </View>
+              <Text style={[styles.netCashBannerSub, { color: colors.mutedForeground }]}>
+                {netCash <= 0
+                  ? "Department budget can only be allocated if there is balance in Available Net Cash. Please record income first."
+                  : `Remaining unallocated net cash: ${settings.currency || "PKR"} ${unallocatedNetCash.toLocaleString()}`}
+              </Text>
+            </View>
+
+            {/* Top Error Notice */}
+            {error ? (
+              <View style={[styles.errorBanner, { backgroundColor: colors.expense + "18", borderColor: colors.expense + "40", marginBottom: 8 }]}>
+                <Text style={[styles.errorText, { color: colors.expense }]}>{error}</Text>
+              </View>
+            ) : null}
+
             {/* Department */}
             <View style={styles.formGroup}>
               <Text style={[styles.label, { color: colors.mutedForeground }]}>DEPARTMENT / COST CENTER *</Text>
@@ -503,5 +646,26 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 13,
     fontFamily: "Inter_700Bold",
+  },
+  netCashBanner: {
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    gap: 4,
+    marginBottom: 8,
+  },
+  netCashBannerTitle: {
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.5,
+  },
+  netCashBannerAmount: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+  },
+  netCashBannerSub: {
+    fontSize: 11.5,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 16,
   },
 });

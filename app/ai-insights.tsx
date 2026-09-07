@@ -27,6 +27,7 @@ import {
   calculateBudgetAllocation,
   calculateBudgetUsed,
   calculateBudgetRemaining,
+  calculateUnallocatedFunds,
 } from "@/services/FinancialCalculationEngine";
 import { calculateFinancialHealth } from "@/services/financialHealthService";
 import { generateFinancialInsights, ActionableInsight } from "@/services/financialInsightsService";
@@ -167,30 +168,22 @@ export default function AIInsightsScreen() {
   const displayedExpense = useMemo(() => calculateTotalExpenses(displayedTxs), [displayedTxs]);
   const displayedNet = displayedIncome - displayedExpense;
 
-  // Total Funding Pool & Net Balance (Harmonized with Top Dashboard Hero Card)
-  const totalFundingPool = displayedIncome + totalAllocatedBudget;
-  const netSurplus = totalFundingPool - displayedExpense;
-  const authoritativeNetBalance = totalAllocatedBudget > 0 ? netSurplus : displayedNet;
+  // Core financial metrics (Harmonized with Authoritative Financial Flow)
+  const unallocatedFunds = calculateUnallocatedFunds(displayedIncome, totalAllocatedBudget);
+  const authoritativeNetBalance = displayedNet;
 
   // Real operating surplus margin
   const profitMargin = displayedIncome > 0
     ? (displayedNet / displayedIncome) * 100
     : (displayedExpense > 0 ? -100 : 0);
 
-  // Capital spend ratio (Outflows as percentage of total funding pool)
-  const capitalSpendRatio = totalFundingPool > 0
-    ? (displayedExpense / totalFundingPool) * 100
-    : (displayedExpense > 0 ? 100 : 0);
-
-  // Real expense ratio (Outflows as percentage of incoming revenue)
+  // Real expense burn ratio (Outflows as percentage of incoming revenue)
   const expenseRatio = displayedIncome > 0
     ? (displayedExpense / displayedIncome) * 100
     : (displayedExpense > 0 ? 100 : 0);
 
-  const retainedSurplusPct = totalFundingPool > 0 ? Math.max(0, Math.round(100 - capitalSpendRatio)) : 0;
-  const isFundingDeficit = netSurplus < 0;
-  const displayedSurplusPct = totalAllocatedBudget > 0 ? (isFundingDeficit ? -Math.round(capitalSpendRatio - 100) : retainedSurplusPct) : profitMargin;
-  const displayedOutflowPct = totalAllocatedBudget > 0 ? Math.min(Math.round(capitalSpendRatio), 100) : Math.min(Math.round(expenseRatio), 100);
+  const displayedSurplusPct = profitMargin;
+  const displayedOutflowPct = Math.min(Math.round(expenseRatio), 100);
 
   // Consolidated unique budgets (aggregating multiple allocations for the same category & department)
   const consolidatedBudgets = useMemo(() => {
@@ -516,7 +509,7 @@ export default function AIInsightsScreen() {
             <View style={styles.healthStats}>
               {[
                 {
-                  label: totalAllocatedBudget > 0 ? "Net Surplus" : "Net Balance",
+                  label: "Net Cash",
                   value: displayedTxs.length > 0 || authoritativeNetBalance !== 0
                     ? `${authoritativeNetBalance >= 0 ? "+" : "-"}${settings.currency} ${fmt(Math.abs(authoritativeNetBalance))}`
                     : `${settings.currency} 0`,
@@ -547,14 +540,14 @@ export default function AIInsightsScreen() {
                       color: incomeGrowth >= 0 ? "#10B981" : "#F43F5E",
                     }
                   : {
-                      label: totalAllocatedBudget > 0 ? "Capital Spent" : "Burn Rate",
+                      label: totalAllocatedBudget > 0 ? "Unallocated" : "Burn Rate",
                       value: totalAllocatedBudget > 0
-                        ? `${capitalSpendRatio.toFixed(1)}%`
+                        ? `${settings.currency} ${fmt(unallocatedFunds)}`
                         : (displayedIncome > 0 || displayedExpense > 0)
                         ? `${expenseRatio.toFixed(1)}%`
                         : "N/A",
                       color: totalAllocatedBudget > 0
-                        ? (capitalSpendRatio <= 50 ? "#10B981" : capitalSpendRatio <= 85 ? "#F59E0B" : "#F43F5E")
+                        ? (unallocatedFunds > 0 ? "#10B981" : "#F59E0B")
                         : (displayedIncome > 0 || displayedExpense > 0)
                         ? (expenseRatio <= 65 ? "#10B981" : expenseRatio <= 85 ? "#F59E0B" : "#F43F5E")
                         : "#94A3B8",

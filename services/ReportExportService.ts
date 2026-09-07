@@ -766,34 +766,35 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
     `;
     } else {
       const hasBudget = (executiveSummary.budgetTotal || 0) > 0;
-      const totalFundingPool = executiveSummary.totalFundingPool || (executiveSummary.totalRevenue + (executiveSummary.budgetTotal || 0));
-      const netCapitalSurplus = executiveSummary.netCapitalSurplus !== undefined ? executiveSummary.netCapitalSurplus : (totalFundingPool - executiveSummary.totalExpenses);
-      const isSurplusPositive = netCapitalSurplus >= 0;
-      const retainedPct = totalFundingPool > 0 ? (netCapitalSurplus / totalFundingPool) * 100 : 0;
+      const unallocatedFunds = executiveSummary.unallocatedFunds !== undefined
+        ? executiveSummary.unallocatedFunds
+        : Math.max(0, executiveSummary.totalRevenue - (executiveSummary.budgetTotal || 0));
+      const netCash = executiveSummary.netOperatingBalance;
+      const isNetPositive = executiveSummary.isNetPositive;
 
       if (hasBudget) {
         kpisHtml = `
       <div class="kpi-card">
-        <div class="kpi-label">Total Realized Inflows</div>
+        <div class="kpi-label">Total Income</div>
         <div class="kpi-val" style="color: #10B981;">+${currency} ${fmt(executiveSummary.totalRevenue)}</div>
         <div class="kpi-sub">${revenueAnalysis.transactions.length} Inflow Receipts</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">Total Realized Expenses</div>
+        <div class="kpi-label">Total Expenses</div>
         <div class="kpi-val" style="color: #F43F5E;">-${currency} ${fmt(executiveSummary.totalExpenses)}</div>
         <div class="kpi-sub">${executiveSummary.budgetUtilizationPct.toFixed(1)}% of Budget Used</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">Authorized Budget Capacity</div>
+        <div class="kpi-label">Department Budget</div>
         <div class="kpi-val" style="color: #3B82F6;">${currency} ${fmt(executiveSummary.budgetTotal)}</div>
-        <div class="kpi-sub">${currency} ${fmtShort(totalFundingPool)} Total Available Pool</div>
+        <div class="kpi-sub">${currency} ${fmtShort(unallocatedFunds)} Unallocated Funds</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">Net Capital Surplus</div>
-        <div class="kpi-val" style="color: ${isSurplusPositive ? "#10B981" : "#F43F5E"};">
-          ${isSurplusPositive ? "+" : "-"}${currency} ${fmt(Math.abs(netCapitalSurplus))}
+        <div class="kpi-label">Net Cash Position</div>
+        <div class="kpi-val" style="color: ${isNetPositive ? "#10B981" : "#F43F5E"};">
+          ${isNetPositive ? "+" : "-"}${currency} ${fmt(Math.abs(netCash))}
         </div>
-        <div class="kpi-sub">${retainedPct.toFixed(1)}% Retained · ${currency} ${fmtShort(executiveSummary.netOperatingBalance)} Cashflow</div>
+        <div class="kpi-sub">${currency} ${fmt(executiveSummary.budgetRemaining)} Remaining Budget</div>
       </div>
     `;
       } else {
@@ -1086,14 +1087,14 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
         </tr>
         ${(executiveSummary.budgetTotal || 0) > 0 ? `
         <tr>
-          <td style="text-align: left; font-weight:700; color:#3B82F6;">B. Approved Fiscal Budget Capital Allocation</td>
-          <td class="num" style="color:#3B82F6; font-weight:700;">+${currency} ${fmt(executiveSummary.budgetTotal)}</td>
+          <td style="text-align: left; font-weight:700; color:#3B82F6;">B. Department Budget Allocation (Funded from Income)</td>
+          <td class="num" style="color:#3B82F6; font-weight:700;">${currency} ${fmt(executiveSummary.budgetTotal)}</td>
           <td style="text-align: center; color:#3B82F6;">${departmentFinancials.departments.length} Cost Centers Monitored</td>
         </tr>
         <tr style="background:#F1F5F9; font-weight:800;">
-          <td style="text-align: left; color:#0F172A;">TOTAL AUTHORIZED CAPITAL POOL (A + B)</td>
-          <td class="num" style="color:#0F172A; font-weight:800;">${currency} ${fmt(executiveSummary.totalFundingPool || (executiveSummary.totalRevenue + (executiveSummary.budgetTotal || 0)))}</td>
-          <td style="text-align: center; font-weight:800;">100% Capital Pool</td>
+          <td style="text-align: left; color:#0F172A;">UNALLOCATED AVAILABLE FUNDS (Income − Budget)</td>
+          <td class="num" style="color:#0F172A; font-weight:800;">${currency} ${fmt(executiveSummary.unallocatedFunds !== undefined ? executiveSummary.unallocatedFunds : Math.max(0, executiveSummary.totalRevenue - (executiveSummary.budgetTotal || 0)))}</td>
+          <td style="text-align: center; font-weight:800;">Liquid Reserve</td>
         </tr>
         ` : ""}
         <tr class="even">
@@ -1392,10 +1393,12 @@ export function buildFinancialPdfBinary(input: ReportOptions | EnterpriseReportD
   const netBalance = executiveSummary.netOperatingBalance;
   const isNetPositive = executiveSummary.isNetPositive;
   const hasBudget = (executiveSummary.budgetTotal || 0) > 0;
-  const totalFundingPool = executiveSummary.totalFundingPool || (totalIncome + (executiveSummary.budgetTotal || 0));
-  const netCapitalSurplus = executiveSummary.netCapitalSurplus !== undefined ? executiveSummary.netCapitalSurplus : (totalFundingPool - totalExpenses);
-  const isSurplusPositive = netCapitalSurplus >= 0;
-  const retainedPct = totalFundingPool > 0 ? (netCapitalSurplus / totalFundingPool) * 100 : 0;
+  const unallocatedFunds = executiveSummary.unallocatedFunds !== undefined
+    ? executiveSummary.unallocatedFunds
+    : Math.max(0, totalIncome - (executiveSummary.budgetTotal || 0));
+  const netCapitalSurplus = netBalance;
+  const isSurplusPositive = isNetPositive;
+  const retainedPct = totalIncome > 0 ? (Math.max(0, netBalance) / totalIncome) * 100 : 0;
   const orgName = metadata.organizationName;
   const generatedBy = metadata.generatedBy;
   const dateStr = metadata.generatedDate;

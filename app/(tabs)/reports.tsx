@@ -29,6 +29,9 @@ import {
 } from "@/services/DatePeriodService";
 import {
   buildAuthoritativeFinancialModel,
+  calculateBudgetAllocation,
+  calculateBudgetUsed,
+  calculateUnallocatedFunds,
 } from "@/services/FinancialCalculationEngine";
 import { FinancialAnalyticsSuite } from "@/components/analytics/FinancialAnalyticsSuite";
 
@@ -184,12 +187,14 @@ export default function ReportsScreen() {
     }));
   }, [periodTransactions, departments]);
 
-  const totalAllocatedBudget = (budgets || []).reduce((s, b) => s + (b.allocated || 0), 0);
+  const totalAllocatedBudget = calculateBudgetAllocation(budgets, departments);
+  const totalBudgetSpent = calculateBudgetUsed(periodTransactions, budgets, undefined, departments);
   const budgetUtilPct =
-    totalAllocatedBudget > 0 ? ((metrics?.totalExpense || 0) / totalAllocatedBudget) * 100 : 0;
-  const totalFundingPool = (metrics?.totalIncome || 0) + totalAllocatedBudget;
-  const netCapitalSurplus = totalFundingPool - (metrics?.totalExpense || 0);
-  const retainedCapitalPct = totalFundingPool > 0 ? (netCapitalSurplus / totalFundingPool) * 100 : 0;
+    totalAllocatedBudget > 0 ? (totalBudgetSpent / totalAllocatedBudget) * 100 : 0;
+  const unallocatedFunds = calculateUnallocatedFunds(metrics?.totalIncome || 0, totalAllocatedBudget);
+  const netCash = (metrics?.totalIncome || 0) - (metrics?.totalExpense || 0);
+  const netCapitalSurplus = netCash;
+  const retainedCapitalPct = (metrics?.totalIncome || 0) > 0 ? (Math.max(0, netCash) / (metrics?.totalIncome || 1)) * 100 : 0;
 
   const handleExportPDF = async () => {
     if (Platform.OS !== "web") {
@@ -342,23 +347,23 @@ export default function ReportsScreen() {
 
             <View style={styles.kpiRow}>
               <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>BUDGET ALLOCATED</Text>
+                <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>DEPARTMENT BUDGET</Text>
                 <Text style={[styles.kpiVal, { color: colors.primary }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                   {settings.currency} {fmt(totalAllocatedBudget)}
                 </Text>
                 <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
-                  Pool: {settings.currency} {fmt(totalFundingPool)}
+                  Unallocated: {settings.currency} {fmt(unallocatedFunds)}
                 </Text>
               </View>
 
               <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>NET CAPITAL SURPLUS</Text>
+                <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>NET CASH POSITION</Text>
                 <Text style={[styles.kpiVal, { color: netCapitalSurplus >= 0 ? colors.income : colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                   {netCapitalSurplus >= 0 ? "+" : "-"}
                   {settings.currency} {fmt(Math.abs(netCapitalSurplus))}
                 </Text>
                 <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
-                  {retainedCapitalPct.toFixed(0)}% Retained · {metrics.netBalance >= 0 ? "+" : ""}{fmt(metrics.netBalance)} Cash
+                  {retainedCapitalPct.toFixed(0)}% Income Retained
                 </Text>
               </View>
             </View>

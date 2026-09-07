@@ -34,14 +34,6 @@ interface Props {
   onSelectIndex?: (index: number | null) => void;
 }
 
-function fmtVal(n: number) {
-  if (Math.abs(n) >= 1000000) return `${(n / 1000000).toFixed(2)}M`;
-  if (Math.abs(n) >= 1000) {
-    const val = n / 1000;
-    return val % 1 === 0 ? `${val.toFixed(0)}K` : `${val.toFixed(1)}K`;
-  }
-  return n.toLocaleString();
-}
 
 function polarToCartesian(
   centerX: number,
@@ -108,7 +100,7 @@ export function DonutChart({
   const effectiveIndex = useMemo(() => {
     if (selectedIndex !== undefined && selectedIndex !== null) return selectedIndex;
     if (selectedLabel !== undefined) {
-      if (!selectedLabel) return null;
+      if (!selectedLabel || selectedLabel === "all" || selectedLabel === "All") return null;
       const idx = segments.findIndex(
         (s) => s.label.trim().toLowerCase() === selectedLabel.trim().toLowerCase()
       );
@@ -374,7 +366,7 @@ export function DonutChart({
                   numberOfLines={1}
                   adjustsFontSizeToFit
                 >
-                  {currency} {fmtVal(activeSegment.value)}
+                  {currency} {Number(activeSegment.value || 0).toLocaleString()}
                 </Text>
                 <Text
                   style={[
@@ -422,7 +414,7 @@ export function DonutChart({
                   numberOfLines={1}
                   adjustsFontSizeToFit
                 >
-                  {centerLabel || `${currency} ${fmtVal(total)}`}
+                  {centerLabel || `${currency} ${Number(total || 0).toLocaleString()}`}
                 </Text>
                 <Text
                   style={[
@@ -474,17 +466,28 @@ export function DonutChart({
                     >
                       {seg.label}
                     </Text>
-                    <Text
-                      style={[
-                        styles.legendValue,
-                        {
-                          color: isSelected ? seg.color : colors.foreground,
-                          fontFamily: isSelected ? "Inter_700Bold" : "Inter_600SemiBold",
-                        },
-                      ]}
-                    >
-                      {pct}
-                    </Text>
+                    <View style={{ alignItems: "flex-end" }}>
+                      <Text
+                        style={[
+                          styles.legendValue,
+                          {
+                            color: isSelected ? seg.color : colors.foreground,
+                            fontFamily: isSelected ? "Inter_700Bold" : "Inter_600SemiBold",
+                          },
+                        ]}
+                      >
+                        {currency} {Number(seg.value || 0).toLocaleString()}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 10.5,
+                          fontFamily: "Inter_500Medium",
+                          color: isSelected ? seg.color : colors.mutedForeground,
+                        }}
+                      >
+                        {pct}
+                      </Text>
+                    </View>
                   </View>
                 </TouchableOpacity>
               );

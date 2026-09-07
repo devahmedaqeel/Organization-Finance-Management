@@ -19,7 +19,7 @@ import { Transaction } from "@/context/FinanceContext";
 import { useColors } from "@/hooks/useColors";
 import { useSettings } from "@/context/SettingsContext";
 
-const CATS = ["All", "Salaries", "Utilities", "Equipment", "Research", "Maintenance", "Travel", "Other"];
+const CATS = ["All", "Salary / Payroll", "Salaries", "Utilities", "Equipment", "Research", "Maintenance", "Travel", "Other"];
 
 export default function ExpensesScreen() {
   const colors = useColors();
@@ -49,7 +49,9 @@ export default function ExpensesScreen() {
         search.trim() === "" ||
         t.category.toLowerCase().includes(search.toLowerCase()) ||
         t.department.toLowerCase().includes(search.toLowerCase()) ||
-        t.description.toLowerCase().includes(search.toLowerCase())
+        t.description.toLowerCase().includes(search.toLowerCase()) ||
+        (t.employeeName && t.employeeName.toLowerCase().includes(search.toLowerCase())) ||
+        (t.referenceNumber && t.referenceNumber.toLowerCase().includes(search.toLowerCase()))
       ),
     [transactions, search, filterCat]
   );

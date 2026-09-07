@@ -1,8 +1,13 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View, ScrollView, useWindowDimensions } from "react-native";
 import { Department, useFinance } from "@/context/FinanceContext";
 import { useColors } from "@/hooks/useColors";
 import { useSettings } from "@/context/SettingsContext";
+import {
+  calculateTotalIncome,
+  calculateTotalExpenses,
+  validateBudgetAllocationAgainstNetCash,
+} from "@/services/FinancialCalculationEngine";
 import {
   SvgLayers,
   SvgPlus,
@@ -22,9 +27,13 @@ export function WebDepartmentModal({ visible, onClose, deptToEdit }: WebDepartme
   const isMobile = width < 768;
 
   const { settings } = useSettings();
-  const { addDepartment, updateDepartment } = useFinance();
+  const { addDepartment, updateDepartment, transactions, budgets, departments } = useFinance();
 
   const isEditing = Boolean(deptToEdit);
+
+  const netCash = useMemo(() => {
+    return calculateTotalIncome(transactions) - calculateTotalExpenses(transactions);
+  }, [transactions]);
 
   const [name, setName] = useState("");
   const [headCount, setHeadCount] = useState("");
@@ -62,6 +71,26 @@ export function WebDepartmentModal({ visible, onClose, deptToEdit }: WebDepartme
     }
     const numHeadCount = parseInt(headCount) || 0;
     const numBudget = parseFloat(budgetAllocated) || 0;
+
+    if (numBudget > 0) {
+      const validation = validateBudgetAllocationAgainstNetCash(
+        numBudget,
+        transactions,
+        budgets,
+        departments,
+        {
+          type: "department",
+          editingDepartmentId: deptToEdit?.id,
+          targetDepartmentName: name.trim(),
+          currency: settings.currency || "PKR",
+        }
+      );
+
+      if (!validation.isValid) {
+        setError(validation.errorMessage || "Department budget exceeds Available Net Cash.");
+        return;
+      }
+    }
 
     setSubmitting(true);
     setError("");
@@ -179,6 +208,11 @@ export function WebDepartmentModal({ visible, onClose, deptToEdit }: WebDepartme
                   onChangeText={setBudgetAllocated}
                 />
               </View>
+              <Text style={{ fontSize: 11, color: netCash <= 0 ? "#EF4444" : colors.mutedForeground, marginTop: 4 }}>
+                {netCash <= 0
+                  ? `⚠️ Available Net Cash is ${settings.currency} ${netCash.toLocaleString()} (No budget can be allocated)`
+                  : `Available Net Cash: ${settings.currency} ${netCash.toLocaleString()}`}
+              </Text>
             </View>
 
             {/* Head of Department & Contact */}

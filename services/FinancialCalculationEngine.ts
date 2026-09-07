@@ -32,6 +32,11 @@ export interface Transaction {
   addedBy?: string;
   createdAt?: string;
   budgetId?: string | null;
+  expenseSource?: "manual" | "payroll" | "reimbursement" | "invoice" | string;
+  payrollId?: string;
+  employeeId?: string;
+  employeeName?: string;
+  referenceNumber?: string;
 }
 
 export interface Budget {
@@ -50,6 +55,7 @@ export interface Department {
   name: string;
   headCount?: number;
   budgetAllocated?: number;
+  categories?: string[];
 }
 
 export interface PayrollEntry {
@@ -157,6 +163,9 @@ export interface CompleteFinancialAnalyticsModel {
   totalExpenses: number;
   netBalance: number;
   transactionCount: number;
+  totalAllocatedBudget?: number;
+  unallocatedFunds?: number;
+  departmentMetrics?: DepartmentMetric[];
 }
 
 // ============================================================================
@@ -265,20 +274,45 @@ export function calculateActualCash(
 }
 
 /**
- * 4b. TOTAL AVAILABLE FUNDS:
- * Combined organizational capital pool (Total Income + Total Budget - Total Expenses).
- * When an expense occurs (budget-linked or unbudgeted), it increases Total Expenses
- * and immediately decreases the Total Available Funds.
+ * 4b. UNALLOCATED FUNDS / TOTAL AVAILABLE FUNDS:
+ * The unallocated portion of institutional income available for department budget allocation.
+ * Formula: Math.max(0, Total Income - Total Allocated Department Budget).
+ * CRITICAL RULE: NEVER ADD BUDGET TO INCOME (£10k Income + £4k Budget != £14k).
  */
 export function calculateTotalAvailableFunds(
   totalIncome: number,
-  totalBudget: number,
-  totalExpenses: number
+  totalAllocatedBudget: number = 0,
+  _totalExpenses?: number
 ): number {
   const inc = safeNumber(totalIncome, 0);
-  const bud = safeNumber(totalBudget, 0);
-  const exp = safeNumber(totalExpenses, 0);
-  return (inc + bud) - exp;
+  const bud = safeNumber(totalAllocatedBudget, 0);
+  return Math.max(0, inc - bud);
+}
+
+export function calculateUnallocatedFunds(
+  totalIncome: number,
+  totalAllocatedBudget: number
+): number {
+  return calculateTotalAvailableFunds(totalIncome, totalAllocatedBudget);
+}
+
+/**
+ * Helper to determine if a budget's category designation represents an all-category / department-wide pool.
+ */
+export function isAllCategoryBudget(category?: string | null): boolean {
+  if (!category) return true;
+  const c = category.trim().toLowerCase();
+  return (
+    c === "" ||
+    c === "all" ||
+    c === "all categories" ||
+    c === "all categories (department pool)" ||
+    c.includes("all categories") ||
+    c === "department pool" ||
+    c.includes("department pool") ||
+    c === "general" ||
+    c === "general operations"
+  );
 }
 
 /**
@@ -312,21 +346,60 @@ export function isExpenseBudgetLinked(
     const bDept = (b.department || "").trim().toLowerCase();
     const bCat = (b.category || "").trim().toLowerCase();
     const deptMatch = !bDept || bDept === "all" || !tDept || tDept === "all" || tDept === bDept;
-    const catMatch = bCat.length > 0 && tCat === bCat;
+    const isAllCat = isAllCategoryBudget(b.category);
+    const catMatch = isAllCat || (bCat.length > 0 && tCat === bCat);
     return deptMatch && catMatch;
   });
 }
 
 /**
- * 5. BUDGET ALLOCATION: Total planned limits across line items or department caps.
- * Deduplicates by budget ID to guarantee zero double-counting.
+ * 4.5 EFFECTIVE DEPARTMENT BUDGET ALLOCATION:
+ * Computes authoritative department budget allocation by checking both:
+ * 1. The department document's direct budgetAllocated ceiling (`departments` collection)
+ * 2. Sum of allocated line-item budgets for this department in `budgets` collection (from "Department Budget Allocations" tab)
+ * Takes the maximum ceiling to guarantee that whether an Admin sets a budget in "Departments" or
+ * in "Department Budget Allocations", the system accurately recognizes the budget without false "NO BUDGET ALLOCATED" errors.
+ */
+export function calculateEffectiveDepartmentBudget(
+  departmentName: string,
+  departments?: Department[] | null,
+  budgets?: Budget[] | null
+): {
+  allocated: number;
+  matchedDept: Department | undefined;
+  deptAllocated: number;
+  budgetsAllocated: number;
+} {
+  const cleanName = (departmentName || "").trim().toLowerCase();
+  if (!cleanName) {
+    return { allocated: 0, matchedDept: undefined, deptAllocated: 0, budgetsAllocated: 0 };
+  }
+
+  const matchedDept = (departments || []).find(
+    (d) => (d.name || "").trim().toLowerCase() === cleanName
+  );
+  const deptAllocated = safeNumber(matchedDept?.budgetAllocated, 0);
+
+  const budgetsAllocated = (budgets || [])
+    .filter((b) => (b.department || "").trim().toLowerCase() === cleanName)
+    .reduce((sum, b) => sum + safeNumber(b.allocated, 0), 0);
+
+  const allocated = Math.max(deptAllocated, budgetsAllocated);
+
+  return { allocated, matchedDept, deptAllocated, budgetsAllocated };
+}
+
+/**
+ * 5. BUDGET ALLOCATION: Total planned limits across department budgets or line items.
+ * If both departments and budgets exist, computes the unified non-duplicated allocation per department
+ * (taking the effective maximum ceiling for each department).
+ * Deduplicates by ID/Department to guarantee zero double-counting.
  */
 export function calculateBudgetAllocation(
   budgets?: Budget[] | null,
   departments?: Department[]
 ): number {
-  if (budgets !== undefined && budgets !== null) {
-    if (budgets.length === 0) return 0;
+  if (budgets && (!departments || departments.length === 0)) {
     const seenBudgetIds = new Set<string>();
     return budgets.reduce((s, b) => {
       if (!b || !b.id || seenBudgetIds.has(b.id)) return s;
@@ -334,7 +407,8 @@ export function calculateBudgetAllocation(
       return s + safeNumber(b.allocated, 0);
     }, 0);
   }
-  if (departments && departments.length > 0) {
+
+  if (departments && (!budgets || budgets.length === 0)) {
     const seenDeptIds = new Set<string>();
     return departments.reduce((s, d) => {
       if (!d || !d.id || seenDeptIds.has(d.id)) return s;
@@ -342,7 +416,152 @@ export function calculateBudgetAllocation(
       return s + safeNumber(d.budgetAllocated, 0);
     }, 0);
   }
+
+  if (departments && departments.length > 0 && budgets && budgets.length > 0) {
+    const seenDepts = new Set<string>();
+    let total = 0;
+    departments.forEach((d) => {
+      const dName = (d.name || "").trim().toLowerCase();
+      seenDepts.add(dName);
+      const bAlloc = budgets
+        .filter((b) => (b.department || "").trim().toLowerCase() === dName)
+        .reduce((s, b) => s + safeNumber(b.allocated, 0), 0);
+      total += Math.max(safeNumber(d.budgetAllocated, 0), bAlloc);
+    });
+
+    budgets.forEach((b) => {
+      const bDept = (b.department || "").trim().toLowerCase();
+      if (bDept && !seenDepts.has(bDept)) {
+        seenDepts.add(bDept);
+        const bAlloc = budgets
+          .filter((item) => (item.department || "").trim().toLowerCase() === bDept)
+          .reduce((s, item) => s + safeNumber(item.allocated, 0), 0);
+        total += bAlloc;
+      }
+    });
+
+    return total;
+  }
+
   return 0;
+}
+
+export interface BudgetNetCashValidation {
+  isValid: boolean;
+  netCash: number;
+  currentTotalAllocated: number;
+  unallocatedNetCash: number;
+  maxAvailableToAllocate: number;
+  errorMessage?: string;
+}
+
+export interface BudgetNetCashValidationOptions {
+  type?: "budget" | "department";
+  editingBudgetId?: string;
+  editingDepartmentId?: string;
+  targetDepartmentName?: string;
+  currency?: string;
+}
+
+/**
+ * Validates whether a proposed budget allocation or edit is permissible against Available Net Cash.
+ * 
+ * CORE RULES:
+ * 1. Available Net Cash = Total Income - Total Expenses.
+ * 2. If Available Net Cash <= 0:
+ *    - All budget allocation is strictly rejected.
+ *    - Message: "Cannot allocate department budget because Available Net Cash is PKR 0 (or in deficit). Please record income before allocating budgets."
+ * 3. If Available Net Cash > 0:
+ *    - We simulate the resulting organization-wide total budget allocation when applying this change.
+ *    - If resultingTotalAllocation > Available Net Cash:
+ *      - Rejected!
+ *      - Message: "Requested budget (${currency} ${requestedAmount.toLocaleString()}) exceeds Available Net Cash (${currency} ${netCash.toLocaleString()})."
+ *    - If resultingTotalAllocation <= Available Net Cash:
+ *      - Approved! (isValid: true)
+ */
+export function validateBudgetAllocationAgainstNetCash(
+  requestedAmount: number,
+  transactions: Transaction[],
+  budgets: Budget[] = [],
+  departments: Department[] = [],
+  options?: BudgetNetCashValidationOptions
+): BudgetNetCashValidation {
+  const currency = options?.currency || "PKR";
+  const totalIncome = calculateTotalIncome(transactions);
+  const totalExpenses = calculateTotalExpenses(transactions);
+  const netCash = totalIncome - totalExpenses; // Available Net Cash
+
+  const currentTotalAllocated = calculateBudgetAllocation(budgets, departments);
+
+  // 1. If Net Cash is zero or negative, no department budget can be allocated
+  if (netCash <= 0) {
+    return {
+      isValid: false,
+      netCash,
+      currentTotalAllocated,
+      unallocatedNetCash: 0,
+      maxAvailableToAllocate: 0,
+      errorMessage: `Cannot allocate department budget because Available Net Cash is ${currency} ${netCash.toLocaleString()}. Please record income before allocating budgets.`,
+    };
+  }
+
+  const allocType = options?.type || (options?.editingDepartmentId ? "department" : "budget");
+  const editingBudgetId = options?.editingBudgetId;
+  const editingDeptId = options?.editingDepartmentId;
+  const targetDept = (options?.targetDepartmentName || "").trim();
+
+  // Baseline items excluding the record currently being modified
+  const otherBudgets = editingBudgetId
+    ? (budgets || []).filter((b) => b && b.id !== editingBudgetId)
+    : (budgets || []);
+
+  const otherDepts = editingDeptId
+    ? (departments || []).filter((d) => d && d.id !== editingDeptId)
+    : (departments || []);
+
+  const hypotheticalBudgets = [...otherBudgets];
+  const hypotheticalDepartments = [...otherDepts];
+
+  if (allocType === "department") {
+    const existingDept = (departments || []).find((d) => d && d.id === editingDeptId);
+    hypotheticalDepartments.push({
+      id: editingDeptId || "temp_dept_id",
+      name: targetDept || existingDept?.name || "Department",
+      budgetAllocated: requestedAmount,
+    });
+  } else {
+    const existingBudget = (budgets || []).find((b) => b && b.id === editingBudgetId);
+    hypotheticalBudgets.push({
+      id: editingBudgetId || "temp_budget_id",
+      category: existingBudget?.category || "General",
+      department: targetDept || existingBudget?.department || "General",
+      allocated: requestedAmount,
+    });
+  }
+
+  const resultingTotalAllocation = calculateBudgetAllocation(hypotheticalBudgets, hypotheticalDepartments);
+  const baselineAllocation = calculateBudgetAllocation(otherBudgets, otherDepts);
+  const unallocatedNetCash = Math.max(0, netCash - currentTotalAllocated);
+  const maxAvailableToAllocate = Math.max(0, netCash - baselineAllocation);
+
+  if (resultingTotalAllocation > netCash) {
+    return {
+      isValid: false,
+      netCash,
+      currentTotalAllocated,
+      unallocatedNetCash,
+      maxAvailableToAllocate,
+      errorMessage: `Requested budget (${currency} ${requestedAmount.toLocaleString()}) exceeds Available Net Cash (${currency} ${netCash.toLocaleString()}). Maximum available to allocate is ${currency} ${maxAvailableToAllocate.toLocaleString()}.`,
+    };
+  }
+
+  return {
+    isValid: true,
+    netCash,
+    currentTotalAllocated,
+    unallocatedNetCash,
+    maxAvailableToAllocate,
+  };
 }
 
 /**
@@ -381,7 +600,13 @@ export function calculateBudgetSpentForCategory(
       const tDept = (t.department || "").trim().toLowerCase();
       const tCat = (t.category || "").trim().toLowerCase();
       const deptMatch = !bDept || bDept === "all" || !tDept || tDept === "all" || tDept === bDept;
-      const catMatch = !bCat || bCat === "all" || (bCat.length > 0 && (tCat === bCat || (tCat === "salaries" && bCat === "payroll") || (tCat === "payroll" && bCat === "salaries")));
+      const isAllCat = isAllCategoryBudget(budget.category);
+      const catMatch =
+        isAllCat ||
+        (bCat.length > 0 &&
+          (tCat === bCat ||
+            (tCat === "salaries" && bCat === "payroll") ||
+            (tCat === "payroll" && bCat === "salaries")));
 
       if (deptMatch && catMatch) {
         seenTxIds.add(t.id);
@@ -393,21 +618,31 @@ export function calculateBudgetSpentForCategory(
 }
 
 /**
- * 7. TOTAL BUDGET USED: Sum of ONLY expenses linked/assigned to active budgets.
- * Unbudgeted expenses (no budgetId, or "unbudgeted"/"none") are strictly excluded from Budget Used.
+ * 7. TOTAL BUDGET USED: Sum of expenses under budgeted departments (or linked to active budgets).
+ * All categories in a budgeted department draw from that department's budget.
  * Deduplicates by transaction ID to ensure no double-counting.
  */
 export function calculateBudgetUsed(
   transactions: Transaction[],
-  budgets: Budget[],
-  period?: NormalizedPeriod
+  budgets?: Budget[] | null,
+  period?: NormalizedPeriod,
+  departments?: Department[]
 ): number {
-  if (!budgets || budgets.length === 0) return 0;
-  const validBudgetIds = new Set(budgets.map((b) => b && b.id).filter(Boolean));
-  if (validBudgetIds.size === 0) return 0;
-
   const txs = filterTransactionsByPeriod(transactions, period);
   const seenTxIds = new Set<string>();
+
+  const budgetedDepts = new Set<string>();
+  if (departments && departments.length > 0) {
+    departments.forEach((d) => {
+      if (d && d.name && safeNumber(d.budgetAllocated, 0) > 0) {
+        budgetedDepts.add(d.name.trim().toLowerCase());
+      }
+    });
+  }
+
+  const validBudgetIds = new Set(
+    (budgets || []).map((b) => b && b.id).filter(Boolean)
+  );
 
   return txs
     .filter((t) => {
@@ -415,7 +650,14 @@ export function calculateBudgetUsed(
       if (t.status === "failed" || (t as any).status === "deleted" || (t as any).status === "void" || (t as any).status === "cancelled") return false;
       if (seenTxIds.has(t.id)) return false;
 
-      // 1. Explicit budgetId set
+      // 1. Department Budget Pool: Any expense belonging to a department with an allocated budget
+      const tDept = (t.department || "").trim().toLowerCase();
+      if (budgetedDepts.size > 0 && budgetedDepts.has(tDept)) {
+        seenTxIds.add(t.id);
+        return true;
+      }
+
+      // 2. Explicit budgetId set
       if (t.budgetId !== undefined && t.budgetId !== null) {
         const bId = t.budgetId.trim();
         if (bId !== "" && bId !== "none" && bId !== "unbudgeted" && validBudgetIds.has(bId)) {
@@ -425,28 +667,163 @@ export function calculateBudgetUsed(
         return false;
       }
 
-      // 2. Legacy / unspecified budgetId: check if any budget matches category & dept
-      const tCat = (t.category || "").trim().toLowerCase();
-      const tDept = (t.department || "").trim().toLowerCase();
-      if (!tCat) return false;
+      // 3. Legacy / unspecified budgetId: check if any budget matches category & dept
+      if (budgets && budgets.length > 0) {
+        const tCat = (t.category || "").trim().toLowerCase();
+        if (tCat) {
+          const matchesAnyBudget = budgets.some((b) => {
+            if (!b) return false;
+            const bDept = (b.department || "").trim().toLowerCase();
+            const bCat = (b.category || "").trim().toLowerCase();
+            const deptMatch = !bDept || bDept === "all" || !tDept || tDept === "all" || tDept === bDept;
+            const isAllCat = isAllCategoryBudget(b.category);
+            const catMatch =
+              isAllCat ||
+              (bCat.length > 0 &&
+                (tCat === bCat ||
+                  (tCat === "salaries" && bCat === "payroll") ||
+                  (tCat === "payroll" && bCat === "salaries")));
+            return deptMatch && catMatch;
+          });
 
-      const matchesAnyBudget = budgets.some((b) => {
-        if (!b) return false;
-        const bDept = (b.department || "").trim().toLowerCase();
-        const bCat = (b.category || "").trim().toLowerCase();
-        const deptMatch = !bDept || bDept === "all" || !tDept || tDept === "all" || tDept === bDept;
-        const catMatch = !bCat || bCat === "all" || (bCat.length > 0 && (tCat === bCat || (tCat === "salaries" && bCat === "payroll") || (tCat === "payroll" && bCat === "salaries")));
-        return deptMatch && catMatch;
-      });
-
-      if (matchesAnyBudget) {
-        seenTxIds.add(t.id);
-        return true;
+          if (matchesAnyBudget) {
+            seenTxIds.add(t.id);
+            return true;
+          }
+        }
       }
 
       return false;
     })
     .reduce((sum, t) => sum + safeNumber(t.amount, 0), 0);
+}
+
+export interface CategorySpendItem {
+  category: string;
+  amount: number;
+  pct: number;
+}
+
+export interface DepartmentMetric {
+  id: string;
+  name: string;
+  allocated: number;
+  spent: number;
+  remaining: number;
+  utilizationPct: number;
+  status: "healthy" | "warning" | "over" | "no_budget";
+  categories: CategorySpendItem[];
+  payrollSpending: number;
+  otherSpending: number;
+}
+
+/**
+ * Authoritative Department Metrics:
+ * Calculates exact budget allocated, spent, remaining, utilization %, and category breakdown
+ * for every department.
+ */
+export function calculateDepartmentMetrics(
+  departments: Department[],
+  transactions: Transaction[],
+  period?: NormalizedPeriod,
+  budgets?: Budget[]
+): DepartmentMetric[] {
+  const txs = filterTransactionsByPeriod(transactions, period);
+
+  // Map known departments
+  const deptMap = new Map<string, Department>();
+  (departments || []).forEach((d) => {
+    if (d && d.name) {
+      deptMap.set(d.name.trim().toLowerCase(), d);
+    }
+  });
+
+  // If budgets contain departments not in deptMap, synthesize them
+  if (budgets && budgets.length > 0) {
+    budgets.forEach((b) => {
+      const bDept = (b.department || "").trim();
+      if (bDept && !deptMap.has(bDept.toLowerCase())) {
+        deptMap.set(bDept.toLowerCase(), {
+          id: `dept_synth_${bDept.toLowerCase().replace(/[^a-z0-9]/g, "_")}`,
+          name: bDept,
+          headCount: 0,
+          budgetAllocated: safeNumber(b.allocated, 0),
+        });
+      }
+    });
+  }
+
+  const allDepts = Array.from(deptMap.values());
+
+  return allDepts.map((d) => {
+    const dName = (d.name || "").trim().toLowerCase();
+    const lineBudgetsAllocated = (budgets || [])
+      .filter((b) => (b.department || "").trim().toLowerCase() === dName)
+      .reduce((s, b) => s + safeNumber(b.allocated, 0), 0);
+    const allocated = Math.max(safeNumber(d.budgetAllocated, 0), lineBudgetsAllocated);
+
+    const deptExpenses = txs.filter(
+      (t) =>
+        t &&
+        t.type === "expense" &&
+        safeNumber(t.amount, 0) > 0 &&
+        t.status !== "failed" &&
+        (t as any).status !== "deleted" &&
+        (t.department || "").trim().toLowerCase() === dName
+    );
+
+    const spent = deptExpenses.reduce((s, t) => s + safeNumber(t.amount, 0), 0);
+    const remaining = Math.max(0, allocated - spent);
+    const utilizationPct = allocated > 0 ? (spent / allocated) * 100 : 0;
+
+    const payrollSpending = deptExpenses
+      .filter(
+        (t) =>
+          (t.category || "").trim().toLowerCase() === "salary / payroll" ||
+          (t.category || "").trim().toLowerCase() === "salaries" ||
+          (t.category || "").trim().toLowerCase() === "salary" ||
+          (t.category || "").trim().toLowerCase() === "payroll" ||
+          t.expenseSource === "payroll" ||
+          (t.id && t.id.startsWith("tx_pay_"))
+      )
+      .reduce((s, t) => s + safeNumber(t.amount, 0), 0);
+    const otherSpending = Math.max(0, spent - payrollSpending);
+
+    let status: "healthy" | "warning" | "over" | "no_budget" = "healthy";
+    if (allocated <= 0) {
+      status = "no_budget";
+    } else if (spent > allocated) {
+      status = "over";
+    } else if (utilizationPct >= 80) {
+      status = "warning";
+    }
+
+    const catMap = new Map<string, number>();
+    deptExpenses.forEach((t) => {
+      const cat = (t.category || "General").trim();
+      catMap.set(cat, (catMap.get(cat) || 0) + safeNumber(t.amount, 0));
+    });
+
+    const categories: CategorySpendItem[] = Array.from(catMap.entries()).map(([cat, amt]) => ({
+      category: cat,
+      amount: amt,
+      pct: spent > 0 ? (amt / spent) * 100 : 0,
+    }));
+    categories.sort((a, b) => b.amount - a.amount);
+
+    return {
+      id: d.id,
+      name: d.name,
+      allocated,
+      spent,
+      remaining,
+      utilizationPct,
+      status,
+      categories,
+      payrollSpending,
+      otherSpending,
+    };
+  });
 }
 
 /**
@@ -836,8 +1213,10 @@ export function buildAuthoritativeFinancialModel(
   const totalExpenses = calculateTotalExpenses(filteredTxs);
   const netBalance = calculateNetOperatingResult(filteredTxs);
   const totalBudgetCap = calculateBudgetAllocation(budgets, departments);
-  const actualBudgetSpending = calculateBudgetUsed(filteredTxs, budgets, period);
+  const actualBudgetSpending = calculateBudgetUsed(filteredTxs, budgets, period, departments);
   const budget = calculateBudgetUtilization(actualBudgetSpending, totalBudgetCap, currency);
+  const unallocatedFunds = calculateUnallocatedFunds(totalIncome, totalBudgetCap);
+  const departmentMetrics = departments ? calculateDepartmentMetrics(departments, filteredTxs, period, budgets) : [];
   const prevIncome = previousPeriodTransactions ? calculateTotalIncome(filterTransactionsByPeriod(previousPeriodTransactions, period)) : undefined;
   const prevExpenses = previousPeriodTransactions ? calculateTotalExpenses(filterTransactionsByPeriod(previousPeriodTransactions, period)) : undefined;
   const margin = calculateNetOperatingMargin(totalIncome, totalExpenses, currency, prevIncome, prevExpenses, totalBudgetCap);
@@ -860,5 +1239,8 @@ export function buildAuthoritativeFinancialModel(
     totalExpenses,
     netBalance,
     transactionCount: filteredTxs.length,
+    totalAllocatedBudget: totalBudgetCap,
+    unallocatedFunds,
+    departmentMetrics,
   };
 }

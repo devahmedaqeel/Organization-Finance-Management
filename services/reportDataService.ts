@@ -24,6 +24,7 @@ import {
   calculateBudgetUsed,
   calculateBudgetSpentForCategory,
   calculateBudgetRemaining,
+  calculateUnallocatedFunds,
   safeNumber,
   formatCurrencySafe,
   formatCompactCurrency,
@@ -210,6 +211,7 @@ export interface EnterpriseReportData {
     budgetRemaining: number;
     budgetUtilizationPct: number;
     totalBudgetAllocated: number;
+    unallocatedFunds: number;
     totalFundingPool: number;
     netCapitalSurplus: number;
     retainedCapitalPct: number;
@@ -412,15 +414,17 @@ export function buildEnterpriseReportData(
   });
 
   const budgetTotal = calculateBudgetAllocation(scopedBudgets, allDepartments);
-  const budgetSpent = calculateBudgetUsed(scopedTransactions, scopedBudgets);
+  const budgetSpent = calculateBudgetUsed(scopedTransactions, scopedBudgets, undefined, allDepartments);
   const budgetRemaining = calculateBudgetRemaining(budgetTotal, budgetSpent);
   const budgetUtilizationPct = budgetTotal > 0 ? (budgetSpent / budgetTotal) * 100 : 0;
 
-  // Authoritative Capital Pool calculations matching Dashboard single-source-of-truth
+  // Authoritative Core Financial Flow:
+  // Income -> Available Funds -> Department Budget -> Expense -> Remaining Budget
   const totalBudgetAllocated = budgetTotal;
-  const totalFundingPool = totalRevenue + totalBudgetAllocated;
-  const netCapitalSurplus = totalFundingPool - totalExpenses;
-  const retainedCapitalPct = totalFundingPool > 0 ? (netCapitalSurplus / totalFundingPool) * 100 : 0;
+  const unallocatedFunds = calculateUnallocatedFunds(totalRevenue, totalBudgetAllocated);
+  const netCapitalSurplus = netOperatingBalance;
+  const totalFundingPool = totalRevenue;
+  const retainedCapitalPct = totalRevenue > 0 ? (Math.max(0, netOperatingBalance) / totalRevenue) * 100 : 0;
 
   // 7. Dynamic Financial Health Assessment
   let healthStatus: "excellent" | "healthy" | "watch" | "at_risk" | "critical" = "healthy";
@@ -445,9 +449,9 @@ export function buildEnterpriseReportData(
       healthColor = "#F43F5E";
       healthScore = 45;
     }
-  } else if (budgetTotal > 0 && netCapitalSurplus < 0) {
+  } else if (budgetTotal > 0 && budgetSpent > budgetTotal) {
     healthStatus = "critical";
-    healthLabel = "CAPITAL POOL OVERRUN";
+    healthLabel = "DEPARTMENT BUDGET OVERRUN";
     healthColor = "#E11D48";
     healthScore = 30;
   } else {
@@ -470,7 +474,7 @@ export function buildEnterpriseReportData(
   }
 
   const whyThisMatters = budgetTotal > 0
-    ? `Operating revenue of ${currency} ${formatCompactCurrency(totalRevenue)} plus approved budget of ${currency} ${formatCompactCurrency(budgetTotal)} creates an authorized capital pool of ${currency} ${formatCompactCurrency(totalFundingPool)}. Total disbursements of ${currency} ${formatCompactCurrency(totalExpenses)} leave a net capital surplus of ${currency} ${formatCompactCurrency(netCapitalSurplus)} (${retainedCapitalPct.toFixed(1)}% retained) with an operating cashflow margin of ${netProfitMarginPct.toFixed(1)}%.`
+    ? `Operating revenue of ${currency} ${formatCompactCurrency(totalRevenue)} funds authorized department budgets of ${currency} ${formatCompactCurrency(budgetTotal)}, leaving ${currency} ${formatCompactCurrency(unallocatedFunds)} in unallocated funds. Disbursements of ${currency} ${formatCompactCurrency(totalExpenses)} leave net operating cashflow of ${currency} ${formatCompactCurrency(netOperatingBalance)} (${netProfitMarginPct.toFixed(1)}% operating margin) with ${budgetUtilizationPct.toFixed(1)}% department budget utilized.`
     : isNetPositive
     ? `Operating revenue of ${currency} ${formatCompactCurrency(totalRevenue)} exceeds expenses of ${currency} ${formatCompactCurrency(totalExpenses)} by ${currency} ${formatCompactCurrency(netOperatingBalance)} (${netProfitMarginPct.toFixed(1)}% operating margin), maintaining strong cash liquidity.`
     : `Operating expenditures (${currency} ${formatCompactCurrency(totalExpenses)}) exceed realized revenues (${currency} ${formatCompactCurrency(totalRevenue)}) by ${currency} ${formatCompactCurrency(Math.abs(netOperatingBalance))}, causing an operating deficit.`;
@@ -818,6 +822,7 @@ export function buildEnterpriseReportData(
       budgetRemaining,
       budgetUtilizationPct,
       totalBudgetAllocated,
+      unallocatedFunds,
       totalFundingPool,
       netCapitalSurplus,
       retainedCapitalPct,

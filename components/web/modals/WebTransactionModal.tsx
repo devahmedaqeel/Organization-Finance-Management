@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View, ScrollView, useWindowDimensions } from "react-native";
 import { Transaction, TransactionType, useFinance } from "@/context/FinanceContext";
+import { calculateEffectiveDepartmentBudget } from "@/services/FinancialCalculationEngine";
 import { useColors } from "@/hooks/useColors";
 import { useSettings } from "@/context/SettingsContext";
 import { formatYMD } from "@/services/DatePeriodService";
@@ -13,7 +14,7 @@ import {
   SvgShield,
 } from "../SvgIcons";
 
-import { getUnifiedCategories } from "@/constants/categories";
+import { getUnifiedCategories, getDepartmentCategories } from "@/constants/categories";
 
 const PAYMENT_METHODS = ["Electronic Transfer", "Cash", "Cheque", "Credit Card", "Direct Debit"];
 
@@ -35,7 +36,7 @@ export function WebTransactionModal({
   const isMobile = width < 768;
 
   const { settings, addCustomCategory } = useSettings();
-  const { addTransaction, updateTransaction, departments, budgets } = useFinance();
+  const { addTransaction, updateTransaction, departments, budgets, transactions } = useFinance();
 
   const isEditing = Boolean(transactionToEdit);
 
@@ -54,8 +55,42 @@ export function WebTransactionModal({
   const [newCatInput, setNewCatInput] = useState("");
 
   const categories = React.useMemo(() => {
-    return getUnifiedCategories(type, settings.customIncomeCategories, settings.customExpenseCategories);
-  }, [type, settings.customIncomeCategories, settings.customExpenseCategories]);
+    if (type === "expense") {
+      return getDepartmentCategories(department, departments, settings.customExpenseCategories);
+    }
+    return getUnifiedCategories("income", settings.customIncomeCategories, settings.customExpenseCategories);
+  }, [type, department, departments, settings.customIncomeCategories, settings.customExpenseCategories]);
+
+  // Department metrics for budget validation
+  const selectedDeptMetric = React.useMemo(() => {
+    if (!department || type !== "expense") return null;
+    const clean = department.trim().toLowerCase();
+    const effectiveDept = calculateEffectiveDepartmentBudget(clean, departments, budgets);
+    const allocated = effectiveDept.allocated;
+
+    const spent = (transactions || [])
+      .filter((t) => {
+        if (t.type !== "expense" || (t.department || "").trim().toLowerCase() !== clean) return false;
+        if (isEditing && transactionToEdit && t.id === transactionToEdit.id) return false;
+        return t.status !== "failed" && (t as any).status !== "deleted";
+      })
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
+
+    const remaining = Math.max(0, allocated - spent);
+    return {
+      allocated,
+      spent,
+      remaining,
+      hasBudget: allocated > 0,
+      isExhausted: allocated > 0 && remaining <= 0,
+    };
+  }, [department, type, departments, budgets, transactions, isEditing, transactionToEdit]);
+
+  useEffect(() => {
+    if (categories.length > 0 && (!category || !categories.includes(category))) {
+      setCategory(categories[0]);
+    }
+  }, [categories]);
 
   useEffect(() => {
     if (visible) {
@@ -70,11 +105,14 @@ export function WebTransactionModal({
         setPaymentMethod(transactionToEdit.paymentMethod || "Electronic Transfer");
         setDate(transactionToEdit.date || formatYMD(new Date()));
       } else {
-        const defaultCats = getUnifiedCategories(initialType, settings.customIncomeCategories, settings.customExpenseCategories);
+        const defaultDept = departments.length > 0 ? departments[0].name : "Marketing";
+        const defaultCats = initialType === "expense"
+          ? getDepartmentCategories(defaultDept, departments, settings.customExpenseCategories)
+          : getUnifiedCategories("income", settings.customIncomeCategories, settings.customExpenseCategories);
         setType(initialType);
         setAmount("");
+        setDepartment(defaultDept);
         setCategory(defaultCats[0] || (initialType === "income" ? "Government Grant" : "Salaries"));
-        setDepartment(departments.length > 0 ? departments[0].name : "Software Engineering");
         setSelectedBudgetId("");
         setDescription("");
         setReferenceNumber(`TXN-${Math.random().toString(36).substring(2, 8).toUpperCase()}`);
@@ -94,23 +132,36 @@ export function WebTransactionModal({
       setError("Please enter a valid amount greater than 0.");
       return;
     }
+    if (type === "expense" && !department.trim()) {
+      setError("Please assign a department / cost center.");
+      return;
+    }
     if (!category.trim()) {
       setError("Please select a transaction category.");
       return;
     }
-    if (!department.trim()) {
-      setError("Please assign a department / cost center.");
-      return;
+
+    // Authoritative Department Budget Validation
+    if (type === "expense") {
+      if (!selectedDeptMetric || !selectedDeptMetric.hasBudget) {
+        setError("No budget has been allocated to this department. Allocate a department budget before recording an expense.");
+        return;
+      }
+      if (parsedAmount > selectedDeptMetric.remaining) {
+        setError(`Insufficient department budget. Remaining budget: ${settings.currency} ${selectedDeptMetric.remaining.toLocaleString()}.`);
+        return;
+      }
     }
 
     setSubmitting(true);
     try {
+      const assignedDept = type === "expense" ? department.trim() : (transactionToEdit?.department || "Institutional");
       if (isEditing && transactionToEdit) {
-        updateTransaction(transactionToEdit.id, {
+        await updateTransaction(transactionToEdit.id, {
           type,
           amount: parsedAmount,
           category: category.trim(),
-          department: department.trim(),
+          department: assignedDept,
           description: description.trim(),
           referenceNumber: referenceNumber.trim(),
           paymentMethod,
@@ -118,11 +169,11 @@ export function WebTransactionModal({
           budgetId: type === "expense" ? (selectedBudgetId.trim() || null) : null,
         });
       } else {
-        addTransaction({
+        await addTransaction({
           type,
           amount: parsedAmount,
           category: category.trim(),
-          department: department.trim(),
+          department: assignedDept,
           description: description.trim(),
           referenceNumber: referenceNumber.trim(),
           paymentMethod,
@@ -373,39 +424,114 @@ export function WebTransactionModal({
               )}
             </View>
 
-            {/* Department */}
-            <View style={styles.formGroup}>
-              <Text style={[styles.label, { color: colors.mutedForeground }]}>DEPARTMENT COST CENTER *</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={{ flexDirection: "row", gap: 6, paddingVertical: 4 }}>
-                  {(departments.length > 0
-                    ? departments.map((d) => d.name)
-                    : ["Software Engineering", "Administration", "Research & Development", "Finance"]
-                  ).map((dept) => (
-                    <TouchableOpacity
-                      key={dept}
-                      style={[
-                        styles.chip,
-                        {
-                          backgroundColor: department === dept ? colors.primary : colors.background,
-                          borderColor: department === dept ? "transparent" : colors.border,
-                        },
-                      ]}
-                      onPress={() => setDepartment(dept)}
-                    >
-                      <Text
+            {/* Department (Expenses only) */}
+            {type === "expense" && (
+              <View style={styles.formGroup}>
+                <Text style={[styles.label, { color: colors.mutedForeground }]}>DEPARTMENT COST CENTER *</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  <View style={{ flexDirection: "row", gap: 6, paddingVertical: 4 }}>
+                    {(departments.length > 0
+                      ? departments.map((d) => d.name)
+                      : ["Software Engineering", "Administration", "Research & Development", "Finance"]
+                    ).map((dept) => (
+                      <TouchableOpacity
+                        key={dept}
                         style={[
-                          styles.chipText,
-                          { color: department === dept ? "#FFFFFF" : colors.foreground },
+                          styles.chip,
+                          {
+                            backgroundColor: department === dept ? colors.primary : colors.background,
+                            borderColor: department === dept ? "transparent" : colors.border,
+                          },
                         ]}
+                        onPress={() => setDepartment(dept)}
                       >
-                        {dept}
+                        <Text
+                          style={[
+                            styles.chipText,
+                            { color: department === dept ? "#FFFFFF" : colors.foreground },
+                          ]}
+                        >
+                          {dept}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </ScrollView>
+              </View>
+            )}
+
+            {/* Department Budget Status Badge (Expenses only) */}
+            {type === "expense" && (
+              <View
+                style={{
+                  marginTop: -6,
+                  marginBottom: 16,
+                  padding: 12,
+                  borderRadius: 10,
+                  backgroundColor: selectedDeptMetric?.hasBudget
+                    ? (selectedDeptMetric.isExhausted ? colors.expense + "15" : colors.card)
+                    : colors.expense + "15",
+                  borderWidth: 1,
+                  borderColor: selectedDeptMetric?.hasBudget
+                    ? (selectedDeptMetric.isExhausted ? colors.expense + "40" : colors.border)
+                    : colors.expense + "40",
+                }}
+              >
+                {selectedDeptMetric?.hasBudget ? (
+                  <View>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                      <Text style={{ fontSize: 11, fontWeight: "700", color: colors.mutedForeground, letterSpacing: 0.5 }}>
+                        DEPARTMENT BUDGET HEALTH
                       </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </ScrollView>
-            </View>
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          fontWeight: "700",
+                          color: selectedDeptMetric.isExhausted ? colors.expense : "#10B981",
+                        }}
+                      >
+                        {selectedDeptMetric.isExhausted
+                          ? "Budget Depleted"
+                          : `${((selectedDeptMetric.spent / selectedDeptMetric.allocated) * 100).toFixed(0)}% Utilized`}
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                      <View>
+                        <Text style={{ fontSize: 10, color: colors.mutedForeground }}>Allocated</Text>
+                        <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>
+                          {settings.currency} {selectedDeptMetric.allocated.toLocaleString()}
+                        </Text>
+                      </View>
+                      <View>
+                        <Text style={{ fontSize: 10, color: colors.mutedForeground }}>Spent</Text>
+                        <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>
+                          {settings.currency} {selectedDeptMetric.spent.toLocaleString()}
+                        </Text>
+                      </View>
+                      <View>
+                        <Text style={{ fontSize: 10, color: colors.mutedForeground }}>Remaining Budget</Text>
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            fontWeight: "700",
+                            color: selectedDeptMetric.remaining > 0 ? "#10B981" : colors.expense,
+                          }}
+                        >
+                          {settings.currency} {selectedDeptMetric.remaining.toLocaleString()}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <Text style={{ fontSize: 16 }}>⚠️</Text>
+                    <Text style={{ fontSize: 12, color: colors.expense, fontWeight: "600", flex: 1 }}>
+                      No budget has been allocated to this department. Allocate a department budget before recording an expense.
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
 
             {/* Budget Allocation (Expenses only) */}
             {type === "expense" && budgets && budgets.length > 0 && (

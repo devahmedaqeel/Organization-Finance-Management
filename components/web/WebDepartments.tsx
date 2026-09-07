@@ -4,6 +4,7 @@ import { useFinance, Department } from "@/context/FinanceContext";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
 import { useColors } from "@/hooks/useColors";
+import { isSalaryExpenseCategory } from "@/constants/categories";
 import { WebDepartmentModal } from "./modals/WebDepartmentModal";
 import { WebDepartmentStaffModal } from "./modals/WebDepartmentStaffModal";
 import { WebConfirmModal } from "./modals/WebConfirmModal";
@@ -22,7 +23,7 @@ export function WebDepartments() {
 
   const { user } = useAuth();
   const { settings } = useSettings();
-  const { departments, transactions, deleteDepartment } = useFinance();
+  const { departments, transactions, deleteDepartment, budgets } = useFinance();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editingDept, setEditingDept] = useState<Department | null>(null);
@@ -31,23 +32,39 @@ export function WebDepartments() {
 
   const canEdit = user?.role === "admin";
 
-  // Calculate actual spend for each department
+  // Calculate actual spend and payroll breakdown for each department
   const deptsWithSpend = useMemo(() => {
     return (departments || []).map((d) => {
-      const actualSpend = (transactions || [])
-        .filter((t) => t && t.type === "expense" && t.department?.trim().toLowerCase() === d.name?.trim().toLowerCase())
-        .reduce((sum, t) => sum + (t.amount || 0), 0);
+      const deptTxns = (transactions || []).filter(
+        (t) => t && t.type === "expense" && t.department?.trim().toLowerCase() === d.name?.trim().toLowerCase()
+      );
+      const payrollSpending = deptTxns
+        .filter((t) => t.expenseSource === "payroll" || Boolean(t.payrollId) || isSalaryExpenseCategory(t.category))
+        .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+      const otherSpending = deptTxns
+        .filter((t) => !(t.expenseSource === "payroll" || Boolean(t.payrollId) || isSalaryExpenseCategory(t.category)))
+        .reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+      const actualSpend = payrollSpending + otherSpending;
+      const lineBudgetAllocated = (budgets || [])
+        .filter((b) => (b.department || "").trim().toLowerCase() === (d.name || "").trim().toLowerCase())
+        .reduce((s, b) => s + (Number(b.allocated) || 0), 0);
+      const budgetAllocated = Math.max(Number(d.budgetAllocated) || 0, lineBudgetAllocated);
+      const remainingBudget = Math.max(0, budgetAllocated - actualSpend);
+      const ratio = budgetAllocated > 0 ? (actualSpend / budgetAllocated) * 100 : 0;
 
-      const ratio = (d.budgetAllocated || 0) > 0 ? (actualSpend / d.budgetAllocated) * 100 : 0;
       return {
         ...d,
+        budgetAllocated,
+        payrollSpending,
+        otherSpending,
         actualSpend,
+        remainingBudget,
         ratio,
         isOver: ratio >= 100,
         isWarning: ratio >= 80 && ratio < 100,
       };
     });
-  }, [departments, transactions]);
+  }, [departments, transactions, budgets]);
 
   const totalHeadcount = useMemo(
     () => (departments || []).reduce((s, d) => s + (d.headCount || 0), 0),
@@ -55,8 +72,8 @@ export function WebDepartments() {
   );
 
   const totalAllocated = useMemo(
-    () => (departments || []).reduce((s, d) => s + (d.budgetAllocated || 0), 0),
-    [departments]
+    () => deptsWithSpend.reduce((s, d) => s + (d.budgetAllocated || 0), 0),
+    [deptsWithSpend]
   );
 
   const totalActualSpend = useMemo(
@@ -208,6 +225,51 @@ export function WebDepartments() {
                   </View>
                   <View style={[styles.deptTrack, { backgroundColor: colors.border }]}>
                     <View style={[styles.deptFill, { width: `${pct}%`, backgroundColor: statusColor }]} />
+                  </View>
+                </View>
+
+                {/* 6-Metric Financial Breakdown Strip */}
+                <View style={[styles.breakdownBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                  <View style={styles.breakdownRow}>
+                    <View style={styles.breakdownItem}>
+                      <Text style={[styles.breakdownLabel, { color: colors.mutedForeground }]}>ALLOCATED</Text>
+                      <Text style={[styles.breakdownVal, { color: colors.foreground }]}>
+                        {settings.currency} {Number(dept.budgetAllocated || 0).toLocaleString()}
+                      </Text>
+                    </View>
+                    <View style={styles.breakdownItem}>
+                      <Text style={[styles.breakdownLabel, { color: "#8B5CF6" }]}>PAYROLL SPEND</Text>
+                      <Text style={[styles.breakdownVal, { color: "#8B5CF6" }]}>
+                        {settings.currency} {Number(dept.payrollSpending || 0).toLocaleString()}
+                      </Text>
+                    </View>
+                    <View style={styles.breakdownItem}>
+                      <Text style={[styles.breakdownLabel, { color: colors.mutedForeground }]}>OTHER EXPENSES</Text>
+                      <Text style={[styles.breakdownVal, { color: colors.mutedForeground }]}>
+                        {settings.currency} {Number(dept.otherSpending || 0).toLocaleString()}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={[styles.breakdownDivider, { backgroundColor: colors.border }]} />
+                  <View style={styles.breakdownRow}>
+                    <View style={styles.breakdownItem}>
+                      <Text style={[styles.breakdownLabel, { color: colors.mutedForeground }]}>TOTAL SPENT</Text>
+                      <Text style={[styles.breakdownVal, { color: statusColor }]}>
+                        {settings.currency} {Number(dept.actualSpend || 0).toLocaleString()}
+                      </Text>
+                    </View>
+                    <View style={styles.breakdownItem}>
+                      <Text style={[styles.breakdownLabel, { color: colors.mutedForeground }]}>REMAINING</Text>
+                      <Text style={[styles.breakdownVal, { color: (dept.remainingBudget || 0) > 0 ? colors.income : colors.expense }]}>
+                        {settings.currency} {Number(dept.remainingBudget || 0).toLocaleString()}
+                      </Text>
+                    </View>
+                    <View style={styles.breakdownItem}>
+                      <Text style={[styles.breakdownLabel, { color: colors.mutedForeground }]}>UTILIZATION</Text>
+                      <Text style={[styles.breakdownVal, { color: statusColor }]}>
+                        {(dept.ratio || 0).toFixed(1)}%
+                      </Text>
+                    </View>
                   </View>
                 </View>
 
@@ -521,5 +583,34 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: "Inter_400Regular",
     textAlign: "center",
+  },
+  breakdownBox: {
+    borderRadius: 10,
+    borderWidth: 1,
+    padding: 10,
+    gap: 8,
+  },
+  breakdownRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 6,
+  },
+  breakdownItem: {
+    flex: 1,
+    gap: 2,
+  },
+  breakdownLabel: {
+    fontSize: 9,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.4,
+  },
+  breakdownVal: {
+    fontSize: 11.5,
+    fontFamily: "Inter_700Bold",
+  },
+  breakdownDivider: {
+    height: 1,
+    width: "100%",
   },
 });

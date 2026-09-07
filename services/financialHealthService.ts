@@ -6,7 +6,7 @@
  * Budget Adherence, and Payroll Burden to produce an authoritative health score and diagnostic.
  */
 
-import { Transaction, Budget, PayrollEntry } from "@/context/FinanceContext";
+import { Transaction, Budget, PayrollEntry, Department } from "@/context/FinanceContext";
 import { NormalizedPeriod, filterTransactionsByPeriod, computePeriodMetrics } from "./DatePeriodService";
 import { calculateBudgetAllocation, calculateBudgetUsed } from "./FinancialCalculationEngine";
 
@@ -53,7 +53,8 @@ export function calculateFinancialHealth(
   budgets: Budget[],
   payroll: PayrollEntry[],
   currentPeriod?: NormalizedPeriod,
-  previousPeriod?: NormalizedPeriod
+  previousPeriod?: NormalizedPeriod,
+  departments?: Department[]
 ): FinancialHealthReport {
   // Exclude deleted, void, or cancelled records
   const activeTxs = (transactions || []).filter(
@@ -75,8 +76,8 @@ export function calculateFinancialHealth(
   const prevIncome = prevMetrics ? (prevMetrics.totalIncome || 0) : 0;
   const prevExpense = prevMetrics ? (prevMetrics.totalExpense || 0) : 0;
 
-  const totalBudget = calculateBudgetAllocation(activeBudgets);
-  const totalBudgetSpent = calculateBudgetUsed(currentTxs, activeBudgets, currentPeriod);
+  const totalBudget = calculateBudgetAllocation(activeBudgets, departments);
+  const totalBudgetSpent = calculateBudgetUsed(currentTxs, activeBudgets, currentPeriod, departments);
   const totalPayroll = activePayroll.reduce((s, p) => s + (p.baseSalary || 0) + (p.bonus || 0) - (p.deductions || 0), 0);
 
   // 1. Operating Margin (Dynamic Weight: 35 when applicable)

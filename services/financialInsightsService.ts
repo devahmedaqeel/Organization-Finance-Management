@@ -19,6 +19,8 @@ import {
   calculateBudgetRemaining,
   calculateBudgetUtilization,
   calculatePayrollCost,
+  calculateUnallocatedFunds,
+  calculateBudgetUsed,
   safeNumber,
 } from "./FinancialCalculationEngine";
 
@@ -96,23 +98,24 @@ export function generateFinancialInsights(
   // 1. CASH FLOW & OPERATING RESULT INSIGHTS
   // ──────────────────────────────────────────────────────────────────────────
   const totalBudgeted = calculateBudgetAllocation(budgets, departments);
-  const totalPool = income + totalBudgeted;
-  const poolNet = totalPool - expense;
+  const totalBudgetSpent = calculateBudgetUsed(currentTxs, budgets, undefined, departments);
+  const netBudgetRemaining = calculateBudgetRemaining(totalBudgeted, totalBudgetSpent);
+  const unallocatedFunds = calculateUnallocatedFunds(income, totalBudgeted);
 
   if (net < 0 && expense > 0) {
-    const isBudgetCovered = totalBudgeted > 0 && poolNet >= 0;
+    const isBudgetCovered = totalBudgeted > 0 && totalBudgetSpent <= totalBudgeted;
     const burnRatio = income > 0 ? (expense / income) * 100 : 100;
     const excessOverRevenue = income > 0 ? ((expense - income) / income) * 100 : 100;
     insights.push({
       id: `cf-deficit-${currentPeriod.label}`,
       organizationId: orgId,
       type: "OPERATING_DEFICIT",
-      title: isBudgetCovered ? "Operating Deficit (Budget-Covered)" : "Operating Deficit Notice",
+      title: isBudgetCovered ? "Operating Deficit (Within Department Budget)" : "Operating Deficit Notice",
       summary: isBudgetCovered
-        ? `Disbursements exceed recognized inflows by ${currency} ${Math.abs(net).toLocaleString()} during ${currentPeriod.label}, but remain fully funded by the approved budget capital pool (${currency} ${poolNet.toLocaleString()} surplus remaining).`
+        ? `Disbursements exceed recognized inflows by ${currency} ${Math.abs(net).toLocaleString()} during ${currentPeriod.label}, but remain within approved department budget allocations (${currency} ${netBudgetRemaining.toLocaleString()} remaining).`
         : `Disbursements exceed recognized institutional inflows by ${currency} ${Math.abs(net).toLocaleString()} during ${currentPeriod.label}.`,
       whyItMatters: isBudgetCovered
-        ? `Disbursements exceed incoming revenue by ${excessOverRevenue.toFixed(1)}%, but are authorized and funded by pre-allocated institutional budget capital (${currency} ${poolNet.toLocaleString()} surplus remaining).`
+        ? `Disbursements exceed incoming revenue by ${excessOverRevenue.toFixed(1)}%, but are authorized within departmental budget caps (${currency} ${netBudgetRemaining.toLocaleString()} remaining budget).`
         : income > 0
         ? `Disbursements exceed incoming revenue by ${excessOverRevenue.toFixed(1)}% (total spending is ${burnRatio.toFixed(1)}% of inflows), creating a deficit that degrades treasury reserves.`
         : `Operating with zero incoming revenue (${currency} ${expense.toLocaleString()} disbursed), which depletes cash reserves.`,
@@ -122,11 +125,11 @@ export function generateFinancialInsights(
       severity: "CRITICAL",
       category: "cashflow",
       metric: isBudgetCovered
-        ? `+${currency} ${poolNet.toLocaleString()} (Pool Surplus)`
+        ? `-${currency} ${Math.abs(net).toLocaleString()} (${currency} ${netBudgetRemaining.toLocaleString()} Budget Left)`
         : `-${currency} ${Math.abs(net).toLocaleString()} (-${excessOverRevenue.toFixed(1)}% Deficit)`,
-      currentValue: isBudgetCovered ? poolNet : net,
+      currentValue: net,
       period: currentPeriod.label,
-      sourceReference: isBudgetCovered ? "Executive Capital Pool Ledger" : "Executive Cash Flow Ledger",
+      sourceReference: isBudgetCovered ? "Department Budget Ledger" : "Executive Cash Flow Ledger",
       actionRoute: "/(tabs)/expenses",
       timestamp: nowStr,
       isActionable: true,
@@ -135,28 +138,28 @@ export function generateFinancialInsights(
   } else if (net > 0 && income > 0) {
     const margin = (net / income) * 100;
     const isBudgetCovered = totalBudgeted > 0;
-    const poolRetainedPct = totalPool > 0 ? (poolNet / totalPool) * 100 : 0;
+    const unallocatedPct = income > 0 ? (unallocatedFunds / income) * 100 : 0;
     insights.push({
       id: `cf-surplus-${currentPeriod.label}`,
       organizationId: orgId,
       type: "OPERATING_SURPLUS",
-      title: isBudgetCovered ? "Positive Operating Surplus & Capital Pool" : "Positive Operating Surplus",
+      title: isBudgetCovered ? "Positive Operating Cashflow & Budget Allocation" : "Positive Operating Surplus",
       summary: isBudgetCovered
-        ? `Net operating surplus of ${currency} ${net.toLocaleString()} (+${margin.toFixed(1)}% operating margin) achieved. Combined with the approved ${currency} ${totalBudgeted.toLocaleString()} budget, total institutional capital stands at ${currency} ${poolNet.toLocaleString()} (${poolRetainedPct.toFixed(0)}% retained).`
+        ? `Net operating cashflow of ${currency} ${net.toLocaleString()} (+${margin.toFixed(1)}% margin) achieved. Department budgets allocated: ${currency} ${totalBudgeted.toLocaleString()} (${currency} ${unallocatedFunds.toLocaleString()} unallocated funds remaining).`
         : `Net operating surplus of ${currency} ${net.toLocaleString()} achieved with a +${margin.toFixed(1)}% operating margin.`,
       whyItMatters: isBudgetCovered
-        ? `Operating strictly within recognized revenues preserves 100% of approved budget reserves for scheduled milestones.`
+        ? `Operating with positive cashflow ensures liquidity while maintaining ${currency} ${unallocatedFunds.toLocaleString()} (${unallocatedPct.toFixed(0)}%) in unallocated reserve funds.`
         : "Healthy operating margins maintain liquid capital reserves for planned infrastructure.",
       recommendedAction: "Maintain current expenditure controls and review the consolidated statement for capital reserve allocations.",
       severity: "SUCCESS",
       category: "cashflow",
       metric: isBudgetCovered
-        ? `+${currency} ${poolNet.toLocaleString()} (${poolRetainedPct.toFixed(0)}% Retained)`
+        ? `+${currency} ${net.toLocaleString()} (${currency} ${unallocatedFunds.toLocaleString()} Unallocated)`
         : `+${currency} ${net.toLocaleString()} (${margin.toFixed(1)}% NOM)`,
-      currentValue: isBudgetCovered ? poolNet : net,
+      currentValue: net,
       changePercent: margin,
       period: currentPeriod.label,
-      sourceReference: isBudgetCovered ? "Executive Capital Pool Ledger" : "Statement of Financial Operations",
+      sourceReference: isBudgetCovered ? "Department Budget Allocation Ledger" : "Statement of Financial Operations",
       actionRoute: "/(tabs)/reports",
       timestamp: nowStr,
       isActionable: true,

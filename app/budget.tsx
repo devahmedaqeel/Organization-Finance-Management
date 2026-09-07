@@ -25,6 +25,9 @@ import {
   calculateBudgetUsed,
   calculateBudgetSpentForCategory,
   calculateBudgetRemaining,
+  calculateTotalIncome,
+  calculateTotalExpenses,
+  validateBudgetAllocationAgainstNetCash,
 } from "@/services/FinancialCalculationEngine";
 import { useColors } from "@/hooks/useColors";
 import { useSettings } from "@/context/SettingsContext";
@@ -67,15 +70,29 @@ export default function BudgetScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { budgets, transactions, addBudget, updateBudget, deleteBudget, departments } = useFinance();
+  const {
+    budgets,
+    transactions,
+    addBudget,
+    updateBudget,
+    deleteBudget,
+    departments,
+    totalIncome,
+    totalAllocatedBudget,
+    unallocatedFunds,
+    totalBudgetSpent,
+    totalBudgetRemaining,
+    budgetUtilization,
+    departmentMetrics,
+  } = useFinance();
   const { settings } = useSettings();
   const keyboardHeight = useKeyboardHeight();
 
   const availableDepts = useMemo(() => {
     const list = departments && departments.length > 0 ? departments.map((d) => d.name) : DEPARTMENTS;
-    const set = new Set([...list, ...budgets.map((b) => b.department)]);
+    const set = new Set([...list, ...(departmentMetrics || []).map((d) => d.name), ...budgets.map((b) => b.department)]);
     return Array.from(set).filter(Boolean);
-  }, [departments, budgets]);
+  }, [departments, departmentMetrics, budgets]);
 
   const defaultPeriod = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
 
@@ -92,6 +109,17 @@ export default function BudgetScreen() {
   const canEdit = user?.role === "admin";
   const webTop = Platform.OS === "web" ? 67 : 0;
 
+  // Operating cash and Available to Allocate buffer
+  const netCash = useMemo(() => {
+    return calculateTotalIncome(transactions) - calculateTotalExpenses(transactions);
+  }, [transactions]);
+
+  const availableToAllocate = useMemo(() => {
+    return Math.max(0, netCash - totalAllocatedBudget);
+  }, [netCash, totalAllocatedBudget]);
+
+  const unallocatedNetCash = availableToAllocate;
+
   // Compute spend per budget item using central calculateBudgetSpentForCategory
   const budgetWithSpend = useMemo(() =>
     budgets.map((b) => {
@@ -101,41 +129,37 @@ export default function BudgetScreen() {
     [budgets, transactions]
   );
 
-  // Group by department based on actual budget-linked expenses
+  // Group by department based on authoritative departmentMetrics (real departments, no fake "General")
   const deptBudgetData = useMemo(() => {
-    const map: Record<string, { allocated: number }> = {};
-    budgets.forEach((b) => {
-      const dName = b.department?.trim() || "General";
-      if (!map[dName]) map[dName] = { allocated: 0 };
-      map[dName].allocated += (b.allocated || 0);
-    });
+    const active = (departmentMetrics || []).filter((d) => d.allocated > 0);
+    return active.map((d, i) => ({
+      label: d.name,
+      value: d.allocated,
+      spent: d.spent,
+      remaining: d.remaining,
+      utilization: d.utilizationPct,
+      color: DEPT_COLORS[i % DEPT_COLORS.length],
+    }));
+  }, [departmentMetrics]);
 
-    return Object.entries(map).map(([deptName, stats], i) => {
-      const dBudgets = budgets.filter(
-        (b) => deptName === "All" || deptName === "General" || (b.department || "").trim().toLowerCase() === deptName.toLowerCase()
-      );
-      const dSpent = calculateBudgetUsed(transactions, dBudgets);
-      return {
-        label: deptName,
-        value: stats.allocated,
-        spent: dSpent,
-        remaining: Math.max(stats.allocated - dSpent, 0),
-        utilization: stats.allocated > 0 ? (dSpent / stats.allocated) * 100 : 0,
-        color: DEPT_COLORS[i % DEPT_COLORS.length],
-      };
-    });
-  }, [budgets, transactions]);
+  // Overall totals from authoritative context
+  const totalAllocated = totalAllocatedBudget;
+  const totalSpent = totalBudgetSpent;
+  const totalRemaining = totalBudgetRemaining;
+  const overallUtilization = budgetUtilization;
 
-  // Overall totals
-  const totalAllocated = useMemo(() => calculateBudgetAllocation(budgets), [budgets]);
-  const totalSpent = useMemo(() => calculateBudgetUsed(transactions, budgets), [transactions, budgets]);
-  const totalRemaining = useMemo(() => calculateBudgetRemaining(totalAllocated, totalSpent), [totalAllocated, totalSpent]);
-  const overallUtilization = totalAllocated > 0 ? (totalSpent / totalAllocated) * 100 : 0;
+  // Filtered department metrics for Section 8 overview
+  const filteredDeptMetrics = useMemo(() => {
+    if (selectedDeptFilter === "All") return departmentMetrics || [];
+    return (departmentMetrics || []).filter(
+      (d) => d.name.trim().toLowerCase() === selectedDeptFilter.trim().toLowerCase()
+    );
+  }, [departmentMetrics, selectedDeptFilter]);
 
   // Filtered budget list
   const filteredBudgets = useMemo(() => {
     if (selectedDeptFilter === "All") return budgetWithSpend;
-    return budgetWithSpend.filter((b) => b.department === selectedDeptFilter);
+    return budgetWithSpend.filter((b) => (b.department || "").trim().toLowerCase() === selectedDeptFilter.trim().toLowerCase());
   }, [budgetWithSpend, selectedDeptFilter]);
 
   const handleOpenAdd = () => {
@@ -164,6 +188,25 @@ export default function BudgetScreen() {
       setError("Enter valid positive amount");
       return;
     }
+
+    const validation = validateBudgetAllocationAgainstNetCash(
+      amt,
+      transactions,
+      budgets,
+      departments,
+      {
+        type: "budget",
+        editingBudgetId: editingBudget?.id,
+        targetDepartmentName: dept,
+        currency: settings.currency || "PKR",
+      }
+    );
+
+    if (!validation.isValid) {
+      setError(validation.errorMessage || "Allocation exceeds Available Net Cash.");
+      return;
+    }
+
     if (editingBudget) {
       updateBudget(editingBudget.id, { department: dept, category: cat, allocated: amt, period });
     } else {
@@ -237,29 +280,68 @@ export default function BudgetScreen() {
           )}
         </View>
 
-        {/* Top Summary KPI Cards */}
-        <View style={[styles.summaryCardRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={styles.summaryColItem}>
-            <Text style={[styles.summaryColLabel, { color: colors.mutedForeground }]}>ALLOCATED</Text>
-            <Text style={[styles.summaryColValue, { color: colors.warning }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+        {/* Section 8: Top 5 Executive Summary KPI Cards */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.kpiScroll}
+          contentContainerStyle={styles.kpiScrollContent}
+        >
+          {/* Card 1: TOTAL INCOME */}
+          <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.kpiCardTop}>
+              <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>TOTAL INCOME</Text>
+              <Feather name="trending-up" size={12} color={colors.income} />
+            </View>
+            <Text style={[styles.kpiVal, { color: colors.income }]}>
+              {settings.currency} {fmtNum(totalIncome)}
+            </Text>
+          </View>
+
+          {/* Card 2: TOTAL ALLOCATED */}
+          <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.kpiCardTop}>
+              <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>ALLOCATED</Text>
+              <Feather name="pie-chart" size={12} color={colors.primary} />
+            </View>
+            <Text style={[styles.kpiVal, { color: colors.foreground }]}>
               {settings.currency} {fmtNum(totalAllocated)}
             </Text>
           </View>
-          <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
-          <View style={styles.summaryColItem}>
-            <Text style={[styles.summaryColLabel, { color: colors.mutedForeground }]}>TOTAL SPENT</Text>
-            <Text style={[styles.summaryColValue, { color: colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+
+          {/* Card 3: AVAILABLE TO ALLOCATE */}
+          <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: availableToAllocate > 0 ? colors.income + "40" : colors.border }]}>
+            <View style={styles.kpiCardTop}>
+              <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>AVAILABLE</Text>
+              <Feather name="check-circle" size={12} color={availableToAllocate > 0 ? colors.income : colors.warning} />
+            </View>
+            <Text style={[styles.kpiVal, { color: availableToAllocate > 0 ? colors.income : colors.warning }]}>
+              {settings.currency} {fmtNum(availableToAllocate)}
+            </Text>
+          </View>
+
+          {/* Card 4: TOTAL DEPARTMENT SPENDING */}
+          <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.kpiCardTop}>
+              <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>SPENDING</Text>
+              <Feather name="arrow-up-right" size={12} color={colors.expense} />
+            </View>
+            <Text style={[styles.kpiVal, { color: colors.expense }]}>
               {settings.currency} {fmtNum(totalSpent)}
             </Text>
           </View>
-          <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
-          <View style={styles.summaryColItem}>
-            <Text style={[styles.summaryColLabel, { color: colors.mutedForeground }]}>REMAINING</Text>
-            <Text style={[styles.summaryColValue, { color: colors.income }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+
+          {/* Card 5: REMAINING DEPARTMENT FUNDS */}
+          <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.kpiCardTop}>
+              <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>REMAINING</Text>
+              <Feather name="shield" size={12} color={totalRemaining >= 0 ? colors.primary : colors.expense} />
+            </View>
+            <Text style={[styles.kpiVal, { color: totalRemaining >= 0 ? colors.income : colors.expense }]}>
               {settings.currency} {fmtNum(totalRemaining)}
             </Text>
           </View>
-        </View>
+        </ScrollView>
       </View>
 
       <ScrollView
@@ -267,121 +349,230 @@ export default function BudgetScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Department Budget Allocation Interactive Donut Card */}
-        {deptBudgetData.length > 0 && (
-          <View style={[styles.chartCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.cardHeader}>
-              <View>
-                <Text style={[styles.cardTitle, { color: colors.foreground }]}>
-                  Department Budget Allocation
-                </Text>
-                <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
-                  Interactive allocation & utilization breakdown
-                </Text>
-              </View>
-              <View style={[styles.utilBadge, { backgroundColor: (overallUtilization > 100 ? colors.expense : colors.primary) + "18", borderColor: (overallUtilization > 100 ? colors.expense : colors.primary) + "33" }]}>
-                <Text style={[styles.utilBadgeText, { color: overallUtilization > 100 ? colors.expense : colors.primary }]}>
-                  {overallUtilization.toFixed(0)}% Used
-                </Text>
-              </View>
+        <View style={[styles.chartCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.cardHeader}>
+            <View>
+              <Text style={[styles.cardTitle, { color: colors.foreground }]}>
+                Department Budget Allocation
+              </Text>
+              <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
+                Interactive allocation & utilization breakdown
+              </Text>
             </View>
-
-            {/* Symmetrical Concentric Donut Chart */}
-            <DonutChart
-              segments={deptBudgetData.map((d) => ({
-                label: d.label,
-                value: d.value,
-                color: d.color,
-              }))}
-              size={132}
-              strokeWidth={11}
-              centerLabel={`${settings.currency} ${fmtNum(totalAllocated)}`}
-              centerSub="Total Allocated"
-              currency={settings.currency}
-              selectedLabel={selectedDeptFilter === "All" ? undefined : selectedDeptFilter}
-              onSelectLabel={(label) => {
-                if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
-                setSelectedDeptFilter(label || "All");
-              }}
-              showChips={false}
-            />
-
-            {/* Department Filter Pills (Smooth Edge-to-Edge Slider) */}
-            <View style={styles.filterPillsSection}>
-              <Text style={[styles.filterLabel, { color: colors.mutedForeground }]}>FILTER BY DEPARTMENT</Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.filterPillsScroll}
-                contentContainerStyle={styles.filterPillsRow}
-              >
-                <TouchableOpacity
-                  style={[
-                    styles.deptPill,
-                    {
-                      backgroundColor: selectedDeptFilter === "All" ? colors.primary : (colors.cardAlt ?? colors.muted),
-                      borderColor: selectedDeptFilter === "All" ? colors.primary : colors.border,
-                    },
-                  ]}
-                  onPress={() => {
-                    if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
-                    setSelectedDeptFilter("All");
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    style={[
-                      styles.deptPillText,
-                      { color: selectedDeptFilter === "All" ? "#FFFFFF" : colors.mutedForeground },
-                      selectedDeptFilter === "All" && { fontFamily: "Inter_700Bold" },
-                    ]}
-                  >
-                    All Depts ({budgets.length})
-                  </Text>
-                </TouchableOpacity>
-
-                {deptBudgetData.map((d) => {
-                  const isSelected = selectedDeptFilter === d.label;
-                  return (
-                    <TouchableOpacity
-                      key={d.label}
-                      style={[
-                        styles.deptPill,
-                        {
-                          backgroundColor: isSelected ? d.color : (colors.cardAlt ?? colors.muted),
-                          borderColor: isSelected ? d.color : colors.border,
-                        },
-                      ]}
-                      onPress={() => {
-                        if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
-                        setSelectedDeptFilter(isSelected ? "All" : d.label);
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <View style={[styles.deptDot, { backgroundColor: isSelected ? "#FFFFFF" : d.color }]} />
-                      <Text
-                        style={[
-                          styles.deptPillText,
-                          { color: isSelected ? "#FFFFFF" : colors.foreground },
-                          isSelected && { fontFamily: "Inter_700Bold" },
-                        ]}
-                      >
-                        {d.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
+            <View style={[styles.utilBadge, { backgroundColor: (overallUtilization > 100 ? colors.expense : colors.primary) + "18", borderColor: (overallUtilization > 100 ? colors.expense : colors.primary) + "33" }]}>
+              <Text style={[styles.utilBadgeText, { color: overallUtilization > 100 ? colors.expense : colors.primary }]}>
+                {overallUtilization.toFixed(0)}% Used
+              </Text>
             </View>
           </View>
-        )}
 
-        {/* Detailed Department Budgets List */}
+          {/* Symmetrical Concentric Donut Chart */}
+          <DonutChart
+            segments={deptBudgetData.map((d) => ({
+              label: d.label,
+              value: d.value,
+              color: d.color,
+            }))}
+            size={132}
+            strokeWidth={11}
+            centerLabel={`${settings.currency} ${fmtNum(totalAllocated)}`}
+            centerSub="Total Allocated"
+            currency={settings.currency}
+            selectedLabel={selectedDeptFilter === "All" ? undefined : selectedDeptFilter}
+            onSelectLabel={(label) => {
+              if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
+              setSelectedDeptFilter(label || "All");
+            }}
+            showChips={false}
+          />
+
+          {/* Department Filter Pills (Smooth Edge-to-Edge Slider) */}
+          <View style={styles.filterPillsSection}>
+            <Text style={[styles.filterLabel, { color: colors.mutedForeground }]}>FILTER BY DEPARTMENT</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.filterPillsScroll}
+              contentContainerStyle={styles.filterPillsRow}
+            >
+              <TouchableOpacity
+                style={[
+                  styles.deptPill,
+                  {
+                    backgroundColor: selectedDeptFilter === "All" ? colors.primary : (colors.cardAlt ?? colors.muted),
+                    borderColor: selectedDeptFilter === "All" ? colors.primary : colors.border,
+                  },
+                ]}
+                onPress={() => {
+                  if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
+                  setSelectedDeptFilter("All");
+                }}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.deptPillText,
+                    { color: selectedDeptFilter === "All" ? "#FFFFFF" : colors.mutedForeground },
+                    selectedDeptFilter === "All" && { fontFamily: "Inter_700Bold" },
+                  ]}
+                >
+                  All Depts ({availableDepts.length})
+                </Text>
+              </TouchableOpacity>
+
+              {availableDepts.map((dName, idx) => {
+                const isSelected = selectedDeptFilter.toLowerCase() === dName.toLowerCase();
+                const dColor = DEPT_COLORS[idx % DEPT_COLORS.length];
+                return (
+                  <TouchableOpacity
+                    key={dName}
+                    style={[
+                      styles.deptPill,
+                      {
+                        backgroundColor: isSelected ? dColor : (colors.cardAlt ?? colors.muted),
+                        borderColor: isSelected ? dColor : colors.border,
+                      },
+                    ]}
+                    onPress={() => {
+                      if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
+                      setSelectedDeptFilter(isSelected ? "All" : dName);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.deptDot, { backgroundColor: isSelected ? "#FFFFFF" : dColor }]} />
+                    <Text
+                      style={[
+                        styles.deptPillText,
+                        { color: isSelected ? "#FFFFFF" : colors.foreground },
+                        isSelected && { fontFamily: "Inter_700Bold" },
+                      ]}
+                    >
+                      {dName}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+
+        {/* Section 8: Department Allocations Overview */}
         <View style={styles.listHeaderRow}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-            {selectedDeptFilter === "All" ? "All Department Budgets" : `${selectedDeptFilter} Budgets`}
+            Department Allocations
           </Text>
           <Text style={[styles.itemCountText, { color: colors.mutedForeground }]}>
-            {filteredBudgets.length} {filteredBudgets.length === 1 ? "item" : "items"}
+            {filteredDeptMetrics.length} {filteredDeptMetrics.length === 1 ? "dept" : "depts"}
+          </Text>
+        </View>
+
+        {filteredDeptMetrics.map((dm) => {
+          const statusColor =
+            dm.status === "over"
+              ? colors.expense
+              : dm.status === "warning"
+              ? colors.warning
+              : dm.status === "no_budget"
+              ? colors.mutedForeground
+              : colors.income;
+
+          const statusText =
+            dm.status === "over"
+              ? "OVERRUN"
+              : dm.status === "warning"
+              ? "NEAR CEILING"
+              : dm.status === "no_budget"
+              ? "UNBUDGETED"
+              : "ON TRACK";
+
+          const utilPct = Math.min(Math.round(dm.utilizationPct), 100);
+
+          return (
+            <View
+              key={dm.id || dm.name}
+              style={[
+                styles.budgetCard,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: dm.status === "over" ? colors.expense + "60" : colors.border,
+                },
+              ]}
+            >
+              <View style={styles.budgetHeader}>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={[styles.budgetDept, { color: colors.foreground }]}>{dm.name}</Text>
+                  <Text style={[styles.budgetCat, { color: colors.mutedForeground }]}>
+                    Payroll: {settings.currency} {fmtNum(dm.payrollSpending)} · Other: {settings.currency} {fmtNum(dm.otherSpending)}
+                  </Text>
+                </View>
+                <View style={{ alignItems: "flex-end", gap: 4 }}>
+                  <View style={[styles.statusBadge, { backgroundColor: statusColor + "18", borderColor: statusColor + "33" }]}>
+                    <Text style={[styles.statusBadgeText, { color: statusColor }]}>{statusText}</Text>
+                  </View>
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: statusColor }}>
+                    {dm.utilizationPct.toFixed(1)}% Used
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.cardProgressWrap}>
+                <View style={[styles.progressTrack, { backgroundColor: colors.muted }]}>
+                  <View style={[styles.progressFill, { backgroundColor: statusColor, width: `${utilPct}%` }]} />
+                </View>
+              </View>
+
+              <View style={[styles.deptMetricsRow, { borderColor: colors.border, backgroundColor: colors.background }]}>
+                <View style={styles.deptMetricItem}>
+                  <Text style={[styles.deptMetricLabel, { color: colors.mutedForeground }]}>ALLOCATED</Text>
+                  <Text style={[styles.deptMetricVal, { color: colors.foreground }]}>
+                    {settings.currency} {fmtNum(dm.allocated)}
+                  </Text>
+                </View>
+                <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
+                <View style={styles.deptMetricItem}>
+                  <Text style={[styles.deptMetricLabel, { color: colors.mutedForeground }]}>SPENT</Text>
+                  <Text style={[styles.deptMetricVal, { color: colors.expense }]}>
+                    {settings.currency} {fmtNum(dm.spent)}
+                  </Text>
+                </View>
+                <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
+                <View style={styles.deptMetricItem}>
+                  <Text style={[styles.deptMetricLabel, { color: colors.mutedForeground }]}>REMAINING</Text>
+                  <Text style={[styles.deptMetricVal, { color: dm.remaining >= 0 ? colors.income : colors.expense }]}>
+                    {settings.currency} {fmtNum(dm.remaining)}
+                  </Text>
+                </View>
+              </View>
+
+              {canEdit && (
+                <View style={{ flexDirection: "row", justifyContent: "flex-end", marginTop: 6 }}>
+                  <TouchableOpacity
+                    style={[styles.deptActionBtn, { borderColor: colors.primary }]}
+                    onPress={() => {
+                      setDept(dm.name);
+                      setEditingBudget(null);
+                      setAllocated("");
+                      setPeriod(defaultPeriod);
+                      setError("");
+                      setModalVisible(true);
+                    }}
+                  >
+                    <Feather name="plus" size={13} color={colors.primary} />
+                    <Text style={[styles.deptActionBtnText, { color: colors.primary }]}>Allocate Budget</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          );
+        })}
+
+        {/* Detailed Department Budgets List */}
+        <View style={[styles.listHeaderRow, { marginTop: 12 }]}>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
+            {selectedDeptFilter === "All" ? "Category Line-Items" : `${selectedDeptFilter} Line-Items`}
+          </Text>
+          <Text style={[styles.itemCountText, { color: colors.mutedForeground }]}>
+            {filteredBudgets.length} {filteredBudgets.length === 1 ? "line" : "lines"}
           </Text>
         </View>
 
@@ -486,6 +677,33 @@ export default function BudgetScreen() {
             </Text>
             
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 100 }}>
+              {/* Available Net Cash Status Banner */}
+              <View
+                style={{
+                  backgroundColor: netCash <= 0 ? "#EF444415" : "#10B98115",
+                  borderColor: netCash <= 0 ? "#EF444440" : "#10B98140",
+                  borderWidth: 1,
+                  borderRadius: 10,
+                  padding: 10,
+                  marginBottom: 12,
+                  marginTop: 4,
+                }}
+              >
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: netCash <= 0 ? "#EF4444" : "#10B981" }}>
+                    {netCash <= 0 ? "⚠️ INSUFFICIENT NET CASH" : "✓ AVAILABLE NET CASH"}
+                  </Text>
+                  <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: netCash <= 0 ? "#EF4444" : "#10B981" }}>
+                    {settings.currency || "PKR"} {netCash.toLocaleString()}
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 10.5, color: colors.mutedForeground, marginTop: 2 }}>
+                  {netCash <= 0
+                    ? "Department budget can only be allocated if there is balance in Available Net Cash."
+                    : `Remaining unallocated net cash: ${settings.currency || "PKR"} ${unallocatedNetCash.toLocaleString()}`}
+                </Text>
+              </View>
+
               <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>SELECT DEPARTMENT</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.modalChipsRow}>
                 {availableDepts.map((d) => (
@@ -619,6 +837,73 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
+  },
+  kpiScroll: {
+    marginTop: 6,
+  },
+  kpiScrollContent: {
+    gap: 8,
+    paddingHorizontal: 2,
+    paddingBottom: 2,
+  },
+  kpiCard: {
+    minWidth: 112,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 4,
+  },
+  kpiCardTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 4,
+  },
+  kpiLabel: {
+    fontSize: 9,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.5,
+  },
+  kpiVal: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+  },
+  deptMetricsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    marginTop: 6,
+  },
+  deptMetricItem: {
+    flex: 1,
+    alignItems: "center",
+    gap: 2,
+  },
+  deptMetricLabel: {
+    fontSize: 8.5,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.4,
+  },
+  deptMetricVal: {
+    fontSize: 11.5,
+    fontFamily: "Inter_700Bold",
+  },
+  deptActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  deptActionBtnText: {
+    fontSize: 11,
+    fontFamily: "Inter_700Bold",
   },
   summaryCardRow: {
     flexDirection: "row",

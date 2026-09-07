@@ -22,8 +22,13 @@ import {
   getPresetPeriod,
   aggregateTransactionsByGranularity,
 } from "@/services/DatePeriodService";
+import {
+  calculateBudgetUsed,
+  calculateBudgetAllocation,
+  calculateBudgetRemaining,
+  calculateUnallocatedFunds,
+} from "@/services/FinancialCalculationEngine";
 import { router } from "expo-router";
-import { calculateBudgetUsed } from "@/services/FinancialCalculationEngine";
 
 interface Props {
   visible: boolean;
@@ -64,11 +69,9 @@ export function NetBalanceBreakdownModal({
   const { settings } = useSettings();
   const [activeTab, setActiveTab] = useState<TabType>("overview");
   const [modalBalanceMode, setModalBalanceMode] = useState<"cashflow" | "budget" | "surplus">(initialMode);
-  const [expandedFormula, setExpandedFormula] = useState<string | null>("surplus");
+  const [expandedFormula, setExpandedFormula] = useState<string | null>("cashflow_net");
 
-  const totalLineBudgeted = budgets.reduce((s, b) => s + (b.allocated || 0), 0);
-  const totalDeptBudgeted = departments.reduce((s, d) => s + (d.budgetAllocated || 0), 0);
-  const totalBudgeted = totalLineBudgeted;
+  const totalBudgeted = calculateBudgetAllocation(budgets, departments);
 
   // 1. Operating Cashflow Net (True revenue minus expenditure)
   const actualCashflowNet = totalIncome - totalExpenses;
@@ -78,23 +81,25 @@ export function NetBalanceBreakdownModal({
   const expenseRatio = totalIncome > 0 ? (totalExpenses / totalIncome) * 100 : (totalExpenses > 0 ? 100 : 0);
 
   // 2. Remaining Operating Budget (Allocated budget minus actual budget expenditure)
-  const totalBudgetSpent = useMemo(() => calculateBudgetUsed(transactions, budgets), [transactions, budgets]);
-  const netBudgetRemaining = totalBudgeted - totalBudgetSpent;
+  const totalBudgetSpent = useMemo(() => calculateBudgetUsed(transactions, budgets, undefined, departments), [transactions, budgets, departments]);
+  const netBudgetRemaining = calculateBudgetRemaining(totalBudgeted, totalBudgetSpent);
   const netBudgetUtilization = totalBudgeted > 0 ? (totalBudgetSpent / totalBudgeted) * 100 : 0;
   const isBudgetSafe = netBudgetRemaining >= 0;
 
-  // 3. Institutional Capital Pool Surplus (Funding pool minus expenditure)
-  const totalFundingPool = totalIncome + totalBudgeted;
-  const authoritativeNetSurplus = netSurplus !== undefined ? netSurplus : (totalFundingPool - totalExpenses);
+  // 3. Authoritative Core Financial Flow:
+  // Income -> Available Funds -> Department Budget -> Expense -> Remaining Budget
+  // Unallocated Funds = Math.max(0, totalIncome - totalBudgeted)
+  const unallocatedFunds = calculateUnallocatedFunds(totalIncome, totalBudgeted);
+  const authoritativeNetSurplus = actualCashflowNet;
   const isCapitalSurplus = authoritativeNetSurplus >= 0;
-  const retainedSurplusPct = totalFundingPool > 0 ? (authoritativeNetSurplus / totalFundingPool) * 100 : 0;
+  const unallocatedPct = totalIncome > 0 ? (unallocatedFunds / totalIncome) * 100 : 0;
 
   // Dynamic active balance based on selected mode
   const currentModalBalance =
     modalBalanceMode === "budget" && totalBudgeted > 0
       ? netBudgetRemaining
       : modalBalanceMode === "surplus" && totalBudgeted > 0
-      ? authoritativeNetSurplus
+      ? unallocatedFunds
       : actualCashflowNet;
 
   const isCurrentModalSurplus = currentModalBalance >= 0;
@@ -499,7 +504,7 @@ export function NetBalanceBreakdownModal({
                       >
                         <Feather name="shield" size={11} color={modalBalanceMode === "surplus" ? "#FFFFFF" : colors.mutedForeground} />
                         <Text style={{ fontSize: 10, fontFamily: "Inter_700Bold", color: modalBalanceMode === "surplus" ? "#FFFFFF" : colors.mutedForeground }} numberOfLines={1}>
-                          Surplus ({authoritativeNetSurplus >= 0 ? "+" : ""}{settings.currency} {fmtShort(authoritativeNetSurplus)})
+                          Unallocated ({settings.currency} {fmtShort(unallocatedFunds)})
                         </Text>
                       </TouchableOpacity>
                     </View>
@@ -511,18 +516,18 @@ export function NetBalanceBreakdownModal({
                         {modalBalanceMode === "budget" && totalBudgeted > 0
                           ? "REMAINING OPERATING BUDGET"
                           : modalBalanceMode === "surplus" && totalBudgeted > 0
-                          ? "NET CAPITAL POOL SURPLUS"
+                          ? "UNALLOCATED AVAILABLE FUNDS"
                           : "NET OPERATING CASHFLOW"}
                       </Text>
                       <Text style={[styles.heroValue, { color: isCurrentModalSurplus ? colors.income : colors.expense }]}>
-                        {isCurrentModalSurplus ? "+" : "-"}
+                        {modalBalanceMode === "surplus" ? "" : isCurrentModalSurplus ? "+" : "-"}
                         {settings.currency} {fmt(Math.abs(currentModalBalance))}
                       </Text>
                       <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 2, fontFamily: "Inter_500Medium" }}>
                         {modalBalanceMode === "budget" && totalBudgeted > 0
                           ? `Allocated: ${settings.currency} ${fmt(totalBudgeted)} · Spend: ${settings.currency} ${fmt(totalExpenses)}`
                           : modalBalanceMode === "surplus" && totalBudgeted > 0
-                          ? `Pool: ${settings.currency} ${fmt(totalFundingPool)} (Revenue + Budget) · Spend: ${settings.currency} ${fmt(totalExpenses)}`
+                          ? `Total Income: ${settings.currency} ${fmt(totalIncome)} · Allocated Budget: ${settings.currency} ${fmt(totalBudgeted)}`
                           : `Gross Inflows: ${settings.currency} ${fmt(totalIncome)} · Gross Outflows: ${settings.currency} ${fmt(totalExpenses)}`}
                       </Text>
                     </View>
@@ -532,7 +537,7 @@ export function NetBalanceBreakdownModal({
                         {modalBalanceMode === "budget" && totalBudgeted > 0
                           ? (isCurrentModalSurplus ? "HEALTHY BUDGET BUFFER" : "BUDGET OVERRUN")
                           : modalBalanceMode === "surplus" && totalBudgeted > 0
-                          ? (isCurrentModalSurplus ? "HEALTHY CAPITAL SURPLUS" : "FUNDING DEFICIT")
+                          ? (unallocatedFunds > 0 ? "UNALLOCATED FUNDS AVAILABLE" : "FUNDS FULLY ALLOCATED")
                           : (isCashflowSurplus ? "HEALTHY SURPLUS" : "OPERATING DEFICIT")}
                       </Text>
                     </View>
@@ -545,7 +550,7 @@ export function NetBalanceBreakdownModal({
                         {modalBalanceMode === "budget" && totalBudgeted > 0
                           ? "Budget Used"
                           : modalBalanceMode === "surplus" && totalBudgeted > 0
-                          ? "Capital Retained"
+                          ? "Unallocated %"
                           : "Operating Margin"}
                       </Text>
                       <Text
@@ -556,7 +561,7 @@ export function NetBalanceBreakdownModal({
                               modalBalanceMode === "budget" && totalBudgeted > 0
                                 ? (netBudgetUtilization > 100 ? colors.expense : colors.income)
                                 : modalBalanceMode === "surplus" && totalBudgeted > 0
-                                ? (retainedSurplusPct >= 50 ? colors.income : colors.warning)
+                                ? colors.income
                                 : (actualMarginPct >= 0 ? colors.income : colors.expense),
                           },
                         ]}
@@ -566,14 +571,14 @@ export function NetBalanceBreakdownModal({
                         {modalBalanceMode === "budget" && totalBudgeted > 0
                           ? `${netBudgetUtilization.toFixed(1)}%`
                           : modalBalanceMode === "surplus" && totalBudgeted > 0
-                          ? `${retainedSurplusPct.toFixed(1)}%`
+                          ? `${unallocatedPct.toFixed(1)}%`
                           : `${actualMarginPct.toFixed(1)}%`}
                       </Text>
                       <Text style={[styles.metricBlockSub, { color: colors.mutedForeground }]} numberOfLines={1}>
                         {modalBalanceMode === "budget" && totalBudgeted > 0
                           ? `${settings.currency} ${fmtShort(totalExpenses)} Spend`
                           : modalBalanceMode === "surplus" && totalBudgeted > 0
-                          ? `${retainedSurplusPct.toFixed(0)}% Preserved`
+                          ? "Liquid Reserve"
                           : (actualMarginPct >= 20 ? "High Efficiency" : actualMarginPct >= 5 ? "Healthy Range" : "Tight Buffer")}
                       </Text>
                     </View>
@@ -583,21 +588,21 @@ export function NetBalanceBreakdownModal({
                         {modalBalanceMode === "budget" && totalBudgeted > 0
                           ? "Budget Cap"
                           : modalBalanceMode === "surplus" && totalBudgeted > 0
-                          ? "Funding Pool"
+                          ? "Department Budget"
                           : "Coverage Ratio"}
                       </Text>
                       <Text style={[styles.metricBlockVal, { color: colors.primary }]} numberOfLines={1} adjustsFontSizeToFit>
                         {modalBalanceMode === "budget" && totalBudgeted > 0
                           ? `${settings.currency} ${fmtShort(totalBudgeted)}`
                           : modalBalanceMode === "surplus" && totalBudgeted > 0
-                          ? `${settings.currency} ${fmtShort(totalFundingPool)}`
+                          ? `${settings.currency} ${fmtShort(totalBudgeted)}`
                           : (coverageRatio >= 90 ? "99x" : `${coverageRatio.toFixed(2)}x`)}
                       </Text>
                       <Text style={[styles.metricBlockSub, { color: colors.mutedForeground }]} numberOfLines={1}>
                         {modalBalanceMode === "budget" && totalBudgeted > 0
                           ? "Total Allocated"
                           : modalBalanceMode === "surplus" && totalBudgeted > 0
-                          ? "Revenue + Budget"
+                          ? "Allocated from Income"
                           : "Inflows / Outflows"}
                       </Text>
                     </View>
@@ -607,7 +612,7 @@ export function NetBalanceBreakdownModal({
                         {modalBalanceMode === "budget" && totalBudgeted > 0
                           ? "Remaining"
                           : modalBalanceMode === "surplus" && totalBudgeted > 0
-                          ? "Capital Left"
+                          ? "Remaining Budget"
                           : "MoM Shift"}
                       </Text>
                       <Text
@@ -618,7 +623,7 @@ export function NetBalanceBreakdownModal({
                               modalBalanceMode === "budget" && totalBudgeted > 0
                                 ? (isBudgetSafe ? colors.income : colors.expense)
                                 : modalBalanceMode === "surplus" && totalBudgeted > 0
-                                ? (isCapitalSurplus ? colors.income : colors.expense)
+                                ? (netBudgetRemaining >= 0 ? colors.income : colors.expense)
                                 : (isCashflowSurplus ? colors.income : colors.expense),
                           },
                         ]}
@@ -628,14 +633,14 @@ export function NetBalanceBreakdownModal({
                         {modalBalanceMode === "budget" && totalBudgeted > 0
                           ? `${netBudgetRemaining >= 0 ? "+" : "-"}${settings.currency} ${fmtShort(Math.abs(netBudgetRemaining))}`
                           : modalBalanceMode === "surplus" && totalBudgeted > 0
-                          ? `${authoritativeNetSurplus >= 0 ? "+" : "-"}${settings.currency} ${fmtShort(Math.abs(authoritativeNetSurplus))}`
+                          ? `${netBudgetRemaining >= 0 ? "+" : "-"}${settings.currency} ${fmtShort(Math.abs(netBudgetRemaining))}`
                           : latestMoMInfo.text}
                       </Text>
                       <Text style={[styles.metricBlockSub, { color: colors.mutedForeground }]} numberOfLines={1}>
                         {modalBalanceMode === "budget" && totalBudgeted > 0
                           ? "Available Buffer"
                           : modalBalanceMode === "surplus" && totalBudgeted > 0
-                          ? "Available Capital"
+                          ? "Dept Budget Left"
                           : latestMoMInfo.sub}
                       </Text>
                     </View>
@@ -648,14 +653,14 @@ export function NetBalanceBreakdownModal({
                         {modalBalanceMode === "budget" && totalBudgeted > 0
                           ? `Allocated: ${settings.currency} ${fmt(totalBudgeted)}`
                           : modalBalanceMode === "surplus" && totalBudgeted > 0
-                          ? `Pool: +${settings.currency} ${fmt(totalFundingPool)}`
+                          ? `Unallocated: ${settings.currency} ${fmt(unallocatedFunds)}`
                           : `Inflows: +${settings.currency} ${fmt(totalIncome)} (${totalIncome + totalExpenses > 0 ? ((totalIncome / (totalIncome + totalExpenses)) * 100).toFixed(0) : 0}%)`}
                       </Text>
                       <Text style={{ fontSize: 11, color: colors.expense, fontFamily: "Inter_700Bold" }}>
                         {modalBalanceMode === "budget" && totalBudgeted > 0
                           ? `Spent: -${settings.currency} ${fmt(totalExpenses)} (${netBudgetUtilization.toFixed(0)}%)`
                           : modalBalanceMode === "surplus" && totalBudgeted > 0
-                          ? `Spent: -${settings.currency} ${fmt(totalExpenses)}`
+                          ? `Allocated Budget: ${settings.currency} ${fmt(totalBudgeted)}`
                           : `Outflows: -${settings.currency} ${fmt(totalExpenses)} (${totalIncome + totalExpenses > 0 ? ((totalExpenses / (totalIncome + totalExpenses)) * 100).toFixed(0) : 0}%)`}
                       </Text>
                     </View>
@@ -668,7 +673,7 @@ export function NetBalanceBreakdownModal({
                               modalBalanceMode === "budget" && totalBudgeted > 0
                                 ? Math.max(0, 100 - netBudgetUtilization)
                                 : modalBalanceMode === "surplus" && totalBudgeted > 0
-                                ? retainedSurplusPct
+                                ? unallocatedPct
                                 : totalIncome + totalExpenses > 0
                                 ? (totalIncome / (totalIncome + totalExpenses)) * 100
                                 : 50,
@@ -687,7 +692,7 @@ export function NetBalanceBreakdownModal({
                               modalBalanceMode === "budget" && totalBudgeted > 0
                                 ? netBudgetUtilization
                                 : modalBalanceMode === "surplus" && totalBudgeted > 0
-                                ? 100 - retainedSurplusPct
+                                ? 100 - unallocatedPct
                                 : totalIncome + totalExpenses > 0
                                 ? (totalExpenses / (totalIncome + totalExpenses)) * 100
                                 : 50,
@@ -695,7 +700,7 @@ export function NetBalanceBreakdownModal({
                             ),
                             95
                           )}%`,
-                          backgroundColor: colors.expense,
+                          backgroundColor: colors.primary,
                         }}
                       />
                     </View>
@@ -1114,8 +1119,8 @@ export function NetBalanceBreakdownModal({
                           <Text style={[styles.formulaNumText, { color: "#10B981" }]}>5</Text>
                         </View>
                         <View style={{ flex: 1 }}>
-                          <Text style={[styles.formulaTitle, { color: colors.foreground }]}>Net Capital Pool Surplus</Text>
-                          <Text style={[styles.formulaSub, { color: colors.mutedForeground }]}>Formula: Total Funding Pool (Revenue + Budget) − Expenses</Text>
+                          <Text style={[styles.formulaTitle, { color: colors.foreground }]}>Unallocated Available Funds</Text>
+                          <Text style={[styles.formulaSub, { color: colors.mutedForeground }]}>Formula: Total Income − Allocated Department Budget</Text>
                         </View>
                       </View>
                       <Feather name={expandedFormula === "pool_surplus" ? "chevron-up" : "chevron-down"} size={18} color={colors.mutedForeground} />
@@ -1124,17 +1129,17 @@ export function NetBalanceBreakdownModal({
                     {expandedFormula === "pool_surplus" && (
                       <View style={[styles.formulaBody, { borderTopColor: colors.border }]}>
                         <Text style={[styles.formulaMath, { color: colors.foreground }]}>
-                          Total Funding Pool ({settings.currency} {fmt(totalFundingPool)}) − Total Expenses ({settings.currency} {fmt(totalExpenses)})
+                          Total Income ({settings.currency} {fmt(totalIncome)}) − Allocated Budget ({settings.currency} {fmt(totalBudgeted)})
                         </Text>
-                        <View style={[styles.formulaResultBox, { backgroundColor: (authoritativeNetSurplus >= 0 ? colors.income : colors.expense) + "15", borderColor: (authoritativeNetSurplus >= 0 ? colors.income : colors.expense) + "33" }]}>
+                        <View style={[styles.formulaResultBox, { backgroundColor: colors.income + "15", borderColor: colors.income + "33" }]}>
                           <Text style={[styles.formulaResultLabel, { color: colors.mutedForeground }]}>Live Calculation Result:</Text>
-                          <Text style={[styles.formulaResultVal, { color: authoritativeNetSurplus >= 0 ? colors.income : colors.expense }]}>
-                            {authoritativeNetSurplus >= 0 ? "+" : "-"}{settings.currency} {fmt(Math.abs(authoritativeNetSurplus))} ({retainedSurplusPct.toFixed(1)}% Retained Capital)
+                          <Text style={[styles.formulaResultVal, { color: colors.income }]}>
+                            {settings.currency} {fmt(unallocatedFunds)} ({unallocatedPct.toFixed(1)}% Available Reserve)
                           </Text>
                         </View>
                         <Text style={[styles.formulaExplanation, { color: colors.mutedForeground }]}>
-                          • Measures institutional capital remaining after combining earned revenues and budgeted capital reserve.
-                          {"\n"}• Current status indicates {retainedSurplusPct.toFixed(1)}% of all available capital remains liquid and unspent.
+                          • Income is the source of available funds. Department budgets are allocated out of income.
+                          {"\n"}• Current status indicates {settings.currency} {fmt(unallocatedFunds)} ({unallocatedPct.toFixed(1)}%) remains unallocated and liquid.
                         </Text>
                       </View>
                     )}

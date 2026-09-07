@@ -51,6 +51,11 @@ const testSuites = [
     cmd: "npx",
     args: ["-y", "tsx", "services/__tests__/crossPlatformSync.test.ts"],
   },
+  {
+    name: "9. Automatic Payroll -> Department Expense & Budget Integration Suite",
+    cmd: "npx",
+    args: ["-y", "tsx", "services/__tests__/payrollExpenseIntegration.test.ts"],
+  },
 ];
 
 console.log("\n=======================================================");

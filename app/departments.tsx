@@ -21,10 +21,16 @@ import { ProgressBar } from "@/components/ProgressBar";
 import { ConfirmDeleteModal } from "@/components/ConfirmDeleteModal";
 import { useAuth } from "@/context/AuthContext";
 import { useFinance, Department } from "@/context/FinanceContext";
+import {
+  calculateTotalIncome,
+  calculateTotalExpenses,
+  validateBudgetAllocationAgainstNetCash,
+} from "@/services/FinancialCalculationEngine";
 import { useColors } from "@/hooks/useColors";
 import { useSettings } from "@/context/SettingsContext";
 import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
 import { showFloatingToast } from "@/utils/toast";
+import { isSalaryExpenseCategory } from "@/constants/categories";
 
 const DEPT_COLORS = ["#3B82F6", "#10B981", "#8B5CF6", "#F59E0B", "#F43F5E", "#0EA5E9", "#EC4899"];
 
@@ -32,9 +38,14 @@ export default function DepartmentsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { departments, transactions, addDepartment, updateDepartment, deleteDepartment } = useFinance();
+  const { departments, transactions, addDepartment, updateDepartment, deleteDepartment, budgets } = useFinance();
   const { settings } = useSettings();
   const keyboardHeight = useKeyboardHeight();
+
+  const netCash = useMemo(
+    () => calculateTotalIncome(transactions) - calculateTotalExpenses(transactions),
+    [transactions]
+  );
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editingDept, setEditingDept] = useState<Department | null>(null);
@@ -62,20 +73,32 @@ export default function DepartmentsScreen() {
     return String(Math.round(n));
   };
 
-  // Detailed Department Spend & Inflows
+  // Compute metrics per department
   const deptsWithMetrics = useMemo(() => {
     return departments.map((d) => {
-      const dName = d.name?.trim().toLowerCase();
-      const spent = transactions
-        .filter((t) => t.type === "expense" && t.department?.trim().toLowerCase() === dName)
+      const dName = d.name.trim().toLowerCase();
+
+      // Separate payroll vs other spending
+      const deptExpenses = transactions.filter(
+        (t) => t.type === "expense" && t.department?.trim().toLowerCase() === dName
+      );
+      const payrollSpending = deptExpenses
+        .filter((t) => t.expenseSource === "payroll" || Boolean(t.payrollId) || isSalaryExpenseCategory(t.category))
         .reduce((s, t) => s + (t.amount || 0), 0);
+      const otherSpending = deptExpenses
+        .filter((t) => !(t.expenseSource === "payroll" || Boolean(t.payrollId) || isSalaryExpenseCategory(t.category)))
+        .reduce((s, t) => s + (t.amount || 0), 0);
+      const spent = payrollSpending + otherSpending;
 
       const income = transactions
         .filter((t) => t.type === "income" && t.department?.trim().toLowerCase() === dName)
         .reduce((s, t) => s + (t.amount || 0), 0);
 
       const net = income - spent;
-      const allocated = d.budgetAllocated || 0;
+      const lineBudgetAllocated = (budgets || [])
+        .filter((b) => (b.department || "").trim().toLowerCase() === dName)
+        .reduce((s, b) => s + (Number(b.allocated) || 0), 0);
+      const allocated = Math.max(d.budgetAllocated || 0, lineBudgetAllocated);
       const utilPct = allocated > 0 ? (spent / allocated) * 100 : 0;
       const remaining = allocated - spent;
 
@@ -85,6 +108,9 @@ export default function DepartmentsScreen() {
 
       return {
         ...d,
+        budgetAllocated: allocated,
+        payrollSpending,
+        otherSpending,
         spent,
         income,
         net,
@@ -93,12 +119,12 @@ export default function DepartmentsScreen() {
         status,
       };
     });
-  }, [departments, transactions]);
+  }, [departments, transactions, budgets]);
 
   // Overall Department Totals
   const totalAllocated = useMemo(
-    () => departments.reduce((s, d) => s + (d.budgetAllocated || 0), 0),
-    [departments]
+    () => deptsWithMetrics.reduce((s, d) => s + (d.budgetAllocated || 0), 0),
+    [deptsWithMetrics]
   );
   const totalSpent = useMemo(
     () => deptsWithMetrics.reduce((s, d) => s + d.spent, 0),
@@ -145,6 +171,27 @@ export default function DepartmentsScreen() {
       setError("Please fill all fields with valid positive numbers.");
       return;
     }
+
+    if (bg > 0) {
+      const validation = validateBudgetAllocationAgainstNetCash(
+        bg,
+        transactions,
+        budgets,
+        departments,
+        {
+          type: "department",
+          editingDepartmentId: editingDept?.id,
+          targetDepartmentName: name.trim(),
+          currency: settings.currency || "PKR",
+        }
+      );
+
+      if (!validation.isValid) {
+        setError(validation.errorMessage || "Department budget exceeds Available Net Cash.");
+        return;
+      }
+    }
+
     if (editingDept) {
       updateDepartment(editingDept.id, { name: name.trim(), headCount: hc, budgetAllocated: bg });
     } else {
@@ -372,20 +419,34 @@ export default function DepartmentsScreen() {
                 )}
               </View>
 
-              {/* Fiscal Breakdown Strip */}
-              <View style={styles.deptFiscalStrip}>
-                <View style={[styles.deptFiscalBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
+              {/* Fiscal Breakdown Strip - 6 metrics summary */}
+              <View style={[styles.deptFiscalStrip, { flexWrap: "wrap", gap: 6 }]}>
+                <View style={[styles.deptFiscalBox, { backgroundColor: colors.background, borderColor: colors.border, minWidth: "30%", flex: 1 }]}>
                   <Text style={[styles.deptFiscalLabel, { color: colors.mutedForeground }]}>Allocated</Text>
                   <Text style={[styles.deptFiscalVal, { color: colors.foreground }]}>{fmt(item.budgetAllocated)}</Text>
                 </View>
-                <View style={[styles.deptFiscalBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                  <Text style={[styles.deptFiscalLabel, { color: colors.mutedForeground }]}>Actual Spent</Text>
+                <View style={[styles.deptFiscalBox, { backgroundColor: colors.background, borderColor: colors.border, minWidth: "30%", flex: 1 }]}>
+                  <Text style={[styles.deptFiscalLabel, { color: "#8B5CF6" }]}>Payroll Spend</Text>
+                  <Text style={[styles.deptFiscalVal, { color: "#8B5CF6" }]}>{fmt(item.payrollSpending || 0)}</Text>
+                </View>
+                <View style={[styles.deptFiscalBox, { backgroundColor: colors.background, borderColor: colors.border, minWidth: "30%", flex: 1 }]}>
+                  <Text style={[styles.deptFiscalLabel, { color: colors.mutedForeground }]}>Other Exp</Text>
+                  <Text style={[styles.deptFiscalVal, { color: colors.mutedForeground }]}>{fmt(item.otherSpending || 0)}</Text>
+                </View>
+                <View style={[styles.deptFiscalBox, { backgroundColor: colors.background, borderColor: colors.border, minWidth: "30%", flex: 1 }]}>
+                  <Text style={[styles.deptFiscalLabel, { color: colors.mutedForeground }]}>Total Spend</Text>
                   <Text style={[styles.deptFiscalVal, { color: colors.expense }]}>{fmt(item.spent)}</Text>
                 </View>
-                <View style={[styles.deptFiscalBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                <View style={[styles.deptFiscalBox, { backgroundColor: colors.background, borderColor: colors.border, minWidth: "30%", flex: 1 }]}>
                   <Text style={[styles.deptFiscalLabel, { color: colors.mutedForeground }]}>Remaining</Text>
                   <Text style={[styles.deptFiscalVal, { color: item.remaining >= 0 ? colors.income : colors.expense }]}>
                     {item.remaining >= 0 ? "+" : "-"}{fmt(Math.abs(item.remaining))}
+                  </Text>
+                </View>
+                <View style={[styles.deptFiscalBox, { backgroundColor: colors.background, borderColor: colors.border, minWidth: "30%", flex: 1 }]}>
+                  <Text style={[styles.deptFiscalLabel, { color: colors.mutedForeground }]}>Utilization</Text>
+                  <Text style={[styles.deptFiscalVal, { color: statusTextColor }]}>
+                    {item.utilPct.toFixed(1)}%
                   </Text>
                 </View>
               </View>
@@ -470,6 +531,13 @@ export default function DepartmentsScreen() {
                     value={f.value}
                     onChangeText={f.onChange}
                   />
+                  {f.label.startsWith("BUDGET ALLOCATED") && (
+                    <Text style={{ fontSize: 10.5, color: netCash <= 0 ? "#EF4444" : colors.mutedForeground, marginTop: 4 }}>
+                      {netCash <= 0
+                        ? `⚠️ Available Net Cash: ${settings.currency} ${netCash.toLocaleString()} (No budget can be allocated)`
+                        : `Available Net Cash: ${settings.currency} ${netCash.toLocaleString()}`}
+                    </Text>
+                  )}
                 </View>
               ))}
 

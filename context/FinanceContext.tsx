@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useState, useRef, useMemo, useCallback } from "react";
-import { collection, doc, setDoc, deleteDoc, onSnapshot, query, where, getDocs } from "firebase/firestore";
+import { collection, doc, setDoc, deleteDoc, onSnapshot, query, where, getDocs, writeBatch } from "firebase/firestore";
 import { db } from "../config/firebase";
 import { useAuth } from "./AuthContext";
 import { useSettings } from "./SettingsContext";
@@ -33,10 +33,15 @@ import {
   calculateNetOperatingResult,
   calculateActualCash,
   calculateTotalAvailableFunds,
+  calculateUnallocatedFunds,
   calculateBudgetSpentForCategory,
   calculateBudgetAllocation,
   calculateBudgetUsed,
   calculateBudgetRemaining,
+  calculateDepartmentMetrics,
+  calculateEffectiveDepartmentBudget,
+  validateBudgetAllocationAgainstNetCash,
+  DepartmentMetric,
 } from "@/services/FinancialCalculationEngine";
 
 export type TransactionType = "income" | "expense";
@@ -59,6 +64,10 @@ export interface Transaction {
   referenceNumber?: string;
   status?: "completed" | "pending" | "reconciled" | "failed";
   budgetId?: string | null;
+  expenseSource?: "manual" | "payroll" | "reimbursement" | "invoice";
+  payrollId?: string;
+  employeeId?: string;
+  employeeName?: string;
 }
 
 export interface Budget {
@@ -95,6 +104,7 @@ export interface PayrollEntry {
   paymentStatus?: "paid" | "pending" | "processing";
   status?: "paid" | "pending" | "processing";
   bankAccountNumber?: string;
+  expenseId?: string;
 }
 
 export interface Department {
@@ -109,6 +119,7 @@ export interface Department {
   headOfDepartment?: string;
   contactEmail?: string;
   code?: string;
+  categories?: string[];
 }
 
 export type SyncStatus = "synced" | "syncing" | "offline_pending" | "error";
@@ -143,9 +154,12 @@ interface FinanceContextValue {
   totalBudgeted: number;
   totalLineBudgeted: number;
   totalDeptBudgeted: number;
+  totalAllocatedBudget: number;
   totalBudgetSpent: number;
   totalBudgetRemaining: number;
   totalAvailableFunds: number;
+  unallocatedFunds: number;
+  departmentMetrics: DepartmentMetric[];
 }
 
 function generateSafeId(collectionName: string = "transactions"): string {
@@ -534,6 +548,39 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Permission denied: cannot create transaction");
     }
 
+    // --- Strict Authoritative Budget Validation for Expenses ---
+    if (t.type === "expense") {
+      const deptName = (t.department || "").trim();
+      const effectiveDept = calculateEffectiveDepartmentBudget(deptName, departments, budgets);
+      const allocated = effectiveDept.allocated;
+
+      if (allocated <= 0) {
+        const errorMsg = "No budget has been allocated to this department. Allocate a department budget before recording an expense.";
+        showFloatingToast("Expense Blocked", errorMsg);
+        throw new Error(errorMsg);
+      }
+
+      const currentDeptSpent = unifiedTransactions
+        .filter(
+          (tx) =>
+            tx.type === "expense" &&
+            (tx.department || "").trim().toLowerCase() === deptName.toLowerCase() &&
+            tx.status !== "failed" &&
+            (tx as any).status !== "deleted"
+        )
+        .reduce((sum, tx) => sum + safeNumber(tx.amount, 0), 0);
+
+      const remaining = Math.max(0, allocated - currentDeptSpent);
+      const txAmount = safeNumber(t.amount, 0);
+
+      if (txAmount > remaining) {
+        const curr = settings.currency || "PKR";
+        const errorMsg = `Insufficient department budget. Remaining budget: ${curr} ${remaining.toLocaleString()}.`;
+        showFloatingToast("Budget Limit Exceeded", errorMsg);
+        throw new Error(errorMsg);
+      }
+    }
+
     const id = generateSafeId("transactions");
     const now = new Date().toISOString();
     const orgName = settings.organizationName || user?.organization || "OFM — Organization Finance Management";
@@ -611,20 +658,18 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       }
 
       // 3. Department-level allocation cap check
-      const matchDept = departments.find(
-        (d) => d.name?.trim().toLowerCase() === newTx.department?.trim().toLowerCase()
-      );
-      if (matchDept && (matchDept.budgetAllocated || 0) > 0) {
-        const allocated = matchDept.budgetAllocated || 0;
+      const effectiveDept = calculateEffectiveDepartmentBudget(newTx.department || "", departments, budgets);
+      if (effectiveDept.allocated > 0) {
+        const allocated = effectiveDept.allocated;
         const currentDeptSpent = transactions
-          .filter((t) => t.type === "expense" && t.department?.trim().toLowerCase() === matchDept.name?.trim().toLowerCase())
+          .filter((t) => t.type === "expense" && t.department?.trim().toLowerCase() === (newTx.department || "").trim().toLowerCase())
           .reduce((s, t) => s + t.amount, 0) + newTx.amount;
         const deptRatio = (currentDeptSpent / allocated) * 100;
         if (deptRatio >= 100) {
-          showFloatingToast("Department Cap Exceeded", `⚠️ ${matchDept.name} Department Budget Cap Exceeded (${deptRatio.toFixed(0)}%).`);
-          triggerLocalNotification("Department Budget Exceeded", `${matchDept.name} has exceeded its allocated ceiling of ${settings.currency} ${allocated.toLocaleString()}.`);
+          showFloatingToast("Department Cap Exceeded", `⚠️ ${newTx.department} Department Budget Cap Exceeded (${deptRatio.toFixed(0)}%).`);
+          triggerLocalNotification("Department Budget Exceeded", `${newTx.department} has exceeded its allocated ceiling of ${settings.currency} ${allocated.toLocaleString()}.`);
         } else if (deptRatio >= 80) {
-          showFloatingToast("Department Alert", `⚡ ${matchDept.name} has utilized ${deptRatio.toFixed(0)}% of its budget ceiling.`);
+          showFloatingToast("Department Alert", `⚡ ${newTx.department} has utilized ${deptRatio.toFixed(0)}% of its budget ceiling.`);
         }
       }
     }
@@ -634,6 +679,40 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     if (!can(user, "edit_transaction")) {
       showFloatingToast("Permission Denied", "You do not have permission to edit transactions.");
       throw new Error("Permission denied: cannot edit transaction");
+    }
+
+    const prevTx = transactions.find((item) => item.id === id);
+    const isExpense = (updates.type === "expense") || (!updates.type && prevTx?.type === "expense");
+    if (isExpense) {
+      const targetDeptName = ((updates.department || prevTx?.department) || "").trim();
+      const effectiveDept = calculateEffectiveDepartmentBudget(targetDeptName, departments, budgets);
+      const allocated = effectiveDept.allocated;
+      if (allocated <= 0) {
+        const errorMsg = "No budget has been allocated to this department. Allocate a department budget before recording an expense.";
+        showFloatingToast("Expense Blocked", errorMsg);
+        throw new Error(errorMsg);
+      }
+
+      const currentDeptSpentWithoutThisTx = unifiedTransactions
+        .filter(
+          (tx) =>
+            tx.id !== id &&
+            tx.type === "expense" &&
+            (tx.department || "").trim().toLowerCase() === targetDeptName.toLowerCase() &&
+            tx.status !== "failed" &&
+            (tx as any).status !== "deleted"
+        )
+        .reduce((sum, tx) => sum + safeNumber(tx.amount, 0), 0);
+
+      const remaining = Math.max(0, allocated - currentDeptSpentWithoutThisTx);
+      const newAmount = updates.amount !== undefined ? safeNumber(updates.amount, 0) : safeNumber(prevTx?.amount, 0);
+
+      if (newAmount > remaining) {
+        const curr = settings.currency || "PKR";
+        const errorMsg = `Insufficient department budget. Remaining budget: ${curr} ${remaining.toLocaleString()}.`;
+        showFloatingToast("Budget Limit Exceeded", errorMsg);
+        throw new Error(errorMsg);
+      }
     }
 
     const enrichedUpdates = { ...updates, updatedAt: new Date().toISOString() };
@@ -737,6 +816,25 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Permission denied: cannot add budget");
     }
 
+    // Available Net Cash validation
+    const validation = validateBudgetAllocationAgainstNetCash(
+      safeNumber(b.allocated, 0),
+      transactions,
+      budgets,
+      departments,
+      {
+        type: "budget",
+        targetDepartmentName: b.department,
+        currency: settings.currency || "PKR",
+      }
+    );
+
+    if (!validation.isValid) {
+      const err = validation.errorMessage || "Cannot allocate budget: exceeds Available Net Cash.";
+      showFloatingToast("Net Cash Restriction", err);
+      throw new Error(err);
+    }
+
     const id = generateSafeId("budgets");
     const now = new Date().toISOString();
     const orgName = settings.organizationName || user?.organization || "OFM — Organization Finance Management";
@@ -771,6 +869,19 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         entityId: id,
         metadata: { category: newBudget.category, department: newBudget.department, allocated: newBudget.allocated },
       }).catch(() => {});
+
+      // Synchronize department ceiling if department document has lower or 0 allocation
+      const deptNameClean = (newBudget.department || "").trim().toLowerCase();
+      const matchedDept = departments.find((d) => (d.name || "").trim().toLowerCase() === deptNameClean);
+      if (matchedDept) {
+        const allDeptsBudgets = [{ ...newBudget }, ...budgets.filter((item) => item.id !== id)];
+        const deptTotalBudget = allDeptsBudgets
+          .filter((item) => (item.department || "").trim().toLowerCase() === deptNameClean)
+          .reduce((sum, item) => sum + safeNumber(item.allocated, 0), 0);
+        if (deptTotalBudget > safeNumber(matchedDept.budgetAllocated, 0)) {
+          updateDepartment(matchedDept.id, { budgetAllocated: deptTotalBudget }).catch(() => {});
+        }
+      }
     } catch (err) {
       console.log("Budget saved offline:", err);
     }
@@ -780,6 +891,28 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     if (!can(user, "manage_budgets")) {
       showFloatingToast("Permission Denied", "You do not have permission to edit budgets.");
       throw new Error("Permission denied: cannot edit budget");
+    }
+
+    if (updates.allocated !== undefined) {
+      const existing = budgets.find((b) => b.id === id);
+      const validation = validateBudgetAllocationAgainstNetCash(
+        safeNumber(updates.allocated, 0),
+        transactions,
+        budgets,
+        departments,
+        {
+          type: "budget",
+          editingBudgetId: id,
+          targetDepartmentName: updates.department || existing?.department,
+          currency: settings.currency || "PKR",
+        }
+      );
+
+      if (!validation.isValid) {
+        const err = validation.errorMessage || "Cannot update budget: exceeds Available Net Cash.";
+        showFloatingToast("Net Cash Restriction", err);
+        throw new Error(err);
+      }
     }
 
     const enrichedUpdates = { ...updates, updatedAt: new Date().toISOString() };
@@ -801,6 +934,19 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         entityId: id,
         metadata: updates,
       }).catch(() => {});
+
+      // Synchronize department ceiling if department document has lower or 0 allocation
+      const targetDept = (updates.department || budgets.find((b) => b.id === id)?.department || "").trim().toLowerCase();
+      const matchedDept = departments.find((d) => (d.name || "").trim().toLowerCase() === targetDept);
+      if (matchedDept && targetDept) {
+        const allDeptsBudgets = budgets.map((b) => (b.id === id ? { ...b, ...enrichedUpdates } : b));
+        const deptTotalBudget = allDeptsBudgets
+          .filter((item) => (item.department || "").trim().toLowerCase() === targetDept)
+          .reduce((sum, item) => sum + safeNumber(item.allocated, 0), 0);
+        if (deptTotalBudget > safeNumber(matchedDept.budgetAllocated, 0)) {
+          updateDepartment(matchedDept.id, { budgetAllocated: deptTotalBudget }).catch(() => {});
+        }
+      }
     } catch (err) {
       console.log("Budget update queued offline:", err);
     }
@@ -864,11 +1010,49 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Permission denied: cannot create payroll");
     }
 
+    const deptName = (p.department || "").trim();
+    if (!deptName) {
+      showFloatingToast("Department Required", "Please assign a department to the employee.");
+      throw new Error("Employee department is required for payroll disbursement.");
+    }
+
+    // 1. Authoritative Department Budget Check:
+    // If department has budget <= 0, block payroll!
+    const effectiveDept = calculateEffectiveDepartmentBudget(deptName, departments, budgets);
+    const allocatedBudget = effectiveDept.allocated;
+    if (allocatedBudget <= 0) {
+      const err = `Payroll cannot be processed because the ${deptName} department has no allocated budget.`;
+      showFloatingToast("Budget Error", err);
+      throw new Error(err);
+    }
+
+    const netSalary = safeNumber(p.baseSalary, 0) + safeNumber(p.bonus, 0) - safeNumber(p.deductions, 0);
+
+    // 2. Authoritative Insufficient Department Budget Check:
+    const dLower = deptName.toLowerCase();
+    const currentDeptSpent = transactions
+      .filter(
+        (t) =>
+          t.type === "expense" &&
+          (t.department || "").trim().toLowerCase() === dLower &&
+          t.status !== "failed" &&
+          (t as any).status !== "deleted"
+      )
+      .reduce((s, t) => s + safeNumber(t.amount, 0), 0);
+
+    const remainingBudget = Math.max(0, allocatedBudget - currentDeptSpent);
+    if (netSalary > remainingBudget) {
+      const currency = settings.currency || "PKR";
+      const err = `Insufficient ${deptName} department budget. Available: ${currency} ${remainingBudget.toLocaleString()}. Required for payroll: ${currency} ${netSalary.toLocaleString()}.`;
+      showFloatingToast("Insufficient Budget", err);
+      throw new Error(err);
+    }
+
     const id = generateSafeId("payroll");
+    const txId = `tx_pay_${id}`;
     const now = new Date().toISOString();
     const orgName = settings.organizationName || user?.organization || "OFM — Organization Finance Management";
     const orgId = user?.organizationId || activeOrgId || "default_org";
-    const netSalary = safeNumber(p.baseSalary, 0) + safeNumber(p.bonus, 0) - safeNumber(p.deductions, 0);
 
     const newPayroll: PayrollEntry = {
       ...p,
@@ -879,21 +1063,15 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       createdAt: p.createdAt || now,
       updatedAt: now,
       paymentStatus: p.paymentStatus || "paid",
+      expenseId: txId,
     };
 
-    setPayroll((prev) => {
-      const updated = [newPayroll, ...prev.filter((item) => item.id !== id)];
-      AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(updated)).catch(() => {});
-      return updated;
-    });
-
-    // ─── Automatic Ledger Expense Transaction Sync ───
-    const txId = `tx_pay_${id}`;
+    // ─── Automatic Ledger Expense Transaction Sync (Category: "Salary / Payroll") ───
     const salaryTx: Transaction = {
       id: txId,
       type: "expense",
       amount: netSalary,
-      category: "Salaries",
+      category: "Salary / Payroll",
       department: p.department || "General",
       date: p.month ? `${p.month}-01` : now.split("T")[0],
       title: `Salary — ${p.employeeName} (${p.month || "Current"})`,
@@ -905,7 +1083,18 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       updatedAt: now,
       paymentMethod: "Bank Transfer",
       status: "completed",
+      expenseSource: "payroll",
+      payrollId: id,
+      employeeId: p.employeeId,
+      employeeName: p.employeeName,
+      referenceNumber: `PAY-${id.substring(0, 8).toUpperCase()}`,
     };
+
+    setPayroll((prev) => {
+      const updated = [newPayroll, ...prev.filter((item) => item.id !== id)];
+      AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
 
     setTransactions((prev) => {
       const updated = [salaryTx, ...prev.filter((t) => t.id !== txId)];
@@ -914,12 +1103,20 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     });
 
     try {
-      await Promise.all([
-        setDoc(doc(db, "payroll", id), newPayroll),
-        setDoc(doc(db, "transactions", txId), salaryTx).catch(() => {}),
-      ]);
+      const batch = writeBatch(db);
+      batch.set(doc(db, "payroll", id), newPayroll);
+      batch.set(doc(db, "transactions", txId), salaryTx);
+      await batch.commit().catch(async (err) => {
+        console.log("Batch commit failed, attempting Promise.all fallback:", err);
+        await Promise.all([
+          setDoc(doc(db, "payroll", id), newPayroll),
+          setDoc(doc(db, "transactions", txId), salaryTx).catch(() => {}),
+        ]);
+      });
+
       saveDocREST("payroll", id, newPayroll).catch(() => {});
       saveDocREST("transactions", txId, salaryTx).catch(() => {});
+
       recordAuditLog({
         organizationId: orgId,
         actorUid: user?.id || "anonymous",
@@ -928,9 +1125,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         action: "create",
         entity: "payroll",
         entityId: id,
-        metadata: { employeeName: p.employeeName, month: p.month, netSalary, department: p.department },
+        metadata: { employeeName: p.employeeName, month: p.month, netSalary, department: p.department, expenseId: txId },
       }).catch(() => {});
-      
+
       dispatchNotification(
         {
           type: "PAYROLL_PROCESSED",
@@ -955,30 +1152,62 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Permission denied: cannot update payroll");
     }
 
-    const enrichedUpdates = { ...updates, updatedAt: new Date().toISOString() };
-    let updatedNetSalary: number | undefined;
+    const existing = payroll.find((p) => p.id === id);
+    const targetDeptName = (updates.department ?? existing?.department ?? "").trim();
+    const base = updates.baseSalary !== undefined ? safeNumber(updates.baseSalary, 0) : safeNumber(existing?.baseSalary, 0);
+    const bonus = updates.bonus !== undefined ? safeNumber(updates.bonus, 0) : safeNumber(existing?.bonus, 0);
+    const deductions = updates.deductions !== undefined ? safeNumber(updates.deductions, 0) : safeNumber(existing?.deductions, 0);
+    const updatedNetSalary = base + bonus - deductions;
+
+    if (targetDeptName) {
+      const effectiveDept = calculateEffectiveDepartmentBudget(targetDeptName, departments, budgets);
+      const allocatedBudget = effectiveDept.allocated;
+      if (allocatedBudget <= 0) {
+        const err = `Payroll cannot be processed because the ${targetDeptName} department has no allocated budget.`;
+        showFloatingToast("Budget Error", err);
+        throw new Error(err);
+      }
+
+      const txId = `tx_pay_${id}`;
+      const dLower = targetDeptName.toLowerCase();
+      const currentDeptSpentWithoutThis = transactions
+        .filter(
+          (t) =>
+            t.type === "expense" &&
+            (t.department || "").trim().toLowerCase() === dLower &&
+            t.status !== "failed" &&
+            (t as any).status !== "deleted" &&
+            t.id !== txId
+        )
+        .reduce((s, t) => s + safeNumber(t.amount, 0), 0);
+
+      const availableForThis = Math.max(0, allocatedBudget - currentDeptSpentWithoutThis);
+      if (updatedNetSalary > availableForThis) {
+        const currency = settings.currency || "PKR";
+        const err = `Insufficient ${targetDeptName} department budget. Available: ${currency} ${availableForThis.toLocaleString()}. Required for payroll: ${currency} ${updatedNetSalary.toLocaleString()}.`;
+        showFloatingToast("Insufficient Budget", err);
+        throw new Error(err);
+      }
+    }
+
+    const enrichedUpdates = { ...updates, netSalary: updatedNetSalary, updatedAt: new Date().toISOString() };
+    const txId = `tx_pay_${id}`;
+    const employeeName = updates.employeeName ?? existing?.employeeName ?? "Staff";
+    const employeeId = updates.employeeId ?? existing?.employeeId ?? "EMP";
+    const month = updates.month ?? existing?.month ?? "Current";
+    const salaryTitle = `Salary — ${employeeName} (${month})`;
+    const salaryDesc = `Staff payroll disbursement for ${employeeName} (${employeeId}). Base: ${base}, Bonus: ${bonus}, Deductions: ${deductions}`;
 
     setPayroll((prev) => {
       const updated = prev.map((p) => {
         if (p.id === id) {
-          const merged = { ...p, ...enrichedUpdates };
-          const base = merged.baseSalary || 0;
-          const bonus = merged.bonus || 0;
-          const deductions = merged.deductions || 0;
-          merged.netSalary = base + bonus - deductions;
-          updatedNetSalary = merged.netSalary;
-          return merged;
+          return { ...p, ...enrichedUpdates };
         }
         return p;
       });
       AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(updated)).catch(() => {});
       return updated;
     });
-
-    // Also update linked transaction in transactions list
-    const txId = `tx_pay_${id}`;
-    const salaryTitle = updates.employeeName ? `Salary — ${updates.employeeName} (${updates.month || "Current"})` : undefined;
-    const salaryDesc = updates.employeeName ? `Staff payroll disbursement for ${updates.employeeName} (${updates.employeeId || "Staff"})` : undefined;
 
     setTransactions((prev) => {
       const exists = prev.some((t) => t.id === txId);
@@ -987,10 +1216,15 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           if (t.id === txId) {
             return {
               ...t,
-              amount: updatedNetSalary ?? t.amount,
-              department: updates.department ?? t.department,
-              title: salaryTitle ?? t.title,
-              description: salaryDesc ?? t.description,
+              amount: updatedNetSalary,
+              category: "Salary / Payroll",
+              department: targetDeptName || t.department,
+              title: salaryTitle,
+              description: salaryDesc,
+              employeeName,
+              employeeId,
+              expenseSource: "payroll" as const,
+              payrollId: id,
               updatedAt: new Date().toISOString(),
             };
           }
@@ -1002,12 +1236,12 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         const salaryTx: Transaction = {
           id: txId,
           type: "expense",
-          amount: updatedNetSalary || 0,
-          category: "Salaries",
-          department: updates.department || "General",
-          date: updates.month ? `${updates.month}-01` : new Date().toISOString().split("T")[0],
-          title: salaryTitle || `Salary — Staff (${updates.month || "Current"})`,
-          description: salaryDesc || "Staff payroll disbursement",
+          amount: updatedNetSalary,
+          category: "Salary / Payroll",
+          department: targetDeptName || "General",
+          date: month ? `${month}-01` : new Date().toISOString().split("T")[0],
+          title: salaryTitle,
+          description: salaryDesc,
           addedBy: user?.name || user?.email || "Payroll System",
           organizationId: activeOrgId,
           organization: user?.organization || "Organization Finance Management",
@@ -1015,6 +1249,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           updatedAt: new Date().toISOString(),
           paymentMethod: "Bank Transfer",
           status: "completed",
+          expenseSource: "payroll",
+          payrollId: id,
+          employeeId,
+          employeeName,
+          referenceNumber: `PAY-${id.substring(0, 8).toUpperCase()}`,
         };
         const updated = [salaryTx, ...prev];
         AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(updated)).catch(() => {});
@@ -1023,19 +1262,32 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     });
 
     try {
-      await setDoc(doc(db, "payroll", id), enrichedUpdates, { merge: true });
+      const txUpdates = {
+        amount: updatedNetSalary,
+        category: "Salary / Payroll",
+        department: targetDeptName,
+        title: salaryTitle,
+        description: salaryDesc,
+        employeeName,
+        employeeId,
+        expenseSource: "payroll",
+        payrollId: id,
+        updatedAt: new Date().toISOString(),
+      };
+
+      const batch = writeBatch(db);
+      batch.set(doc(db, "payroll", id), enrichedUpdates, { merge: true });
+      batch.set(doc(db, "transactions", txId), txUpdates, { merge: true });
+      await batch.commit().catch(async () => {
+        await Promise.all([
+          setDoc(doc(db, "payroll", id), enrichedUpdates, { merge: true }),
+          setDoc(doc(db, "transactions", txId), txUpdates, { merge: true }),
+        ]);
+      });
+
       saveDocREST("payroll", id, enrichedUpdates).catch(() => {});
-      if (updatedNetSalary !== undefined || updates.department || updates.employeeName) {
-        const txUpdates = {
-          amount: updatedNetSalary,
-          department: updates.department,
-          title: salaryTitle,
-          description: salaryDesc,
-          updatedAt: new Date().toISOString(),
-        };
-        await setDoc(doc(db, "transactions", txId), txUpdates, { merge: true }).catch(() => {});
-        saveDocREST("transactions", txId, txUpdates).catch(() => {});
-      }
+      saveDocREST("transactions", txId, txUpdates).catch(() => {});
+
       recordAuditLog({
         organizationId: activeOrgId,
         actorUid: user?.id || "anonymous",
@@ -1066,14 +1318,24 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     let failureReason: any = null;
 
     try {
-      await Promise.all([
-        deleteDoc(doc(db, "payroll", id)).catch((err) => { failureReason = err; }),
-        deleteDoc(doc(db, "payroll", aliasId)).catch(() => {}),
-        deleteDoc(doc(db, "transactions", txId)).catch(() => {}),
-      ]);
+      const batch = writeBatch(db);
+      batch.delete(doc(db, "payroll", id));
+      batch.delete(doc(db, "transactions", txId));
+      if (aliasId !== id) {
+        batch.delete(doc(db, "payroll", aliasId));
+      }
+      await batch.commit();
       deleteSucceeded = true;
     } catch (err: any) {
       failureReason = err;
+      try {
+        await Promise.all([
+          deleteDoc(doc(db, "payroll", id)).catch((e) => { failureReason = e; }),
+          deleteDoc(doc(db, "payroll", aliasId)).catch(() => {}),
+          deleteDoc(doc(db, "transactions", txId)).catch(() => {}),
+        ]);
+        deleteSucceeded = true;
+      } catch (e2) {}
     }
 
     const restSuccess = await deleteDocREST("payroll", id).catch(() => false);
@@ -1118,6 +1380,26 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Permission denied: cannot create department");
     }
 
+    if (safeNumber(d.budgetAllocated, 0) > 0) {
+      const validation = validateBudgetAllocationAgainstNetCash(
+        safeNumber(d.budgetAllocated, 0),
+        transactions,
+        budgets,
+        departments,
+        {
+          type: "department",
+          targetDepartmentName: d.name,
+          currency: settings.currency || "PKR",
+        }
+      );
+
+      if (!validation.isValid) {
+        const err = validation.errorMessage || "Cannot allocate department budget: exceeds Available Net Cash.";
+        showFloatingToast("Net Cash Restriction", err);
+        throw new Error(err);
+      }
+    }
+
     const id = generateSafeId("departments");
     const now = new Date().toISOString();
     const orgName = settings.organizationName || user?.organization || "OFM — Organization Finance Management";
@@ -1160,6 +1442,28 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     if (!can(user, "manage_departments")) {
       showFloatingToast("Permission Denied", "You do not have permission to update departments.");
       throw new Error("Permission denied: cannot update department");
+    }
+
+    if (updates.budgetAllocated !== undefined && safeNumber(updates.budgetAllocated, 0) > 0) {
+      const existing = departments.find((d) => d.id === id);
+      const validation = validateBudgetAllocationAgainstNetCash(
+        safeNumber(updates.budgetAllocated, 0),
+        transactions,
+        budgets,
+        departments,
+        {
+          type: "department",
+          editingDepartmentId: id,
+          targetDepartmentName: updates.name || existing?.name,
+          currency: settings.currency || "PKR",
+        }
+      );
+
+      if (!validation.isValid) {
+        const err = validation.errorMessage || "Cannot update department budget: exceeds Available Net Cash.";
+        showFloatingToast("Net Cash Restriction", err);
+        throw new Error(err);
+      }
     }
 
     const enrichedUpdates = { ...updates, updatedAt: new Date().toISOString() };
@@ -1314,16 +1618,26 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     return calculateBudgetAllocation([], departments);
   }, [departments]);
 
-  const totalBudgeted = totalLineBudgeted;
+  const totalAllocatedBudget = useMemo(() => {
+    return calculateBudgetAllocation(budgets, departments);
+  }, [budgets, departments]);
+
+  const totalBudgeted = totalAllocatedBudget;
   const actualCash = useMemo(() => calculateActualCash(unifiedTransactions), [unifiedTransactions]);
   const totalBudgetSpent = useMemo(() => {
-    return calculateBudgetUsed(unifiedTransactions, budgets);
-  }, [unifiedTransactions, budgets]);
-  const totalBudgetRemaining = useMemo(() => calculateBudgetRemaining(totalBudgeted, totalBudgetSpent), [totalBudgeted, totalBudgetSpent]);
-  const budgetUtilization = useMemo(() => totalBudgeted > 0 ? (totalBudgetSpent / totalBudgeted) * 100 : 0, [totalBudgeted, totalBudgetSpent]);
-  const totalAvailableFunds = useMemo(() => {
-    return calculateTotalAvailableFunds(totalIncome, totalBudgeted, totalExpenses);
-  }, [totalIncome, totalBudgeted, totalExpenses]);
+    return calculateBudgetUsed(unifiedTransactions, budgets, undefined, departments);
+  }, [unifiedTransactions, budgets, departments]);
+  const totalBudgetRemaining = useMemo(() => calculateBudgetRemaining(totalAllocatedBudget, totalBudgetSpent), [totalAllocatedBudget, totalBudgetSpent]);
+  const budgetUtilization = useMemo(() => totalAllocatedBudget > 0 ? (totalBudgetSpent / totalAllocatedBudget) * 100 : 0, [totalAllocatedBudget, totalBudgetSpent]);
+  const unallocatedFunds = useMemo(() => {
+    return calculateUnallocatedFunds(totalIncome, totalAllocatedBudget);
+  }, [totalIncome, totalAllocatedBudget]);
+  const totalAvailableFunds = unallocatedFunds;
+
+  const departmentMetrics = useMemo(() => {
+    return calculateDepartmentMetrics(departments, unifiedTransactions, undefined, budgets);
+  }, [departments, unifiedTransactions, budgets]);
+
   const unreadNotificationCount = useMemo(() => notifications.filter((n) => !n.read).length, [notifications]);
 
   const refreshData = useCallback(async () => {
@@ -1403,9 +1717,12 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     totalBudgeted,
     totalLineBudgeted,
     totalDeptBudgeted,
+    totalAllocatedBudget,
     totalBudgetSpent,
     totalBudgetRemaining,
     totalAvailableFunds,
+    unallocatedFunds,
+    departmentMetrics,
   }), [
     unifiedTransactions,
     budgetsWithSpent,
@@ -1434,9 +1751,12 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     totalBudgeted,
     totalLineBudgeted,
     totalDeptBudgeted,
+    totalAllocatedBudget,
     totalBudgetSpent,
     totalBudgetRemaining,
     totalAvailableFunds,
+    unallocatedFunds,
+    departmentMetrics,
   ]);
 
   return (

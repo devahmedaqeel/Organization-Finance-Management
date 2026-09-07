@@ -13,11 +13,12 @@ import {
   View,
 } from "react-native";
 import { Transaction, TransactionType, useFinance } from "@/context/FinanceContext";
+import { calculateEffectiveDepartmentBudget } from "@/services/FinancialCalculationEngine";
 import { useColors } from "@/hooks/useColors";
 import { useSettings } from "@/context/SettingsContext";
 import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
 import { formatYMD } from "@/services/DatePeriodService";
-import { getUnifiedCategories } from "@/constants/categories";
+import { getUnifiedCategories, getDepartmentCategories } from "@/constants/categories";
 
 interface Props {
   visible: boolean;
@@ -41,12 +42,8 @@ export function AddTransactionModal({
 }: Props) {
   const colors = useColors();
   const { settings, addCustomCategory } = useSettings();
-  const { departments, addDepartment, updateDepartment, budgets } = useFinance();
+  const { departments, addDepartment, updateDepartment, budgets, transactions } = useFinance();
   const keyboardHeight = useKeyboardHeight();
-  
-  const cats = React.useMemo(() => {
-    return getUnifiedCategories(type, settings.customIncomeCategories, settings.customExpenseCategories);
-  }, [type, settings.customIncomeCategories, settings.customExpenseCategories]);
 
   const isEditMode = !!editItem;
 
@@ -59,13 +56,51 @@ export function AddTransactionModal({
         { id: "d4", name: "Finance", headCount: 8, budgetAllocated: 180000 }
       ];
 
-  const [category, setCategory] = useState(cats[0]);
-  const [amount, setAmount] = useState("");
   const [department, setDepartment] = useState("");
+  const [category, setCategory] = useState("");
+  const [amount, setAmount] = useState("");
   const [selectedBudgetId, setSelectedBudgetId] = useState("");
   const [description, setDescription] = useState("");
   const [date, setDate] = useState(() => formatYMD(new Date()));
   const [error, setError] = useState("");
+
+  const cats = React.useMemo(() => {
+    if (type === "expense") {
+      return getDepartmentCategories(department, resolvedDepts, settings.customExpenseCategories);
+    }
+    return getUnifiedCategories(type, settings.customIncomeCategories, settings.customExpenseCategories);
+  }, [type, department, resolvedDepts, settings.customIncomeCategories, settings.customExpenseCategories]);
+
+  // Department metrics for budget validation
+  const selectedDeptMetric = React.useMemo(() => {
+    if (!department || type !== "expense") return null;
+    const clean = department.trim().toLowerCase();
+    const effectiveDept = calculateEffectiveDepartmentBudget(clean, resolvedDepts, budgets);
+    const allocated = effectiveDept.allocated;
+
+    const spent = (transactions || [])
+      .filter((t) => {
+        if (t.type !== "expense" || (t.department || "").trim().toLowerCase() !== clean) return false;
+        if (isEditMode && editItem && t.id === editItem.id) return false;
+        return t.status !== "failed" && (t as any).status !== "deleted";
+      })
+      .reduce((sum, t) => sum + (t.amount || 0), 0);
+
+    const remaining = Math.max(0, allocated - spent);
+    return {
+      allocated,
+      spent,
+      remaining,
+      hasBudget: allocated > 0,
+      isExhausted: allocated > 0 && remaining <= 0,
+    };
+  }, [department, type, resolvedDepts, budgets, transactions, isEditMode, editItem]);
+
+  useEffect(() => {
+    if (cats.length > 0 && (!category || !cats.includes(category))) {
+      setCategory(cats[0]);
+    }
+  }, [cats]);
 
   // Inline category creation
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
@@ -80,17 +115,20 @@ export function AddTransactionModal({
   useEffect(() => {
     const defaultDept = resolvedDepts[0]?.name || "Administration";
     if (editItem) {
+      setDepartment(editItem.department);
       setCategory(editItem.category);
       setAmount(editItem.amount.toString());
-      setDepartment(editItem.department);
       setSelectedBudgetId(editItem.budgetId || "");
       setDescription(editItem.description || "");
       setDate(editItem.date);
       setError("");
     } else {
-      setCategory(cats[0]);
-      setAmount("");
+      const defaultCats = type === "expense"
+        ? getDepartmentCategories(defaultDept, resolvedDepts, settings.customExpenseCategories)
+        : getUnifiedCategories(type, settings.customIncomeCategories, settings.customExpenseCategories);
       setDepartment(defaultDept);
+      setCategory(defaultCats[0] || (type === "income" ? "Government Grant" : "Salaries"));
+      setAmount("");
       setSelectedBudgetId("");
       setDescription("");
       setDate(formatYMD(new Date()));
@@ -101,7 +139,7 @@ export function AddTransactionModal({
     setIsCreatingDept(false);
     setIsEditingDept(false);
     setDeptInputText("");
-  }, [editItem, visible, departments]);
+  }, [editItem, visible, departments, type]);
 
   const handleSubmit = () => {
     const amt = parseFloat(amount);
@@ -114,12 +152,23 @@ export function AddTransactionModal({
       return;
     }
 
+    if (type === "expense") {
+      if (!selectedDeptMetric || !selectedDeptMetric.hasBudget) {
+        setError("No budget has been allocated to this department. Allocate a department budget before recording an expense.");
+        return;
+      }
+      if (amt > selectedDeptMetric.remaining) {
+        setError(`Insufficient department budget. Remaining budget: ${settings.currency} ${selectedDeptMetric.remaining.toLocaleString()}`);
+        return;
+      }
+    }
+
     const payload: Omit<Transaction, "id"> = {
       type,
       category,
       amount: amt,
       date,
-      department,
+      department: isIncome ? (editItem?.department || "Institutional") : department,
       description,
       addedBy,
       budgetId: type === "expense" && selectedBudgetId.trim() ? selectedBudgetId.trim() : undefined,
@@ -295,118 +344,195 @@ export function AddTransactionModal({
               onChangeText={(v) => { setDate(v); setError(""); }}
             />
 
-            {/* Department */}
-            <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>DEPARTMENT</Text>
-            <View style={styles.chips}>
-              {resolvedDepts.map((d) => (
-                <TouchableOpacity
-                  key={d.id}
-                  style={[
-                    styles.chip,
-                    {
-                      backgroundColor: department === d.name ? colors.primary : colors.muted,
-                      borderColor: department === d.name ? colors.primary : colors.border,
-                    },
-                  ]}
-                  onPress={() => {
-                    setDepartment(d.name);
-                    setIsCreatingDept(false);
-                    setIsEditingDept(false);
-                  }}
-                >
-                  <Text style={[styles.chipText, { color: department === d.name ? "#fff" : colors.foreground }]}>
-                    {d.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* Inline Department Actions */}
-            <View style={{ flexDirection: "row", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-              <TouchableOpacity
-                style={[styles.miniActionBtn, { borderColor: colors.border }]}
-                onPress={() => {
-                  setDeptInputText("");
-                  setIsEditingDept(false);
-                  setIsCreatingDept(true);
-                }}
-                activeOpacity={0.7}
-              >
-                <Feather name="plus" size={13} color={colors.primary} />
-                <Text style={[styles.miniActionBtnText, { color: colors.primary }]}>Add Department</Text>
-              </TouchableOpacity>
-
-              {resolvedDepts.some((d) => d.name === department) && (
-                <TouchableOpacity
-                  style={[styles.miniActionBtn, { borderColor: colors.border }]}
-                  onPress={() => {
-                    setDeptInputText(department);
-                    setIsCreatingDept(false);
-                    setIsEditingDept(true);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Feather name="edit-2" size={12} color={colors.primary} />
-                  <Text style={[styles.miniActionBtnText, { color: colors.primary }]}>Rename Selected</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {/* Inline Department Editor Form */}
-            {(isCreatingDept || isEditingDept) && (
-              <View style={[styles.deptForm, { backgroundColor: colors.muted, borderColor: colors.border }]}>
-                <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground, marginBottom: 6 }}>
-                  {isCreatingDept ? "CREATE NEW DEPARTMENT" : `RENAME "${department}"`}
-                </Text>
-                <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-                  <TextInput
-                    style={[styles.miniInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
-                    placeholder="Department name"
-                    placeholderTextColor={colors.mutedForeground}
-                    value={deptInputText}
-                    onChangeText={setDeptInputText}
-                    autoFocus
-                  />
-                  <TouchableOpacity
-                    style={[styles.miniSaveBtn, { backgroundColor: colors.primary }]}
-                    onPress={async () => {
-                      if (!deptInputText.trim()) return;
-                      const trimmedName = deptInputText.trim();
-                      if (isCreatingDept) {
-                        await addDepartment({
-                          name: trimmedName,
-                          headCount: 0,
-                          budgetAllocated: 0,
-                        });
-                        setDepartment(trimmedName);
+            {/* Department (Expenses only) */}
+            {!isIncome && (
+              <>
+                <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>DEPARTMENT</Text>
+                <View style={styles.chips}>
+                  {resolvedDepts.map((d) => (
+                    <TouchableOpacity
+                      key={d.id}
+                      style={[
+                        styles.chip,
+                        {
+                          backgroundColor: department === d.name ? colors.primary : colors.muted,
+                          borderColor: department === d.name ? colors.primary : colors.border,
+                        },
+                      ]}
+                      onPress={() => {
+                        setDepartment(d.name);
                         setIsCreatingDept(false);
-                      } else {
-                        const deptToUpdate = resolvedDepts.find((d) => d.name === department);
-                        if (deptToUpdate) {
-                          await updateDepartment(deptToUpdate.id, {
-                            name: trimmedName,
-                          });
-                          setDepartment(trimmedName);
-                          setIsEditingDept(false);
-                        }
-                      }
-                      setDeptInputText("");
-                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                    }}
-                  >
-                    <Feather name="check" size={14} color="#fff" />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.miniCancelBtn, { borderColor: colors.border }]}
-                    onPress={() => {
-                      setIsCreatingDept(false);
-                      setIsEditingDept(false);
-                      setDeptInputText("");
-                    }}
-                  >
-                    <Feather name="x" size={14} color={colors.mutedForeground} />
-                  </TouchableOpacity>
+                        setIsEditingDept(false);
+                      }}
+                    >
+                      <Text style={[styles.chipText, { color: department === d.name ? "#fff" : colors.foreground }]}>
+                        {d.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
+
+                {/* Inline Department Actions */}
+                <View style={{ flexDirection: "row", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+                  <TouchableOpacity
+                    style={[styles.miniActionBtn, { borderColor: colors.border }]}
+                    onPress={() => {
+                      setDeptInputText("");
+                      setIsEditingDept(false);
+                      setIsCreatingDept(true);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Feather name="plus" size={13} color={colors.primary} />
+                    <Text style={[styles.miniActionBtnText, { color: colors.primary }]}>Add Department</Text>
+                  </TouchableOpacity>
+
+                  {resolvedDepts.some((d) => d.name === department) && (
+                    <TouchableOpacity
+                      style={[styles.miniActionBtn, { borderColor: colors.border }]}
+                      onPress={() => {
+                        setDeptInputText(department);
+                        setIsCreatingDept(false);
+                        setIsEditingDept(true);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Feather name="edit-2" size={12} color={colors.primary} />
+                      <Text style={[styles.miniActionBtnText, { color: colors.primary }]}>Rename Selected</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* Inline Department Editor Form */}
+                {(isCreatingDept || isEditingDept) && (
+                  <View style={[styles.deptForm, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground, marginBottom: 6 }}>
+                      {isCreatingDept ? "CREATE NEW DEPARTMENT" : `RENAME "${department}"`}
+                    </Text>
+                    <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                      <TextInput
+                        style={[styles.miniInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
+                        placeholder="Department name"
+                        placeholderTextColor={colors.mutedForeground}
+                        value={deptInputText}
+                        onChangeText={setDeptInputText}
+                        autoFocus
+                      />
+                      <TouchableOpacity
+                        style={[styles.miniSaveBtn, { backgroundColor: colors.primary }]}
+                        onPress={async () => {
+                          if (!deptInputText.trim()) return;
+                          const trimmedName = deptInputText.trim();
+                          if (isCreatingDept) {
+                            await addDepartment({
+                              name: trimmedName,
+                              headCount: 0,
+                              budgetAllocated: 0,
+                            });
+                            setDepartment(trimmedName);
+                            setIsCreatingDept(false);
+                          } else {
+                            const deptToUpdate = resolvedDepts.find((d) => d.name === department);
+                            if (deptToUpdate) {
+                              await updateDepartment(deptToUpdate.id, {
+                                name: trimmedName,
+                              });
+                              setDepartment(trimmedName);
+                              setIsEditingDept(false);
+                            }
+                          }
+                          setDeptInputText("");
+                          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                        }}
+                      >
+                        <Feather name="check" size={14} color="#fff" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.miniCancelBtn, { borderColor: colors.border }]}
+                        onPress={() => {
+                          setIsCreatingDept(false);
+                          setIsEditingDept(false);
+                          setDeptInputText("");
+                        }}
+                      >
+                        <Feather name="x" size={14} color={colors.mutedForeground} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+              </>
+            )}
+
+            {/* Department Budget Health Indicator (Expenses only) */}
+            {!isIncome && (
+              <View
+                style={{
+                  marginTop: 12,
+                  marginBottom: 6,
+                  padding: 10,
+                  borderRadius: 10,
+                  backgroundColor: selectedDeptMetric?.hasBudget
+                    ? (selectedDeptMetric.isExhausted ? colors.expense + "15" : colors.card)
+                    : colors.expense + "15",
+                  borderWidth: 1,
+                  borderColor: selectedDeptMetric?.hasBudget
+                    ? (selectedDeptMetric.isExhausted ? colors.expense + "40" : colors.border)
+                    : colors.expense + "40",
+                }}
+              >
+                {selectedDeptMetric?.hasBudget ? (
+                  <View>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                      <Text style={{ fontSize: 10, fontWeight: "700", color: colors.mutedForeground, letterSpacing: 0.5 }}>
+                        DEPARTMENT BUDGET
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          fontWeight: "700",
+                          color: selectedDeptMetric.isExhausted ? colors.expense : "#10B981",
+                        }}
+                      >
+                        {selectedDeptMetric.isExhausted
+                          ? "Budget Exhausted"
+                          : `${((selectedDeptMetric.spent / selectedDeptMetric.allocated) * 100).toFixed(0)}% Utilized`}
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                      <View>
+                        <Text style={{ fontSize: 9, color: colors.mutedForeground }}>Allocated</Text>
+                        <Text style={{ fontSize: 12, fontWeight: "600", color: colors.foreground }}>
+                          {settings.currency} {selectedDeptMetric.allocated.toLocaleString()}
+                        </Text>
+                      </View>
+                      <View>
+                        <Text style={{ fontSize: 9, color: colors.mutedForeground }}>Spent</Text>
+                        <Text style={{ fontSize: 12, fontWeight: "600", color: colors.foreground }}>
+                          {settings.currency} {selectedDeptMetric.spent.toLocaleString()}
+                        </Text>
+                      </View>
+                      <View>
+                        <Text style={{ fontSize: 9, color: colors.mutedForeground }}>Remaining</Text>
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontWeight: "700",
+                            color: selectedDeptMetric.remaining > 0 ? "#10B981" : colors.expense,
+                          }}
+                        >
+                          {settings.currency} {selectedDeptMetric.remaining.toLocaleString()}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Text style={{ fontSize: 14 }}>⚠️</Text>
+                    <Text style={{ fontSize: 11, color: colors.expense, fontWeight: "600", flex: 1 }}>
+                      No budget has been allocated to this department. Allocate a department budget before recording an expense.
+                    </Text>
+                  </View>
+                )}
               </View>
             )}
 

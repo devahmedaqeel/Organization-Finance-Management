@@ -20,6 +20,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import { useFinance, PayrollEntry } from "@/context/FinanceContext";
+import { calculateEffectiveDepartmentBudget } from "@/services/FinancialCalculationEngine";
 import { useColors } from "@/hooks/useColors";
 import { useSettings } from "@/context/SettingsContext";
 import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
@@ -40,7 +41,7 @@ export default function PayrollScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { payroll, addPayroll, updatePayroll, deletePayroll, departments, budgets } = useFinance();
+  const { payroll, addPayroll, updatePayroll, deletePayroll, departments, budgets, transactions } = useFinance();
   const { settings } = useSettings();
   const keyboardHeight = useKeyboardHeight();
 
@@ -76,6 +77,74 @@ export default function PayrollScreen() {
     const set = new Set([...list, ...payroll.map((p) => p.department)]);
     return Array.from(set).filter(Boolean);
   }, [departments, payroll]);
+
+  // Extract known employees with their historical department
+  const knownEmployees = useMemo(() => {
+    const map = new Map<string, { name: string; employeeId: string; department: string; designation?: string; baseSalary?: number }>();
+    payroll.forEach((p) => {
+      if (p.employeeName && p.department) {
+        const key = p.employeeName.trim().toLowerCase();
+        if (!map.has(key)) {
+          map.set(key, {
+            name: p.employeeName.trim(),
+            employeeId: p.employeeId,
+            department: p.department,
+            designation: p.designation,
+            baseSalary: p.baseSalary,
+          });
+        }
+      }
+    });
+    return Array.from(map.values());
+  }, [payroll]);
+
+  // Auto-match employee to existing department
+  const matchedStaff = useMemo(() => {
+    if (!name.trim()) return null;
+    return knownEmployees.find((e) => e.name.toLowerCase() === name.trim().toLowerCase()) || null;
+  }, [knownEmployees, name]);
+
+  useEffect(() => {
+    if (matchedStaff && matchedStaff.department && matchedStaff.department !== dept) {
+      setDept(matchedStaff.department);
+      if (matchedStaff.employeeId && (!empId || empId.startsWith("EMP"))) {
+        setEmpId(matchedStaff.employeeId);
+      }
+      if (matchedStaff.baseSalary && !salary) {
+        setSalary(String(matchedStaff.baseSalary));
+      }
+    }
+  }, [matchedStaff]);
+
+  // Department Budget Analysis
+  const selectedDeptBudget = useMemo(() => {
+    return calculateEffectiveDepartmentBudget(dept, departments, budgets);
+  }, [departments, dept, budgets]);
+
+  const selectedDeptObj = selectedDeptBudget.matchedDept;
+  const deptBudgetAllocated = selectedDeptBudget.allocated;
+
+  const deptCurrentSpent = useMemo(() => {
+    if (!dept) return 0;
+    const dLower = dept.trim().toLowerCase();
+    const editTxId = editingEntry ? `tx_pay_${editingEntry.id}` : null;
+    return (transactions || [])
+      .filter(
+        (t) =>
+          t.type === "expense" &&
+          (t.department || "").trim().toLowerCase() === dLower &&
+          t.status !== "failed" &&
+          (t as any).status !== "deleted" &&
+          t.id !== editTxId
+      )
+      .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+  }, [transactions, dept, editingEntry]);
+
+  const deptRemainingBudget = Math.max(0, deptBudgetAllocated - deptCurrentSpent);
+  const currentNet = Math.max(0, (parseFloat(salary) || 0) + (parseFloat(bonus) || 0) - (parseFloat(deductions) || 0));
+  const projectedRemaining = deptRemainingBudget - currentNet;
+  const isZeroBudget = deptBudgetAllocated <= 0;
+  const isOverBudget = currentNet > deptRemainingBudget && !isZeroBudget;
 
   const fmt = (n: number) => {
     const abs = Math.abs(n);
@@ -154,6 +223,23 @@ export default function PayrollScreen() {
     }
     if (isNaN(sal) || sal <= 0) {
       setError("Please enter a valid base salary amount");
+      return;
+    }
+
+    if (!dept?.trim()) {
+      setError("Please select an assigned department");
+      return;
+    }
+
+    // Strict Enforcement: Zero allocated budget
+    if (isZeroBudget) {
+      setError(`Payroll cannot be processed because the ${dept} department has no allocated budget.`);
+      return;
+    }
+
+    // Strict Enforcement: Insufficient remaining budget
+    if (currentNet > deptRemainingBudget) {
+      setError(`Insufficient ${dept} department budget. Available: ${settings.currency} ${deptRemainingBudget.toLocaleString()}. Required for payroll: ${settings.currency} ${currentNet.toLocaleString()}.`);
       return;
     }
 
@@ -691,8 +777,38 @@ export default function PayrollScreen() {
               {editingEntry ? "Edit Employee Payroll" : "Add Employee Payroll"}
             </Text>
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 100 }}>
+              <View key="EMPLOYEE NAME">
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>EMPLOYEE NAME</Text>
+                <TextInput
+                  style={[styles.input, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground }]}
+                  placeholder="e.g. Ahmed"
+                  placeholderTextColor={colors.mutedForeground}
+                  keyboardType="default"
+                  value={name}
+                  onChangeText={setName}
+                />
+                {knownEmployees.length > 0 && !matchedStaff ? (
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 8, marginTop: -2 }}>
+                    <Text style={{ fontSize: 10.5, color: colors.mutedForeground, alignSelf: "center" }}>Select Staff:</Text>
+                    {knownEmployees.slice(0, 4).map((emp) => (
+                      <TouchableOpacity
+                        key={emp.name}
+                        style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.cardAlt ?? colors.muted }}
+                        onPress={() => {
+                          setName(emp.name);
+                          setDept(emp.department);
+                          if (emp.employeeId) setEmpId(emp.employeeId);
+                          if (emp.baseSalary && !salary) setSalary(String(emp.baseSalary));
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, color: colors.foreground, fontFamily: "Inter_500Medium" }}>{emp.name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                ) : null}
+              </View>
+
               {[
-                { label: "EMPLOYEE NAME", value: name, onChange: setName, placeholder: "Full name", keyboard: "default" as const },
                 { label: "EMPLOYEE ID", value: empId, onChange: setEmpId, placeholder: "EMP001", keyboard: "default" as const },
                 { label: `BASE SALARY (${settings.currency})`, value: salary, onChange: setSalary, placeholder: "0.00", keyboard: "decimal-pad" as const },
                 { label: `BONUS / INCENTIVES (${settings.currency})`, value: bonus, onChange: setBonus, placeholder: "0.00", keyboard: "decimal-pad" as const },
@@ -704,63 +820,149 @@ export default function PayrollScreen() {
                   <TextInput style={[styles.input, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground }]} placeholder={f.placeholder} placeholderTextColor={colors.mutedForeground} keyboardType={f.keyboard} value={f.value} onChangeText={f.onChange} />
                 </View>
               ))}
-              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>DEPARTMENT</Text>
+
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground, marginBottom: 0 }]}>DEPARTMENT</Text>
+                {matchedStaff ? (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#8B5CF618", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: "#8B5CF630" }}>
+                    <Feather name="lock" size={10} color="#8B5CF6" />
+                    <Text style={{ fontSize: 10, color: "#8B5CF6", fontFamily: "Inter_600SemiBold" }}>
+                      Auto-locked to {matchedStaff.name}&apos;s department
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+
               <View style={styles.chips}>
-                {availableDepts.map((d) => (
-                  <TouchableOpacity key={d} style={[styles.chip, { backgroundColor: dept === d ? "#8B5CF6" : (colors.cardAlt ?? colors.muted), borderColor: dept === d ? "#8B5CF6" : colors.border }]} onPress={() => setDept(d)}>
-                    <Text style={[styles.chipText, { color: dept === d ? "#fff" : colors.foreground }]}>{d}</Text>
-                  </TouchableOpacity>
-                ))}
+                {availableDepts.map((d) => {
+                  const isSelected = dept === d;
+                  const isDeptDisabled = Boolean(matchedStaff && matchedStaff.department && matchedStaff.department !== d);
+                  return (
+                    <TouchableOpacity
+                      key={d}
+                      disabled={isDeptDisabled}
+                      style={[
+                        styles.chip,
+                        {
+                          backgroundColor: isSelected ? "#8B5CF6" : (colors.cardAlt ?? colors.muted),
+                          borderColor: isSelected ? "#8B5CF6" : colors.border,
+                          opacity: isDeptDisabled ? 0.35 : 1,
+                        },
+                      ]}
+                      onPress={() => setDept(d)}
+                    >
+                      <Text style={[styles.chipText, { color: isSelected ? "#fff" : colors.foreground }]}>{d}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
 
               {/* ─── Real-Time Department Budget Deduction Indicator ─── */}
-              {(() => {
-                const s = parseFloat(salary) || 0;
-                const b = parseFloat(bonus) || 0;
-                const d = parseFloat(deductions) || 0;
-                const netAmt = Math.max(0, s + b - d);
-                const matchBudget = budgets.find(
-                  (bg) => bg.department?.trim().toLowerCase() === dept?.trim().toLowerCase() && bg.category?.toLowerCase() === "salaries"
-                ) || budgets.find((bg) => bg.department?.trim().toLowerCase() === dept?.trim().toLowerCase());
-
-                return (
-                  <View style={{ backgroundColor: "#8B5CF612", borderColor: "#8B5CF633", borderWidth: 1, borderRadius: 12, padding: 12, marginVertical: 8, gap: 4 }}>
-                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                        <Feather name="shield" size={13} color="#8B5CF6" />
-                        <Text style={{ fontSize: 11.5, fontFamily: "Inter_700Bold", color: "#8B5CF6" }}>
-                          Budget Deduction Sync
-                        </Text>
-                      </View>
-                      <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>
-                        {dept}
-                      </Text>
-                    </View>
-                    <Text style={{ fontSize: 10.5, color: colors.mutedForeground, marginTop: 1 }}>
-                      {matchBudget
-                        ? `Allocated: ${settings.currency} ${matchBudget.allocated.toLocaleString()} · Spent: ${settings.currency} ${(matchBudget.spent || 0).toLocaleString()}`
-                        : `Deducting directly from ${dept} department expenditure.`}
+              <View
+                style={{
+                  backgroundColor: colors.cardAlt ?? colors.background,
+                  borderColor: colors.border,
+                  borderWidth: 1,
+                  borderRadius: 14,
+                  padding: 14,
+                  marginVertical: 10,
+                  gap: 10,
+                }}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 6 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Feather name="shield" size={13} color="#8B5CF6" />
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: colors.foreground }}>
+                      Department Budget: <Text style={{ color: "#8B5CF6" }}>{dept}</Text>
                     </Text>
-                    {netAmt > 0 && (
-                      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 4, paddingTop: 6, borderTopWidth: 1, borderTopColor: "#8B5CF622" }}>
-                        <Text style={{ fontSize: 11.5, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>
-                          Deduction from Outflows:
-                        </Text>
-                        <Text style={{ fontSize: 12.5, fontFamily: "Inter_700Bold", color: colors.expense }}>
-                          -{settings.currency} {netAmt.toLocaleString()}
-                        </Text>
-                      </View>
-                    )}
                   </View>
-                );
-              })()}
+                  <View
+                    style={{
+                      paddingHorizontal: 8,
+                      paddingVertical: 3,
+                      borderRadius: 6,
+                      borderWidth: 1,
+                      backgroundColor: isZeroBudget ? colors.expense + "18" : isOverBudget ? colors.expense + "18" : colors.income + "18",
+                      borderColor: isZeroBudget ? colors.expense + "40" : isOverBudget ? colors.expense + "40" : colors.income + "40",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 10,
+                        fontFamily: "Inter_700Bold",
+                        color: isZeroBudget ? colors.expense : isOverBudget ? colors.expense : colors.income,
+                      }}
+                    >
+                      {isZeroBudget ? "NO BUDGET ALLOCATED" : isOverBudget ? "DEFICIT PREVENTED" : "BUDGET AVAILABLE"}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: "row", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                  <View style={{ minWidth: "22%", gap: 2 }}>
+                    <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_700Bold" }}>ALLOCATED</Text>
+                    <Text style={{ fontSize: 12.5, fontFamily: "Inter_700Bold", color: colors.foreground }}>
+                      {settings.currency} {deptBudgetAllocated.toLocaleString()}
+                    </Text>
+                  </View>
+                  <View style={{ minWidth: "22%", gap: 2 }}>
+                    <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_700Bold" }}>CURRENT SPENT</Text>
+                    <Text style={{ fontSize: 12.5, fontFamily: "Inter_700Bold", color: colors.mutedForeground }}>
+                      {settings.currency} {deptCurrentSpent.toLocaleString()}
+                    </Text>
+                  </View>
+                  <View style={{ minWidth: "22%", gap: 2 }}>
+                    <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_700Bold" }}>REMAINING</Text>
+                    <Text style={{ fontSize: 12.5, fontFamily: "Inter_700Bold", color: deptRemainingBudget > 0 ? colors.income : colors.expense }}>
+                      {settings.currency} {deptRemainingBudget.toLocaleString()}
+                    </Text>
+                  </View>
+                  <View style={{ minWidth: "22%", gap: 2 }}>
+                    <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_700Bold" }}>PAYROLL CHARGE</Text>
+                    <Text style={{ fontSize: 12.5, fontFamily: "Inter_700Bold", color: "#8B5CF6" }}>
+                      -{settings.currency} {currentNet.toLocaleString()}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Status Notice */}
+                {isZeroBudget ? (
+                  <View style={{ backgroundColor: colors.expense + "15", borderColor: colors.expense + "35", borderWidth: 1, padding: 10, borderRadius: 8 }}>
+                    <Text style={{ fontSize: 11.5, color: colors.expense, fontFamily: "Inter_500Medium", lineHeight: 16 }}>
+                      🚫 Payroll cannot be processed because the <Text style={{ fontWeight: "700" }}>{dept}</Text> department has no allocated budget ({settings.currency} 0).
+                    </Text>
+                  </View>
+                ) : isOverBudget ? (
+                  <View style={{ backgroundColor: colors.expense + "15", borderColor: colors.expense + "35", borderWidth: 1, padding: 10, borderRadius: 8 }}>
+                    <Text style={{ fontSize: 11.5, color: colors.expense, fontFamily: "Inter_500Medium", lineHeight: 16 }}>
+                      ⚠️ Insufficient {dept} department budget. Available: {settings.currency} {deptRemainingBudget.toLocaleString()}. Required: {settings.currency} {currentNet.toLocaleString()}.
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={{ backgroundColor: colors.income + "12", borderColor: colors.income + "30", borderWidth: 1, padding: 10, borderRadius: 8 }}>
+                    <Text style={{ fontSize: 11.5, color: colors.income, fontFamily: "Inter_600SemiBold", lineHeight: 16 }}>
+                      ✓ Sufficient department budget. Projected remaining after payroll: {settings.currency} {projectedRemaining.toLocaleString()}.
+                    </Text>
+                  </View>
+                )}
+              </View>
 
               {error ? <Text style={[styles.error, { color: colors.expense }]}>{error}</Text> : null}
               <View style={styles.modalBtns}>
                 <TouchableOpacity style={[styles.cancelBtn, { borderColor: colors.border }]} onPress={() => setModalVisible(false)}>
                   <Text style={[styles.cancelText, { color: colors.mutedForeground }]}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.addBtn, { backgroundColor: "#8B5CF6" }]} onPress={handleSave}>
+                <TouchableOpacity
+                  disabled={isZeroBudget || isOverBudget}
+                  style={[
+                    styles.addBtn,
+                    {
+                      backgroundColor: (isZeroBudget || isOverBudget) ? colors.mutedForeground + "40" : "#8B5CF6",
+                      opacity: (isZeroBudget || isOverBudget) ? 0.6 : 1,
+                    },
+                  ]}
+                  onPress={handleSave}
+                >
                   <Text style={styles.addBtnText}>{editingEntry ? "Save Changes" : "Disburse Salary"}</Text>
                 </TouchableOpacity>
               </View>

@@ -32,11 +32,10 @@ export function WebIncome({ onOpenReport }: WebIncomeProps) {
 
   const { user } = useAuth();
   const { settings } = useSettings();
-  const { transactions, deleteTransaction, departments, totalIncome, totalExpenses, netBalance } = useFinance();
+  const { transactions, deleteTransaction, totalIncome, totalExpenses, netBalance } = useFinance();
 
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
-  const [selectedDepartment, setSelectedDepartment] = useState("all");
   const [sortField, setSortField] = useState<"date" | "amount" | "category">("date");
   const [sortAsc, setSortAsc] = useState(false);
 
@@ -46,20 +45,6 @@ export function WebIncome({ onOpenReport }: WebIncomeProps) {
   const [deletingTx, setDeletingTx] = useState<Transaction | null>(null);
 
   const canEdit = user?.role === "admin" || user?.role === "accountant";
-
-  // Deduplicated Unique Departments list
-  const uniqueDepartments = useMemo(() => {
-    const seen = new Set<string>();
-    const list: string[] = [];
-    departments.forEach((d) => {
-      const name = d.name?.trim();
-      if (name && !seen.has(name.toLowerCase())) {
-        seen.add(name.toLowerCase());
-        list.push(name);
-      }
-    });
-    return list;
-  }, [departments]);
 
   // Filter categories
   const categories = useMemo(() => {
@@ -75,16 +60,14 @@ export function WebIncome({ onOpenReport }: WebIncomeProps) {
     let list = transactions.filter((t) => {
       if (t.type !== "income") return false;
       const matchCat = selectedCategory === "all" || selectedCategory === "All" || (t.category || "").toLowerCase() === selectedCategory.toLowerCase();
-      const matchDept = selectedDepartment === "all" || selectedDepartment === "All" || (t.department || "").toLowerCase() === selectedDepartment.toLowerCase();
       const matchSearch =
         search.trim() === "" ||
         (t.category || "").toLowerCase().includes(search.toLowerCase()) ||
         (t.description || "").toLowerCase().includes(search.toLowerCase()) ||
-        (t.department && (t.department || "").toLowerCase().includes(search.toLowerCase())) ||
         (t.referenceNumber && (t.referenceNumber || "").toLowerCase().includes(search.toLowerCase())) ||
         (t.addedBy && (t.addedBy || "").toLowerCase().includes(search.toLowerCase()));
 
-      return matchCat && matchDept && matchSearch;
+      return matchCat && matchSearch;
     });
 
     list.sort((a, b) => {
@@ -104,7 +87,7 @@ export function WebIncome({ onOpenReport }: WebIncomeProps) {
     });
 
     return list;
-  }, [transactions, selectedCategory, selectedDepartment, search, sortField, sortAsc]);
+  }, [transactions, selectedCategory, search, sortField, sortAsc]);
 
   const totalFilteredIncome = useMemo(
     () => filteredTransactions.reduce((s, t) => s + t.amount, 0),
@@ -236,56 +219,6 @@ export function WebIncome({ onOpenReport }: WebIncomeProps) {
             </View>
           </ScrollView>
         </View>
-
-        {/* Department Filter Pills */}
-        <View style={styles.filterGroup}>
-          <Text style={[styles.filterLabel, { color: colors.mutedForeground }]}>Department:</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={{ flexDirection: "row", gap: 6 }}>
-              <TouchableOpacity
-                style={[
-                  styles.filterChip,
-                  {
-                    backgroundColor: selectedDepartment === "all" ? colors.income : colors.background,
-                    borderColor: selectedDepartment === "all" ? "transparent" : colors.border,
-                  },
-                ]}
-                onPress={() => setSelectedDepartment("all")}
-              >
-                <Text
-                  style={[
-                    styles.filterChipText,
-                    { color: selectedDepartment === "all" ? "#FFFFFF" : colors.foreground },
-                  ]}
-                >
-                  All Cost Centers
-                </Text>
-              </TouchableOpacity>
-              {uniqueDepartments.map((deptName) => (
-                <TouchableOpacity
-                  key={deptName}
-                  style={[
-                    styles.filterChip,
-                    {
-                      backgroundColor: selectedDepartment.toLowerCase() === deptName.toLowerCase() ? colors.income : colors.background,
-                      borderColor: selectedDepartment.toLowerCase() === deptName.toLowerCase() ? "transparent" : colors.border,
-                    },
-                  ]}
-                  onPress={() => setSelectedDepartment(deptName)}
-                >
-                  <Text
-                    style={[
-                      styles.filterChipText,
-                      { color: selectedDepartment.toLowerCase() === deptName.toLowerCase() ? "#FFFFFF" : colors.foreground },
-                    ]}
-                  >
-                    {deptName}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </ScrollView>
-        </View>
       </View>
 
       {/* ─── Mobile Card List OR Desktop Data Table ─── */}
@@ -323,7 +256,7 @@ export function WebIncome({ onOpenReport }: WebIncomeProps) {
 
                 <View style={styles.mobileCardMeta}>
                   <Text style={[styles.mobileMetaText, { color: colors.mutedForeground }]}>
-                    {tx.date} · {tx.department} · {tx.paymentMethod || "Electronic"}
+                    {tx.date} · {tx.paymentMethod || "Electronic"}
                   </Text>
                   {tx.referenceNumber ? (
                     <Text style={[styles.refText, { color: colors.mutedForeground }]}>
@@ -359,11 +292,11 @@ export function WebIncome({ onOpenReport }: WebIncomeProps) {
       ) : (
         <View style={[styles.tableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <ScrollView horizontal contentContainerStyle={{ minWidth: "100%" }} showsHorizontalScrollIndicator={true}>
-            <View style={{ minWidth: 700, width: "100%" }}>
+            <View style={{ minWidth: 650, width: "100%" }}>
               {/* Table Header */}
               <View style={[styles.tableHeader, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
                 <TouchableOpacity
-                  style={[styles.thCol, { width: 92, paddingLeft: 14, paddingRight: 4 }]}
+                  style={[styles.thCol, { width: 95, paddingLeft: 14, paddingRight: 4 }]}
                   onPress={() => {
                     if (sortField === "date") setSortAsc(!sortAsc);
                     else {
@@ -377,7 +310,7 @@ export function WebIncome({ onOpenReport }: WebIncomeProps) {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.thCol, { width: 108, paddingHorizontal: 4 }]}
+                  style={[styles.thCol, { width: 120, paddingHorizontal: 4 }]}
                   onPress={() => {
                     if (sortField === "category") setSortAsc(!sortAsc);
                     else {
@@ -390,20 +323,16 @@ export function WebIncome({ onOpenReport }: WebIncomeProps) {
                   {sortField === "category" && <SvgChevronDown size={11} color={colors.primary} />}
                 </TouchableOpacity>
 
-                <View style={[styles.thCol, { flex: 1, minWidth: 120, paddingHorizontal: 6 }]}>
+                <View style={[styles.thCol, { flex: 1, minWidth: 140, paddingHorizontal: 6 }]}>
                   <Text style={[styles.thText, { color: colors.mutedForeground }]}>DESCRIPTION / REF</Text>
                 </View>
 
-                <View style={[styles.thCol, { width: 135, paddingHorizontal: 4 }]}>
-                  <Text style={[styles.thText, { color: colors.mutedForeground }]}>DEPARTMENT</Text>
-                </View>
-
-                <View style={[styles.thCol, { width: 110, paddingHorizontal: 4 }]}>
+                <View style={[styles.thCol, { width: 130, paddingHorizontal: 4 }]}>
                   <Text style={[styles.thText, { color: colors.mutedForeground }]}>METHOD</Text>
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.thCol, { width: 125, paddingHorizontal: 4, justifyContent: "flex-end" }]}
+                  style={[styles.thCol, { width: 130, paddingHorizontal: 4, justifyContent: "flex-end" }]}
                   onPress={() => {
                     if (sortField === "amount") setSortAsc(!sortAsc);
                     else {
@@ -435,17 +364,17 @@ export function WebIncome({ onOpenReport }: WebIncomeProps) {
               ) : (
                 filteredTransactions.map((tx) => (
                   <View key={tx.id} style={[styles.tableRow, { borderBottomColor: colors.border }]}>
-                    <View style={[styles.tdCol, { width: 92, paddingLeft: 14, paddingRight: 4 }]}>
+                    <View style={[styles.tdCol, { width: 95, paddingLeft: 14, paddingRight: 4 }]}>
                       <Text style={[styles.dateText, { color: colors.foreground }]} numberOfLines={1}>{tx.date}</Text>
                     </View>
 
-                    <View style={[styles.tdCol, { width: 108, paddingHorizontal: 4 }]}>
+                    <View style={[styles.tdCol, { width: 120, paddingHorizontal: 4 }]}>
                       <View style={[styles.catBadge, { backgroundColor: colors.income + "18" }]}>
                         <Text style={[styles.catBadgeText, { color: colors.income }]} numberOfLines={1}>{tx.category}</Text>
                       </View>
                     </View>
 
-                    <View style={[styles.tdCol, { flex: 1, minWidth: 120, paddingHorizontal: 6, overflow: "hidden" }]}>
+                    <View style={[styles.tdCol, { flex: 1, minWidth: 140, paddingHorizontal: 6, overflow: "hidden" }]}>
                       <Text style={[styles.descText, { color: colors.foreground }]} numberOfLines={1}>
                         {tx.description || "No description provided"}
                       </Text>
@@ -454,19 +383,13 @@ export function WebIncome({ onOpenReport }: WebIncomeProps) {
                       </Text>
                     </View>
 
-                    <View style={[styles.tdCol, { width: 135, paddingHorizontal: 4 }]}>
-                      <Text style={[styles.deptText, { color: colors.foreground }]} numberOfLines={1}>
-                        {tx.department}
-                      </Text>
-                    </View>
-
-                    <View style={[styles.tdCol, { width: 110, paddingHorizontal: 4 }]}>
+                    <View style={[styles.tdCol, { width: 130, paddingHorizontal: 4 }]}>
                       <Text style={[styles.methodText, { color: colors.mutedForeground }]} numberOfLines={1}>
                         {tx.paymentMethod || "Electronic"}
                       </Text>
                     </View>
 
-                    <View style={[styles.tdCol, { width: 125, paddingHorizontal: 4, alignItems: "flex-end" }]}>
+                    <View style={[styles.tdCol, { width: 130, paddingHorizontal: 4, alignItems: "flex-end" }]}>
                       <Text style={[styles.amountText, { color: colors.income, textAlign: "right" }]} numberOfLines={1}>
                         +{settings.currency} {tx.amount.toLocaleString()}
                       </Text>

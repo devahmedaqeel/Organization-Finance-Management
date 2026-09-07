@@ -28,6 +28,8 @@ import {
   calculateExpenseDistribution,
   buildAuthoritativeFinancialModel,
   calculateTotalAvailableFunds,
+  calculateUnallocatedFunds,
+  calculateDepartmentMetrics,
 } from "../FinancialCalculationEngine";
 
 function assert(condition: boolean, testName: string) {
@@ -466,61 +468,101 @@ assert(calculateBudgetRemaining(0, 0) === 0, "Step 8: Remaining Budget = 0");
 assert(calculateBudgetUtilization(0, 0).rawUtilizationPct === 0, "Step 8: Clean empty utilization state");
 
 // ============================================================================
-// SCENARIO 35: TOTAL AVAILABLE FUNDS (INCOME + BUDGET - ALL EXPENSES)
-// (Top hero balance combines both Income & Budget, and decreases upon ANY expense)
+// SCENARIO 35: AUTHORITATIVE FINANCIAL WORKFLOW & BUDGET VALIDATION
+// (INCOME -> AVAILABLE FUNDS -> DEPT BUDGET -> DEPT CATEGORIES -> EXPENSE -> REMAINING BUDGET -> ALL ANALYTICS)
 // ============================================================================
-console.log("\n--- SCENARIO 35: Total Available Funds (Income + Budget - All Outflows) ---");
+console.log("\n--- SCENARIO 35: Authoritative Non-Additive Financial Workflow ---");
 
 let fundTxs: Transaction[] = [];
-let fundBudgets: Budget[] = [];
+let fundDepts: Department[] = [
+  { id: "dept-eng", name: "Engineering", budgetAllocated: 4000 },
+  { id: "dept-mkt", name: "Marketing", budgetAllocated: 0 },
+];
+let fundBudgets: Budget[] = [
+  { id: "f-b-cloud", category: "Cloud Hosting", allocated: 4000, department: "Engineering" }
+];
 
-// Initial: Income = 10,000, Budget = 6,000, Expense = 0
+// 1. Initial State: Income = 10,000, Department Budget Allocated = 4,000, Expenses = 0
 fundTxs.push({ id: "f-inc-1", type: "income", category: "Client Contract", amount: 10000, date: "2026-09-01", department: "Commercial" });
-fundBudgets.push({ id: "f-b-cloud", category: "Cloud Hosting", allocated: 6000, department: "Engineering" });
 
 const initInc = calculateTotalIncome(fundTxs);
-const initBud = calculateBudgetAllocation(fundBudgets);
+const initBud = calculateBudgetAllocation(fundBudgets, fundDepts);
 const initExp = calculateTotalExpenses(fundTxs);
-const initFunds = calculateTotalAvailableFunds(initInc, initBud, initExp);
+const initUnallocated = calculateUnallocatedFunds(initInc, initBud);
+const initNetCash = calculateNetOperatingResult(fundTxs);
 
-assert(initInc === 10000, "Income is 10,000");
-assert(initBud === 6000, "Budget is 6,000");
+assert(initInc === 10000, "Income is exactly 10,000");
+assert(initBud === 4000, "Department Budget is exactly 4,000");
 assert(initExp === 0, "Initial Expenses is 0");
-assert(initFunds === 16000, "TOP HERO BALANCE: Total Available Funds combines both (10k + 6k = 16,000)");
+// CRITICAL RULE VERIFICATION: Budget is an allocation of income, NOT additive capital!
+assert(initUnallocated === 6000, "AUTHORITATIVE RULE: Budget NEVER added to income! Unallocated = Income - Budget = 10k - 4k = 6,000 (NOT 14,000)");
+assert(initNetCash === 10000, "Net Cash Position = Total Income - Total Expenses = 10,000");
 
-// Expense 1: Budget-linked expense = 1,000 (Cloud Hosting)
-fundTxs.push({ id: "f-exp-1", type: "expense", category: "Cloud Hosting", budgetId: "f-b-cloud", amount: 1000, date: "2026-09-02", department: "Engineering" });
-const exp1Total = calculateTotalExpenses(fundTxs);
-const fundsAfterExp1 = calculateTotalAvailableFunds(initInc, initBud, exp1Total);
-assert(exp1Total === 1000, "Expenses = 1,000");
-assert(fundsAfterExp1 === 15000, "BUDGET EXPENSE: Total Funds decreases from 16,000 to 15,000 (-1,000)");
+// 2. Department Budget Metrics & Category-Scoped Expenses
+let deptMetrics = calculateDepartmentMetrics(fundDepts, fundTxs);
+const engMetric = deptMetrics.find((d) => d.name === "Engineering");
+const mktMetric = deptMetrics.find((d) => d.name === "Marketing");
 
-// Expense 2: Other / Unbudgeted expense = 500 (Marketing)
-fundTxs.push({ id: "f-exp-2", type: "expense", category: "Marketing", budgetId: "unbudgeted", amount: 500, date: "2026-09-03", department: "Growth" });
-const exp2Total = calculateTotalExpenses(fundTxs);
-const fundsAfterExp2 = calculateTotalAvailableFunds(initInc, initBud, exp2Total);
-assert(exp2Total === 1500, "Expenses = 1,500");
-assert(fundsAfterExp2 === 14500, "UNBUDGETED EXPENSE: Total Funds decreases further from 15,000 to 14,500 (-500)");
+assert(engMetric?.allocated === 4000, "Engineering Budget Allocated is 4,000");
+assert(engMetric?.spent === 0, "Engineering Spent is 0");
+assert(engMetric?.remaining === 4000, "Engineering Remaining Budget is 4,000");
+assert(mktMetric?.allocated === 0, "Marketing Budget Allocated is 0 (Unallocated)");
 
-// Delete Unbudgeted expense
-fundTxs = fundTxs.filter((t) => t.id !== "f-exp-2");
-const expAfterDel = calculateTotalExpenses(fundTxs);
-const fundsAfterDel = calculateTotalAvailableFunds(initInc, initBud, expAfterDel);
-assert(expAfterDel === 1000, "Expenses returns to 1,000");
-assert(fundsAfterDel === 15000, "DELETE EXPENSE: Total Funds immediately recovers to 15,000 (+500)");
+// 3. Blocking Validation 1: No Budget = No Expense
+// Attempt expense on department with budget <= 0 (Marketing)
+function validateExpenseSubmission(deptName: string, amount: number, depts: Department[], allTxs: Transaction[]): { allowed: boolean; error?: string } {
+  const targetDept = depts.find((d) => d.name.trim().toLowerCase() === deptName.trim().toLowerCase());
+  const allocated = targetDept?.budgetAllocated || 0;
+  if (allocated <= 0) {
+    return {
+      allowed: false,
+      error: "No budget has been allocated to this department. Allocate a department budget before recording an expense.",
+    };
+  }
+  const currentSpent = allTxs
+    .filter((t) => t.type === "expense" && t.department?.trim().toLowerCase() === deptName.trim().toLowerCase())
+    .reduce((sum, t) => sum + (t.amount || 0), 0);
+  const remaining = allocated - currentSpent;
+  if (amount > remaining) {
+    return {
+      allowed: false,
+      error: `Insufficient department budget. Remaining budget: PKR ${remaining.toLocaleString()}.`,
+    };
+  }
+  return { allowed: true };
+}
 
-// Delete Budget-linked expense
-fundTxs = fundTxs.filter((t) => t.id !== "f-exp-1");
-const expZero = calculateTotalExpenses(fundTxs);
-const fundsFull = calculateTotalAvailableFunds(initInc, initBud, expZero);
-assert(expZero === 0, "Expenses returns to 0");
-assert(fundsFull === 16000, "DELETE ALL EXPENSES: Total Funds returns to full 16,000");
+const noBudgetCheck = validateExpenseSubmission("Marketing", 500, fundDepts, fundTxs);
+assert(!noBudgetCheck.allowed, "BLOCKING: Expense blocked on department without budget (Marketing)");
+assert(noBudgetCheck.error === "No budget has been allocated to this department. Allocate a department budget before recording an expense.", "Exact no-budget error message matched");
 
-// Delete All records
-fundTxs = [];
-fundBudgets = [];
-const emptyFunds = calculateTotalAvailableFunds(0, 0, 0);
-assert(emptyFunds === 0, "EMPTY LEDGER: Total Funds is 0");
+// 4. Record Valid Expense within Remaining Budget
+const validCheck = validateExpenseSubmission("Engineering", 1500, fundDepts, fundTxs);
+assert(validCheck.allowed, "Engineering has 4,000 budget -> 1,500 expense permitted");
+fundTxs.push({ id: "f-exp-1", type: "expense", category: "Cloud Hosting", budgetId: "f-b-cloud", amount: 1500, date: "2026-09-02", department: "Engineering" });
+
+deptMetrics = calculateDepartmentMetrics(fundDepts, fundTxs);
+const engMetricAfter1 = deptMetrics.find((d) => d.name === "Engineering");
+assert(engMetricAfter1?.spent === 1500, "Engineering budget spent updated to 1,500");
+assert(engMetricAfter1?.remaining === 2500, "Engineering budget remaining updated to 2,500 (4,000 - 1,500)");
+
+// 5. Blocking Validation 2: Expense Limit = Remaining Budget
+// Attempt expense of 3,000 when remaining is 2,500
+const overBudgetCheck = validateExpenseSubmission("Engineering", 3000, fundDepts, fundTxs);
+assert(!overBudgetCheck.allowed, "BLOCKING: Expense exceeding remaining budget (3,000 > 2,500) blocked");
+assert(Boolean(overBudgetCheck.error?.includes("Insufficient department budget")), "Exact insufficient budget error message triggered");
+
+// 6. Record second valid expense up to exact remaining limit
+const secondValidCheck = validateExpenseSubmission("Engineering", 2500, fundDepts, fundTxs);
+assert(secondValidCheck.allowed, "Exact remaining budget (2,500) expense permitted");
+fundTxs.push({ id: "f-exp-2", type: "expense", category: "Cloud Hosting", budgetId: "f-b-cloud", amount: 2500, date: "2026-09-03", department: "Engineering" });
+
+deptMetrics = calculateDepartmentMetrics(fundDepts, fundTxs);
+const engMetricAfter2 = deptMetrics.find((d) => d.name === "Engineering");
+assert(engMetricAfter2?.spent === 4000, "Engineering budget fully utilized (4,000)");
+assert(engMetricAfter2?.remaining === 0, "Engineering budget remaining is 0");
+assert(calculateTotalExpenses(fundTxs) === 4000, "Total expenses is 4,000");
+assert(calculateNetOperatingResult(fundTxs) === 6000, "Net Cash Position is 6,000 (10k Income - 4k Outflows)");
 
 // ============================================================================
 // SCENARIO 32: STAFF SALARY DISBURSEMENT DEDUCTION FROM BALANCE
@@ -529,6 +571,9 @@ console.log("--- SCENARIO 32: Staff Salary Disbursement Flow ---");
 
 const salaryOrgInc = 100000;
 const salaryOrgBud = 50000;
+let salaryDepts: Department[] = [
+  { id: "dept-ops", name: "Operations", budgetAllocated: salaryOrgBud }
+];
 let salaryTxs: Transaction[] = [
   { id: "inc-seed", type: "income", category: "Tuition", amount: salaryOrgInc, date: "2026-09-01", department: "Academics" }
 ];
@@ -539,10 +584,12 @@ let salaryBudgets: Budget[] = [
 // Baseline before paying salary
 let sTotalInc = calculateTotalIncome(salaryTxs);
 let sTotalExp = calculateTotalExpenses(salaryTxs);
-let sNetSurplus = calculateTotalAvailableFunds(sTotalInc, salaryOrgBud, sTotalExp);
+let sUnallocated = calculateUnallocatedFunds(sTotalInc, salaryOrgBud);
+let sNetCash = calculateNetOperatingResult(salaryTxs);
 assert(sTotalInc === 100000, "Initial Revenue is 100,000");
 assert(sTotalExp === 0, "Initial Total Expenses is 0");
-assert(sNetSurplus === 150000, "Initial Total Balance is 150,000 (100k inc + 50k bud - 0 exp)");
+assert(sUnallocated === 50000, "Initial Unallocated Funds is 50,000 (100k inc - 50k allocated budget, NEVER 150k)");
+assert(sNetCash === 100000, "Initial Net Cash is 100,000 (100k inc - 0 exp)");
 
 // Disburse Staff Salary 1: 30,000 net (Base: 25k, Bonus: 7k, Deductions: 2k)
 const staffNet1 = 25000 + 7000 - 2000; // 30,000
@@ -559,13 +606,11 @@ const salaryTx1: Transaction = {
 salaryTxs.push(salaryTx1);
 
 sTotalExp = calculateTotalExpenses(salaryTxs);
-sNetSurplus = calculateTotalAvailableFunds(sTotalInc, salaryOrgBud, sTotalExp);
-const netOperatingResult1 = calculateNetOperatingResult(salaryTxs);
+sNetCash = calculateNetOperatingResult(salaryTxs);
 const salBudgetSpent1 = calculateBudgetSpentForCategory(salaryBudgets[0], salaryTxs);
 
 assert(sTotalExp === 30000, "Disburse Salary 30k -> Total Expenses immediately increases to 30,000");
-assert(sNetSurplus === 120000, "Disburse Salary 30k -> Total Balance immediately drops from 150k to 120,000 (-30,000)");
-assert(netOperatingResult1 === 70000, "Net Operating Result drops from 100k to 70,000 (100k inc - 30k salary)");
+assert(sNetCash === 70000, "Disburse Salary 30k -> Net Cash drops from 100k to 70,000 (-30,000)");
 assert(salBudgetSpent1 === 30000, "Salaries Budget spent immediately registers 30,000");
 
 // Disburse Staff Salary 2: 20,000 net
@@ -582,11 +627,9 @@ const salaryTx2: Transaction = {
 salaryTxs.push(salaryTx2);
 
 sTotalExp = calculateTotalExpenses(salaryTxs);
-sNetSurplus = calculateTotalAvailableFunds(sTotalInc, salaryOrgBud, sTotalExp);
-const netOperatingResult2 = calculateNetOperatingResult(salaryTxs);
+sNetCash = calculateNetOperatingResult(salaryTxs);
 assert(sTotalExp === 50000, "Disburse 2nd Salary 20k -> Total Expenses is 50,000 (30k + 20k)");
-assert(sNetSurplus === 100000, "Disburse 2nd Salary 20k -> Total Balance drops further to 100,000 (-20,000)");
-assert(netOperatingResult2 === 50000, "Net Operating Result drops to 50,000");
+assert(sNetCash === 50000, "Disburse 2nd Salary 20k -> Net Cash drops further to 50,000 (-20,000)");
 
 // ============================================================================
 // SCENARIO 33: STAFF SALARY DELETION REVERSAL
@@ -596,16 +639,16 @@ console.log("--- SCENARIO 33: Staff Salary Deletion Reversal ---");
 // Delete Salary 1 (30,000)
 salaryTxs = salaryTxs.filter((t) => t.id !== "tx_pay_p1");
 sTotalExp = calculateTotalExpenses(salaryTxs);
-sNetSurplus = calculateTotalAvailableFunds(sTotalInc, salaryOrgBud, sTotalExp);
+sNetCash = calculateNetOperatingResult(salaryTxs);
 assert(sTotalExp === 20000, "Delete Salary 1 -> Total Expenses drops to 20,000");
-assert(sNetSurplus === 130000, "Delete Salary 1 -> Total Balance recovers by +30k to 130,000");
+assert(sNetCash === 80000, "Delete Salary 1 -> Net Cash recovers by +30k to 80,000");
 
 // Delete Salary 2 (20,000)
 salaryTxs = salaryTxs.filter((t) => t.id !== "tx_pay_p2");
 sTotalExp = calculateTotalExpenses(salaryTxs);
-sNetSurplus = calculateTotalAvailableFunds(sTotalInc, salaryOrgBud, sTotalExp);
+sNetCash = calculateNetOperatingResult(salaryTxs);
 assert(sTotalExp === 0, "Delete Salary 2 -> Total Expenses returns to 0");
-assert(sNetSurplus === 150000, "Delete Salary 2 -> Total Balance returns to full 150,000");
+assert(sNetCash === 100000, "Delete Salary 2 -> Net Cash returns to full 100,000");
 
 // ============================================================================
 // SCENARIO 34: MASTER PROMPT SECTION 19 COMPREHENSIVE EXAMPLE

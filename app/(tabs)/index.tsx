@@ -51,6 +51,7 @@ import {
   calculateBudgetAllocation,
   calculateBudgetUsed,
   calculateBudgetRemaining,
+  calculateUnallocatedFunds,
 } from "@/services/FinancialCalculationEngine";
 import { FinancialAnalyticsSuite } from "@/components/analytics/FinancialAnalyticsSuite";
 
@@ -62,9 +63,6 @@ const ROLE_COLORS: Record<string, string> = {
 };
 
 function fmt(n: number) {
-  const abs = Math.abs(n);
-  if (abs >= 1000000) return `${(n / 1000000).toFixed(2)}M`;
-  if (abs >= 1000) return `${(n / 1000).toFixed(1)}K`;
   return Number(n || 0).toLocaleString();
 }
 function fmtCur(n: number, cur: string) {
@@ -225,24 +223,31 @@ export default function DashboardScreen() {
   }, [orgDisplayName]);
   const webTop = Platform.OS === "web" ? 67 : 0;
   const roleColor = ROLE_COLORS[user?.role ?? "admin"];
-  const [balanceViewMode, setBalanceViewMode] = useState<"cashflow" | "expenses" | "budget">("cashflow");
+  const [balanceViewMode, setBalanceViewMode] = useState<"cashflow" | "expenses">("cashflow");
   const totalLineBudgeted = calculateBudgetAllocation(budgets);
   const totalDeptBudgeted = calculateBudgetAllocation([], departments);
-  const totalBudgeted = totalLineBudgeted;
-  const totalBudgetSpent = calculateBudgetUsed(transactions, budgets);
-  const netBudgetRemaining = calculateBudgetRemaining(totalBudgeted, totalBudgetSpent);
-  const netBudgetUtilization = totalBudgeted > 0 ? (totalBudgetSpent / totalBudgeted) * 100 : 0;
+  const totalAllocatedBudget = calculateBudgetAllocation(budgets, departments);
+  const totalBudgeted = totalAllocatedBudget;
+  const totalBudgetSpent = calculateBudgetUsed(transactions, budgets, undefined, departments);
+  const netBudgetRemaining = calculateBudgetRemaining(totalAllocatedBudget, totalBudgetSpent);
+  const netBudgetUtilization = totalAllocatedBudget > 0 ? (totalBudgetSpent / totalAllocatedBudget) * 100 : 0;
 
-  // Net Surplus incorporates Institutional Income and Budget Allocated minus Outflows
-  const totalFundingPool = totalIncome + totalBudgeted;
-  const netSurplus = totalFundingPool - totalExpenses;
-  const realNetOperatingResult = netSurplus;
+  // Authoritative Core Financial Flow:
+  // Income -> Available Funds -> Department Budget -> Expense -> Remaining Budget
+  // NEVER ADD BUDGET TO INCOME!
+  const netCash = totalIncome - totalExpenses;
+  const netSurplus = netCash;
+  const realNetOperatingResult = netCash;
   const isDeficit = totalExpenses > totalIncome;
-  const isFundingDeficit = netSurplus < 0;
-  const isEffectiveDeficit = totalBudgeted > 0 ? isFundingDeficit : isDeficit;
+  const isFundingDeficit = netCash < 0;
+  const isEffectiveDeficit = isDeficit;
+
+  // Section 8 & Master Calculation Engine: Available to Allocate is strictly gated by Available Net Cash!
+  const availableToAllocate = Math.max(0, netCash - totalAllocatedBudget);
+  const unallocatedFunds = availableToAllocate;
 
   // 1. Kitni Income Retain: percentage of actual income retained after operating expenses
-  const incomeRetainedAmount = totalIncome - totalExpenses;
+  const incomeRetainedAmount = netCash;
   const incomeRetainedPct = totalIncome > 0
     ? Math.max(0, Math.round((incomeRetainedAmount / totalIncome) * 100))
     : 0;
@@ -256,29 +261,22 @@ export default function DashboardScreen() {
   const budgetUsedPct = Math.round(netBudgetUtilization);
 
   // 4. Budget-integrated Expense Ratios
-  const budgetExpensePct = totalBudgeted > 0
-    ? Math.round((totalBudgetSpent / totalBudgeted) * 100)
+  const budgetExpensePct = totalAllocatedBudget > 0
+    ? Math.round((totalBudgetSpent / totalAllocatedBudget) * 100)
     : expensePctOfIncome;
-  const budgetRemainingAmount = Math.max(0, totalBudgeted - totalBudgetSpent);
+  const budgetRemainingAmount = netBudgetRemaining;
 
   // Operating Margin on Inflows (Revenue)
   const operatingMargin = totalIncome > 0
     ? ((incomeRetainedAmount / totalIncome) * 100)
     : (totalExpenses > 0 ? -100 : 0);
 
-  // Capital Pool Ratios
-  const rawSpendRatio = totalFundingPool > 0 ? (totalExpenses / totalFundingPool) * 100 : (totalExpenses > 0 ? 100 : 0);
-  const clampedSpendRatio = Math.min(Math.round(rawSpendRatio), 100);
-  const retainedSurplusPct = Math.max(0, Math.round(100 - rawSpendRatio));
-  
-  // Real-time authoritative display balance (Net Surplus vs Total Outflows vs Allocated Budget)
+  // Real-time authoritative display balance
   const currentHeroBalance =
     balanceViewMode === "cashflow"
-      ? netSurplus
-      : balanceViewMode === "budget"
-      ? totalBudgeted
+      ? netCash
       : -totalExpenses;
-  const isHeroExpenseDeficit = totalBudgeted > 0 ? totalExpenses > totalBudgeted : totalExpenses > totalIncome;
+  const isHeroExpenseDeficit = totalAllocatedBudget > 0 ? totalBudgetSpent > totalAllocatedBudget : totalExpenses > totalIncome;
   const currentHeroIsDeficit = balanceViewMode === "cashflow" ? isEffectiveDeficit : isHeroExpenseDeficit;
 
   const heroBadgeColor = currentHeroIsDeficit ? "#FB7185" : "#34D399";
@@ -290,9 +288,7 @@ export default function DashboardScreen() {
 
   const heroBadgeText = balanceViewMode === "expenses"
     ? null
-    : (totalBudgeted > 0
-        ? `${isFundingDeficit ? "-" : "+"}${retainedSurplusPct}% Surplus`
-        : `${operatingMargin >= 0 ? "+" : ""}${operatingMargin.toFixed(1)}% Margin`);
+    : `${operatingMargin >= 0 ? "+" : ""}${operatingMargin.toFixed(1)}% Margin`;
 
   // Filtered transactions for the modal viewer
   const filteredTransactions = useMemo(() => {
@@ -626,9 +622,7 @@ export default function DashboardScreen() {
               minimumFontScale={0.85}
             >
               {balanceViewMode === "cashflow"
-                ? "OPERATING RESULT"
-                : balanceViewMode === "budget"
-                ? "BUDGET CAP"
+                ? "NET CASH / AVAILABLE CASH"
                 : "OUTFLOW AUDIT"}
             </Text>
             <TouchableOpacity
@@ -671,16 +665,16 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* View Mode Switcher Pills (Symmetrical Side-by-Side Flex, 10px Gap, Zero Touch) */}
-        <View style={{ flexDirection: "row", gap: 10, marginBottom: 14 }}>
+        {/* View Mode Switcher Pills (Symmetrical Side-by-Side Flex, 8px Gap, Zero Touch) */}
+        <View style={{ flexDirection: "row", gap: 8, marginBottom: 14 }}>
           <TouchableOpacity
             style={{
               flex: 1,
               flexDirection: "row",
               alignItems: "center",
               justifyContent: "center",
-              gap: 4.5,
-              paddingHorizontal: 6,
+              gap: 4,
+              paddingHorizontal: 4,
               paddingVertical: 5.5,
               borderRadius: 10,
               backgroundColor: balanceViewMode === "cashflow" ? "rgba(59, 130, 246, 0.30)" : "rgba(255, 255, 255, 0.08)",
@@ -702,9 +696,9 @@ export default function DashboardScreen() {
               }}
               numberOfLines={1}
               adjustsFontSizeToFit
-              minimumFontScale={0.75}
+              minimumFontScale={0.7}
             >
-              Surplus ({netSurplus >= 0 ? "+" : "-"}{settings.currency} {fmt(Math.abs(netSurplus))})
+              Net Cash ({netCash >= 0 ? "+" : "-"}{settings.currency} {fmt(Math.abs(netCash))})
             </Text>
           </TouchableOpacity>
 
@@ -714,8 +708,8 @@ export default function DashboardScreen() {
               flexDirection: "row",
               alignItems: "center",
               justifyContent: "center",
-              gap: 4.5,
-              paddingHorizontal: 6,
+              gap: 4,
+              paddingHorizontal: 4,
               paddingVertical: 5.5,
               borderRadius: 10,
               backgroundColor: balanceViewMode === "expenses" ? "rgba(244, 63, 94, 0.30)" : "rgba(255, 255, 255, 0.08)",
@@ -737,7 +731,7 @@ export default function DashboardScreen() {
               }}
               numberOfLines={1}
               adjustsFontSizeToFit
-              minimumFontScale={0.75}
+              minimumFontScale={0.7}
             >
               Outflows (-{settings.currency} {fmt(totalExpenses)})
             </Text>
@@ -811,17 +805,15 @@ export default function DashboardScreen() {
           ) : null}
         </View>
 
-        {/* Dynamic Cash Flow / Expense Flow Progress Bar & Labels */}
+        {/* Dynamic Cash Flow / Budget Status Bar & Labels */}
         <View style={{ gap: 7, marginTop: 2 }}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
             <Text style={{ color: "#CBD5E1", fontSize: 11, fontFamily: "Inter_500Medium" }} numberOfLines={1}>
-              {totalExpenses === 0
+              {totalAllocatedBudget > 0
+                ? `Available to Allocate: ${settings.currency} ${fmt(availableToAllocate)}`
+                : totalExpenses === 0
                 ? "0% Outflows"
-                : totalBudgeted > 0
-                ? `${clampedSpendRatio}% Capital Spent`
-                : totalIncome > 0
-                ? `${expensePctOfIncome}% Income Spent`
-                : `${clampedSpendRatio}% Pool Spent`}
+                : `${expensePctOfIncome}% Income Spent`}
             </Text>
             <Text
               style={{ color: isEffectiveDeficit ? "#FB7185" : "#34D399", fontSize: 11, fontFamily: "Inter_700Bold" }}
@@ -829,26 +821,20 @@ export default function DashboardScreen() {
               adjustsFontSizeToFit
               minimumFontScale={0.8}
             >
-              {totalIncome === 0 && totalExpenses === 0 && totalBudgeted === 0
-                ? "No Activity"
-                : totalBudgeted > 0
-                ? isFundingDeficit
-                  ? `Deficit (-${settings.currency} ${fmt(Math.abs(netSurplus))})`
-                  : `+${settings.currency} ${fmt(netSurplus)} Surplus (${retainedSurplusPct}% Retained)`
+              {totalAllocatedBudget > 0
+                ? `Remaining Budget: ${settings.currency} ${fmt(netBudgetRemaining)} (${budgetUsedPct}% Spent)`
                 : isDeficit
-                ? `Deficit (-${settings.currency} ${fmt(totalExpenses - totalIncome)})`
-                : totalExpenses === totalIncome
-                ? "0% Retained (Break-even)"
-                : `${incomeRetainedPct}% Income Retained`}
+                ? `Operating Deficit (-${settings.currency} ${fmt(totalExpenses - totalIncome)})`
+                : `${incomeRetainedPct}% Retained`}
             </Text>
           </View>
           <View style={{ height: 6, borderRadius: 3, backgroundColor: "rgba(255, 255, 255, 0.12)", overflow: "hidden" }}>
             <View
               style={{
                 height: "100%",
-                width: `${totalExpenses === 0 ? 0 : Math.min(Math.max(totalBudgeted > 0 ? clampedSpendRatio : (totalIncome > 0 ? expensePctOfIncome : clampedSpendRatio), 2), 100)}%`,
-                backgroundColor: isEffectiveDeficit ? "#FB7185" : "#38BDF8",
                 borderRadius: 3,
+                width: `${totalAllocatedBudget > 0 ? Math.min(Math.max(budgetUsedPct, 2.5), 100) : (totalIncome > 0 ? Math.min(Math.max(expensePctOfIncome, 2.5), 100) : (totalExpenses > 0 ? 100 : 0))}%`,
+                backgroundColor: isEffectiveDeficit || (totalAllocatedBudget > 0 && budgetUsedPct > 100) ? "#FB7185" : "#38BDF8",
               }}
             />
           </View>
@@ -905,19 +891,17 @@ export default function DashboardScreen() {
             >
               {totalIncome === 0
                 ? "No Income (0%)"
-                : totalBudgeted > 0
-                ? `${retainedSurplusPct}% Capital Retained`
+                : totalAllocatedBudget > 0
+                ? `Available: ${settings.currency} ${fmt(availableToAllocate)}`
                 : isDeficit
                 ? "0% Retained (Deficit)"
-                : totalExpenses === totalIncome
-                ? "0% Retained (Break-even)"
                 : `${incomeRetainedPct}% Retained`}
             </Text>
             <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 4, overflow: "hidden" }}>
               <View
                 style={{
                   height: "100%",
-                  width: `${totalIncome === 0 ? 0 : isEffectiveDeficit ? 0 : Math.min(Math.max(totalBudgeted > 0 ? retainedSurplusPct : incomeRetainedPct, 2), 100)}%`,
+                  width: `${totalIncome === 0 ? 0 : isEffectiveDeficit ? 0 : Math.min(Math.max(totalAllocatedBudget > 0 && totalIncome > 0 ? (unallocatedFunds / totalIncome) * 100 : incomeRetainedPct, 2), 100)}%`,
                   backgroundColor: isEffectiveDeficit ? colors.expense : colors.income,
                   borderRadius: 2,
                 }}
@@ -952,8 +936,8 @@ export default function DashboardScreen() {
                     backgroundColor:
                       (totalExpenses === 0
                         ? colors.income
-                        : totalBudgeted > 0
-                        ? totalExpenses > totalBudgeted
+                        : totalAllocatedBudget > 0
+                        ? totalBudgetSpent > totalAllocatedBudget
                           ? colors.expense
                           : colors.primary
                         : isDeficit
@@ -971,8 +955,8 @@ export default function DashboardScreen() {
                       color:
                         totalExpenses === 0
                           ? colors.income
-                          : totalBudgeted > 0
-                          ? totalExpenses > totalBudgeted
+                          : totalAllocatedBudget > 0
+                          ? totalBudgetSpent > totalAllocatedBudget
                             ? colors.expense
                             : colors.primary
                           : isDeficit
@@ -986,14 +970,12 @@ export default function DashboardScreen() {
                 >
                   {totalExpenses === 0
                     ? "No Outflows"
-                    : totalBudgeted > 0
-                    ? totalExpenses > totalBudgeted
+                    : totalAllocatedBudget > 0
+                    ? totalBudgetSpent > totalAllocatedBudget
                       ? "Over Budget"
                       : "Within Budget"
                     : isDeficit
                     ? "Over Inflow"
-                    : totalExpenses === totalIncome
-                    ? "Break-even"
                     : "Outflows"}
                 </Text>
               </View>
@@ -1008,8 +990,8 @@ export default function DashboardScreen() {
                 color:
                   totalExpenses === 0
                     ? colors.income
-                    : totalBudgeted > 0
-                    ? totalExpenses > totalBudgeted
+                    : totalAllocatedBudget > 0
+                    ? totalBudgetSpent > totalAllocatedBudget
                       ? colors.expense
                       : colors.income
                     : isDeficit
@@ -1024,27 +1006,21 @@ export default function DashboardScreen() {
             >
               {totalExpenses === 0
                 ? "0% Outflow"
-                : totalBudgeted > 0
-                ? isFundingDeficit
-                  ? `${clampedSpendRatio}% of Capital (Over Pool)`
-                  : `${clampedSpendRatio}% of Capital (${settings.currency} ${fmt(netSurplus)} Left)`
-                : isDeficit
-                ? `${expensePctOfIncome}% of Inflow (Deficit)`
-                : totalIncome > 0
-                ? `${expensePctOfIncome}% of Inflow (${settings.currency} ${fmt(incomeRetainedAmount)} Left)`
-                : "100% Outflows (No Inflow)"}
+                : totalAllocatedBudget > 0
+                ? `${settings.currency} ${fmt(totalBudgetSpent)} of ${fmt(totalAllocatedBudget)} Budget Spent`
+                : `${expensePctOfIncome}% of Inflow`}
             </Text>
             <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 4, overflow: "hidden" }}>
               <View
                 style={{
                   height: "100%",
-                  width: `${totalExpenses === 0 ? 0 : Math.min(Math.max(totalBudgeted > 0 ? clampedSpendRatio : expensePctOfIncome, 4), 100)}%`,
+                  width: `${totalExpenses === 0 ? 0 : Math.min(Math.max(totalAllocatedBudget > 0 ? budgetUsedPct : expensePctOfIncome, 4), 100)}%`,
                   backgroundColor:
                     totalExpenses === 0
                       ? colors.income
                       : isEffectiveDeficit
                       ? colors.expense
-                      : (totalBudgeted > 0 ? clampedSpendRatio : expensePctOfIncome) > 85
+                      : (totalAllocatedBudget > 0 ? budgetUsedPct : expensePctOfIncome) > 85
                       ? colors.warning
                       : colors.income,
                   borderRadius: 2,
@@ -1053,7 +1029,7 @@ export default function DashboardScreen() {
             </View>
           </TouchableOpacity>
 
-          {/* Card 3: Total Budget */}
+          {/* Card 3: Department Budget */}
           <TouchableOpacity
             style={[
               styles.kpiCard,
@@ -1075,7 +1051,7 @@ export default function DashboardScreen() {
                   styles.kpiIconWrap,
                   {
                     backgroundColor:
-                      (totalBudgeted === 0
+                      (totalAllocatedBudget === 0
                         ? colors.muted
                         : budgetUsedPct > 100
                         ? colors.expense
@@ -1089,7 +1065,7 @@ export default function DashboardScreen() {
                   name="pie-chart"
                   size={17}
                   color={
-                    totalBudgeted === 0
+                    totalAllocatedBudget === 0
                       ? colors.mutedForeground
                       : budgetUsedPct > 100
                       ? colors.expense
@@ -1104,7 +1080,7 @@ export default function DashboardScreen() {
                   styles.kpiTag,
                   {
                     backgroundColor:
-                      (totalBudgeted === 0
+                      (totalAllocatedBudget === 0
                         ? colors.muted
                         : budgetUsedPct > 100
                         ? colors.expense
@@ -1119,7 +1095,7 @@ export default function DashboardScreen() {
                     styles.kpiTagText,
                     {
                       color:
-                        totalBudgeted === 0
+                        totalAllocatedBudget === 0
                           ? colors.mutedForeground
                           : budgetUsedPct > 100
                           ? colors.expense
@@ -1130,7 +1106,7 @@ export default function DashboardScreen() {
                   ]}
                   numberOfLines={1}
                 >
-                  {totalBudgeted === 0 ? "No Budget" : budgetUsedPct > 100 ? "Over Limit" : `${budgetUsedPct}% Used`}
+                  {totalAllocatedBudget === 0 ? "No Budget" : budgetUsedPct > 100 ? "Over Limit" : `${budgetUsedPct}% Used`}
                 </Text>
               </View>
             </View>
@@ -1145,15 +1121,15 @@ export default function DashboardScreen() {
               adjustsFontSizeToFit
               minimumFontScale={0.75}
             >
-              {settings.currency} {fmt(totalBudgeted)}
+              {settings.currency} {fmt(totalAllocatedBudget)}
             </Text>
             <Text style={[styles.kpiLabelText, { color: colors.mutedForeground }]} numberOfLines={1}>
-              Total Budget
+              Department Budget
             </Text>
             <Text
               style={{
                 fontSize: 9.5,
-                color: totalBudgeted === 0 ? colors.mutedForeground : totalBudgetSpent > totalBudgeted ? colors.expense : colors.income,
+                color: totalAllocatedBudget === 0 ? colors.mutedForeground : totalBudgetSpent > totalAllocatedBudget ? colors.expense : colors.income,
                 fontFamily: "Inter_600SemiBold",
                 marginTop: -2,
               }}
@@ -1161,17 +1137,17 @@ export default function DashboardScreen() {
               adjustsFontSizeToFit
               minimumFontScale={0.8}
             >
-              {totalBudgeted === 0
+              {totalAllocatedBudget === 0
                 ? "No Active Budget"
-                : totalBudgetSpent > totalBudgeted
-                ? `${settings.currency} ${fmt(totalBudgetSpent - totalBudgeted)} Over Limit`
+                : totalBudgetSpent > totalAllocatedBudget
+                ? `${settings.currency} ${fmt(totalBudgetSpent - totalAllocatedBudget)} Over Limit`
                 : `${settings.currency} ${fmt(netBudgetRemaining)} Available`}
             </Text>
             <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 4, overflow: "hidden" }}>
               <View
                 style={{
                   height: "100%",
-                  width: `${totalBudgeted === 0 ? 0 : Math.min(Math.max(budgetUsedPct, 4), 100)}%`,
+                  width: `${totalAllocatedBudget === 0 ? 0 : Math.min(Math.max(budgetUsedPct, 4), 100)}%`,
                   backgroundColor:
                     budgetUsedPct > 100
                       ? colors.expense
