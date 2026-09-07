@@ -54,6 +54,7 @@ export default function ReportsScreen() {
   const [periodModalVisible, setPeriodModalVisible] = useState(false);
   const [exportModalVisible, setExportModalVisible] = useState(false);
   const [drillDownModal, setDrillDownModal] = useState<DrillDownType | null>(null);
+  const [drillDownDept, setDrillDownDept] = useState<string | undefined>(undefined);
   const webTop = Platform.OS === "web" ? 67 : 0;
   const chartWidth = chartW;
 
@@ -66,6 +67,7 @@ export default function ReportsScreen() {
     const onBackPress = () => {
       if (drillDownModal !== null) {
         setDrillDownModal(null);
+        setDrillDownDept(undefined);
         return true;
       }
       if (periodModalVisible) {
@@ -449,7 +451,13 @@ export default function ReportsScreen() {
           margin={authFinancialModel.margin}
           distribution={authFinancialModel.distribution}
           currency={settings.currency}
-          onOpenDrillDown={(type) => setDrillDownModal(type)}
+          departments={departments}
+          budgets={budgets}
+          transactions={periodTransactions}
+          onOpenDrillDown={(type, dept) => {
+            setDrillDownModal(type);
+            setDrillDownDept(dept);
+          }}
         />
 
         {/* ─── 4. Department Spending Breakdown (Horizontal Bar) ─── */}
@@ -498,7 +506,11 @@ export default function ReportsScreen() {
       <FinancialDrillDownModal
         visible={drillDownModal !== null}
         type={drillDownModal || "budget"}
-        onClose={() => setDrillDownModal(null)}
+        onClose={() => {
+          setDrillDownModal(null);
+          setDrillDownDept(undefined);
+        }}
+        initialDepartment={drillDownDept}
         currency={settings.currency}
         period={activePeriod}
         transactions={transactions}

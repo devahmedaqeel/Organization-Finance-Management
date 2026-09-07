@@ -39,7 +39,7 @@ export function WebDepartmentStaffModal({
   const isMobile = width < 768;
 
   const { settings } = useSettings();
-  const { payroll = [], departments = [] } = useFinance();
+  const { payroll = [], departments = [], budgets = [], transactions = [] } = useFinance();
 
   const [selectedDeptId, setSelectedDeptId] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -133,6 +133,51 @@ export function WebDepartmentStaffModal({
     : activeDept?.headCount || registeredCount;
 
   const unassignedSlots = Math.max(0, totalHeadcount - registeredCount);
+
+  // Financial breakdown for active department
+  const activeDeptFinances = useMemo(() => {
+    if (isAllSelected) {
+      const allocated = departments.reduce((s, d) => s + (Number(d.budgetAllocated) || 0), 0);
+      const spent = transactions
+        .filter((t) => t && t.type === "expense" && t.status !== "failed" && (t as any).status !== "deleted")
+        .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+      const remaining = Math.max(0, allocated - spent);
+      const ratio = allocated > 0 ? (spent / allocated) * 100 : 0;
+      return {
+        allocated,
+        spent,
+        remaining,
+        ratio,
+        isOver: allocated > 0 && spent > allocated,
+      };
+    }
+
+    const targetDeptName = (activeDept ? activeDept.name : selectedDeptId).trim().toLowerCase();
+    const lineBudgetsAllocated = budgets
+      .filter((b) => (b.department || "").trim().toLowerCase() === targetDeptName)
+      .reduce((s, b) => s + (Number(b.allocated) || 0), 0);
+    const allocated = Math.max(Number(activeDept?.budgetAllocated) || 0, lineBudgetsAllocated);
+
+    const deptTxs = transactions.filter(
+      (t) =>
+        t &&
+        t.type === "expense" &&
+        t.status !== "failed" &&
+        (t as any).status !== "deleted" &&
+        (t.department || "").trim().toLowerCase() === targetDeptName
+    );
+    const spent = deptTxs.reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    const remaining = Math.max(0, allocated - spent);
+    const ratio = allocated > 0 ? (spent / allocated) * 100 : 0;
+
+    return {
+      allocated,
+      spent,
+      remaining,
+      ratio,
+      isOver: allocated > 0 && spent > allocated,
+    };
+  }, [isAllSelected, departments, activeDept, selectedDeptId, budgets, transactions]);
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -324,7 +369,7 @@ export function WebDepartmentStaffModal({
             )}
           </View>
 
-          {/* Quick Stats Grid */}
+          {/* Quick Stats Grid with Headcount, Payroll, and Budget Allocation */}
           <View style={styles.statsRow}>
             <View
               style={[
@@ -333,11 +378,11 @@ export function WebDepartmentStaffModal({
               ]}
             >
               <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>
-                {isAllSelected ? "TOTAL ORG HEADCOUNT" : "TOTAL HEADCOUNT"}
+                {isAllSelected ? "TOTAL HEADCOUNT" : "UNIT HEADCOUNT"}
               </Text>
               <Text style={[styles.statValue, { color: "#0EA5E9" }]}>{totalHeadcount}</Text>
               <Text style={[styles.statSub, { color: colors.mutedForeground }]}>
-                {isAllSelected ? "Operational across units" : "Operational positions"}
+                {registeredCount} profiles active
               </Text>
             </View>
 
@@ -348,13 +393,64 @@ export function WebDepartmentStaffModal({
               ]}
             >
               <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>
-                {isAllSelected ? "TOTAL MONTHLY PAYROLL" : "MONTHLY PAYROLL"}
+                MONTHLY PAYROLL
               </Text>
-              <Text style={[styles.statValue, { color: colors.foreground }]}>
+              <Text style={[styles.statValue, { color: "#8B5CF6" }]}>
                 {settings.currency} {totalMonthlyPayroll.toLocaleString()}
               </Text>
               <Text style={[styles.statSub, { color: colors.mutedForeground }]}>
-                Disbursed compensation
+                Direct compensation
+              </Text>
+            </View>
+
+            <View
+              style={[
+                styles.statBox,
+                { backgroundColor: colors.background, borderColor: colors.border },
+              ]}
+            >
+              <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>
+                ALLOCATED BUDGET
+              </Text>
+              <Text style={[styles.statValue, { color: colors.foreground }]}>
+                {activeDeptFinances.allocated > 0
+                  ? `${settings.currency} ${activeDeptFinances.allocated.toLocaleString()}`
+                  : "No Cap Set"}
+              </Text>
+              <Text style={[styles.statSub, { color: colors.mutedForeground }]}>
+                Approved ceiling
+              </Text>
+            </View>
+
+            <View
+              style={[
+                styles.statBox,
+                { backgroundColor: colors.background, borderColor: colors.border },
+              ]}
+            >
+              <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>
+                {activeDeptFinances.isOver ? "OVER BUDGET" : "REMAINING FUNDS"}
+              </Text>
+              <Text
+                style={[
+                  styles.statValue,
+                  {
+                    color: activeDeptFinances.isOver
+                      ? colors.expense
+                      : activeDeptFinances.remaining > 0
+                      ? colors.income
+                      : colors.mutedForeground,
+                  },
+                ]}
+              >
+                {activeDeptFinances.allocated > 0
+                  ? `${settings.currency} ${activeDeptFinances.remaining.toLocaleString()}`
+                  : `Spent: ${settings.currency} ${activeDeptFinances.spent.toLocaleString()}`}
+              </Text>
+              <Text style={[styles.statSub, { color: colors.mutedForeground }]}>
+                {activeDeptFinances.allocated > 0
+                  ? `${activeDeptFinances.ratio.toFixed(1)}% Cap utilized`
+                  : "Uncapped Cost Center"}
               </Text>
             </View>
           </View>
@@ -623,13 +719,15 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: "row",
-    gap: 12,
+    flexWrap: "wrap",
+    gap: 10,
     paddingHorizontal: 20,
     paddingVertical: 10,
   },
   statBox: {
     flex: 1,
-    padding: 12,
+    minWidth: 125,
+    padding: 10,
     borderRadius: 12,
     borderWidth: 1,
   },

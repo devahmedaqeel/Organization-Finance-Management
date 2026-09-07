@@ -94,6 +94,7 @@ export function WebDashboard({
   const [growthMode, setGrowthMode] = useState<number>(0);
   const [activePeriod, setActivePeriod] = useState<NormalizedPeriod>(() => getPresetPeriod("last_6m"));
   const [drillDownType, setDrillDownType] = useState<DrillDownType | null>(null);
+  const [drillDownDept, setDrillDownDept] = useState<string | undefined>(undefined);
   const [chartContainerWidth, setChartContainerWidth] = useState<number>(0);
 
   // Authoritative Single Source of Truth Financial Calculation Pipeline
@@ -958,7 +959,13 @@ export function WebDashboard({
         margin={authFinancialModel.margin}
         distribution={authFinancialModel.distribution}
         currency={settings.currency}
-        onOpenDrillDown={(type) => setDrillDownType(type)}
+        departments={departments}
+        budgets={budgets}
+        transactions={transactions}
+        onOpenDrillDown={(type, dept) => {
+          setDrillDownType(type);
+          setDrillDownDept(dept);
+        }}
       />
 
       {/* ─── Department Spending Horizontal Bars (HBarChart) ─── */}
@@ -1113,7 +1120,11 @@ export function WebDashboard({
       <FinancialDrillDownModal
         visible={drillDownType !== null}
         type={drillDownType || "budget"}
-        onClose={() => setDrillDownType(null)}
+        onClose={() => {
+          setDrillDownType(null);
+          setDrillDownDept(undefined);
+        }}
+        initialDepartment={drillDownDept}
         currency={settings.currency}
         period={activePeriod}
         transactions={transactions}

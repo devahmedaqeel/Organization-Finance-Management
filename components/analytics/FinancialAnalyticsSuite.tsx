@@ -4,6 +4,7 @@ import {
   Text,
   View,
   TouchableOpacity,
+  ScrollView,
   Platform,
   useWindowDimensions,
 } from "react-native";
@@ -18,22 +19,31 @@ import {
   SvgArrowUpRight,
   SvgArrowDownRight,
   SvgChevronDown,
+  SvgBriefcase,
 } from "@/components/web/SvgIcons";
 import {
   ValidatedBudgetAnalytics,
   ValidatedOperatingMarginAnalytics,
   ValidatedExpenseDistributionAnalytics,
+  DepartmentMetric,
+  calculateDepartmentMetrics,
   formatCurrencySafe,
   formatCompactCurrency,
 } from "@/services/FinancialCalculationEngine";
+import { useFinance, Department, Budget, Transaction } from "@/context/FinanceContext";
 
 interface Props {
   budget: ValidatedBudgetAnalytics;
   margin: ValidatedOperatingMarginAnalytics;
   distribution: ValidatedExpenseDistributionAnalytics;
   currency?: string;
-  onOpenDrillDown: (type: "budget" | "nob" | "expense") => void;
+  onOpenDrillDown: (type: "budget" | "nob" | "expense", department?: string) => void;
   isCompact?: boolean;
+  departments?: Department[];
+  departmentMetrics?: DepartmentMetric[];
+  budgets?: Budget[];
+  transactions?: Transaction[];
+  onOpenDepartmentStaff?: (dept: Department | { id: string; name: string }) => void;
 }
 
 export function FinancialAnalyticsSuite({
@@ -43,10 +53,150 @@ export function FinancialAnalyticsSuite({
   currency = "PKR",
   onOpenDrillDown,
   isCompact = false,
+  departments: propDepartments,
+  departmentMetrics: propDepartmentMetrics,
+  budgets: propBudgets,
+  transactions: propTransactions,
+  onOpenDepartmentStaff,
 }: Props) {
   const colors = useColors();
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
+
+  // Safe fallback to FinanceContext
+  let financeContext: any = null;
+  try {
+    financeContext = useFinance();
+  } catch (e) {
+    // Handled safely if rendered outside provider
+  }
+
+  const effectiveDepts = propDepartments || financeContext?.departments || [];
+  const effectiveBudgets = propBudgets || financeContext?.budgets || [];
+  const effectiveTransactions = propTransactions || financeContext?.transactions || [];
+
+  const effectiveDeptMetrics: DepartmentMetric[] = useMemo(() => {
+    if (propDepartmentMetrics && propDepartmentMetrics.length > 0) {
+      return propDepartmentMetrics;
+    }
+    if (financeContext?.departmentMetrics && financeContext.departmentMetrics.length > 0) {
+      return financeContext.departmentMetrics;
+    }
+    if (effectiveDepts.length > 0 || effectiveBudgets.length > 0) {
+      return calculateDepartmentMetrics(effectiveDepts, effectiveTransactions, undefined, effectiveBudgets);
+    }
+    return [];
+  }, [propDepartmentMetrics, financeContext?.departmentMetrics, effectiveDepts, effectiveTransactions, effectiveBudgets]);
+
+  const [selectedDeptId, setSelectedDeptId] = useState<string>("ALL");
+
+  const deptOptions = useMemo(() => {
+    const list = [
+      {
+        id: "ALL",
+        name: "All Units",
+        spent: budget.actualSpending,
+        allocated: budget.totalAllocated,
+      },
+    ];
+    effectiveDeptMetrics.forEach((dm) => {
+      list.push({
+        id: dm.id,
+        name: dm.name,
+        spent: dm.spent,
+        allocated: dm.allocated,
+      });
+    });
+    return list;
+  }, [effectiveDeptMetrics, budget]);
+
+  const activeDepartmentMetric = useMemo(() => {
+    if (selectedDeptId === "ALL") return null;
+    return (
+      effectiveDeptMetrics.find(
+        (d) =>
+          d.id === selectedDeptId ||
+          d.name.trim().toLowerCase() === selectedDeptId.trim().toLowerCase()
+      ) || null
+    );
+  }, [selectedDeptId, effectiveDeptMetrics]);
+
+  const activeBudgetView = useMemo(() => {
+    if (!activeDepartmentMetric) {
+      return {
+        isDept: false,
+        name: "All Units",
+        isValid: budget.isValid,
+        totalAllocated: budget.totalAllocated,
+        actualSpending: budget.actualSpending,
+        remainingAmount: budget.remainingAmount,
+        excessAmount: budget.excessAmount,
+        rawUtilizationPct: budget.rawUtilizationPct,
+        displayPct: budget.displayPct,
+        isOverBudget: budget.isOverBudget,
+        statusColor: budget.statusColor,
+        statusLabel: budget.statusLabel,
+        remainingText: budget.remainingText,
+        explanation: budget.explanation,
+        payrollSpending: 0,
+        otherSpending: 0,
+      };
+    }
+
+    const d = activeDepartmentMetric;
+    const isOver = d.allocated > 0 && d.spent > d.allocated;
+    const isWarning = d.utilizationPct >= 80 && !isOver;
+    const isValid = d.allocated > 0 || d.spent > 0;
+    const statusColor =
+      d.allocated <= 0
+        ? colors.mutedForeground
+        : isOver
+        ? colors.expense
+        : isWarning
+        ? colors.warning
+        : colors.income;
+
+    const statusLabel =
+      d.allocated <= 0
+        ? "No Budget Cap"
+        : isOver
+        ? "Over Budget Cap"
+        : isWarning
+        ? "Near Ceiling"
+        : "On Track";
+
+    const remainingText =
+      d.allocated <= 0
+        ? `${formatCompactCurrency(d.spent, currency)} Disbursed`
+        : isOver
+        ? `${formatCompactCurrency(d.spent - d.allocated, currency)} Over Limit`
+        : `${formatCompactCurrency(d.remaining, currency)} Remaining`;
+
+    const explanation =
+      d.allocated > 0
+        ? `Budget Cap: ${formatCompactCurrency(d.allocated, currency)} · Disbursed: ${formatCompactCurrency(d.spent, currency)} (${d.utilizationPct.toFixed(1)}% Used)`
+        : `No allocated ceiling configured · Disbursed: ${formatCompactCurrency(d.spent, currency)}`;
+
+    return {
+      isDept: true,
+      deptId: d.id,
+      name: d.name,
+      isValid,
+      totalAllocated: d.allocated,
+      actualSpending: d.spent,
+      remainingAmount: d.remaining,
+      excessAmount: Math.max(0, d.spent - d.allocated),
+      rawUtilizationPct: d.utilizationPct,
+      displayPct: `${d.utilizationPct.toFixed(1)}%`,
+      isOverBudget: isOver,
+      statusColor,
+      statusLabel,
+      remainingText,
+      explanation,
+      payrollSpending: d.payrollSpending || 0,
+      otherSpending: d.otherSpending || 0,
+    };
+  }, [activeDepartmentMetric, budget, colors, currency]);
 
   // Active interaction mode states
   const [budgetMode, setBudgetMode] = useState<"used" | "spent" | "remaining">("used");
@@ -104,8 +254,12 @@ export function FinancialAnalyticsSuite({
                   </TouchableOpacity>
                 </View>
                 <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>
-                  {budget.isValid
-                    ? `Cap: ${formatCompactCurrency(budget.totalAllocated, currency)}`
+                  {activeBudgetView.isDept
+                    ? activeBudgetView.totalAllocated > 0
+                      ? `Cap: ${formatCompactCurrency(activeBudgetView.totalAllocated, currency)} · ${activeBudgetView.name}`
+                      : `Uncapped · ${activeBudgetView.name}`
+                    : budget.isValid
+                    ? `Cap: ${formatCompactCurrency(budget.totalAllocated, currency)} · Organization Total`
                     : "No Budget Cap Configured"}
                 </Text>
               </View>
@@ -114,7 +268,7 @@ export function FinancialAnalyticsSuite({
             <TouchableOpacity
               onPress={() => {
                 if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                onOpenDrillDown("budget");
+                onOpenDrillDown("budget", selectedDeptId !== "ALL" ? activeBudgetView.name : undefined);
               }}
               style={{ flexShrink: 0 }}
             >
@@ -128,48 +282,55 @@ export function FinancialAnalyticsSuite({
               <Text style={[styles.tooltipText, { color: colors.foreground }]}>
                 📐 <Text style={{ fontFamily: "Inter_700Bold" }}>Formula:</Text> (Actual Spend ÷ Budget Cap) × 100
               </Text>
-              <Text style={[styles.tooltipSub, { color: colors.mutedForeground }]}>{budget.explanation}</Text>
+              <Text style={[styles.tooltipSub, { color: colors.mutedForeground }]}>{activeBudgetView.explanation}</Text>
             </View>
           )}
 
           {/* Contextual Status Strip (Uniform 46px minHeight across all cards) */}
-          <View style={[styles.statusStrip, { backgroundColor: budget.statusColor + "14", borderColor: budget.statusColor + "30" }]}>
-            <View style={[styles.statusDot, { backgroundColor: budget.statusColor }]} />
-            <Text style={[styles.statusStripText, { color: budget.statusColor }]} numberOfLines={2}>
-              {budget.statusLabel} · {budget.remainingText}
+          <View style={[styles.statusStrip, { backgroundColor: activeBudgetView.statusColor + "14", borderColor: activeBudgetView.statusColor + "30" }]}>
+            <View style={[styles.statusDot, { backgroundColor: activeBudgetView.statusColor }]} />
+            <Text style={[styles.statusStripText, { color: activeBudgetView.statusColor }]} numberOfLines={2}>
+              {activeBudgetView.statusLabel} · {activeBudgetView.remainingText}
             </Text>
+            {activeBudgetView.isDept && (
+              <View style={[styles.deptIndicatorBadge, { backgroundColor: activeBudgetView.statusColor + "20" }]}>
+                <Text style={[styles.deptIndicatorText, { color: activeBudgetView.statusColor }]} numberOfLines={1}>
+                  {activeBudgetView.name}
+                </Text>
+              </View>
+            )}
           </View>
 
           {/* Visual Ring / Gauge */}
           <View style={styles.ringCenterWrap}>
             {(() => {
               const remRatio =
-                budget.isValid && budget.totalAllocated > 0
-                  ? Math.min(100, Math.max(0, (budget.remainingAmount / budget.totalAllocated) * 100))
+                activeBudgetView.isValid && activeBudgetView.totalAllocated > 0
+                  ? Math.min(100, Math.max(0, (activeBudgetView.remainingAmount / activeBudgetView.totalAllocated) * 100))
                   : 0;
 
               const spentRatio =
-                budget.isValid && budget.totalAllocated > 0
-                  ? Math.min(100, Math.max(0, (budget.actualSpending / budget.totalAllocated) * 100))
+                activeBudgetView.isValid && activeBudgetView.totalAllocated > 0
+                  ? Math.min(100, Math.max(0, (activeBudgetView.actualSpending / activeBudgetView.totalAllocated) * 100))
                   : 0;
 
               const activePct =
-                !budget.isValid
+                !activeBudgetView.isValid
                   ? 0
                   : budgetMode === "remaining"
                   ? remRatio
                   : budgetMode === "spent"
                   ? spentRatio
-                  : Math.min(100, Math.max(0, budget.rawUtilizationPct));
+                  : Math.min(100, Math.max(0, activeBudgetView.rawUtilizationPct));
 
               const centerLabel =
-                !budget.isValid
+                !activeBudgetView.isValid
                   ? "0%"
                   : budgetMode === "spent"
-                  ? formatCompactCurrency(budget.actualSpending, currency)
+                  ? formatCompactCurrency(activeBudgetView.actualSpending, currency)
                   : budgetMode === "remaining"
-                  ? formatCompactCurrency(budget.remainingAmount, currency)
-                  : budget.displayPct;
+                  ? formatCompactCurrency(activeBudgetView.remainingAmount, currency)
+                  : activeBudgetView.displayPct;
 
               const label =
                 budgetMode === "spent"
@@ -179,22 +340,22 @@ export function FinancialAnalyticsSuite({
                   : "Budget Used";
 
               const sublabel =
-                !budget.isValid
+                !activeBudgetView.isValid
                   ? "NO CAP"
                   : budgetMode === "spent"
-                  ? `${budget.rawUtilizationPct < 1 && budget.rawUtilizationPct > 0 ? budget.rawUtilizationPct.toFixed(1) : budget.rawUtilizationPct.toFixed(0)}% OF CAP`
+                  ? `${activeBudgetView.rawUtilizationPct < 1 && activeBudgetView.rawUtilizationPct > 0 ? activeBudgetView.rawUtilizationPct.toFixed(1) : activeBudgetView.rawUtilizationPct.toFixed(0)}% OF CAP`
                   : budgetMode === "remaining"
                   ? `${remRatio < 100 && remRatio > 99 ? remRatio.toFixed(1) : remRatio.toFixed(0)}% LEFT`
-                  : budget.isOverBudget
-                  ? `${formatCompactCurrency(budget.excessAmount, currency)} Over`
-                  : `${formatCompactCurrency(budget.actualSpending, currency)} Spent`;
+                  : activeBudgetView.isOverBudget
+                  ? `${formatCompactCurrency(activeBudgetView.excessAmount, currency)} Over`
+                  : `${formatCompactCurrency(activeBudgetView.actualSpending, currency)} Spent`;
 
               return (
                 <RingProgress
                   percentage={activePct}
                   size={142}
                   strokeWidth={12}
-                  color={budgetMode === "remaining" ? colors.income : budget.statusColor}
+                  color={budgetMode === "remaining" ? colors.income : activeBudgetView.statusColor}
                   centerLabel={centerLabel}
                   label={label}
                   sublabel={sublabel}
@@ -204,7 +365,7 @@ export function FinancialAnalyticsSuite({
           </View>
 
           {/* Dual-Track Visual Budget Allocation Bar */}
-          {budget.isValid && budget.totalAllocated > 0 && (
+          {activeBudgetView.isValid && activeBudgetView.totalAllocated > 0 ? (
             <View style={styles.flowBarSection}>
               <View style={[styles.flowBarTrack, { backgroundColor: (colors.cardAlt ?? colors.muted) + "50" }]}>
                 {/* Spent Segment: Red / Expense */}
@@ -212,7 +373,7 @@ export function FinancialAnalyticsSuite({
                   style={[
                     styles.flowBarFill,
                     {
-                      width: `${Math.max(3, Math.min(97, budget.rawUtilizationPct))}%`,
+                      width: `${Math.max(3, Math.min(97, activeBudgetView.rawUtilizationPct))}%`,
                       backgroundColor: colors.expense,
                     },
                   ]}
@@ -222,7 +383,7 @@ export function FinancialAnalyticsSuite({
                   style={[
                     styles.flowBarFill,
                     {
-                      width: `${Math.max(3, Math.min(97, Math.max(0, 100 - budget.rawUtilizationPct)))}%`,
+                      width: `${Math.max(3, Math.min(97, Math.max(0, 100 - activeBudgetView.rawUtilizationPct)))}%`,
                       backgroundColor: colors.income,
                     },
                   ]}
@@ -234,7 +395,7 @@ export function FinancialAnalyticsSuite({
                   <Text style={[styles.flowLegendText, { color: colors.mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                     Spent:{" "}
                     <Text style={{ color: colors.expense, fontFamily: "Inter_700Bold" }}>
-                      {formatCompactCurrency(budget.actualSpending, currency)} ({budget.rawUtilizationPct.toFixed(0)}%)
+                      {formatCompactCurrency(activeBudgetView.actualSpending, currency)} ({activeBudgetView.rawUtilizationPct.toFixed(0)}%)
                     </Text>
                   </Text>
                 </View>
@@ -243,15 +404,103 @@ export function FinancialAnalyticsSuite({
                   <Text style={[styles.flowLegendText, { color: colors.mutedForeground, textAlign: "right" }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                     Left:{" "}
                     <Text style={{ color: colors.income, fontFamily: "Inter_700Bold" }}>
-                      {formatCompactCurrency(budget.remainingAmount, currency)} ({Math.max(0, 100 - budget.rawUtilizationPct).toFixed(0)}%)
+                      {formatCompactCurrency(activeBudgetView.remainingAmount, currency)} ({Math.max(0, 100 - activeBudgetView.rawUtilizationPct).toFixed(0)}%)
                     </Text>
                   </Text>
                 </View>
               </View>
             </View>
+          ) : activeBudgetView.isDept && activeBudgetView.actualSpending > 0 ? (
+            <View style={[styles.uncappedNotice, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border }]}>
+              <Text style={[styles.uncappedNoticeText, { color: colors.mutedForeground }]}>
+                Live Disbursements: <Text style={{ color: colors.expense, fontFamily: "Inter_700Bold" }}>{formatCompactCurrency(activeBudgetView.actualSpending, currency)}</Text> (Uncapped Cost Center)
+              </Text>
+            </View>
+          ) : null}
+
+          {/* Department Selector Option Controls (Requested by User) */}
+          {deptOptions.length > 1 && (
+            <View style={styles.deptOptionsContainer}>
+              <View style={styles.deptOptionsHeader}>
+                <Text style={[styles.deptOptionsLabel, { color: colors.mutedForeground }]}>
+                  SELECT DEPARTMENT OPTION:
+                </Text>
+                {activeBudgetView.isDept && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setSelectedDeptId("ALL");
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.resetDeptText, { color: colors.primary }]}>
+                      Show All Units
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.deptChipsScroll}
+              >
+                {deptOptions.map((dept) => {
+                  const isSelected = selectedDeptId === dept.id;
+                  return (
+                    <TouchableOpacity
+                      key={dept.id}
+                      style={[
+                        styles.deptChip,
+                        {
+                          backgroundColor: isSelected ? colors.primary : (colors.cardAlt ?? colors.muted) + "30",
+                          borderColor: isSelected ? colors.primary : colors.border,
+                        },
+                      ]}
+                      onPress={() => {
+                        if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        setSelectedDeptId(dept.id);
+                      }}
+                      activeOpacity={0.75}
+                    >
+                      <Text
+                        style={[
+                          styles.deptChipText,
+                          { color: isSelected ? "#FFFFFF" : colors.foreground },
+                          isSelected && { fontFamily: "Inter_700Bold" },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {dept.name}
+                      </Text>
+                      <View
+                        style={[
+                          styles.deptChipBadge,
+                          {
+                            backgroundColor: isSelected
+                              ? "rgba(255, 255, 255, 0.25)"
+                              : (colors.cardAlt ?? colors.muted) + "60",
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.deptChipBadgeText,
+                            { color: isSelected ? "#FFFFFF" : colors.mutedForeground },
+                          ]}
+                        >
+                          {dept.allocated > 0
+                            ? `${((dept.spent / dept.allocated) * 100).toFixed(0)}%`
+                            : formatCompactCurrency(dept.spent, currency)}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
           )}
 
-          {/* Segmented Option Controls */}
+          {/* Segmented Metric View Mode Controls */}
           <View style={styles.chipsRow}>
             {[
               { id: "used", label: "% Used" },
@@ -309,7 +558,7 @@ export function FinancialAnalyticsSuite({
                 adjustsFontSizeToFit
                 minimumFontScale={0.75}
               >
-                {formatCompactCurrency(budget.actualSpending, currency)}
+                {formatCompactCurrency(activeBudgetView.actualSpending, currency)}
               </Text>
             </View>
             <View style={[styles.bentoDivider, { backgroundColor: colors.border }]} />
@@ -323,12 +572,12 @@ export function FinancialAnalyticsSuite({
                 ALLOCATED
               </Text>
               <Text
-                style={[styles.bentoVal, { color: budget.isValid ? colors.foreground : colors.mutedForeground }]}
+                style={[styles.bentoVal, { color: activeBudgetView.isValid && activeBudgetView.totalAllocated > 0 ? colors.foreground : colors.mutedForeground }]}
                 numberOfLines={1}
                 adjustsFontSizeToFit
                 minimumFontScale={0.75}
               >
-                {budget.isValid ? formatCompactCurrency(budget.totalAllocated, currency) : "Not Set"}
+                {activeBudgetView.isValid && activeBudgetView.totalAllocated > 0 ? formatCompactCurrency(activeBudgetView.totalAllocated, currency) : "Not Set"}
               </Text>
             </View>
             <View style={[styles.bentoDivider, { backgroundColor: colors.border }]} />
@@ -339,15 +588,15 @@ export function FinancialAnalyticsSuite({
                 adjustsFontSizeToFit
                 minimumFontScale={0.72}
               >
-                {budget.isOverBudget ? "OVER BUDGET" : "REMAINING"}
+                {activeBudgetView.isOverBudget ? "OVER BUDGET" : "REMAINING"}
               </Text>
               <Text
                 style={[
                   styles.bentoVal,
                   {
-                    color: budget.isOverBudget
+                    color: activeBudgetView.isOverBudget
                       ? colors.expense
-                      : budget.remainingAmount > 0
+                      : activeBudgetView.remainingAmount > 0
                       ? colors.income
                       : colors.mutedForeground,
                   },
@@ -356,14 +605,42 @@ export function FinancialAnalyticsSuite({
                 adjustsFontSizeToFit
                 minimumFontScale={0.75}
               >
-                {budget.isValid
-                  ? budget.isOverBudget
-                    ? `-${formatCompactCurrency(budget.excessAmount, currency)}`
-                    : formatCompactCurrency(budget.remainingAmount, currency)
+                {activeBudgetView.isValid && activeBudgetView.totalAllocated > 0
+                  ? activeBudgetView.isOverBudget
+                    ? `-${formatCompactCurrency(activeBudgetView.excessAmount, currency)}`
+                    : formatCompactCurrency(activeBudgetView.remainingAmount, currency)
+                  : activeBudgetView.actualSpending > 0
+                  ? "Uncapped"
                   : "—"}
               </Text>
             </View>
           </View>
+
+          {/* Department Spending Composition Note */}
+          {activeBudgetView.isDept && (activeBudgetView.payrollSpending > 0 || activeBudgetView.otherSpending > 0) && (
+            <View style={[styles.deptSubMetaRow, { borderColor: colors.border }]}>
+              <Text style={[styles.deptSubMetaText, { color: colors.mutedForeground }]}>
+                Payroll: <Text style={{ color: "#8B5CF6", fontFamily: "Inter_700Bold" }}>{formatCompactCurrency(activeBudgetView.payrollSpending, currency)}</Text>
+                {"  "}•{"  "}
+                Operational: <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold" }}>{formatCompactCurrency(activeBudgetView.otherSpending, currency)}</Text>
+              </Text>
+              {onOpenDepartmentStaff && (
+                <TouchableOpacity
+                  onPress={() => {
+                    const matchedDept = effectiveDepts.find(
+                      (d) => d.id === activeBudgetView.deptId || d.name.trim().toLowerCase() === activeBudgetView.name.trim().toLowerCase()
+                    );
+                    onOpenDepartmentStaff(matchedDept || { id: activeBudgetView.deptId || activeBudgetView.name, name: activeBudgetView.name });
+                  }}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                >
+                  <Text style={{ fontSize: 10, color: "#0EA5E9", fontFamily: "Inter_700Bold" }}>
+                    View Roster →
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
         </View>
 
         {/* ========================================================================= */}
@@ -1199,6 +1476,84 @@ const styles = StyleSheet.create({
     fontSize: 9.5,
     fontFamily: "Inter_500Medium",
     letterSpacing: -0.2,
+  },
+  deptOptionsContainer: {
+    gap: 6,
+    marginVertical: 4,
+  },
+  deptOptionsHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 2,
+  },
+  deptOptionsLabel: {
+    fontSize: 9,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.5,
+  },
+  resetDeptText: {
+    fontSize: 10,
+    fontFamily: "Inter_600SemiBold",
+  },
+  deptChipsScroll: {
+    gap: 6,
+    paddingVertical: 2,
+  },
+  deptChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  deptChipText: {
+    fontSize: 10.5,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: -0.1,
+  },
+  deptChipBadge: {
+    paddingHorizontal: 5,
+    paddingVertical: 1.5,
+    borderRadius: 8,
+  },
+  deptChipBadgeText: {
+    fontSize: 9,
+    fontFamily: "Inter_700Bold",
+  },
+  deptIndicatorBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginLeft: "auto",
+  },
+  deptIndicatorText: {
+    fontSize: 9.5,
+    fontFamily: "Inter_700Bold",
+  },
+  deptSubMetaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingTop: 8,
+    marginTop: 4,
+    borderTopWidth: 1,
+  },
+  deptSubMetaText: {
+    fontSize: 10.5,
+  },
+  uncappedNotice: {
+    padding: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: "center",
+    marginVertical: 4,
+  },
+  uncappedNoticeText: {
+    fontSize: 10.5,
+    fontFamily: "Inter_500Medium",
   },
   chipsRow: {
     flexDirection: "row",

@@ -72,6 +72,7 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
   const [customStart, setCustomStart] = useState(() => activePeriod.startDate || "2026-01-01");
   const [customEnd, setCustomEnd] = useState(() => activePeriod.endDate || "2026-09-01");
   const [drillDownType, setDrillDownType] = useState<DrillDownType | null>(null);
+  const [drillDownDept, setDrillDownDept] = useState<string | undefined>(undefined);
   const [chartContainerWidth, setChartContainerWidth] = useState<number>(0);
 
   const fmt = (n: number) => {
@@ -656,7 +657,13 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
             margin={authFinancialModel.margin}
             distribution={authFinancialModel.distribution}
             currency={settings.currency}
-            onOpenDrillDown={(type) => setDrillDownType(type)}
+            departments={departments}
+            budgets={budgets}
+            transactions={periodTransactions}
+            onOpenDrillDown={(type, dept) => {
+              setDrillDownType(type);
+              setDrillDownDept(dept);
+            }}
           />
 
           {/* Historical Trend Curve */}
@@ -1028,7 +1035,11 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
         <FinancialDrillDownModal
           visible={drillDownType !== null}
           type={drillDownType || "expense"}
-          onClose={() => setDrillDownType(null)}
+          onClose={() => {
+            setDrillDownType(null);
+            setDrillDownDept(undefined);
+          }}
+          initialDepartment={drillDownDept}
           currency={settings.currency}
           period={activePeriod}
           transactions={transactions}

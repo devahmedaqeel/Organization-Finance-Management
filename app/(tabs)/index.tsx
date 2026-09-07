@@ -312,6 +312,7 @@ export default function DashboardScreen() {
   const [mobileBudgetMode, setMobileBudgetMode] = useState<"used" | "spent" | "remaining">("used");
   const [mobileNobMode, setMobileNobMode] = useState<"margin" | "inflows" | "net">("margin");
   const [mobileDrillDown, setMobileDrillDown] = useState<DrillDownType | null>(null);
+  const [mobileDrillDownDept, setMobileDrillDownDept] = useState<string | undefined>(undefined);
   const [customSelection, setCustomSelection] = useState<any | null>(null);
   const [activePeriod, setActivePeriod] = useState<NormalizedPeriod>(() =>
     getPresetPeriod("last_6m")
@@ -322,6 +323,7 @@ export default function DashboardScreen() {
     const onBackPress = () => {
       if (mobileDrillDown !== null) {
         setMobileDrillDown(null);
+        setMobileDrillDownDept(undefined);
         return true;
       }
       if (txModalVisible) {
@@ -1329,7 +1331,13 @@ export default function DashboardScreen() {
         margin={authFinancialModel.margin}
         distribution={authFinancialModel.distribution}
         currency={settings.currency}
-        onOpenDrillDown={(type) => setMobileDrillDown(type)}
+        departments={departments}
+        budgets={budgets}
+        transactions={transactions}
+        onOpenDrillDown={(type, dept) => {
+          setMobileDrillDown(type);
+          setMobileDrillDownDept(dept);
+        }}
       />
 
       {/* Top Department Cost Centers Card */}
@@ -1679,7 +1687,11 @@ export default function DashboardScreen() {
       <FinancialDrillDownModal
         visible={mobileDrillDown !== null}
         type={mobileDrillDown || "budget"}
-        onClose={() => setMobileDrillDown(null)}
+        onClose={() => {
+          setMobileDrillDown(null);
+          setMobileDrillDownDept(undefined);
+        }}
+        initialDepartment={mobileDrillDownDept}
         currency={settings.currency}
         period={activePeriod}
         transactions={transactions}

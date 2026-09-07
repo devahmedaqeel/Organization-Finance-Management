@@ -38,6 +38,7 @@ interface Props {
   nobHealth?: NetOperatingBalanceHealth;
   onNavigate?: (tab: string) => void;
   departments?: Department[];
+  initialDepartment?: string;
 }
 
 function fmt(n: number) {
@@ -57,6 +58,7 @@ export function FinancialDrillDownModal({
   nobHealth,
   onNavigate,
   departments,
+  initialDepartment,
 }: Props) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -65,6 +67,27 @@ export function FinancialDrillDownModal({
 
   const [activeTab, setActiveTab] = useState<"overview" | "breakdown" | "trend" | "ledger">("overview");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedDepartment, setSelectedDepartment] = useState<string>("ALL");
+
+  React.useEffect(() => {
+    if (visible) {
+      setSelectedDepartment(initialDepartment || "ALL");
+      setSelectedCategory(null);
+    }
+  }, [visible, initialDepartment]);
+
+  const isDeptFilter = selectedDepartment !== "ALL";
+
+  const allAvailableDepts = useMemo(() => {
+    const set = new Set<string>();
+    (departments || []).forEach((d) => {
+      if (d.name) set.add(d.name.trim());
+    });
+    (budgets || []).forEach((b) => {
+      if (b.department && b.department.toLowerCase() !== "all") set.add(b.department.trim());
+    });
+    return Array.from(set);
+  }, [departments, budgets]);
 
   // Authoritative Fallback Safe Health Pipeline
   const effectiveNobHealth: NetOperatingBalanceHealth = useMemo(() => {
@@ -110,20 +133,43 @@ export function FinancialDrillDownModal({
   const monthlyTrend = effectiveNobHealth?.monthlyTrend ?? [];
   const expenseCount = effectiveNobHealth?.expenseCount ?? 0;
 
-  // Budget metrics
+  // Global Budget metrics
   const totalAllocated = useMemo(() => {
     const line = (budgets || []).reduce((s, b) => s + (b.allocated || 0), 0);
     if (line > 0) return line;
     return (departments || []).reduce((s, d) => s + (d.budgetAllocated || 0), 0);
   }, [budgets, departments]);
+
   const actualBudgetSpent = useMemo(() => {
     const bSpent = (budgets || []).reduce((s, b) => s + (b.spent || 0), 0);
     if (bSpent > 0 || (budgets && budgets.length > 0)) return bSpent;
     return totalSpent;
   }, [budgets, totalSpent]);
-  const budgetRatio = totalAllocated > 0 ? (actualBudgetSpent / totalAllocated) * 100 : 0;
-  const remainingBudget = Math.max(0, totalAllocated - actualBudgetSpent);
-  const isOverBudget = totalAllocated > 0 && actualBudgetSpent > totalAllocated;
+
+  // Department-specific or Global Filtered Budget Metrics
+  const activeAllocated = useMemo(() => {
+    if (!isDeptFilter) return totalAllocated;
+    const target = selectedDepartment.trim().toLowerCase();
+    const line = (budgets || [])
+      .filter((b) => (b.department || "").trim().toLowerCase() === target)
+      .reduce((s, b) => s + (b.allocated || 0), 0);
+    const dAlloc = (departments || [])
+      .filter((d) => (d.name || "").trim().toLowerCase() === target)
+      .reduce((s, d) => s + (d.budgetAllocated || 0), 0);
+    return Math.max(dAlloc, line);
+  }, [isDeptFilter, selectedDepartment, totalAllocated, budgets, departments]);
+
+  const activeDeptSpent = useMemo(() => {
+    if (!isDeptFilter) return actualBudgetSpent;
+    const target = selectedDepartment.trim().toLowerCase();
+    return filterTransactionsByPeriod(transactions, period)
+      .filter((t) => t.type === "expense" && (t.department || "").trim().toLowerCase() === target)
+      .reduce((s, t) => s + (t.amount || 0), 0);
+  }, [isDeptFilter, selectedDepartment, actualBudgetSpent, transactions, period]);
+
+  const activeBudgetRatio = activeAllocated > 0 ? (activeDeptSpent / activeAllocated) * 100 : 0;
+  const activeRemainingBudget = Math.max(0, activeAllocated - activeDeptSpent);
+  const activeIsOverBudget = activeAllocated > 0 && activeDeptSpent > activeAllocated;
 
   // Filtered period transactions for ledger
   const periodTxs = useMemo(() => {
@@ -132,7 +178,15 @@ export function FinancialDrillDownModal({
     );
   }, [transactions, period]);
 
-  const expenseTxs = useMemo(() => periodTxs.filter((t) => t.type === "expense"), [periodTxs]);
+  const expenseTxs = useMemo(() => {
+    let txs = periodTxs.filter((t) => t.type === "expense");
+    if (type === "budget" && isDeptFilter) {
+      const target = selectedDepartment.trim().toLowerCase();
+      txs = txs.filter((t) => (t.department || "").trim().toLowerCase() === target);
+    }
+    return txs;
+  }, [periodTxs, type, isDeptFilter, selectedDepartment]);
+
   const filteredExpenseLedger = useMemo(() => {
     if (!selectedCategory) return expenseTxs;
     return expenseTxs.filter((t) => (t.category || "General Expense") === selectedCategory);
@@ -236,6 +290,52 @@ export function FinancialDrillDownModal({
             </ScrollView>
           </View>
 
+          {/* Department Filter Strip for Budget Drill Down */}
+          {type === "budget" && allAvailableDepts.length > 0 && (
+            <View style={[styles.deptFilterStrip, { borderBottomColor: colors.border, backgroundColor: (colors.cardAlt ?? colors.muted) + "15" }]}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.deptFilterScroll}>
+                <TouchableOpacity
+                  style={[
+                    styles.drillDeptPill,
+                    { borderColor: colors.border },
+                    !isDeptFilter && { backgroundColor: colors.primary, borderColor: colors.primary },
+                  ]}
+                  onPress={() => {
+                    if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
+                    setSelectedDepartment("ALL");
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.drillDeptPillText, { color: !isDeptFilter ? "#FFFFFF" : colors.foreground }]}>
+                    All Units
+                  </Text>
+                </TouchableOpacity>
+                {allAvailableDepts.map((dName) => {
+                  const isSelected = selectedDepartment.trim().toLowerCase() === dName.toLowerCase();
+                  return (
+                    <TouchableOpacity
+                      key={dName}
+                      style={[
+                        styles.drillDeptPill,
+                        { borderColor: colors.border },
+                        isSelected && { backgroundColor: colors.primary, borderColor: colors.primary },
+                      ]}
+                      onPress={() => {
+                        if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
+                        setSelectedDepartment(dName);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.drillDeptPillText, { color: isSelected ? "#FFFFFF" : colors.foreground }]}>
+                        {dName}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+
           {/* ─── Body Content ─── */}
           <ScrollView
             contentContainerStyle={styles.scrollBody}
@@ -251,23 +351,25 @@ export function FinancialDrillDownModal({
                     {
                       backgroundColor:
                         type === "budget"
-                          ? (isOverBudget ? colors.expense : colors.income) + "12"
+                          ? (activeIsOverBudget ? colors.expense : colors.income) + "12"
                           : type === "nob"
                           ? nobStatusColor + "12"
                           : colors.primary + "12",
                       borderColor:
                         type === "budget"
-                          ? (isOverBudget ? colors.expense : colors.income) + "30"
+                          ? (activeIsOverBudget ? colors.expense : colors.income) + "30"
                           : type === "nob"
                           ? nobStatusColor + "30"
                           : colors.primary + "30",
                     },
                   ]}
                 >
-                  <Text style={[styles.insightTitle, { color: colors.foreground }]}>Financial Insight</Text>
+                  <Text style={[styles.insightTitle, { color: colors.foreground }]}>
+                    {type === "budget" && isDeptFilter ? `Financial Insight (${selectedDepartment})` : "Financial Insight"}
+                  </Text>
                   <Text style={[styles.insightText, { color: colors.mutedForeground }]}>
                     {type === "budget"
-                      ? getBudgetInsight(totalAllocated, totalSpent, currency)
+                      ? getBudgetInsight(activeAllocated, activeDeptSpent, currency)
                       : type === "nob"
                       ? getNobInsight(effectiveNobHealth, currency)
                       : getExpenseDistributionInsight(expenseBreakdown, totalSpent)}
@@ -279,27 +381,31 @@ export function FinancialDrillDownModal({
                   {type === "budget" && (
                     <>
                       <View style={[styles.kpiCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border }]}>
-                        <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>ALLOCATED BUDGET</Text>
-                        <Text style={[styles.kpiVal, { color: totalAllocated > 0 ? colors.foreground : colors.mutedForeground }]}>
-                          {totalAllocated > 0 ? `${currency} ${fmt(totalAllocated)}` : "No Cap Set"}
+                        <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>
+                          {isDeptFilter ? `${selectedDepartment.toUpperCase()} ALLOCATED` : "ALLOCATED BUDGET"}
                         </Text>
-                      </View>
-                      <View style={[styles.kpiCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border }]}>
-                        <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>ACTUAL SPENT</Text>
-                        <Text style={[styles.kpiVal, { color: colors.expense }]}>{currency} {fmt(totalSpent)}</Text>
+                        <Text style={[styles.kpiVal, { color: activeAllocated > 0 ? colors.foreground : colors.mutedForeground }]}>
+                          {activeAllocated > 0 ? `${currency} ${fmt(activeAllocated)}` : "No Cap Set"}
+                        </Text>
                       </View>
                       <View style={[styles.kpiCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border }]}>
                         <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>
-                          {isOverBudget ? "OVER BUDGET" : "REMAINING CAP"}
+                          {isDeptFilter ? `${selectedDepartment.toUpperCase()} SPENT` : "ACTUAL SPENT"}
                         </Text>
-                        <Text style={[styles.kpiVal, { color: isOverBudget ? colors.expense : colors.income }]}>
-                          {totalAllocated > 0 ? `${isOverBudget ? "+" : ""}${currency} ${fmt(Math.abs(remainingBudget))}` : "—"}
+                        <Text style={[styles.kpiVal, { color: colors.expense }]}>{currency} {fmt(activeDeptSpent)}</Text>
+                      </View>
+                      <View style={[styles.kpiCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border }]}>
+                        <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>
+                          {activeIsOverBudget ? "OVER BUDGET" : "REMAINING CAP"}
+                        </Text>
+                        <Text style={[styles.kpiVal, { color: activeIsOverBudget ? colors.expense : colors.income }]}>
+                          {activeAllocated > 0 ? `${activeIsOverBudget ? "+" : ""}${currency} ${fmt(Math.abs(activeRemainingBudget))}` : "—"}
                         </Text>
                       </View>
                       <View style={[styles.kpiCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border }]}>
                         <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>USAGE RATIO</Text>
-                        <Text style={[styles.kpiVal, { color: isOverBudget ? colors.expense : colors.income }]}>
-                          {totalAllocated > 0 ? `${budgetRatio.toFixed(1)}%` : "0%"}
+                        <Text style={[styles.kpiVal, { color: activeIsOverBudget ? colors.expense : colors.income }]}>
+                          {activeAllocated > 0 ? `${activeBudgetRatio.toFixed(1)}%` : "0%"}
                         </Text>
                       </View>
                     </>
@@ -389,10 +495,49 @@ export function FinancialDrillDownModal({
                 </Text>
 
                 {type === "budget" ? (
-                  budgets.length === 0 ? (
-                    <Text style={{ color: colors.mutedForeground, paddingVertical: 16 }}>No department budgets configured.</Text>
-                  ) : (
-                    budgets.map((b) => {
+                  (() => {
+                    const displayedBudgets = isDeptFilter
+                      ? budgets.filter((b) => (b.department || "").trim().toLowerCase() === selectedDepartment.trim().toLowerCase())
+                      : budgets;
+
+                    if (displayedBudgets.length === 0) {
+                      if (isDeptFilter) {
+                        return (
+                          <View style={[styles.breakdownRow, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border, padding: 12, borderRadius: 12, gap: 8 }]}>
+                            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+                              <View style={{ flex: 1, minWidth: 0 }}>
+                                <Text style={[styles.rowTitle, { color: colors.foreground }]} numberOfLines={1}>
+                                  {selectedDepartment}
+                                </Text>
+                                <Text style={{ fontSize: 11, color: colors.mutedForeground, fontFamily: "Inter_500Medium", marginTop: 1 }} numberOfLines={1}>
+                                  Consolidated Department Operations
+                                </Text>
+                              </View>
+                              <View style={{ alignItems: "flex-end", flexShrink: 0 }}>
+                                <Text style={[styles.rowVal, { color: activeIsOverBudget ? colors.expense : colors.foreground }]}>
+                                  {currency} {fmt(activeDeptSpent)}{" "}
+                                  <Text style={{ color: colors.mutedForeground, fontSize: 10.5, fontFamily: "Inter_500Medium" }}>
+                                    / {currency} {fmt(activeAllocated)}
+                                  </Text>
+                                </Text>
+                                <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
+                                  <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: activeIsOverBudget ? colors.expense : colors.income }} />
+                                  <Text style={{ fontSize: 10.5, fontFamily: "Inter_700Bold", color: activeIsOverBudget ? colors.expense : colors.income }}>
+                                    {activeBudgetRatio.toFixed(0)}% {activeIsOverBudget ? "Over Limit" : "Used"}
+                                  </Text>
+                                </View>
+                              </View>
+                            </View>
+                            <View style={[styles.track, { backgroundColor: colors.border }]}>
+                              <View style={[styles.fill, { width: `${Math.min(100, Math.round(activeBudgetRatio))}%`, backgroundColor: activeIsOverBudget ? colors.expense : colors.income }]} />
+                            </View>
+                          </View>
+                        );
+                      }
+                      return <Text style={{ color: colors.mutedForeground, paddingVertical: 16 }}>No department budgets configured.</Text>;
+                    }
+
+                    return displayedBudgets.map((b) => {
                       const bDept = b.department?.trim().toLowerCase();
                       const bCat = b.category?.trim().toLowerCase();
                       const deptSpent = transactions
@@ -439,8 +584,8 @@ export function FinancialDrillDownModal({
                           </View>
                         </View>
                       );
-                    })
-                  )
+                    });
+                  })()
                 ) : (
                   expenseBreakdown.map((c) => (
                     <TouchableOpacity
@@ -812,5 +957,24 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 13,
     fontFamily: "Inter_700Bold",
+  },
+  deptFilterStrip: {
+    borderBottomWidth: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  deptFilterScroll: {
+    gap: 8,
+    alignItems: "center",
+  },
+  drillDeptPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4.5,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  drillDeptPillText: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
   },
 });
