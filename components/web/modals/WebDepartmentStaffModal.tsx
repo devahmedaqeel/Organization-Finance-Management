@@ -1,6 +1,15 @@
-import React from "react";
-import { Modal, StyleSheet, Text, TouchableOpacity, View, ScrollView, useWindowDimensions } from "react-native";
-import { Department, useFinance, PayrollEntry } from "@/context/FinanceContext";
+import React, { useState, useEffect, useMemo } from "react";
+import {
+  Modal,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  ScrollView,
+  TextInput,
+  useWindowDimensions,
+} from "react-native";
+import { Department, useFinance } from "@/context/FinanceContext";
 import { useColors } from "@/hooks/useColors";
 import { useSettings } from "@/context/SettingsContext";
 import {
@@ -8,13 +17,14 @@ import {
   SvgX,
   SvgBriefcase,
   SvgCheck,
-  SvgTrendingUp,
+  SvgSearch,
+  SvgLayers,
 } from "../SvgIcons";
 
 interface WebDepartmentStaffModalProps {
   visible: boolean;
   onClose: () => void;
-  department: Department | null;
+  department?: Department | null;
   onEditDepartment?: (dept: Department) => void;
 }
 
@@ -29,18 +39,99 @@ export function WebDepartmentStaffModal({
   const isMobile = width < 768;
 
   const { settings } = useSettings();
-  const { payroll } = useFinance();
+  const { payroll = [], departments = [] } = useFinance();
 
-  if (!department) return null;
+  const [selectedDeptId, setSelectedDeptId] = useState<string>("ALL");
+  const [searchQuery, setSearchQuery] = useState<string>("");
 
-  // Filter staff members assigned to this department
-  const deptStaff = payroll.filter(
-    (p) => p.department?.trim().toLowerCase() === department.name?.trim().toLowerCase()
+  // Sync state whenever modal opens or initial department prop changes
+  useEffect(() => {
+    if (visible) {
+      if (department && department.id) {
+        setSelectedDeptId(department.id);
+      } else {
+        setSelectedDeptId("ALL");
+      }
+      setSearchQuery("");
+    }
+  }, [visible, department]);
+
+  // Build department filter list: official departments and any extra departments found in payroll
+  const allFilterDepts = useMemo(() => {
+    const knownNames = new Set(departments.map((d) => d.name.trim().toLowerCase()));
+    const extraNames = Array.from(
+      new Set(
+        payroll
+          .map((p) => p.department?.trim())
+          .filter((name): name is string => Boolean(name && !knownNames.has(name.toLowerCase())))
+      )
+    );
+
+    const extras: Department[] = extraNames.map((name) => ({
+      id: `custom_${name.toLowerCase()}`,
+      name,
+      headCount: 0,
+      budgetAllocated: 0,
+    }));
+
+    return [...departments, ...extras];
+  }, [departments, payroll]);
+
+  // Determine currently active department object (if not "ALL")
+  const activeDept = useMemo(() => {
+    if (selectedDeptId === "ALL") return null;
+    return (
+      allFilterDepts.find(
+        (d) =>
+          d.id === selectedDeptId ||
+          d.name.trim().toLowerCase() === selectedDeptId.trim().toLowerCase()
+      ) || null
+    );
+  }, [selectedDeptId, allFilterDepts]);
+
+  const isAllSelected = selectedDeptId === "ALL";
+
+  // Filter staff by selected department
+  const deptStaff = useMemo(() => {
+    if (isAllSelected) {
+      return payroll;
+    }
+    const targetDeptName = (activeDept ? activeDept.name : selectedDeptId).trim().toLowerCase();
+    return payroll.filter(
+      (p) => (p.department || "").trim().toLowerCase() === targetDeptName
+    );
+  }, [payroll, isAllSelected, activeDept, selectedDeptId]);
+
+  // Apply search query filter (name, employeeId, designation, department)
+  const filteredStaff = useMemo(() => {
+    if (!searchQuery.trim()) return deptStaff;
+    const q = searchQuery.trim().toLowerCase();
+    return deptStaff.filter((p) => {
+      const nameMatch = (p.employeeName || "").toLowerCase().includes(q);
+      const idMatch = (p.employeeId || "").toLowerCase().includes(q);
+      const desigMatch = (p.designation || "").toLowerCase().includes(q);
+      const deptMatch = (p.department || "").toLowerCase().includes(q);
+      return nameMatch || idMatch || desigMatch || deptMatch;
+    });
+  }, [deptStaff, searchQuery]);
+
+  if (!visible) return null;
+
+  // Compute stats
+  const totalMonthlyPayroll = deptStaff.reduce(
+    (sum, p) => sum + (p.netSalary || p.baseSalary || 0),
+    0
   );
-
-  const totalMonthlyPayroll = deptStaff.reduce((sum, p) => sum + (p.netSalary || p.baseSalary || 0), 0);
   const registeredCount = deptStaff.length;
-  const totalHeadcount = department.headCount || registeredCount;
+
+  // Headcount calculation
+  const totalHeadcount = isAllSelected
+    ? Math.max(
+        departments.reduce((s, d) => s + (d.headCount || 0), 0),
+        payroll.length
+      )
+    : activeDept?.headCount || registeredCount;
+
   const unassignedSlots = Math.max(0, totalHeadcount - registeredCount);
 
   return (
@@ -52,22 +143,30 @@ export function WebDepartmentStaffModal({
             {
               backgroundColor: colors.card,
               borderColor: colors.border,
-              width: isMobile ? "100%" : 580,
+              width: isMobile ? "100%" : 620,
             },
           ]}
         >
           {/* Header */}
           <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1 }}>
               <View style={[styles.headerIconWrap, { backgroundColor: "#0EA5E918" }]}>
-                <SvgUsers size={20} color="#0EA5E9" />
+                {isAllSelected ? (
+                  <SvgLayers size={20} color="#0EA5E9" />
+                ) : (
+                  <SvgUsers size={20} color="#0EA5E9" />
+                )}
               </View>
-              <View>
-                <Text style={[styles.modalTitle, { color: colors.foreground }]}>
-                  {department.name} — Staff & Roster
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.modalTitle, { color: colors.foreground }]} numberOfLines={1}>
+                  {isAllSelected
+                    ? "All Cost Centers — Staff & Roster"
+                    : `${activeDept?.name || "Department"} — Staff & Roster`}
                 </Text>
-                <Text style={[styles.modalSubtitle, { color: colors.mutedForeground }]}>
-                  {totalHeadcount} Total Personnel Assigned • {registeredCount} Payroll Profiles
+                <Text style={[styles.modalSubtitle, { color: colors.mutedForeground }]} numberOfLines={1}>
+                  {isAllSelected
+                    ? `${totalHeadcount} Total Personnel Assigned • ${payroll.length} Payroll Profiles (All Units)`
+                    : `${totalHeadcount} Total Personnel Assigned • ${registeredCount} Payroll Profiles`}
                 </Text>
               </View>
             </View>
@@ -76,59 +175,289 @@ export function WebDepartmentStaffModal({
             </TouchableOpacity>
           </View>
 
-          {/* Quick Stats Grid */}
-          <View style={styles.statsRow}>
-            <View style={[styles.statBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
-              <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>TOTAL HEADCOUNT</Text>
-              <Text style={[styles.statValue, { color: "#0EA5E9" }]}>{totalHeadcount}</Text>
-              <Text style={[styles.statSub, { color: colors.mutedForeground }]}>Operational positions</Text>
+          {/* Department Filter Selector Bar */}
+          <View
+            style={[
+              styles.filterBar,
+              {
+                borderBottomColor: colors.border,
+                backgroundColor: colors.background,
+              },
+            ]}
+          >
+            <View style={styles.filterBarHeader}>
+              <Text style={[styles.filterBarLabel, { color: colors.mutedForeground }]}>
+                SWITCH DEPARTMENT / COST CENTER:
+              </Text>
+              <Text style={[styles.filterBarCount, { color: "#0EA5E9" }]}>
+                {allFilterDepts.length} Available
+              </Text>
             </View>
 
-            <View style={[styles.statBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
-              <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>MONTHLY PAYROLL</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filterTabsScroll}
+            >
+              {/* All Departments Option */}
+              <TouchableOpacity
+                style={[
+                  styles.filterTab,
+                  {
+                    backgroundColor: isAllSelected ? "#0EA5E9" : colors.card,
+                    borderColor: isAllSelected ? "#0EA5E9" : colors.border,
+                  },
+                ]}
+                onPress={() => setSelectedDeptId("ALL")}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.filterTabText,
+                    { color: isAllSelected ? "#FFFFFF" : colors.foreground },
+                  ]}
+                >
+                  All Departments
+                </Text>
+                <View
+                  style={[
+                    styles.tabBadge,
+                    {
+                      backgroundColor: isAllSelected
+                        ? "rgba(255, 255, 255, 0.25)"
+                        : colors.border,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.tabBadgeText,
+                      { color: isAllSelected ? "#FFFFFF" : colors.mutedForeground },
+                    ]}
+                  >
+                    {payroll.length}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Individual Department Chips */}
+              {allFilterDepts.map((d) => {
+                const isSelected =
+                  selectedDeptId === d.id ||
+                  (!isAllSelected &&
+                    activeDept?.name?.toLowerCase() === d.name.toLowerCase());
+                const deptCount = payroll.filter(
+                  (p) =>
+                    (p.department || "").trim().toLowerCase() ===
+                    d.name.trim().toLowerCase()
+                ).length;
+
+                return (
+                  <TouchableOpacity
+                    key={d.id}
+                    style={[
+                      styles.filterTab,
+                      {
+                        backgroundColor: isSelected ? "#0EA5E9" : colors.card,
+                        borderColor: isSelected ? "#0EA5E9" : colors.border,
+                      },
+                    ]}
+                    onPress={() => setSelectedDeptId(d.id)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.filterTabText,
+                        { color: isSelected ? "#FFFFFF" : colors.foreground },
+                      ]}
+                    >
+                      {d.name}
+                    </Text>
+                    <View
+                      style={[
+                        styles.tabBadge,
+                        {
+                          backgroundColor: isSelected
+                            ? "rgba(255, 255, 255, 0.25)"
+                            : colors.border,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.tabBadgeText,
+                          { color: isSelected ? "#FFFFFF" : colors.mutedForeground },
+                        ]}
+                      >
+                        {deptCount}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+
+          {/* Search Box */}
+          <View
+            style={[
+              styles.searchBoxWrap,
+              { backgroundColor: colors.background, borderColor: colors.border },
+            ]}
+          >
+            <SvgSearch size={15} color={colors.mutedForeground} />
+            <TextInput
+              style={[styles.searchInput, { color: colors.foreground }]}
+              placeholder={`Search ${isAllSelected ? "all employees" : (activeDept?.name || "department") + " employees"} by name, ID, designation...`}
+              placeholderTextColor={colors.mutedForeground}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setSearchQuery("")}
+                activeOpacity={0.7}
+                style={{ padding: 4 }}
+              >
+                <SvgX size={14} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Quick Stats Grid */}
+          <View style={styles.statsRow}>
+            <View
+              style={[
+                styles.statBox,
+                { backgroundColor: colors.background, borderColor: colors.border },
+              ]}
+            >
+              <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>
+                {isAllSelected ? "TOTAL ORG HEADCOUNT" : "TOTAL HEADCOUNT"}
+              </Text>
+              <Text style={[styles.statValue, { color: "#0EA5E9" }]}>{totalHeadcount}</Text>
+              <Text style={[styles.statSub, { color: colors.mutedForeground }]}>
+                {isAllSelected ? "Operational across units" : "Operational positions"}
+              </Text>
+            </View>
+
+            <View
+              style={[
+                styles.statBox,
+                { backgroundColor: colors.background, borderColor: colors.border },
+              ]}
+            >
+              <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>
+                {isAllSelected ? "TOTAL MONTHLY PAYROLL" : "MONTHLY PAYROLL"}
+              </Text>
               <Text style={[styles.statValue, { color: colors.foreground }]}>
                 {settings.currency} {totalMonthlyPayroll.toLocaleString()}
               </Text>
-              <Text style={[styles.statSub, { color: colors.mutedForeground }]}>Disbursed compensation</Text>
+              <Text style={[styles.statSub, { color: colors.mutedForeground }]}>
+                Disbursed compensation
+              </Text>
             </View>
           </View>
 
           {/* Personnel List */}
-          <ScrollView style={styles.listContainer} contentContainerStyle={{ gap: 10, paddingVertical: 6 }}>
-            <Text style={[styles.sectionHeading, { color: colors.mutedForeground }]}>
-              REGISTERED EMPLOYEES ({registeredCount})
-            </Text>
+          <ScrollView
+            style={styles.listContainer}
+            contentContainerStyle={{ gap: 10, paddingVertical: 6 }}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <Text style={[styles.sectionHeading, { color: colors.mutedForeground }]}>
+                REGISTERED EMPLOYEES ({filteredStaff.length}
+                {filteredStaff.length !== deptStaff.length ? ` of ${deptStaff.length}` : ""})
+              </Text>
+              {searchQuery.trim().length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery("")} activeOpacity={0.7}>
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      color: "#0EA5E9",
+                      fontFamily: "Inter_600SemiBold",
+                    }}
+                  >
+                    Clear Filter
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
 
-            {deptStaff.length === 0 ? (
-              <View style={[styles.emptyRoster, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            {filteredStaff.length === 0 ? (
+              <View
+                style={[
+                  styles.emptyRoster,
+                  { backgroundColor: colors.background, borderColor: colors.border },
+                ]}
+              >
                 <SvgBriefcase size={28} color={colors.mutedForeground} />
                 <Text style={[styles.emptyRosterText, { color: colors.foreground }]}>
-                  No individual staff payroll entries mapped yet.
+                  {searchQuery.trim().length > 0
+                    ? `No employees match "${searchQuery}"`
+                    : isAllSelected
+                    ? "No staff payroll entries found in the organization yet."
+                    : `No individual staff payroll entries mapped for "${activeDept?.name || "this department"}" yet.`}
                 </Text>
                 <Text style={[styles.emptyRosterSub, { color: colors.mutedForeground }]}>
-                  This department currently tracks {totalHeadcount} operational personnel. Individual profiles can be added in the Staff Payroll tab.
+                  {searchQuery.trim().length > 0
+                    ? "Try searching for a different keyword or switch to another department tab above."
+                    : "Individual profiles can be registered and assigned in the Staff Payroll tab."}
                 </Text>
               </View>
             ) : (
-              deptStaff.map((staff) => (
+              filteredStaff.map((staff) => (
                 <View
                   key={staff.id}
-                  style={[styles.staffCard, { backgroundColor: colors.background, borderColor: colors.border }]}
+                  style={[
+                    styles.staffCard,
+                    { backgroundColor: colors.background, borderColor: colors.border },
+                  ]}
                 >
                   <View style={styles.staffAvatar}>
                     <Text style={styles.staffAvatarText}>
-                      {staff.employeeName.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase()}
+                      {staff.employeeName
+                        ? staff.employeeName
+                            .split(" ")
+                            .filter(Boolean)
+                            .map((n) => n[0])
+                            .slice(0, 2)
+                            .join("")
+                            .toUpperCase()
+                        : "EM"}
                     </Text>
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.staffName, { color: colors.foreground }]}>{staff.employeeName}</Text>
-                    <Text style={[styles.staffMeta, { color: colors.mutedForeground }]}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text
+                      style={[styles.staffName, { color: colors.foreground }]}
+                      numberOfLines={1}
+                    >
+                      {staff.employeeName}
+                    </Text>
+                    <Text
+                      style={[styles.staffMeta, { color: colors.mutedForeground }]}
+                      numberOfLines={1}
+                    >
                       {staff.employeeId} • {staff.designation || "Staff Member"}
                     </Text>
+                    <View style={styles.deptBadgeWrap}>
+                      <View style={[styles.deptBadge, { backgroundColor: "#0EA5E915" }]}>
+                        <Text style={[styles.deptBadgeText, { color: "#0EA5E9" }]}>
+                          {staff.department || "General"}
+                        </Text>
+                      </View>
+                    </View>
                   </View>
                   <View style={{ alignItems: "flex-end" }}>
                     <Text style={[styles.staffSalary, { color: colors.foreground }]}>
-                      {settings.currency} {(staff.netSalary || staff.baseSalary).toLocaleString()}
+                      {settings.currency}{" "}
+                      {Number(staff.netSalary || staff.baseSalary || 0).toLocaleString()}
                     </Text>
                     <View style={styles.paidBadge}>
                       <SvgCheck size={10} color="#10B981" />
@@ -139,7 +468,7 @@ export function WebDepartmentStaffModal({
               ))
             )}
 
-            {unassignedSlots > 0 && (
+            {!isAllSelected && unassignedSlots > 0 && !searchQuery.trim() && (
               <View style={[styles.unassignedBox, { borderColor: colors.border }]}>
                 <Text style={[styles.unassignedText, { color: colors.mutedForeground }]}>
                   + {unassignedSlots} additional operational personnel positions assigned to this department
@@ -150,16 +479,18 @@ export function WebDepartmentStaffModal({
 
           {/* Footer Actions */}
           <View style={[styles.modalFooter, { borderTopColor: colors.border }]}>
-            {onEditDepartment && (
+            {!isAllSelected && activeDept && onEditDepartment && (
               <TouchableOpacity
                 style={[styles.secondaryBtn, { borderColor: colors.border }]}
                 onPress={() => {
                   onClose();
-                  onEditDepartment(department);
+                  onEditDepartment(activeDept);
                 }}
                 activeOpacity={0.8}
               >
-                <Text style={[styles.secondaryBtnText, { color: colors.foreground }]}>Adjust Headcount</Text>
+                <Text style={[styles.secondaryBtnText, { color: colors.foreground }]}>
+                  Adjust Headcount ({activeDept.name})
+                </Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity
@@ -185,7 +516,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   modalCard: {
-    maxHeight: "90%",
+    maxHeight: "92%",
     borderRadius: 16,
     borderWidth: 1,
     overflow: "hidden",
@@ -223,11 +554,78 @@ const styles = StyleSheet.create({
     padding: 6,
     borderRadius: 8,
   },
+  filterBar: {
+    paddingTop: 10,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+  },
+  filterBarHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    marginBottom: 6,
+  },
+  filterBarLabel: {
+    fontSize: 10,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.5,
+  },
+  filterBarCount: {
+    fontSize: 10,
+    fontFamily: "Inter_600SemiBold",
+  },
+  filterTabsScroll: {
+    paddingHorizontal: 20,
+    gap: 8,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  filterTab: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  filterTabText: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+  },
+  tabBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 10,
+  },
+  tabBadgeText: {
+    fontSize: 10,
+    fontFamily: "Inter_700Bold",
+  },
+  searchBoxWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginHorizontal: 20,
+    marginTop: 10,
+    marginBottom: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    padding: 0,
+  },
   statsRow: {
     flexDirection: "row",
     gap: 12,
     paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingVertical: 10,
   },
   statBox: {
     flex: 1,
@@ -252,7 +650,7 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     paddingHorizontal: 20,
-    maxHeight: 320,
+    maxHeight: 300,
   },
   sectionHeading: {
     fontSize: 11,
@@ -290,6 +688,19 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     marginTop: 2,
   },
+  deptBadgeWrap: {
+    marginTop: 4,
+    flexDirection: "row",
+  },
+  deptBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  deptBadgeText: {
+    fontSize: 10,
+    fontFamily: "Inter_600SemiBold",
+  },
   staffSalary: {
     fontSize: 13,
     fontFamily: "Inter_700Bold",
@@ -317,6 +728,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: "Inter_600SemiBold",
     marginTop: 4,
+    textAlign: "center",
   },
   emptyRosterSub: {
     fontSize: 11,
@@ -366,3 +778,4 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
   },
 });
+

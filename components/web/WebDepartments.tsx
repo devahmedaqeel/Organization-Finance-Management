@@ -28,6 +28,7 @@ export function WebDepartments() {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingDept, setEditingDept] = useState<Department | null>(null);
   const [staffModalDept, setStaffModalDept] = useState<Department | null>(null);
+  const [staffModalVisible, setStaffModalVisible] = useState(false);
   const [deletingDept, setDeletingDept] = useState<Department | null>(null);
 
   const canEdit = user?.role === "admin";
@@ -127,9 +128,8 @@ export function WebDepartments() {
         <TouchableOpacity
           style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 200 }]}
           onPress={() => {
-            if (departments.length > 0) {
-              setStaffModalDept(departments[0]);
-            }
+            setStaffModalDept(null);
+            setStaffModalVisible(true);
           }}
           activeOpacity={0.85}
         >
@@ -203,7 +203,10 @@ export function WebDepartments() {
                         borderColor: "#0EA5E940",
                       },
                     ]}
-                    onPress={() => setStaffModalDept(dept)}
+                    onPress={() => {
+                      setStaffModalDept(dept);
+                      setStaffModalVisible(true);
+                    }}
                     activeOpacity={0.7}
                   >
                     <SvgUsers size={13} color="#0EA5E9" />
@@ -294,7 +297,10 @@ export function WebDepartments() {
                 <View style={styles.cardActions}>
                   <TouchableOpacity
                     style={[styles.cardActionBtn, { borderColor: "#0EA5E930", backgroundColor: "#0EA5E910" }]}
-                    onPress={() => setStaffModalDept(dept)}
+                    onPress={() => {
+                      setStaffModalDept(dept);
+                      setStaffModalVisible(true);
+                    }}
                   >
                     <Text style={[styles.cardActionText, { color: "#0EA5E9" }]}>View Personnel</Text>
                   </TouchableOpacity>
@@ -338,8 +344,11 @@ export function WebDepartments() {
 
       {/* Staff Roster Modal */}
       <WebDepartmentStaffModal
-        visible={Boolean(staffModalDept)}
-        onClose={() => setStaffModalDept(null)}
+        visible={staffModalVisible}
+        onClose={() => {
+          setStaffModalVisible(false);
+          setStaffModalDept(null);
+        }}
         department={staffModalDept}
         onEditDepartment={(dept) => {
           setEditingDept(dept);
