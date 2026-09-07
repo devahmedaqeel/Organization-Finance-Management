@@ -73,9 +73,8 @@ export function WebBudgets() {
   }, [transactions]);
 
   const availableToAllocate = useMemo(() => {
-    const unspentBudgetCommitments = Math.max(0, totalAllocatedBudget - totalBudgetSpent);
-    return Math.max(0, Math.min(unallocatedFunds, netOperatingCash - unspentBudgetCommitments));
-  }, [unallocatedFunds, netOperatingCash, totalAllocatedBudget, totalBudgetSpent]);
+    return Math.max(0, netOperatingCash - totalAllocatedBudget);
+  }, [netOperatingCash, totalAllocatedBudget]);
 
   // Calculate actual spend for each budget item from live transactions
   const budgetsWithLiveSpend = useMemo(() => {

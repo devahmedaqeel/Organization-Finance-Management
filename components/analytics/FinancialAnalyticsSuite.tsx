@@ -596,7 +596,7 @@ export function FinancialAnalyticsSuite({
         {/* ========================================================================= */}
         {/* CARD 1: BUDGET UTILIZATION CARD                                          */}
         {/* ========================================================================= */}
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, isMobile && styles.cardMobile]}>
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, isMobile ? styles.cardMobile : styles.cardDesktop]}>
           {/* Header */}
           <View style={styles.cardHeader}>
             <View style={styles.headerTitleRow}>
@@ -1025,7 +1025,7 @@ export function FinancialAnalyticsSuite({
         {/* ========================================================================= */}
         {/* CARD 2: NET OPERATING MARGIN (NOM) CARD                                  */}
         {/* ========================================================================= */}
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, isMobile && styles.cardMobile]}>
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, isMobile ? styles.cardMobile : styles.cardDesktop]}>
           {/* Header */}
           <View style={styles.cardHeader}>
             <View style={styles.headerTitleRow}>
@@ -1354,7 +1354,7 @@ export function FinancialAnalyticsSuite({
         {/* ========================================================================= */}
         {/* CARD 3: EXPENSE DISTRIBUTION DONUT & RANKED LIST CARD                     */}
         {/* ========================================================================= */}
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, isMobile && styles.cardMobile]}>
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, isMobile ? styles.cardMobile : styles.cardDesktop]}>
           {/* Header */}
           <View style={styles.cardHeader}>
             <View style={styles.headerTitleRow}>
@@ -1819,21 +1819,22 @@ const styles = StyleSheet.create({
     flexDirection: "column",
     flexWrap: "nowrap",
     gap: 14,
+    width: "100%",
+    alignItems: "stretch",
   },
   card: {
-    flex: 1,
     borderRadius: 16,
     borderWidth: 1,
     padding: 18,
     gap: 12,
     justifyContent: "flex-start",
-    overflow: "hidden",
+  },
+  cardDesktop: {
+    flex: 1,
     minWidth: 300,
+    overflow: "hidden",
   },
   cardMobile: {
-    flex: 0,
-    flexGrow: 0,
-    flexShrink: 0,
     width: "100%",
     minWidth: "100%",
     padding: 16,

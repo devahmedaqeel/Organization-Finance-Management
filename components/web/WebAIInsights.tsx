@@ -84,6 +84,12 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
     departments,
     totalBudgeted: contextTotalBudgeted,
     totalBudgetSpent: contextBudgetSpent,
+    totalBudgetRemaining: contextBudgetRemaining,
+    budgetUtilization: contextBudgetUtilization,
+    unallocatedFunds: contextUnallocatedFunds,
+    totalIncome: contextTotalIncome,
+    totalExpenses: contextTotalExpenses,
+    netBalance: contextNetBalance,
   } = useFinance();
   const [allTxModal, setAllTxModal] = useState(false);
   const [txModalFilter, setTxModalFilter] = useState<"all" | "income" | "expense">("all");
@@ -172,11 +178,47 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
     return periodTxs;
   }, [selectedPoint, transactions, periodTxs]);
 
-  // Budget allocations & displayed spend (Unified single source of truth)
-  const totalAllocatedBudget = useMemo(() => {
+  // ─── Authoritative Institutional Budget & Cash Metrics (Single Source of Truth) ───
+  const institutionalTotalBudget = useMemo(() => {
     if (contextTotalBudgeted !== undefined && contextTotalBudgeted > 0) return contextTotalBudgeted;
     return calculateBudgetAllocation(budgets, departments);
   }, [contextTotalBudgeted, budgets, departments]);
+
+  const institutionalBudgetSpent = useMemo(() => {
+    if (contextBudgetSpent !== undefined && contextBudgetSpent > 0) return contextBudgetSpent;
+    return calculateBudgetUsed(transactions, budgets, undefined, departments);
+  }, [contextBudgetSpent, transactions, budgets, departments]);
+
+  const institutionalBudgetRemaining = useMemo(() => {
+    if (contextBudgetRemaining !== undefined && contextBudgetRemaining >= 0) return contextBudgetRemaining;
+    return calculateBudgetRemaining(institutionalTotalBudget, institutionalBudgetSpent);
+  }, [contextBudgetRemaining, institutionalTotalBudget, institutionalBudgetSpent]);
+
+  const institutionalBudgetUtil = useMemo(() => {
+    if (contextBudgetUtilization !== undefined && contextBudgetUtilization >= 0) return contextBudgetUtilization;
+    return institutionalTotalBudget > 0 ? (institutionalBudgetSpent / institutionalTotalBudget) * 100 : 0;
+  }, [contextBudgetUtilization, institutionalTotalBudget, institutionalBudgetSpent]);
+
+  const institutionalTotalIncome = useMemo(() => {
+    if (contextTotalIncome !== undefined && contextTotalIncome > 0) return contextTotalIncome;
+    return calculateTotalIncome(transactions);
+  }, [contextTotalIncome, transactions]);
+
+  const institutionalTotalExpenses = useMemo(() => {
+    if (contextTotalExpenses !== undefined && contextTotalExpenses > 0) return contextTotalExpenses;
+    return calculateTotalExpenses(transactions);
+  }, [contextTotalExpenses, transactions]);
+
+  const institutionalNetCash = useMemo(() => {
+    if (contextNetBalance !== undefined) return contextNetBalance;
+    return institutionalTotalIncome - institutionalTotalExpenses;
+  }, [contextNetBalance, institutionalTotalIncome, institutionalTotalExpenses]);
+
+  const institutionalUnallocated = useMemo(() => {
+    return Math.max(0, institutionalNetCash - institutionalTotalBudget);
+  }, [institutionalNetCash, institutionalTotalBudget]);
+
+  const totalAllocatedBudget = institutionalTotalBudget;
 
   // Authoritative real calculation for the displayed scope
   const displayedTxIncome = useMemo(() => calculateTotalIncome(displayedTxs), [displayedTxs]);
@@ -187,10 +229,6 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
 
   const displayedExpense = useMemo(() => calculateTotalExpenses(displayedTxs), [displayedTxs]);
   const displayedNet = displayedIncome - displayedExpense;
-
-  // Core financial metrics (Harmonized with Authoritative Financial Flow)
-  const unallocatedFunds = calculateUnallocatedFunds(displayedIncome, totalAllocatedBudget);
-  const authoritativeNetBalance = displayedNet;
 
   // Real operating surplus margin
   const profitMargin = displayedIncome > 0
@@ -227,25 +265,27 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
     return Array.from(map.values());
   }, [budgets]);
 
-  // Raw budget spent matching explicitly assigned budget line-items
+  // Raw budget spent matching explicitly assigned budget line-items + departments
   const rawBudgetSpent = useMemo(() => {
-    return calculateBudgetUsed(displayedTxs, budgets);
-  }, [displayedTxs, budgets]);
+    return calculateBudgetUsed(displayedTxs, budgets, undefined, departments);
+  }, [displayedTxs, budgets, departments]);
 
-  // Authoritative displayed budget spent: strictly uses actual budget disbursements
+  // Authoritative displayed budget spent: when inspecting a single month/point, shows that point's budget spend; otherwise shows total institutional spend
   const displayedBudgetSpent = useMemo(() => {
-    if (rawBudgetSpent > 0) return rawBudgetSpent;
-    if (contextBudgetSpent !== undefined && contextBudgetSpent > 0 && displayedTxs.length === transactions.length) {
-      return contextBudgetSpent;
-    }
-    return 0;
-  }, [rawBudgetSpent, contextBudgetSpent, displayedTxs.length, transactions.length]);
+    if (selectedPoint) return rawBudgetSpent;
+    return institutionalBudgetSpent;
+  }, [selectedPoint, rawBudgetSpent, institutionalBudgetSpent]);
 
   const displayedBudgetRemaining = useMemo(() => {
-    return calculateBudgetRemaining(totalAllocatedBudget, displayedBudgetSpent);
-  }, [totalAllocatedBudget, displayedBudgetSpent]);
+    if (selectedPoint) {
+      return calculateBudgetRemaining(institutionalTotalBudget, displayedBudgetSpent);
+    }
+    return institutionalBudgetRemaining;
+  }, [selectedPoint, institutionalTotalBudget, displayedBudgetSpent, institutionalBudgetRemaining]);
 
-  const displayedBudgetUtil = totalAllocatedBudget > 0 ? (displayedBudgetSpent / totalAllocatedBudget) * 100 : 0;
+  const displayedBudgetUtil = institutionalTotalBudget > 0 ? (displayedBudgetSpent / institutionalTotalBudget) * 100 : 0;
+  const authoritativeNetBalance = selectedPoint ? displayedNet : institutionalNetCash;
+  const unallocatedFunds = institutionalUnallocated;
 
   // Transaction Metrics computed strictly from displayed transactions
   const txStats = useMemo(() => {
@@ -309,10 +349,11 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
   }, [displayedTxs]);
 
   // Budget bar items computed from displayed transactions and consolidated budgets, sorted with active spending first
-  const budgetItems = useMemo(() =>
-    consolidatedBudgets
+  const budgetItems = useMemo(() => {
+    const targetTxs = selectedPoint ? displayedTxs : (displayedTxs.length > 0 ? displayedTxs : transactions);
+    return consolidatedBudgets
       .map((b) => {
-        const spent = displayedTxs
+        const spent = targetTxs
           .filter(
             (t) =>
               t.type === "expense" &&
@@ -334,8 +375,8 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
           sublabel: `Budget: ${settings.currency} ${fmt(b.allocated)}`,
         };
       })
-      .sort((a, b) => b.value - a.value || (a.label || "").localeCompare(b.label || "")),
-  [consolidatedBudgets, displayedTxs, settings.currency]);
+      .sort((a, b) => b.value - a.value || (a.label || "").localeCompare(b.label || ""));
+  }, [consolidatedBudgets, selectedPoint, displayedTxs, transactions, settings.currency]);
 
   // Dynamic growth metrics computed strictly from current vs baseline active points
   const { periodGrowth, periodGrowthLabel } = useMemo(() => {
@@ -477,52 +518,44 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
             <View style={[styles.healthStats, isMobile && { justifyContent: "center" }]}>
               {[
                 {
-                  label: "Net Cash",
-                  value: displayedTxs.length > 0 || authoritativeNetBalance !== 0
-                    ? `${authoritativeNetBalance >= 0 ? "+" : "-"}${settings.currency} ${fmt(Math.abs(authoritativeNetBalance))}`
-                    : `${settings.currency} 0`,
-                  color: authoritativeNetBalance >= 0 ? "#10B981" : "#F43F5E",
+                  label: "Allocated Budget",
+                  value: `${settings.currency} ${fmt(institutionalTotalBudget)}`,
+                  color: "#38BDF8",
                 },
                 {
-                  label: "Profit Margin",
-                  value: (displayedIncome > 0 || displayedExpense > 0)
-                    ? `${profitMargin >= 0 ? "+" : ""}${profitMargin.toFixed(1)}%`
-                    : "N/A",
-                  color: (displayedIncome > 0 || displayedExpense > 0)
-                    ? (profitMargin > 10 ? "#10B981" : profitMargin >= 0 ? "#38BDF8" : "#F43F5E")
-                    : "#94A3B8",
+                  label: "Budget Spent",
+                  value: `${settings.currency} ${fmt(institutionalBudgetSpent)}`,
+                  color: "#F43F5E",
+                },
+                {
+                  label: "Remaining Budget",
+                  value: `${settings.currency} ${fmt(institutionalBudgetRemaining)}`,
+                  color: institutionalBudgetRemaining > 0 ? "#10B981" : "#F43F5E",
                 },
                 {
                   label: "Budget Used",
-                  value: totalAllocatedBudget > 0
-                    ? `${displayedBudgetUtil < 10 && displayedBudgetUtil > 0 ? displayedBudgetUtil.toFixed(1) : displayedBudgetUtil.toFixed(0)}%`
-                    : "N/A",
-                  color: totalAllocatedBudget > 0
-                    ? (displayedBudgetUtil <= 75 ? "#10B981" : displayedBudgetUtil <= 100 ? "#F59E0B" : "#F43F5E")
+                  value: institutionalTotalBudget > 0
+                    ? `${institutionalBudgetUtil < 10 && institutionalBudgetUtil > 0 ? institutionalBudgetUtil.toFixed(1) : institutionalBudgetUtil.toFixed(0)}%`
+                    : "0%",
+                  color: institutionalTotalBudget > 0
+                    ? (institutionalBudgetUtil <= 75 ? "#10B981" : institutionalBudgetUtil <= 100 ? "#F59E0B" : "#F43F5E")
                     : "#94A3B8",
                 },
-                hasMoMComparison
-                  ? {
-                      label: "MoM Growth",
-                      value: `${incomeGrowth >= 0 ? "+" : ""}${incomeGrowth.toFixed(1)}%`,
-                      color: incomeGrowth >= 0 ? "#10B981" : "#F43F5E",
-                    }
-                  : {
-                      label: totalAllocatedBudget > 0 ? "Unallocated" : "Burn Rate",
-                      value: totalAllocatedBudget > 0
-                        ? `${settings.currency} ${fmt(unallocatedFunds)}`
-                        : (displayedIncome > 0 || displayedExpense > 0)
-                        ? `${expenseRatio.toFixed(1)}%`
-                        : "N/A",
-                      color: totalAllocatedBudget > 0
-                        ? (unallocatedFunds > 0 ? "#10B981" : "#F59E0B")
-                        : (displayedIncome > 0 || displayedExpense > 0)
-                        ? (expenseRatio <= 65 ? "#10B981" : expenseRatio <= 85 ? "#F59E0B" : "#F43F5E")
-                        : "#94A3B8",
-                    },
+                {
+                  label: "Net Cash",
+                  value: `${institutionalNetCash >= 0 ? "+" : "-"}${settings.currency} ${fmt(Math.abs(institutionalNetCash))}`,
+                  color: institutionalNetCash >= 0 ? "#10B981" : "#F43F5E",
+                },
+                {
+                  label: "Unallocated",
+                  value: `${settings.currency} ${fmt(institutionalUnallocated)}`,
+                  color: institutionalUnallocated > 0 ? "#10B981" : "#F59E0B",
+                },
               ].map((s, i) => (
                 <View key={i} style={[styles.healthStat, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                  <Text style={[styles.healthStatValue, { color: s.color }]}>{s.value}</Text>
+                  <Text style={[styles.healthStatValue, { color: s.color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                    {s.value}
+                  </Text>
                   <Text style={[styles.healthStatLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
                 </View>
               ))}
@@ -636,6 +669,47 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
             </Text>
           </View>
         </View>
+
+        {/* Prominent Point Inspection Banner with 1-click Reset */}
+        {selectedPoint && (
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              backgroundColor: colors.primary + "15",
+              borderColor: colors.primary + "44",
+              borderWidth: 1,
+              borderRadius: 10,
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              marginBottom: 8,
+              gap: 10,
+              flexWrap: "wrap",
+            }}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1, minWidth: 200 }}>
+              <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>
+                Inspecting <Text style={{ fontFamily: "Inter_700Bold", color: colors.primary }}>{selectedPoint.fullDate || selectedPoint.label}</Text>:
+              </Text>
+              <Text style={{ fontSize: 11.5, color: colors.mutedForeground }}>
+                Income {settings.currency} {fmt(displayedIncome)} · Expenses {settings.currency} {fmt(displayedExpense)} · Net {displayedNet >= 0 ? "+" : ""}{settings.currency} {fmt(displayedNet)}
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => setSelectedPoint(null)}
+              style={{
+                backgroundColor: colors.primary,
+                paddingHorizontal: 12,
+                paddingVertical: 5,
+                borderRadius: 12,
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={{ color: "#FFFFFF", fontSize: 11, fontFamily: "Inter_700Bold" }}>Clear Filter ✕</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         <AreaLineChart
           data={chartPoints}
@@ -949,9 +1023,9 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
           {/* Budget progress summary */}
           <View style={[styles.budgetSummaryRow, { marginTop: 14 }]}>
             {[
-              { label: "Total Allocated", value: `${settings.currency} ${fmt(totalAllocatedBudget)}`, color: colors.primary },
-              { label: "Total Spent", value: `${settings.currency} ${fmt(displayedBudgetSpent)}`, color: colors.expense },
-              { label: "Remaining", value: `${settings.currency} ${fmt(Math.max(totalAllocatedBudget - displayedBudgetSpent, 0))}`, color: colors.income },
+              { label: "Total Allocated", value: `${settings.currency} ${fmt(institutionalTotalBudget)}`, color: colors.primary },
+              { label: selectedPoint ? `${selectedPoint.label} Spent` : "Total Spent", value: `${settings.currency} ${fmt(displayedBudgetSpent)}`, color: colors.expense },
+              { label: "Remaining", value: `${settings.currency} ${fmt(displayedBudgetRemaining)}`, color: colors.income },
             ].map((s, i) => (
               <View key={i} style={[styles.budgetSumCard, { backgroundColor: s.color + "15", borderColor: s.color + "33" }]}>
                 <Text style={[styles.budgetSumValue, { color: s.color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{s.value}</Text>
@@ -1292,11 +1366,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   healthStat: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 11,
     paddingVertical: 8,
     borderRadius: 10,
     borderWidth: 1,
-    minWidth: 110,
+    minWidth: 102,
+    flexGrow: 1,
   },
   healthStatValue: {
     fontSize: 13,

@@ -134,7 +134,7 @@ export function WebDashboard({
   // Section 8 & Master Calculation Engine: Available to Allocate is strictly gated by Available Net Cash!
   const unspentBudgetCommitments = Math.max(0, totalAllocatedBudget - totalBudgetSpent);
   const unallocatedRevFunds = Math.max(0, totalIncome - totalAllocatedBudget);
-  const availableToAllocate = Math.max(0, Math.min(unallocatedRevFunds, netCash - unspentBudgetCommitments));
+  const availableToAllocate = Math.max(0, netCash - totalAllocatedBudget);
   const unallocatedFunds = availableToAllocate;
 
   // 1. Kitni Income Retain: percentage of actual income retained after operating expenses
@@ -562,7 +562,7 @@ export function WebDashboard({
               numberOfLines={1}
             >
               {totalAllocatedBudget > 0
-                ? (isMobile ? `Remaining: ${settings.currency} ${fmt(netBudgetRemaining)} (${budgetUsedPct}%)` : `Remaining Budget: ${settings.currency} ${fmt(netBudgetRemaining)} (${budgetUsedPct}% Spent)`)
+                ? (isMobile ? `Remaining: ${settings.currency} ${fmt(netBudgetRemaining)} (${budgetUsedPct}%)` : `Allocated: ${settings.currency} ${fmt(totalAllocatedBudget)} · Remaining Budget: ${settings.currency} ${fmt(netBudgetRemaining)} (${budgetUsedPct}% Spent)`)
                 : isDeficit
                 ? (isMobile ? `Deficit (-${settings.currency} ${fmt(totalExpenses - totalIncome)})` : `Operating Deficit (-${settings.currency} ${fmt(totalExpenses - totalIncome)})`)
                 : `${incomeRetainedPct}% Retained`}

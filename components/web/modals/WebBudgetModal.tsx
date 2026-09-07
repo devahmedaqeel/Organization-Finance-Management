@@ -257,17 +257,17 @@ export function WebBudgetModal({ visible, onClose, budgetToEdit, initialDepartme
               ]}
             >
               <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                <Text style={[styles.netCashBannerTitle, { color: netCash <= 0 ? "#EF4444" : "#10B981" }]}>
-                  {netCash <= 0 ? "⚠️ AVAILABLE NET CASH: INSUFFICIENT" : "✓ AVAILABLE NET CASH"}
+                <Text style={[styles.netCashBannerTitle, { color: unallocatedNetCash <= 0 ? "#EF4444" : "#10B981" }]}>
+                  {unallocatedNetCash <= 0 ? "⚠️ NO UNALLOCATED CASH AVAILABLE" : "✓ AVAILABLE TO ALLOCATE"}
                 </Text>
-                <Text style={[styles.netCashBannerAmount, { color: netCash <= 0 ? "#EF4444" : "#10B981" }]}>
-                  {settings.currency || "PKR"} {netCash.toLocaleString()}
+                <Text style={[styles.netCashBannerAmount, { color: unallocatedNetCash <= 0 ? "#EF4444" : "#10B981" }]}>
+                  {settings.currency || "PKR"} {unallocatedNetCash.toLocaleString()}
                 </Text>
               </View>
               <Text style={[styles.netCashBannerSub, { color: colors.mutedForeground }]}>
-                {netCash <= 0
-                  ? "Department budget can only be allocated if there is balance in Available Net Cash. Please record income first."
-                  : `Remaining unallocated net cash: ${settings.currency || "PKR"} ${unallocatedNetCash.toLocaleString()}`}
+                {unallocatedNetCash <= 0
+                  ? `Total Net Cash is ${settings.currency || "PKR"} ${netCash.toLocaleString()}, all of which is already committed to existing budgets.`
+                  : `Total Net Cash: ${settings.currency || "PKR"} ${netCash.toLocaleString()} · Already Allocated: ${settings.currency || "PKR"} ${Math.max(0, netCash - unallocatedNetCash).toLocaleString()}`}
               </Text>
             </View>
 

@@ -115,9 +115,8 @@ export default function BudgetScreen() {
   }, [transactions]);
 
   const availableToAllocate = useMemo(() => {
-    const unspentBudgetCommitments = Math.max(0, totalAllocatedBudget - totalBudgetSpent);
-    return Math.max(0, Math.min(unallocatedFunds, netCash - unspentBudgetCommitments));
-  }, [unallocatedFunds, netCash, totalAllocatedBudget, totalBudgetSpent]);
+    return Math.max(0, netCash - totalAllocatedBudget);
+  }, [netCash, totalAllocatedBudget]);
 
   const unallocatedNetCash = availableToAllocate;
 
@@ -681,8 +680,8 @@ export default function BudgetScreen() {
               {/* Available Net Cash Status Banner */}
               <View
                 style={{
-                  backgroundColor: netCash <= 0 ? "#EF444415" : "#10B98115",
-                  borderColor: netCash <= 0 ? "#EF444440" : "#10B98140",
+                  backgroundColor: unallocatedNetCash <= 0 ? "#EF444415" : "#10B98115",
+                  borderColor: unallocatedNetCash <= 0 ? "#EF444440" : "#10B98140",
                   borderWidth: 1,
                   borderRadius: 10,
                   padding: 10,
@@ -691,17 +690,17 @@ export default function BudgetScreen() {
                 }}
               >
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                  <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: netCash <= 0 ? "#EF4444" : "#10B981" }}>
-                    {netCash <= 0 ? "⚠️ INSUFFICIENT NET CASH" : "✓ AVAILABLE NET CASH"}
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: unallocatedNetCash <= 0 ? "#EF4444" : "#10B981" }}>
+                    {unallocatedNetCash <= 0 ? "⚠️ NO UNALLOCATED CASH AVAILABLE" : "✓ AVAILABLE TO ALLOCATE"}
                   </Text>
-                  <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: netCash <= 0 ? "#EF4444" : "#10B981" }}>
-                    {settings.currency || "PKR"} {netCash.toLocaleString()}
+                  <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: unallocatedNetCash <= 0 ? "#EF4444" : "#10B981" }}>
+                    {settings.currency || "PKR"} {unallocatedNetCash.toLocaleString()}
                   </Text>
                 </View>
                 <Text style={{ fontSize: 10.5, color: colors.mutedForeground, marginTop: 2 }}>
-                  {netCash <= 0
-                    ? "Department budget can only be allocated if there is balance in Available Net Cash."
-                    : `Remaining unallocated net cash: ${settings.currency || "PKR"} ${unallocatedNetCash.toLocaleString()}`}
+                  {unallocatedNetCash <= 0
+                    ? `Total Net Cash is ${settings.currency || "PKR"} ${netCash.toLocaleString()}, all of which is already committed to existing budgets.`
+                    : `Total Net Cash: ${settings.currency || "PKR"} ${netCash.toLocaleString()} · Already Allocated: ${settings.currency || "PKR"} ${totalAllocatedBudget.toLocaleString()}`}
                 </Text>
               </View>
 

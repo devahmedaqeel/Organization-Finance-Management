@@ -25,6 +25,7 @@ import { useFinance, Department } from "@/context/FinanceContext";
 import {
   calculateTotalIncome,
   calculateTotalExpenses,
+  calculateBudgetAllocation,
   validateBudgetAllocationAgainstNetCash,
 } from "@/services/FinancialCalculationEngine";
 import { useColors } from "@/hooks/useColors";
@@ -48,8 +49,20 @@ export default function DepartmentsScreen() {
     [transactions]
   );
 
-  const [modalVisible, setModalVisible] = useState(false);
   const [editingDept, setEditingDept] = useState<Department | null>(null);
+
+  const maxAvailableForDept = useMemo(() => {
+    const editingId = editingDept?.id;
+    const otherDepts = (departments || []).filter((d) => !editingId || d.id !== editingId);
+    const otherBudgets = (budgets || []).filter((b) => {
+      if (!editingDept?.name) return true;
+      return (b.department || "").trim().toLowerCase() !== editingDept.name.trim().toLowerCase();
+    });
+    const baselineAllocation = calculateBudgetAllocation(otherBudgets, otherDepts);
+    return Math.max(0, netCash - baselineAllocation);
+  }, [editingDept, departments, budgets, netCash]);
+
+  const [modalVisible, setModalVisible] = useState(false);
   const [staffModalVisible, setStaffModalVisible] = useState(false);
   const [staffModalDept, setStaffModalDept] = useState<Department | null>(null);
   const [deptToDelete, setDeptToDelete] = useState<{ id: string; name: string; headCount?: number; budgetAllocated?: number } | null>(null);
@@ -574,11 +587,19 @@ export default function DepartmentsScreen() {
                     onChangeText={f.onChange}
                   />
                   {f.label.startsWith("BUDGET ALLOCATED") && (
-                    <Text style={{ fontSize: 10.5, color: netCash <= 0 ? "#EF4444" : colors.mutedForeground, marginTop: 4 }}>
-                      {netCash <= 0
-                        ? `⚠️ Available Net Cash: ${settings.currency} ${netCash.toLocaleString()} (No budget can be allocated)`
-                        : `Available Net Cash: ${settings.currency} ${netCash.toLocaleString()}`}
-                    </Text>
+                    <View style={{ marginTop: 5, padding: 8, borderRadius: 8, backgroundColor: maxAvailableForDept <= 0 ? "#EF444415" : "#10B98115", borderWidth: 1, borderColor: maxAvailableForDept <= 0 ? "#EF444433" : "#10B98133", gap: 3 }}>
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                        <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: maxAvailableForDept <= 0 ? "#EF4444" : "#10B981" }}>
+                          {maxAvailableForDept <= 0 ? "⚠️ NO BUDGET AVAILABLE" : "✓ AVAILABLE TO ALLOCATE"}
+                        </Text>
+                        <Text style={{ fontSize: 12, fontFamily: "Inter_800ExtraBold", color: maxAvailableForDept <= 0 ? "#EF4444" : "#10B981" }}>
+                          {settings.currency} {maxAvailableForDept.toLocaleString()}
+                        </Text>
+                      </View>
+                      <Text style={{ fontSize: 10, color: colors.mutedForeground }}>
+                        Total Net Cash: {settings.currency} {netCash.toLocaleString()} · Other Units: {settings.currency} {Math.max(0, netCash - maxAvailableForDept).toLocaleString()}
+                      </Text>
+                    </View>
                   )}
                 </View>
               ))}
