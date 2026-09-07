@@ -28,6 +28,7 @@ import {
   buildAuthoritativeFinancialModel,
   calculateBudgetAllocation,
   calculateUnallocatedFunds,
+  calculateDepartmentMetrics,
 } from "@/services/FinancialCalculationEngine";
 import { FinancialAnalyticsSuite } from "@/components/analytics/FinancialAnalyticsSuite";
 import {
@@ -108,9 +109,11 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
       transactions,
       budgets,
       activePeriod,
-      settings.currency
+      settings.currency,
+      undefined,
+      departments
     );
-  }, [transactions, budgets, activePeriod, settings.currency]);
+  }, [transactions, budgets, activePeriod, settings.currency, departments]);
 
   // Authoritative Capital Pool & Unified Surplus
   const totalBudgetAllocated = useMemo(() => {
@@ -171,22 +174,42 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
     }));
   }, [expenseByCat, colors]);
 
-  // Department matrix in period
+  // Authoritative Department matrix in period using single calculation engine
   const deptMatrix = useMemo(() => {
-    return (departments || []).map((d) => {
-      const actualSpend = (periodTransactions || [])
-        .filter((t) => t && t.type === "expense" && t.department?.trim().toLowerCase() === d.name?.trim().toLowerCase())
-        .reduce((sum, t) => sum + (t.amount || 0), 0);
+    return calculateDepartmentMetrics(departments, transactions, activePeriod, budgets);
+  }, [departments, transactions, activePeriod, budgets]);
 
-      const ratio = d.budgetAllocated > 0 ? (actualSpend / d.budgetAllocated) * 100 : 0;
-      return {
-        ...d,
-        actualSpend,
-        ratio,
-        remaining: d.budgetAllocated - actualSpend,
-      };
+  // Scoped Payroll strictly respecting active period
+  const scopedPayroll = useMemo(() => {
+    return (payroll || []).filter((p) => {
+      if (!p) return false;
+      if (activePeriod.presetId === "all_time") return true;
+      if (!p.month) return true;
+      const pMonth = p.month.slice(0, 7);
+      const startMonth = (activePeriod.startDate || "").slice(0, 7);
+      const endMonth = (activePeriod.endDate || "").slice(0, 7);
+      if (startMonth && pMonth < startMonth) return false;
+      if (endMonth && pMonth > endMonth) return false;
+      return true;
     });
-  }, [departments, periodTransactions]);
+  }, [payroll, activePeriod]);
+
+  const payrollTotals = useMemo(() => {
+    const totalDisbursed = scopedPayroll.reduce((s, p) => {
+      const net = p.netSalary !== undefined ? p.netSalary : (p.baseSalary || 0) + (p.bonus || 0) - (p.deductions || 0);
+      return s + (Number(net) || 0);
+    }, 0);
+    const totalBase = scopedPayroll.reduce((s, p) => s + (Number(p.baseSalary) || 0), 0);
+    const totalBonus = scopedPayroll.reduce((s, p) => s + (Number(p.bonus) || 0), 0);
+    const totalDeductions = scopedPayroll.reduce((s, p) => s + (Number(p.deductions) || 0), 0);
+    return {
+      totalDisbursed,
+      totalBase,
+      totalBonus,
+      totalDeductions,
+      count: scopedPayroll.length,
+    };
+  }, [scopedPayroll]);
 
   const [exportModalVisible, setExportModalVisible] = useState(false);
   const [dossierViewerVisible, setDossierViewerVisible] = useState(false);
@@ -410,8 +433,8 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
       <View style={styles.metricsGrid}>
         <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 180 }]}>
           <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>PERIOD REVENUE (INFLOWS)</Text>
-          <Text style={[styles.metricValue, { color: colors.income }]}>
-            +{settings.currency} {fmtShort(metrics.totalIncome)}
+          <Text style={[styles.metricValue, { color: colors.income }]} numberOfLines={1}>
+            +{settings.currency} {fmt(metrics.totalIncome)}
           </Text>
           <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
             {incomeByCat.length} Revenue Streams
@@ -420,8 +443,8 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
 
         <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 180 }]}>
           <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>PERIOD EXPENDITURE (OUTFLOWS)</Text>
-          <Text style={[styles.metricValue, { color: colors.expense }]}>
-            -{settings.currency} {fmtShort(metrics.totalExpense)}
+          <Text style={[styles.metricValue, { color: colors.expense }]} numberOfLines={1}>
+            -{settings.currency} {fmt(metrics.totalExpense)}
           </Text>
           <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
             {totalBudgetAllocated > 0
@@ -434,19 +457,19 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
           <>
             <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 180 }]}>
               <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>DEPARTMENT BUDGET</Text>
-              <Text style={[styles.metricValue, { color: colors.primary }]}>
-                {settings.currency} {fmtShort(totalBudgetAllocated)}
+              <Text style={[styles.metricValue, { color: colors.primary }]} numberOfLines={1}>
+                {settings.currency} {fmt(totalBudgetAllocated)}
               </Text>
               <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
-                {settings.currency} {fmtShort(unallocatedFunds)} Unallocated Funds
+                {settings.currency} {fmt(unallocatedFunds)} Unallocated Funds
               </Text>
             </View>
 
             <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 180 }]}>
               <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>NET CASH POSITION</Text>
-              <Text style={[styles.metricValue, { color: netCapitalSurplus >= 0 ? colors.income : colors.expense }]}>
+              <Text style={[styles.metricValue, { color: netCapitalSurplus >= 0 ? colors.income : colors.expense }]} numberOfLines={1}>
                 {netCapitalSurplus >= 0 ? "+" : "-"}
-                {settings.currency} {fmtShort(Math.abs(netCapitalSurplus))}
+                {settings.currency} {fmt(Math.abs(netCapitalSurplus))}
               </Text>
               <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
                 {retainedCapitalPct.toFixed(1)}% Income Retained
@@ -456,9 +479,9 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
         ) : (
           <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 180 }]}>
             <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>NET OPERATING SURPLUS</Text>
-            <Text style={[styles.metricValue, { color: metrics.netBalance >= 0 ? colors.income : colors.expense }]}>
+            <Text style={[styles.metricValue, { color: metrics.netBalance >= 0 ? colors.income : colors.expense }]} numberOfLines={1}>
               {metrics.netBalance >= 0 ? "+" : "-"}
-              {settings.currency} {fmtShort(Math.abs(metrics.netBalance))}
+              {settings.currency} {fmt(Math.abs(metrics.netBalance))}
             </Text>
             <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
               {metrics.totalIncome > 0 ? `${((metrics.netBalance / metrics.totalIncome) * 100).toFixed(1)}% Net Margin` : "Operating Surplus"}
@@ -704,7 +727,7 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
               <View>
                 <Text style={[styles.panelTitle, { color: colors.foreground }]}>Department Spending Audit</Text>
                 <Text style={[styles.panelSubtitle, { color: colors.mutedForeground }]}>
-                  Actual spend against allocated budget ceilings
+                  Actual spend against allocated budget ceilings ({activePeriod.label})
                 </Text>
               </View>
             </View>
@@ -717,35 +740,62 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
               </View>
             ) : (
               <View style={{ gap: 12 }}>
-                {deptMatrix.map((dept) => (
-                  <View key={dept.id} style={[styles.deptAuditCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                      <Text style={[styles.deptAuditName, { color: colors.foreground }]}>{dept.name}</Text>
-                      <Text style={[styles.deptAuditRatio, { color: dept.ratio > 100 ? colors.expense : dept.ratio > 80 ? colors.warning : colors.income }]}>
-                        {dept.ratio.toFixed(1)}% Used
-                      </Text>
+                {deptMatrix.map((dept) => {
+                  const isOver = dept.spent > dept.allocated && dept.allocated > 0;
+                  const isWarning = dept.utilizationPct >= 80 && !isOver;
+                  const statusColor = isOver ? colors.expense : isWarning ? colors.warning : colors.income;
+                  return (
+                    <View key={dept.id} style={[styles.deptAuditCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                          <Text style={[styles.deptAuditName, { color: colors.foreground }]}>{dept.name}</Text>
+                          <View style={[styles.deptBadge, { backgroundColor: statusColor + "18" }]}>
+                            <Text style={[styles.deptBadgeText, { color: statusColor }]}>
+                              {dept.allocated <= 0
+                                ? "NO BUDGET"
+                                : isOver
+                                ? "OVER BUDGET"
+                                : isWarning
+                                ? "NEAR CEILING"
+                                : "WITHIN BUDGET"}
+                            </Text>
+                          </View>
+                        </View>
+                        <Text style={[styles.deptAuditRatio, { color: statusColor }]}>
+                          {dept.allocated > 0 ? `${dept.utilizationPct.toFixed(1)}% Used` : "N/A"}
+                        </Text>
+                      </View>
+                      <View style={[styles.deptTrack, { backgroundColor: colors.border, marginTop: 6 }]}>
+                        <View
+                          style={[
+                            styles.deptFill,
+                            {
+                              width: `${Math.min(Math.round(dept.utilizationPct), 100)}%`,
+                              backgroundColor: statusColor,
+                            },
+                          ]}
+                        />
+                      </View>
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+                        <Text style={{ fontSize: 11.5, color: colors.mutedForeground }}>
+                          Allocated: <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold" }}>{settings.currency} {fmt(dept.allocated)}</Text>
+                        </Text>
+                        <Text style={{ fontSize: 11.5, color: colors.mutedForeground }}>
+                          Period Spend: <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold" }}>{settings.currency} {fmt(dept.spent)}</Text>
+                        </Text>
+                        <Text style={{ fontSize: 11.5, color: colors.mutedForeground }}>
+                          Payroll Spend: <Text style={{ color: "#8B5CF6", fontFamily: "Inter_600SemiBold" }}>{settings.currency} {fmt(dept.payrollSpending)}</Text>
+                        </Text>
+                        <Text style={{ fontSize: 11.5, color: colors.mutedForeground }}>
+                          Other Spend: <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_600SemiBold" }}>{settings.currency} {fmt(dept.otherSpending)}</Text>
+                        </Text>
+                        <Text style={{ fontSize: 11.5, color: colors.mutedForeground }}>
+                          Remaining: <Text style={{ color: dept.remaining > 0 ? colors.income : colors.expense, fontFamily: "Inter_700Bold" }}>{settings.currency} {fmt(dept.remaining)}</Text>
+                        </Text>
+                      </View>
                     </View>
-                    <View style={[styles.deptTrack, { backgroundColor: colors.border, marginTop: 4 }]}>
-                      <View
-                        style={[
-                          styles.deptFill,
-                          {
-                            width: `${Math.min(Math.round(dept.ratio), 100)}%`,
-                            backgroundColor: dept.ratio > 100 ? colors.expense : dept.ratio > 80 ? colors.warning : colors.income,
-                          },
-                        ]}
-                      />
-                    </View>
-                    <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 4 }}>
-                      <Text style={{ fontSize: 11.5, color: colors.mutedForeground }}>
-                        Spent: {settings.currency} {dept.actualSpend.toLocaleString()}
-                      </Text>
-                      <Text style={{ fontSize: 11.5, color: colors.mutedForeground }}>
-                        Budget: {settings.currency} {dept.budgetAllocated.toLocaleString()}
-                      </Text>
-                    </View>
-                  </View>
-                ))}
+                  );
+                })}
               </View>
             )}
           </View>
@@ -759,31 +809,77 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
               <View>
                 <Text style={[styles.panelTitle, { color: colors.foreground }]}>Institutional Payroll Disbursals</Text>
                 <Text style={[styles.panelSubtitle, { color: colors.mutedForeground }]}>
-                  Monthly staff compensation breakdown
+                  Monthly staff compensation breakdown ({activePeriod.label})
                 </Text>
               </View>
             </View>
 
-            {payroll.length === 0 ? (
+            {/* Payroll Summary Strip */}
+            <View style={[styles.payrollSummaryStrip, { backgroundColor: colors.background, borderColor: colors.border }]}>
+              <View style={styles.payrollSummaryItem}>
+                <Text style={[styles.payrollSummaryLabel, { color: colors.mutedForeground }]}>TOTAL DISBURSED</Text>
+                <Text style={[styles.payrollSummaryValue, { color: "#8B5CF6" }]}>
+                  {settings.currency} {fmt(payrollTotals.totalDisbursed)}
+                </Text>
+              </View>
+              <View style={styles.payrollSummaryItem}>
+                <Text style={[styles.payrollSummaryLabel, { color: colors.mutedForeground }]}>BASE SALARIES</Text>
+                <Text style={[styles.payrollSummaryValue, { color: colors.foreground }]}>
+                  {settings.currency} {fmt(payrollTotals.totalBase)}
+                </Text>
+              </View>
+              <View style={styles.payrollSummaryItem}>
+                <Text style={[styles.payrollSummaryLabel, { color: colors.mutedForeground }]}>BONUSES & ALLOWANCES</Text>
+                <Text style={[styles.payrollSummaryValue, { color: colors.income }]}>
+                  +{settings.currency} {fmt(payrollTotals.totalBonus)}
+                </Text>
+              </View>
+              <View style={styles.payrollSummaryItem}>
+                <Text style={[styles.payrollSummaryLabel, { color: colors.mutedForeground }]}>TAX & DEDUCTIONS</Text>
+                <Text style={[styles.payrollSummaryValue, { color: colors.expense }]}>
+                  -{settings.currency} {fmt(payrollTotals.totalDeductions)}
+                </Text>
+              </View>
+              <View style={styles.payrollSummaryItem}>
+                <Text style={[styles.payrollSummaryLabel, { color: colors.mutedForeground }]}>STAFF PAID</Text>
+                <Text style={[styles.payrollSummaryValue, { color: "#0EA5E9" }]}>
+                  {payrollTotals.count} Personnel
+                </Text>
+              </View>
+            </View>
+
+            {scopedPayroll.length === 0 ? (
               <View style={{ padding: 24, alignItems: "center", justifyContent: "center" }}>
                 <Text style={{ color: colors.mutedForeground, fontSize: 13, fontFamily: "Inter_500Medium" }}>
-                  No staff payroll disbursals recorded for this period.
+                  No staff payroll disbursals recorded for {activePeriod.label}.
                 </Text>
               </View>
             ) : (
               <View style={{ gap: 10 }}>
-                {payroll.map((p) => {
+                {scopedPayroll.map((p) => {
                   const net = p.netSalary !== undefined ? p.netSalary : (p.baseSalary || 0) + (p.bonus || 0) - (p.deductions || 0);
                   return (
                     <View key={p.id} style={[styles.deptAuditCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
                       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                        <View>
-                          <Text style={[styles.deptAuditName, { color: colors.foreground }]}>{p.employeeName}</Text>
-                          <Text style={{ fontSize: 11.5, color: colors.mutedForeground }}>{p.employeeId} · {p.department}</Text>
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                            <Text style={[styles.deptAuditName, { color: colors.foreground }]}>{p.employeeName}</Text>
+                            <View style={[styles.deptBadge, { backgroundColor: "#0EA5E918" }]}>
+                              <Text style={[styles.deptBadgeText, { color: "#0EA5E9" }]}>{p.department || "General"}</Text>
+                            </View>
+                          </View>
+                          <Text style={{ fontSize: 11.5, color: colors.mutedForeground, marginTop: 2 }}>
+                            {p.employeeId} · {p.designation || "Staff Member"} {p.month ? `· Month: ${p.month}` : ""}
+                          </Text>
                         </View>
-                        <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: "#8B5CF6" }}>
-                          {settings.currency} {net.toLocaleString()}
-                        </Text>
+                        <View style={{ alignItems: "flex-end" }}>
+                          <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: "#8B5CF6" }}>
+                            {settings.currency} {fmt(net)}
+                          </Text>
+                          <Text style={{ fontSize: 10.5, color: colors.mutedForeground }}>
+                            Base: {settings.currency} {fmt(p.baseSalary || 0)} | Bonus: +{fmt(p.bonus || 0)} | Ded: -{fmt(p.deductions || 0)}
+                          </Text>
+                        </View>
                       </View>
                     </View>
                   );
@@ -1338,6 +1434,38 @@ const styles = StyleSheet.create({
   deptFill: {
     height: "100%",
     borderRadius: 3,
+  },
+  deptBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  deptBadgeText: {
+    fontSize: 9.5,
+    fontFamily: "Inter_700Bold",
+  },
+  payrollSummaryStrip: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 8,
+  },
+  payrollSummaryItem: {
+    flex: 1,
+    minWidth: 120,
+    gap: 2,
+  },
+  payrollSummaryLabel: {
+    fontSize: 9.5,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.5,
+  },
+  payrollSummaryValue: {
+    fontSize: 14,
+    fontFamily: "Inter_800ExtraBold",
   },
   webViewerOverlay: {
     flex: 1,

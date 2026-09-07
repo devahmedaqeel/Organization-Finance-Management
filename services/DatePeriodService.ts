@@ -270,7 +270,7 @@ export function filterTransactionsByPeriod(
   period: NormalizedPeriod
 ): Transaction[] {
   if (!transactions || transactions.length === 0) return [];
-  if (!period || !period.startDate || !period.endDate) {
+  if (!period || !period.startDate || !period.endDate || period.presetId === "all_time") {
     return transactions.filter((t) => {
       if (!t) return false;
       const status = (t as any).status;

@@ -112,9 +112,11 @@ export default function ReportsScreen() {
       transactions,
       budgets,
       activePeriod,
-      settings.currency
+      settings.currency,
+      undefined,
+      departments
     );
-  }, [transactions, budgets, activePeriod, settings.currency]);
+  }, [transactions, budgets, activePeriod, settings.currency, departments]);
 
   // Expense breakdown by Category
   const expenseByCategory = useMemo(() => {
