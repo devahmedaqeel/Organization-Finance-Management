@@ -1055,17 +1055,17 @@ export function WebDashboard({
           <View style={styles.tableContainer}>
             {/* Table Header */}
             <View style={[styles.tableHeaderRow, { borderBottomColor: colors.border, backgroundColor: colors.background }]}>
-              <Text style={[styles.th, { flex: 2, color: colors.mutedForeground }]}>TRANSACTION / MEMO</Text>
-              {!isMobile && <Text style={[styles.th, { flex: 1.2, color: colors.mutedForeground }]}>CATEGORY</Text>}
-              {!isMobile && <Text style={[styles.th, { flex: 1.2, color: colors.mutedForeground }]}>DEPARTMENT</Text>}
-              <Text style={[styles.th, { flex: 1, color: colors.mutedForeground }]}>DATE</Text>
-              <Text style={[styles.th, { flex: 1.2, color: colors.mutedForeground, textAlign: "right" }]}>AMOUNT</Text>
+              <Text style={[styles.th, { flex: isMobile ? 1 : 2.6, paddingRight: 14, color: colors.mutedForeground }]}>TRANSACTION / MEMO</Text>
+              {!isMobile && <Text style={[styles.th, { width: 145, paddingRight: 12, color: colors.mutedForeground }]}>CATEGORY</Text>}
+              {!isMobile && <Text style={[styles.th, { width: 130, paddingRight: 12, color: colors.mutedForeground }]}>DEPARTMENT</Text>}
+              <Text style={[styles.th, { width: isMobile ? 85 : 100, paddingRight: 10, color: colors.mutedForeground }]}>DATE</Text>
+              <Text style={[styles.th, { width: isMobile ? 95 : 120, color: colors.mutedForeground, textAlign: "right" }]}>AMOUNT</Text>
             </View>
 
             {/* Table Rows */}
             {recentTransactions.map((tx) => (
               <View key={tx.id} style={[styles.tableRow, { borderBottomColor: colors.border }]}>
-                <View style={{ flex: 2, flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <View style={{ flex: isMobile ? 1 : 2.6, flexDirection: "row", alignItems: "center", gap: 10, paddingRight: 14 }}>
                   <View
                     style={[
                       styles.txIconBadge,
@@ -1080,8 +1080,8 @@ export function WebDashboard({
                       <SvgArrowDownLeft size={13} color={colors.expense} />
                     )}
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.txDesc, { color: colors.foreground }]} numberOfLines={1}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={[styles.txDesc, { color: colors.foreground }]}>
                       {tx.description || tx.category}
                     </Text>
                     <Text style={[styles.txRef, { color: colors.mutedForeground }]}>
@@ -1091,28 +1091,28 @@ export function WebDashboard({
                 </View>
 
                 {!isMobile && (
-                  <View style={{ flex: 1.2 }}>
-                    <Text style={[styles.tableCellText, { color: colors.foreground }]} numberOfLines={1}>
+                  <View style={{ width: 145, paddingRight: 12, justifyContent: "center" }}>
+                    <Text style={[styles.tableCellText, { color: colors.foreground }]} numberOfLines={2}>
                       {tx.category}
                     </Text>
                   </View>
                 )}
 
                 {!isMobile && (
-                  <View style={{ flex: 1.2 }}>
-                    <Text style={[styles.tableCellText, { color: colors.foreground }]} numberOfLines={1}>
+                  <View style={{ width: 130, paddingRight: 12, justifyContent: "center" }}>
+                    <Text style={[styles.tableCellText, { color: colors.foreground }]} numberOfLines={2}>
                       {tx.department}
                     </Text>
                   </View>
                 )}
 
-                <View style={{ flex: 1 }}>
+                <View style={{ width: isMobile ? 85 : 100, paddingRight: 10, justifyContent: "center" }}>
                   <Text style={[styles.tableCellText, { color: colors.mutedForeground }]}>
                     {tx.date}
                   </Text>
                 </View>
 
-                <View style={{ flex: 1.2, alignItems: "flex-end" }}>
+                <View style={{ width: isMobile ? 95 : 120, alignItems: "flex-end", justifyContent: "center" }}>
                   <Text
                     style={[
                       styles.txAmount,
@@ -1679,6 +1679,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: "Inter_600SemiBold",
     letterSpacing: -0.2,
+    lineHeight: 18,
   },
   txRef: {
     fontSize: 10.5,

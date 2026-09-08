@@ -432,8 +432,8 @@ export function WebTransactions() {
                       </Text>
                     </View>
 
-                    <View style={[styles.tdCol, { flex: 1, minWidth: 120, paddingHorizontal: 6, overflow: "hidden" }]}>
-                      <Text style={[styles.descText, { color: colors.foreground }]} numberOfLines={1}>
+                    <View style={[styles.tdCol, { flex: 1, minWidth: 140, paddingHorizontal: 6, overflow: "hidden" }]}>
+                      <Text style={[styles.descText, { color: colors.foreground }]}>
                         {tx.description || "No description provided"}
                       </Text>
                       <Text style={[styles.refText, { color: colors.mutedForeground }]} numberOfLines={1}>
@@ -769,6 +769,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: "Inter_600SemiBold",
     letterSpacing: -0.2,
+    lineHeight: 18,
   },
   refText: {
     fontSize: 10.5,
