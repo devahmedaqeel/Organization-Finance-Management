@@ -143,9 +143,15 @@ export function WebDepartmentStaffModal({
       const payrollSpending = allExpenses
         .filter((t) => t.expenseSource === "payroll" || Boolean(t.payrollId) || isSalaryExpenseCategory(t.category))
         .reduce((s, t) => s + (Number(t.amount) || 0), 0);
-      const otherSpending = allExpenses
-        .filter((t) => !(t.expenseSource === "payroll" || Boolean(t.payrollId) || isSalaryExpenseCategory(t.category)))
-        .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+      const otherTxList = allExpenses.filter(
+        (t) => !(t.expenseSource === "payroll" || Boolean(t.payrollId) || isSalaryExpenseCategory(t.category))
+      );
+      const otherSpending = otherTxList.reduce((s, t) => s + (Number(t.amount) || 0), 0);
+      const otherCategoryNames = Array.from(
+        new Set(otherTxList.map((t) => t.category || t.title).filter(Boolean))
+      );
+      const otherCategorySummary =
+        otherCategoryNames.length > 0 ? otherCategoryNames.slice(0, 2).join(", ") : "Non-payroll operations";
       const spent = payrollSpending + otherSpending;
       const remaining = Math.max(0, allocated - spent);
       const ratio = allocated > 0 ? (spent / allocated) * 100 : 0;
@@ -155,6 +161,7 @@ export function WebDepartmentStaffModal({
         spent,
         payrollSpending,
         otherSpending,
+        otherCategorySummary,
         remaining,
         ratio,
         remainingRatio,
@@ -179,9 +186,15 @@ export function WebDepartmentStaffModal({
     const payrollSpending = deptTxs
       .filter((t) => t.expenseSource === "payroll" || Boolean(t.payrollId) || isSalaryExpenseCategory(t.category))
       .reduce((s, t) => s + (Number(t.amount) || 0), 0);
-    const otherSpending = deptTxs
-      .filter((t) => !(t.expenseSource === "payroll" || Boolean(t.payrollId) || isSalaryExpenseCategory(t.category)))
-      .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    const otherTxList = deptTxs.filter(
+      (t) => !(t.expenseSource === "payroll" || Boolean(t.payrollId) || isSalaryExpenseCategory(t.category))
+    );
+    const otherSpending = otherTxList.reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    const otherCategoryNames = Array.from(
+      new Set(otherTxList.map((t) => t.category || t.title).filter(Boolean))
+    );
+    const otherCategorySummary =
+      otherCategoryNames.length > 0 ? otherCategoryNames.slice(0, 2).join(", ") : "Non-payroll operations";
     const spent = payrollSpending + otherSpending;
     const remaining = Math.max(0, allocated - spent);
     const ratio = allocated > 0 ? (spent / allocated) * 100 : 0;
@@ -192,6 +205,7 @@ export function WebDepartmentStaffModal({
       spent,
       payrollSpending,
       otherSpending,
+      otherCategorySummary,
       remaining,
       ratio,
       remainingRatio,
@@ -389,7 +403,7 @@ export function WebDepartmentStaffModal({
             )}
           </View>
 
-          {/* Quick Stats Grid with Headcount, Payroll, Allocated Budget, Total Used, Remaining Baqi Funds, and Operations */}
+          {/* Quick Stats Grid with Headcount, Payroll, Allocated Budget, Total Used, Remaining Funds, and Operations */}
           <View style={styles.statsRow}>
             {/* Box 1: Allocated Budget */}
             <View
@@ -461,13 +475,15 @@ export function WebDepartmentStaffModal({
                 adjustsFontSizeToFit
                 minimumFontScale={0.8}
               >
-                {activeDeptFinances.allocated > 0
+                {activeDeptFinances.otherSpending > 0
+                  ? `Pay: ${settings.currency} ${activeDeptFinances.payrollSpending.toLocaleString()} + Other: ${settings.currency} ${activeDeptFinances.otherSpending.toLocaleString()}`
+                  : activeDeptFinances.allocated > 0
                   ? `${activeDeptFinances.ratio.toFixed(1)}% Cap utilized`
                   : "Actual spend"}
               </Text>
             </View>
 
-            {/* Box 3: Remaining Funds (Kitna Baqi Hai) */}
+            {/* Box 3: Remaining Funds */}
             <View
               style={[
                 styles.statBox,
@@ -580,7 +596,9 @@ export function WebDepartmentStaffModal({
                 adjustsFontSizeToFit
                 minimumFontScale={0.8}
               >
-                Non-payroll operations
+                {activeDeptFinances.otherSpending > 0
+                  ? activeDeptFinances.otherCategorySummary
+                  : "Non-payroll operations"}
               </Text>
             </View>
 
@@ -639,7 +657,7 @@ export function WebDepartmentStaffModal({
                   adjustsFontSizeToFit
                   minimumFontScale={0.8}
                 >
-                  {activeDeptFinances.ratio.toFixed(1)}% Used • {activeDeptFinances.remainingRatio.toFixed(1)}% Baqi
+                  {activeDeptFinances.ratio.toFixed(1)}% Used • {activeDeptFinances.remainingRatio.toFixed(1)}% Remaining
                 </Text>
               </View>
 
@@ -694,7 +712,7 @@ export function WebDepartmentStaffModal({
                 <View style={styles.legendItem}>
                   <View style={[styles.legendDot, { backgroundColor: "#10B981" }]} />
                   <Text style={[styles.legendLabel, { color: colors.mutedForeground }]}>
-                    Baqi:{" "}
+                    Remaining:{" "}
                     <Text style={{ color: "#10B981", fontFamily: "Inter_600SemiBold" }}>
                       {settings.currency} {activeDeptFinances.remaining.toLocaleString()}
                     </Text>
