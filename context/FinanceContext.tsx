@@ -180,12 +180,34 @@ async function loadPersistedTombstones(orgId: string): Promise<Set<string>> {
     }
   } catch {}
 
+  if (typeof localStorage !== "undefined") {
+    try {
+      const webRaw = localStorage.getItem(`ofm_tombstones:${orgId}`);
+      if (webRaw) {
+        const arr = JSON.parse(webRaw);
+        if (Array.isArray(arr)) arr.forEach((id) => result.add(id));
+      }
+    } catch {}
+  }
+
   // Also query Firestore tombstones collection for this organization for zero-resurrection guarantee
   try {
-    const snap = await getDocs(query(collection(db, "tombstones"), where("organizationId", "==", orgId)));
-    snap.forEach((docSnap: any) => {
-      result.add(docSnap.id);
-    });
+    const fetchTombstonesPromise = getDocs(
+      query(collection(db, "tombstones"), where("organizationId", "==", orgId))
+    );
+    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500));
+    const snap: any = await Promise.race([fetchTombstonesPromise, timeoutPromise]);
+
+    if (snap && typeof snap.forEach === "function") {
+      snap.forEach((docSnap: any) => {
+        result.add(docSnap.id);
+      });
+      const arr = Array.from(result).slice(-500);
+      AsyncStorage.setItem(`ofm_tombstones:${orgId}`, JSON.stringify(arr)).catch(() => {});
+      if (typeof localStorage !== "undefined") {
+        try { localStorage.setItem(`ofm_tombstones:${orgId}`, JSON.stringify(arr)); } catch {}
+      }
+    }
   } catch {}
 
   return result;
@@ -197,18 +219,23 @@ async function recordPersistedTombstones(orgId: string, ids: string[]): Promise<
     ids.forEach((id) => existing.add(id));
     const arr = Array.from(existing).slice(-500);
     await AsyncStorage.setItem(`ofm_tombstones:${orgId}`, JSON.stringify(arr));
+    if (typeof localStorage !== "undefined") {
+      try { localStorage.setItem(`ofm_tombstones:${orgId}`, JSON.stringify(arr)); } catch {}
+    }
   } catch {}
 
-  // Also persist to Firestore cloud tombstones collection
+  // Also persist to Firestore cloud tombstones collection with both SDK and REST
   try {
     await Promise.all(
-      ids.map((id) =>
-        setDoc(doc(db, "tombstones", id), {
+      ids.map((id) => {
+        const payload = {
           id,
           organizationId: orgId,
           deletedAt: new Date().toISOString(),
-        }).catch(() => {})
-      )
+        };
+        saveDocREST("tombstones", id, payload).catch(() => {});
+        return setDoc(doc(db, "tombstones", id), payload).catch(() => {});
+      })
     );
   } catch {}
 }
@@ -515,27 +542,27 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     };
   }, [loaded, user?.id, user?.organizationId, activeOrgId]);
 
-  // 3. Organization-Scoped Local Cache Write (guarded against writing empty arrays over non-deleted cache on mount)
+  // 3. Organization-Scoped Local Cache Write (guarantees deleted records are cleared from cache)
   useEffect(() => {
-    if (loaded && user && transactions.length > 0) {
+    if (loaded && user) {
       AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(transactions)).catch(() => {});
     }
   }, [transactions, loaded, cachePrefix, user]);
 
   useEffect(() => {
-    if (loaded && user && budgets.length > 0) {
+    if (loaded && user) {
       AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(budgets)).catch(() => {});
     }
   }, [budgets, loaded, cachePrefix, user]);
 
   useEffect(() => {
-    if (loaded && user && payroll.length > 0) {
+    if (loaded && user) {
       AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(payroll)).catch(() => {});
     }
   }, [payroll, loaded, cachePrefix, user]);
 
   useEffect(() => {
-    if (loaded && user && departments.length > 0) {
+    if (loaded && user) {
       AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(departments)).catch(() => {});
     }
   }, [departments, loaded, cachePrefix, user]);
@@ -750,13 +777,14 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     const targetIds = [id, aliasId];
 
     // If deleting a salary transaction, also clean up linked payroll record
-    if (id.startsWith("tx_pay_")) {
-      const payId = id.replace("tx_pay_", "");
-      targetIds.push(payId);
-      deleteDoc(doc(db, "payroll", payId)).catch(() => {});
-      deleteDocREST("payroll", payId).catch(() => {});
+    const targetTx = transactions.find((t) => t.id === id);
+    const linkedPayrollId = targetTx?.payrollId || (id.startsWith("tx_pay_") ? id.replace("tx_pay_", "") : "");
+    if (linkedPayrollId) {
+      targetIds.push(linkedPayrollId, `tx_pay_${linkedPayrollId}`);
+      deleteDoc(doc(db, "payroll", linkedPayrollId)).catch(() => {});
+      deleteDocREST("payroll", linkedPayrollId).catch(() => {});
       setPayroll((prev) => {
-        const remaining = prev.filter((p) => p.id !== payId);
+        const remaining = prev.filter((p) => p.id !== linkedPayrollId && p.id !== id);
         AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(remaining)).catch(() => {});
         return remaining;
       });
@@ -1314,16 +1342,28 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     const txId = `tx_pay_${id}`;
     const targetIds = [id, aliasId, txId];
 
+    const targetPay = payroll.find((p) => p.id === id);
+    const linkedTxIds = transactions
+      .filter((t) => t.payrollId === id || t.id === txId || (targetPay?.expenseId && t.id === targetPay.expenseId))
+      .map((t) => t.id);
+    linkedTxIds.forEach((tid) => {
+      if (!targetIds.includes(tid)) targetIds.push(tid);
+    });
+
     let deleteSucceeded = false;
     let failureReason: any = null;
 
     try {
       const batch = writeBatch(db);
       batch.delete(doc(db, "payroll", id));
-      batch.delete(doc(db, "transactions", txId));
       if (aliasId !== id) {
         batch.delete(doc(db, "payroll", aliasId));
       }
+      targetIds.forEach((tid) => {
+        if (tid.startsWith("tx_") || linkedTxIds.includes(tid)) {
+          batch.delete(doc(db, "transactions", tid));
+        }
+      });
       await batch.commit();
       deleteSucceeded = true;
     } catch (err: any) {
@@ -1332,7 +1372,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         await Promise.all([
           deleteDoc(doc(db, "payroll", id)).catch((e) => { failureReason = e; }),
           deleteDoc(doc(db, "payroll", aliasId)).catch(() => {}),
-          deleteDoc(doc(db, "transactions", txId)).catch(() => {}),
+          ...targetIds.map((tid) => deleteDoc(doc(db, "transactions", tid)).catch(() => {})),
         ]);
         deleteSucceeded = true;
       } catch (e2) {}
@@ -1340,7 +1380,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
     const restSuccess = await deleteDocREST("payroll", id).catch(() => false);
     await deleteDocREST("payroll", aliasId).catch(() => false);
-    await deleteDocREST("transactions", txId).catch(() => false);
+    await Promise.all(targetIds.map((tid) => deleteDocREST("transactions", tid).catch(() => false)));
     if (restSuccess) deleteSucceeded = true;
 
     if (!deleteSucceeded && failureReason?.code === "permission-denied") {
@@ -1352,13 +1392,13 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     recordPersistedTombstones(activeOrgId, targetIds).catch(() => {});
 
     setPayroll((prev) => {
-      const remaining = prev.filter((p) => p.id !== id && p.id !== aliasId);
+      const remaining = prev.filter((p) => !targetIds.includes(p.id));
       AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(remaining)).catch(() => {});
       return remaining;
     });
 
     setTransactions((prev) => {
-      const remaining = prev.filter((t) => t.id !== txId);
+      const remaining = prev.filter((t) => !targetIds.includes(t.id));
       AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(remaining)).catch(() => {});
       return remaining;
     });
@@ -1680,6 +1720,49 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         const validPayroll = restPayroll.filter((p: PayrollEntry) => !deletedIdsRef.current.has(p.id));
         setPayroll(validPayroll);
         AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(validPayroll)).catch(() => {});
+      }
+
+      // If REST sync was unavailable (e.g. mobile ISP), query Firestore Central Database directly via SDK
+      if (restTxs === null || restBudgets === null || restDepts === null || restPayroll === null) {
+        const [qTxSnap, qBSnap, qDSnap, qPSnap] = await Promise.all([
+          getDocs(query(collection(db, "transactions"), where("organizationId", "==", activeOrgId))).catch(() => null),
+          getDocs(query(collection(db, "budgets"), where("organizationId", "==", activeOrgId))).catch(() => null),
+          getDocs(query(collection(db, "departments"), where("organizationId", "==", activeOrgId))).catch(() => null),
+          getDocs(query(collection(db, "payroll"), where("organizationId", "==", activeOrgId))).catch(() => null),
+        ]);
+        if (qTxSnap) {
+          const list: Transaction[] = [];
+          qTxSnap.forEach((d) => {
+            if (!deletedIdsRef.current.has(d.id)) list.push({ id: d.id, ...d.data() } as Transaction);
+          });
+          list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          setTransactions(list);
+          AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(list)).catch(() => {});
+        }
+        if (qBSnap) {
+          const list: Budget[] = [];
+          qBSnap.forEach((d) => {
+            if (!deletedIdsRef.current.has(d.id)) list.push({ id: d.id, ...d.data() } as Budget);
+          });
+          setBudgets(list);
+          AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(list)).catch(() => {});
+        }
+        if (qDSnap) {
+          const list: Department[] = [];
+          qDSnap.forEach((d) => {
+            if (!deletedIdsRef.current.has(d.id)) list.push({ id: d.id, ...d.data() } as Department);
+          });
+          setDepartments(list);
+          AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(list)).catch(() => {});
+        }
+        if (qPSnap) {
+          const list: PayrollEntry[] = [];
+          qPSnap.forEach((d) => {
+            if (!deletedIdsRef.current.has(d.id)) list.push({ id: d.id, ...d.data() } as PayrollEntry);
+          });
+          setPayroll(list);
+          AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(list)).catch(() => {});
+        }
       }
     } catch (e) {
     } finally {

@@ -63,7 +63,12 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    // 11. Immutable Audit Trail (Tamper-Proof)
+    // 11. Cross-Platform Deletion Tombstones (Zero-Resurrection Guarantee)
+    match /tombstones/{tombstoneId} {
+      allow read, write: if true;
+    }
+
+    // 12. Immutable Audit Trail (Tamper-Proof)
     match /auditLogs/{logId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();

@@ -44,6 +44,7 @@ interface SettingsContextValue {
   settings: Settings;
   updateSettings: (patch: Partial<Settings>) => Promise<void>;
   addCustomCategory: (type: "income" | "expense", category: string) => Promise<void>;
+  deleteCustomCategory: (type: "income" | "expense", category: string) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -51,6 +52,7 @@ const SettingsContext = createContext<SettingsContextValue>({
   settings: DEFAULT_SETTINGS,
   updateSettings: async () => {},
   addCustomCategory: async () => {},
+  deleteCustomCategory: async () => {},
   isLoading: false,
 });
 
@@ -138,9 +140,19 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     await updateSettings({ [key]: updatedList });
   }, [settings, updateSettings]);
 
+  const deleteCustomCategory = useCallback(async (type: "income" | "expense", category: string) => {
+    const cleanCat = category.trim().toLowerCase();
+    if (!cleanCat) return;
+
+    const key = type === "income" ? "customIncomeCategories" : "customExpenseCategories";
+    const currentList = settings[key] || [];
+    const updatedList = currentList.filter((c) => c.trim().toLowerCase() !== cleanCat);
+    await updateSettings({ [key]: updatedList });
+  }, [settings, updateSettings]);
+
   const value = useMemo(
-    () => ({ settings, updateSettings, addCustomCategory, isLoading }),
-    [settings, updateSettings, addCustomCategory, isLoading]
+    () => ({ settings, updateSettings, addCustomCategory, deleteCustomCategory, isLoading }),
+    [settings, updateSettings, addCustomCategory, deleteCustomCategory, isLoading]
   );
 
   return (
