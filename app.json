@@ -2,8 +2,8 @@
   "expo": {
     "name": "OFM — Organization Finance Management",
     "description": "OFM — Organization Finance Management is an enterprise financial management platform for institutional budgets, ledger transactions, department cost centers, and real-time collaboration.",
-    "slug": "ofm-main-updated",
-    "owner": "engraqeels-team",
+    "slug": "ofm-app",
+    "owner": "ahmedaqeeldev",
     "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -103,7 +103,7 @@
         "origin": "https://ofmapp-main.web.app/"
       },
       "eas": {
-        "projectId": "012306b6-9150-4ab0-a477-0505dea5fa7b"
+        "projectId": "4f498606-6644-46f0-821b-c301c60d6f52"
       }
     }
   }

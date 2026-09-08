@@ -15,7 +15,14 @@
       },
       "env": {
         "EAS_SKIP_AUTO_FINGERPRINT": "1",
-        "NODE_ENV": "production"
+        "NODE_ENV": "production",
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyDPpbHAUApFuyq-u1L891fvl95C5mHeSKY",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "ofmapp-main.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "ofmapp-main",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "ofmapp-main.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "940511583527",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:940511583527:web:7aa8d59fc3e2a8939c1d02",
+        "EXPO_PUBLIC_CRAFTMYPDF_API_KEY": "7832MjA6MTE6UjlkM3h4emxpTExzeFR0aQ="
       }
     },
     "production": {}
