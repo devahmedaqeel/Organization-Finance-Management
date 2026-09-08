@@ -20,6 +20,7 @@ import {
   SvgSearch,
   SvgLayers,
 } from "../SvgIcons";
+import { isSalaryExpenseCategory } from "@/constants/categories";
 
 interface WebDepartmentStaffModalProps {
   visible: boolean;
@@ -136,16 +137,27 @@ export function WebDepartmentStaffModal({
   const activeDeptFinances = useMemo(() => {
     if (isAllSelected) {
       const allocated = departments.reduce((s, d) => s + (Number(d.budgetAllocated) || 0), 0);
-      const spent = transactions
-        .filter((t) => t && t.type === "expense" && t.status !== "failed" && (t as any).status !== "deleted")
+      const allExpenses = transactions.filter(
+        (t) => t && t.type === "expense" && t.status !== "failed" && (t as any).status !== "deleted"
+      );
+      const payrollSpending = allExpenses
+        .filter((t) => t.expenseSource === "payroll" || Boolean(t.payrollId) || isSalaryExpenseCategory(t.category))
         .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+      const otherSpending = allExpenses
+        .filter((t) => !(t.expenseSource === "payroll" || Boolean(t.payrollId) || isSalaryExpenseCategory(t.category)))
+        .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+      const spent = payrollSpending + otherSpending;
       const remaining = Math.max(0, allocated - spent);
       const ratio = allocated > 0 ? (spent / allocated) * 100 : 0;
+      const remainingRatio = allocated > 0 ? Math.max(0, 100 - ratio) : 0;
       return {
         allocated,
         spent,
+        payrollSpending,
+        otherSpending,
         remaining,
         ratio,
+        remainingRatio,
         isOver: allocated > 0 && spent > allocated,
       };
     }
@@ -164,15 +176,25 @@ export function WebDepartmentStaffModal({
         (t as any).status !== "deleted" &&
         (t.department || "").trim().toLowerCase() === targetDeptName
     );
-    const spent = deptTxs.reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    const payrollSpending = deptTxs
+      .filter((t) => t.expenseSource === "payroll" || Boolean(t.payrollId) || isSalaryExpenseCategory(t.category))
+      .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    const otherSpending = deptTxs
+      .filter((t) => !(t.expenseSource === "payroll" || Boolean(t.payrollId) || isSalaryExpenseCategory(t.category)))
+      .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    const spent = payrollSpending + otherSpending;
     const remaining = Math.max(0, allocated - spent);
     const ratio = allocated > 0 ? (spent / allocated) * 100 : 0;
+    const remainingRatio = allocated > 0 ? Math.max(0, 100 - ratio) : 0;
 
     return {
       allocated,
       spent,
+      payrollSpending,
+      otherSpending,
       remaining,
       ratio,
+      remainingRatio,
       isOver: allocated > 0 && spent > allocated,
     };
   }, [isAllSelected, departments, activeDept, selectedDeptId, budgets, transactions]);
@@ -367,67 +389,98 @@ export function WebDepartmentStaffModal({
             )}
           </View>
 
-          {/* Quick Stats Grid with Headcount, Payroll, and Budget Allocation */}
+          {/* Quick Stats Grid with Headcount, Payroll, Allocated Budget, Total Used, Remaining Baqi Funds, and Operations */}
           <View style={styles.statsRow}>
+            {/* Box 1: Allocated Budget */}
             <View
               style={[
                 styles.statBox,
                 { backgroundColor: colors.background, borderColor: colors.border },
               ]}
             >
-              <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>
-                {isAllSelected ? "TOTAL HEADCOUNT" : "UNIT HEADCOUNT"}
-              </Text>
-              <Text style={[styles.statValue, { color: "#0EA5E9" }]}>{totalHeadcount}</Text>
-              <Text style={[styles.statSub, { color: colors.mutedForeground }]}>
-                {registeredCount} profiles active
-              </Text>
-            </View>
-
-            <View
-              style={[
-                styles.statBox,
-                { backgroundColor: colors.background, borderColor: colors.border },
-              ]}
-            >
-              <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>
-                MONTHLY PAYROLL
-              </Text>
-              <Text style={[styles.statValue, { color: "#8B5CF6" }]}>
-                {settings.currency} {totalMonthlyPayroll.toLocaleString()}
-              </Text>
-              <Text style={[styles.statSub, { color: colors.mutedForeground }]}>
-                Direct compensation
-              </Text>
-            </View>
-
-            <View
-              style={[
-                styles.statBox,
-                { backgroundColor: colors.background, borderColor: colors.border },
-              ]}
-            >
-              <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>
+              <Text
+                style={[styles.statLabel, { color: colors.mutedForeground }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+              >
                 ALLOCATED BUDGET
               </Text>
-              <Text style={[styles.statValue, { color: colors.foreground }]}>
+              <Text
+                style={[styles.statValue, { color: colors.foreground }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.72}
+              >
                 {activeDeptFinances.allocated > 0
                   ? `${settings.currency} ${activeDeptFinances.allocated.toLocaleString()}`
                   : "No Cap Set"}
               </Text>
-              <Text style={[styles.statSub, { color: colors.mutedForeground }]}>
+              <Text
+                style={[styles.statSub, { color: colors.mutedForeground }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+              >
                 Approved ceiling
               </Text>
             </View>
 
+            {/* Box 2: Total Used (Kitna Used Hoa) */}
             <View
               style={[
                 styles.statBox,
                 { backgroundColor: colors.background, borderColor: colors.border },
               ]}
             >
-              <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>
-                {activeDeptFinances.isOver ? "OVER BUDGET" : "REMAINING FUNDS"}
+              <Text
+                style={[styles.statLabel, { color: colors.mutedForeground }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+              >
+                TOTAL USED
+              </Text>
+              <Text
+                style={[
+                  styles.statValue,
+                  { color: activeDeptFinances.isOver ? colors.expense : "#F59E0B" },
+                ]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.72}
+              >
+                {settings.currency} {activeDeptFinances.spent.toLocaleString()}
+              </Text>
+              <Text
+                style={[
+                  styles.statSub,
+                  { color: activeDeptFinances.isOver ? colors.expense : colors.mutedForeground },
+                ]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+              >
+                {activeDeptFinances.allocated > 0
+                  ? `${activeDeptFinances.ratio.toFixed(1)}% Cap utilized`
+                  : "Actual spend"}
+              </Text>
+            </View>
+
+            {/* Box 3: Remaining Funds (Kitna Baqi Hai) */}
+            <View
+              style={[
+                styles.statBox,
+                { backgroundColor: colors.background, borderColor: colors.border },
+              ]}
+            >
+              <Text
+                style={[styles.statLabel, { color: colors.mutedForeground }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+              >
+                {activeDeptFinances.isOver ? "DEFICIT / OVER" : "REMAINING FUNDS"}
               </Text>
               <Text
                 style={[
@@ -440,18 +493,216 @@ export function WebDepartmentStaffModal({
                       : colors.mutedForeground,
                   },
                 ]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.72}
               >
                 {activeDeptFinances.allocated > 0
                   ? `${settings.currency} ${activeDeptFinances.remaining.toLocaleString()}`
-                  : `Spent: ${settings.currency} ${activeDeptFinances.spent.toLocaleString()}`}
+                  : "Uncapped"}
               </Text>
-              <Text style={[styles.statSub, { color: colors.mutedForeground }]}>
+              <Text
+                style={[
+                  styles.statSub,
+                  { color: activeDeptFinances.isOver ? colors.expense : colors.mutedForeground },
+                ]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+              >
                 {activeDeptFinances.allocated > 0
-                  ? `${activeDeptFinances.ratio.toFixed(1)}% Cap utilized`
-                  : "Uncapped Cost Center"}
+                  ? activeDeptFinances.isOver
+                    ? `${(activeDeptFinances.ratio - 100).toFixed(1)}% Over budget`
+                    : `${activeDeptFinances.remainingRatio.toFixed(1)}% Buffer left`
+                  : "No limit assigned"}
+              </Text>
+            </View>
+
+            {/* Box 4: Monthly Payroll */}
+            <View
+              style={[
+                styles.statBox,
+                { backgroundColor: colors.background, borderColor: colors.border },
+              ]}
+            >
+              <Text
+                style={[styles.statLabel, { color: colors.mutedForeground }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+              >
+                MONTHLY PAYROLL
+              </Text>
+              <Text
+                style={[styles.statValue, { color: "#8B5CF6" }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.72}
+              >
+                {settings.currency} {totalMonthlyPayroll.toLocaleString()}
+              </Text>
+              <Text
+                style={[styles.statSub, { color: colors.mutedForeground }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+              >
+                Direct compensation
+              </Text>
+            </View>
+
+            {/* Box 5: Other Department Expenses */}
+            <View
+              style={[
+                styles.statBox,
+                { backgroundColor: colors.background, borderColor: colors.border },
+              ]}
+            >
+              <Text
+                style={[styles.statLabel, { color: colors.mutedForeground }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+              >
+                OTHER EXPENSES
+              </Text>
+              <Text
+                style={[styles.statValue, { color: "#06B6D4" }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.72}
+              >
+                {settings.currency} {activeDeptFinances.otherSpending.toLocaleString()}
+              </Text>
+              <Text
+                style={[styles.statSub, { color: colors.mutedForeground }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+              >
+                Non-payroll operations
+              </Text>
+            </View>
+
+            {/* Box 6: Unit Headcount */}
+            <View
+              style={[
+                styles.statBox,
+                { backgroundColor: colors.background, borderColor: colors.border },
+              ]}
+            >
+              <Text
+                style={[styles.statLabel, { color: colors.mutedForeground }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+              >
+                {isAllSelected ? "TOTAL HEADCOUNT" : "UNIT HEADCOUNT"}
+              </Text>
+              <Text
+                style={[styles.statValue, { color: "#0EA5E9" }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.72}
+              >
+                {totalHeadcount}
+              </Text>
+              <Text
+                style={[styles.statSub, { color: colors.mutedForeground }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+              >
+                {registeredCount} {registeredCount === 1 ? "profile" : "profiles"} active
               </Text>
             </View>
           </View>
+
+          {/* Executive Budget Reconciliation Progress Bar */}
+          {activeDeptFinances.allocated > 0 && (
+            <View
+              style={[
+                styles.budgetBarCard,
+                { backgroundColor: colors.background, borderColor: colors.border },
+              ]}
+            >
+              <View style={styles.budgetBarHeader}>
+                <Text style={[styles.budgetBarTitle, { color: colors.mutedForeground }]}>
+                  BUDGET RECONCILIATION
+                </Text>
+                <Text
+                  style={[
+                    styles.budgetBarRatio,
+                    { color: activeDeptFinances.isOver ? colors.expense : "#10B981" },
+                  ]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
+                >
+                  {activeDeptFinances.ratio.toFixed(1)}% Used • {activeDeptFinances.remainingRatio.toFixed(1)}% Baqi
+                </Text>
+              </View>
+
+              <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
+                {/* Payroll Portion (Purple) */}
+                <View
+                  style={[
+                    styles.progressSegment,
+                    {
+                      width: `${Math.min(100, (activeDeptFinances.payrollSpending / activeDeptFinances.allocated) * 100)}%`,
+                      backgroundColor: "#8B5CF6",
+                    },
+                  ]}
+                />
+                {/* Other Expenses Portion (Cyan) */}
+                <View
+                  style={[
+                    styles.progressSegment,
+                    {
+                      width: `${Math.min(
+                        Math.max(0, 100 - (activeDeptFinances.payrollSpending / activeDeptFinances.allocated) * 100),
+                        (activeDeptFinances.otherSpending / activeDeptFinances.allocated) * 100
+                      )}%`,
+                      backgroundColor: "#06B6D4",
+                    },
+                  ]}
+                />
+              </View>
+
+              {/* Legend with exact amounts */}
+              <View style={styles.legendRow}>
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: "#8B5CF6" }]} />
+                  <Text style={[styles.legendLabel, { color: colors.mutedForeground }]}>
+                    Payroll:{" "}
+                    <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold" }}>
+                      {settings.currency} {activeDeptFinances.payrollSpending.toLocaleString()}
+                    </Text>
+                  </Text>
+                </View>
+
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: "#06B6D4" }]} />
+                  <Text style={[styles.legendLabel, { color: colors.mutedForeground }]}>
+                    Other:{" "}
+                    <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold" }}>
+                      {settings.currency} {activeDeptFinances.otherSpending.toLocaleString()}
+                    </Text>
+                  </Text>
+                </View>
+
+                <View style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: "#10B981" }]} />
+                  <Text style={[styles.legendLabel, { color: colors.mutedForeground }]}>
+                    Baqi:{" "}
+                    <Text style={{ color: "#10B981", fontFamily: "Inter_600SemiBold" }}>
+                      {settings.currency} {activeDeptFinances.remaining.toLocaleString()}
+                    </Text>
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
 
           {/* Personnel List */}
           <ScrollView
@@ -744,9 +995,62 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     marginTop: 2,
   },
+  budgetBarCard: {
+    marginHorizontal: 20,
+    marginBottom: 8,
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  budgetBarHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  budgetBarTitle: {
+    fontSize: 10,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.5,
+  },
+  budgetBarRatio: {
+    fontSize: 11,
+    fontFamily: "Inter_700Bold",
+  },
+  progressTrack: {
+    height: 8,
+    borderRadius: 4,
+    flexDirection: "row",
+    overflow: "hidden",
+  },
+  progressSegment: {
+    height: "100%",
+  },
+  legendRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 8,
+    gap: 8,
+  },
+  legendItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  legendDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+  },
+  legendLabel: {
+    fontSize: 10.5,
+    fontFamily: "Inter_400Regular",
+  },
   listContainer: {
     paddingHorizontal: 20,
-    maxHeight: 300,
+    maxHeight: 280,
   },
   sectionHeading: {
     fontSize: 11,
