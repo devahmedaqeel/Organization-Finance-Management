@@ -104,6 +104,30 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
   const [customPeriodName, setCustomPeriodName] = useState<string | null>(null);
   const [customSelection, setCustomSelection] = useState<any>(null);
   const [selectedPoint, setSelectedPoint] = useState<any | null>(null);
+  const [chartContainerWidth, setChartContainerWidth] = useState<number>(0);
+
+  // Intelligent active period auto-alignment: if default Last 6 Months has zero transactions but others exist, align to All Time
+  useEffect(() => {
+    if (transactions.length > 0 && activePeriod.presetId === "last_6m") {
+      const txsIn6M = filterTransactionsByPeriod(transactions, activePeriod);
+      if (txsIn6M.length === 0) {
+        const allTimePeriod = getPresetPeriod("all_time", transactions);
+        const txsInAll = filterTransactionsByPeriod(transactions, allTimePeriod);
+        if (txsInAll.length > 0) {
+          setActivePeriod(allTimePeriod);
+          setTrendRange("ALL");
+        }
+      }
+    }
+  }, [transactions.length]);
+
+  const handlePointSelect = (pt: any) => {
+    if (selectedPoint && (selectedPoint.key === pt.key || selectedPoint.label === pt.label)) {
+      setSelectedPoint(null);
+    } else {
+      setSelectedPoint(pt);
+    }
+  };
 
   // 1. Authoritative Financial Health Calculation
   const healthReport = useMemo(() => {
@@ -512,7 +536,13 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
     return actionableInsights;
   }, [actionableInsights, insightFilter]);
 
-  const chartCanvasWidth = isMobile ? width - 44 : isWide ? width - 340 : width - 100;
+  const chartCanvasWidth = useMemo(() => {
+    if (chartContainerWidth > 40) {
+      return chartContainerWidth - 36;
+    }
+    if (isMobile) return width - 44;
+    return Math.min(width - (isWide ? 340 : 100), 1116);
+  }, [chartContainerWidth, isMobile, isWide, width]);
 
   return (
     <ScrollView
@@ -701,7 +731,15 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
       </View>
 
       {/* ─── Financial Trend Card ─── */}
-      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View
+        style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
+        onLayout={(e) => {
+          const w = e.nativeEvent.layout.width;
+          if (w > 40 && Math.abs(w - chartContainerWidth) > 2) {
+            setChartContainerWidth(w);
+          }
+        }}
+      >
         <View style={styles.cardHeaderRow}>
           <View style={{ flex: 1, paddingRight: 8 }}>
             <Text style={[styles.cardTitle, { color: colors.foreground }]}>Financial Trend</Text>
@@ -777,13 +815,17 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
           currency={settings.currency}
           activeRange={customSelection ? undefined : trendRange}
           activePeriod={activePeriod}
-          onPointSelect={(pt) => {
-            setSelectedPoint(pt);
-          }}
+          onPointSelect={handlePointSelect}
           onPeriodSelect={(p) => {
             setActivePeriod(p);
             setCustomPeriodName(p.label);
             setSelectedPoint(null);
+          }}
+          onGranularityChange={(g) => {
+            setActivePeriod((prev) => ({
+              ...prev,
+              userGranularityOverride: g,
+            }));
           }}
           onRangeSelect={(range) => {
             setTrendRange(range);
@@ -796,7 +838,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
             if (selection.presetName) setCustomPeriodName(selection.presetName);
             setSelectedPoint(null);
           }}
-          ranges={["1W", "2W", "1M", "3M", "6M", "1Y"]}
+          ranges={["1W", "2W", "1M", "3M", "6M", "1Y", "ALL"]}
           transactions={transactions}
           userId={user?.id || "default"}
         />

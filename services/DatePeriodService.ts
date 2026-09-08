@@ -143,7 +143,7 @@ export function getAvailableGranularities(): Granularity[] {
   return ["day", "week", "month", "year"];
 }
 
-export function getPresetPeriod(presetId: string): NormalizedPeriod {
+export function getPresetPeriod(presetId: string, transactions?: Transaction[]): NormalizedPeriod {
   const now = new Date();
   const todayStr = formatYMD(now);
   let startDate = todayStr;
@@ -229,7 +229,17 @@ export function getPresetPeriod(presetId: string): NormalizedPeriod {
     case "all":
     case "all_time":
     default: {
-      startDate = "2024-01-01";
+      let minDate = "2024-01-01";
+      if (transactions && transactions.length > 0) {
+        const validDates = transactions
+          .map((t) => (t.date || "").trim().slice(0, 10))
+          .filter((d) => d.length === 10 && d >= "2000-01-01")
+          .sort();
+        if (validDates.length > 0) {
+          minDate = `${validDates[0].slice(0, 7)}-01`;
+        }
+      }
+      startDate = minDate;
       endDate = formatYMD(now);
       label = "All Time";
       break;

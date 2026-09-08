@@ -84,6 +84,30 @@ export default function AIInsightsScreen() {
   const [customPeriodName, setCustomPeriodName] = useState<string | null>(null);
   const [customSelection, setCustomSelection] = useState<any>(null);
   const [selectedPoint, setSelectedPoint] = useState<any | null>(null);
+  const [chartContainerWidth, setChartContainerWidth] = useState<number>(0);
+
+  // Intelligent active period auto-alignment: if default Last 6 Months has zero transactions but others exist, align to All Time
+  useEffect(() => {
+    if (transactions.length > 0 && activePeriod.presetId === "last_6m") {
+      const txsIn6M = filterTransactionsByPeriod(transactions, activePeriod);
+      if (txsIn6M.length === 0) {
+        const allTimePeriod = getPresetPeriod("all_time", transactions);
+        const txsInAll = filterTransactionsByPeriod(transactions, allTimePeriod);
+        if (txsInAll.length > 0) {
+          setActivePeriod(allTimePeriod);
+          setTrendRange("ALL");
+        }
+      }
+    }
+  }, [transactions.length]);
+
+  const handlePointSelect = (pt: any) => {
+    if (selectedPoint && (selectedPoint.key === pt.key || selectedPoint.label === pt.label)) {
+      setSelectedPoint(null);
+    } else {
+      setSelectedPoint(pt);
+    }
+  };
 
   // 1. Authoritative Financial Health Calculation
   const healthReport = useMemo(() => {
@@ -730,10 +754,18 @@ export default function AIInsightsScreen() {
         </View>
       </View>
 
-      {/* Monthly Trend */}
-      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      {/* Financial Trend Card */}
+      <View
+        style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
+        onLayout={(e) => {
+          const w = e.nativeEvent.layout.width;
+          if (w > 40 && Math.abs(w - chartContainerWidth) > 2) {
+            setChartContainerWidth(w);
+          }
+        }}
+      >
         <View style={styles.cardHeaderRow}>
-          <View style={{ flex: 1, paddingRight: 8 }}>
+          <View style={{ flex: 1, paddingRight: 6 }}>
             <Text style={[styles.cardTitle, { color: colors.foreground }]}>Financial Trend</Text>
             <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>
               Income vs Expenses · {activePeriod.label}
@@ -790,18 +822,22 @@ export default function AIInsightsScreen() {
 
         <AreaLineChart
           data={chartPoints}
-          width={chartWidth - 28}
+          width={chartContainerWidth > 40 ? chartContainerWidth - 28 : chartWidth - 28}
           height={165}
           currency={settings.currency}
           activeRange={customSelection ? undefined : trendRange}
           activePeriod={activePeriod}
-          onPointSelect={(pt) => {
-            setSelectedPoint(pt);
-          }}
+          onPointSelect={handlePointSelect}
           onPeriodSelect={(p) => {
             setActivePeriod(p);
             setCustomPeriodName(p.label);
             setSelectedPoint(null);
+          }}
+          onGranularityChange={(g) => {
+            setActivePeriod((prev) => ({
+              ...prev,
+              userGranularityOverride: g,
+            }));
           }}
           onRangeSelect={(range) => {
             setTrendRange(range);
@@ -814,7 +850,7 @@ export default function AIInsightsScreen() {
             if (selection.presetName) setCustomPeriodName(selection.presetName);
             setSelectedPoint(null);
           }}
-          ranges={["1W", "2W", "1M", "3M", "6M", "1Y"]}
+          ranges={["1W", "2W", "1M", "3M", "6M", "1Y", "ALL"]}
           transactions={transactions}
           userId={user?.id || "default"}
         />

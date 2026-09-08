@@ -1338,7 +1338,7 @@ export default function DashboardScreen() {
             setCustomSelection(selection);
             if (selection.presetName) setCustomPeriodName(selection.presetName);
           }}
-          ranges={["1W", "2W", "1M", "3M", "6M", "1Y"]}
+          ranges={["1W", "2W", "1M", "3M", "6M", "1Y", "ALL"]}
           transactions={transactions}
           userId={user?.id || "default"}
         />

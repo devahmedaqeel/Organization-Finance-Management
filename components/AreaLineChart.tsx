@@ -94,6 +94,7 @@ function getRangeForPresetId(presetId?: string): string {
   if (p === "last_3m" || p === "3m") return "3M";
   if (p === "last_6m" || p === "6m") return "6M";
   if (p === "this_year" || p === "1y") return "1Y";
+  if (p === "all" || p === "all_time") return "ALL";
   return "";
 }
 
@@ -116,7 +117,7 @@ export function AreaLineChart({
   currency = "PKR",
   activeRange = "6M",
   onRangeSelect,
-  ranges = ["1W", "2W", "1M", "3M", "6M", "1Y"],
+  ranges = ["1W", "2W", "1M", "3M", "6M", "1Y", "ALL"],
   onCustomDateSelect,
   activePeriod,
   onPeriodSelect,
@@ -131,6 +132,9 @@ export function AreaLineChart({
   const [modalVisible, setModalVisible] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
   const scrollOffsetRef = useRef(0);
+  const [measuredContainerWidth, setMeasuredContainerWidth] = useState<number>(0);
+
+  const effectiveWidth = measuredContainerWidth > 40 ? Math.min(width, measuredContainerWidth) : width;
 
   const currentPeriod =
     activePeriod ||
@@ -145,7 +149,10 @@ export function AreaLineChart({
         ? "last_3m"
         : activeRange === "1Y"
         ? "this_year"
-        : "last_6m"
+        : activeRange === "ALL"
+        ? "all_time"
+        : "last_6m",
+      transactions
     );
 
   const currentSelectedRange =
@@ -188,8 +195,8 @@ export function AreaLineChart({
   const padBottom = 26;
 
   const pointSpacing = (data && data.length > 20) ? 46 : (data && data.length > 8) ? 56 : 0;
-  const effectiveCanvasWidth = pointSpacing > 0 && data ? Math.max(width, data.length * pointSpacing + padLeft + padRight) : width;
-  const isScrollable = effectiveCanvasWidth > width;
+  const effectiveCanvasWidth = pointSpacing > 0 && data ? Math.max(effectiveWidth, data.length * pointSpacing + padLeft + padRight) : effectiveWidth;
+  const isScrollable = effectiveCanvasWidth > effectiveWidth;
 
   const chartW = Math.max(effectiveCanvasWidth - padLeft - padRight, 10);
   const chartH = Math.max(height - padTop - padBottom, 10);
@@ -232,10 +239,10 @@ export function AreaLineChart({
     return `${line} L ${toX(data.length - 1)} ${padTop + chartH} L ${toX(0)} ${padTop + chartH} Z`;
   };
 
-  const handleTouchAtX = (touchX: number) => {
+  const handleTouchAtX = (touchX: number, isCommit = false) => {
     if (!data || data.length === 0) return;
     const clampedX = Math.max(padLeft, Math.min(effectiveCanvasWidth - padRight, touchX));
-    const ratio = (clampedX - padLeft) / chartW;
+    const ratio = (clampedX - padLeft) / Math.max(chartW, 1);
     const rawIdx = Math.round(ratio * (data.length - 1));
     const newIdx = Math.max(0, Math.min(data.length - 1, rawIdx));
 
@@ -245,9 +252,10 @@ export function AreaLineChart({
       if (Platform.OS !== "web") {
         Haptics.selectionAsync().catch(() => {});
       }
-      if (onPointSelect && data[newIdx]) {
-        onPointSelect(data[newIdx]);
-      }
+    }
+
+    if (isCommit && onPointSelect && data[newIdx]) {
+      onPointSelect(data[newIdx]);
     }
   };
 
@@ -257,12 +265,14 @@ export function AreaLineChart({
       onStartShouldSetPanResponder: () => !isScrollable,
       onMoveShouldSetPanResponder: () => !isScrollable,
       onPanResponderGrant: (evt: GestureResponderEvent) => {
-        handleTouchAtX(evt.nativeEvent.locationX);
+        handleTouchAtX(evt.nativeEvent.locationX, false);
       },
       onPanResponderMove: (evt: GestureResponderEvent) => {
-        handleTouchAtX(evt.nativeEvent.locationX);
+        handleTouchAtX(evt.nativeEvent.locationX, false);
       },
-      onPanResponderRelease: () => {},
+      onPanResponderRelease: (evt: GestureResponderEvent) => {
+        handleTouchAtX(evt.nativeEvent.locationX, true);
+      },
       onPanResponderTerminate: () => {},
     })
   ).current;
@@ -284,8 +294,8 @@ export function AreaLineChart({
       if (totalLen <= 35) return i % 2 === 0 || i === totalLen - 1;
       return i % 3 === 0 || i === totalLen - 1;
     }
-    if (totalLen <= 6) return true;
-    if (totalLen <= 10) return i % 2 === 0 || i === totalLen - 1;
+    if (totalLen <= 7) return true;
+    if (totalLen <= 12) return i % 2 === 0 || i === totalLen - 1;
     if (totalLen <= 20) return i % 3 === 0 || i === totalLen - 1;
     return i % 5 === 0 || i === totalLen - 1;
   };
@@ -310,11 +320,15 @@ export function AreaLineChart({
         ? "this_month"
         : r === "3M"
         ? "last_3m"
+        : r === "6M"
+        ? "last_6m"
         : r === "1Y"
         ? "this_year"
+        : r === "ALL"
+        ? "all_time"
         : "last_6m";
 
-    const period = getPresetPeriod(mappedPreset);
+    const period = getPresetPeriod(mappedPreset, transactions);
     if (onPeriodSelect) {
       onPeriodSelect({
         ...period,
@@ -331,10 +345,10 @@ export function AreaLineChart({
     let updatedPeriod = { ...currentPeriod, userGranularityOverride: g };
 
     if (g === "month" && (currentSelectedRange === "1W" || currentSelectedRange === "2W")) {
-      updatedPeriod = { ...getPresetPeriod("last_6m"), userGranularityOverride: "month" };
+      updatedPeriod = { ...getPresetPeriod("last_6m", transactions), userGranularityOverride: "month" };
       if (onRangeSelect) onRangeSelect("6M");
     } else if (g === "year" && currentSelectedRange !== "1Y") {
-      updatedPeriod = { ...getPresetPeriod("this_year"), userGranularityOverride: "year" };
+      updatedPeriod = { ...getPresetPeriod("this_year", transactions), userGranularityOverride: "year" };
       if (onRangeSelect) onRangeSelect("1Y");
     }
 
@@ -344,7 +358,15 @@ export function AreaLineChart({
   };
 
   return (
-    <View style={styles.container}>
+    <View
+      style={styles.container}
+      onLayout={(e) => {
+        const w = e.nativeEvent.layout.width;
+        if (w > 40 && Math.abs(w - measuredContainerWidth) > 2) {
+          setMeasuredContainerWidth(w);
+        }
+      }}
+    >
       {/* ─── Top Control Row: Scrollable Quick Period Pills + Fixed Custom Button ─── */}
       <View style={styles.topControlRow}>
         <ScrollView
@@ -550,23 +572,23 @@ export function AreaLineChart({
           <View
             style={{ width: effectiveCanvasWidth, height, cursor: "crosshair" as any }}
             {...(isScrollable ? {} : panResponder.panHandlers)}
-            onTouchStart={(e) => handleTouchAtX(e.nativeEvent.locationX)}
-            onTouchMove={(e) => handleTouchAtX(e.nativeEvent.locationX)}
-            onTouchEnd={(e) => handleTouchAtX(e.nativeEvent.locationX)}
+            onTouchStart={(e) => handleTouchAtX(e.nativeEvent.locationX, false)}
+            onTouchMove={(e) => handleTouchAtX(e.nativeEvent.locationX, false)}
+            onTouchEnd={(e) => handleTouchAtX(e.nativeEvent.locationX, true)}
             {...(Platform.OS === "web"
               ? {
                   onPointerMove: (e: any) => {
                     const rect = e.currentTarget?.getBoundingClientRect?.();
                     if (rect) {
                       const clientX = e.clientX - rect.left;
-                      handleTouchAtX(clientX);
+                      handleTouchAtX(clientX, false);
                     }
                   },
                   onPointerDown: (e: any) => {
                     const rect = e.currentTarget?.getBoundingClientRect?.();
                     if (rect) {
                       const clientX = e.clientX - rect.left;
-                      handleTouchAtX(clientX);
+                      handleTouchAtX(clientX, true);
                     }
                   },
                 }
@@ -647,10 +669,24 @@ export function AreaLineChart({
                 return (
                   <React.Fragment key={`anchor-${i}`}>
                     {d.income > 0 && (
-                      <SvgCircle cx={px} cy={pyInc} r={3.5} fill={colors.income} opacity={0.85} />
+                      <SvgCircle
+                        cx={px}
+                        cy={pyInc}
+                        r={3.5}
+                        fill={colors.income}
+                        opacity={0.85}
+                        onPress={() => handleTouchAtX(px, true)}
+                      />
                     )}
                     {d.expense > 0 && (
-                      <SvgCircle cx={px} cy={pyExp} r={3.5} fill={colors.expense} opacity={0.85} />
+                      <SvgCircle
+                        cx={px}
+                        cy={pyExp}
+                        r={3.5}
+                        fill={colors.expense}
+                        opacity={0.85}
+                        onPress={() => handleTouchAtX(px, true)}
+                      />
                     )}
                   </React.Fragment>
                 );
@@ -689,25 +725,31 @@ export function AreaLineChart({
               />
             </Svg>
 
-            {/* X-Axis Tick Labels */}
-            <View style={[styles.xAxisRow, { left: padLeft, width: chartW, top: padTop + chartH + 4 }]}>
+            {/* X-Axis Tick Labels (Pixel-Perfect Position Directly Under Each Point) */}
+            <View style={{ position: "absolute", left: 0, width: effectiveCanvasWidth, top: padTop + chartH + 4, height: 24 }}>
               {data.map((d, i) => {
                 const isAct = i === activeIdx;
                 const showText = shouldRenderLabel(i, data.length);
+                const xPos = toX(i);
 
                 return (
                   <TouchableOpacity
                     key={i}
                     onPress={() => {
-                      setSelectedIndex(i);
-                      if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
+                      handleTouchAtX(xPos, true);
                     }}
-                    style={styles.xLabelWrap}
+                    style={{
+                      position: "absolute",
+                      left: Math.max(0, xPos - 26),
+                      width: 52,
+                      alignItems: "center",
+                    }}
+                    activeOpacity={0.7}
                   >
                     <Text
                       style={[
                         styles.xLabel,
-                        { color: isAct ? colors.primary : colors.mutedForeground },
+                        { color: isAct ? colors.primary : colors.mutedForeground, textAlign: "center" },
                         isAct && { fontFamily: "Inter_700Bold" },
                       ]}
                       numberOfLines={1}
