@@ -354,12 +354,40 @@ export function FinancialAnalyticsSuite({
 
     let explanation = "Departmental disbursement breakdown.";
     if (topDept) {
-      if (fullDepts.length === 1) {
-        explanation = `100% of spending is in ${topDept.name} (${formatCompactCurrency(topDept.amount, currency)}). Single active cost center.`;
-      } else if (fullDepts.length >= 2 && Math.abs(fullDepts[0].pct - fullDepts[1].pct) < 0.1) {
-        explanation = `⚖️ Equal Cost Distribution: Outflows are evenly split between ${fullDepts[0].name} (${fullDepts[0].displayPct}) and ${fullDepts[1].name} (${fullDepts[1].displayPct}).`;
+      const activeSpendDepts = fullDepts.filter((d) => d.amount > 0);
+      const zeroSpendDepts = effectiveDeptMetrics.filter((d) => d.spent === 0);
+
+      const zeroText =
+        zeroSpendDepts.length > 0
+          ? ` ${zeroSpendDepts.map((d) => `${d.name}: ${currency} 0 used`).join(", ")} (${currency} ${formatCompactCurrency(
+              zeroSpendDepts.reduce((s, d) => s + d.remaining, 0),
+              currency
+            )} budget remaining).`
+          : "";
+
+      if (activeSpendDepts.length === 1) {
+        explanation = `🏢 100% of spending is in ${topDept.name} (${currency} ${formatCompactCurrency(
+          topDept.amount,
+          currency
+        )} used of ${currency} ${formatCompactCurrency(total, currency)} total).${zeroText}`;
+      } else if (
+        activeSpendDepts.length >= 2 &&
+        Math.abs(activeSpendDepts[0].pct - activeSpendDepts[1].pct) < 0.5
+      ) {
+        explanation = `⚖️ Balanced Spending: ${activeSpendDepts
+          .map(
+            (d) =>
+              `${d.name}: ${currency} ${formatCompactCurrency(d.amount, currency)} (${d.displayPct})`
+          )
+          .join(" · ")} (${currency} ${formatCompactCurrency(total, currency)} total spent).${zeroText}`;
       } else {
-        explanation = `${topDept.name} is the primary cost center, consuming ${topDept.displayPct} of all departmental disbursements.`;
+        explanation = `🏢 Primary Cost Center: ${topDept.name} leads with ${currency} ${formatCompactCurrency(
+          topDept.amount,
+          currency
+        )} (${topDept.displayPct} of ${currency} ${formatCompactCurrency(
+          total,
+          currency
+        )} total spent).${zeroText}`;
       }
     }
 
@@ -398,6 +426,20 @@ export function FinancialAnalyticsSuite({
         ) || null
       : null;
 
+    const selectedDeptMetric = selectedDistributionItem
+      ? effectiveDeptMetrics.find(
+          (dm) =>
+            dm.name.toLowerCase() === selectedDistributionItem.toLowerCase() ||
+            dm.id.toLowerCase() === selectedDistributionItem.toLowerCase()
+        ) || null
+      : null;
+
+    let contextualExplanation = deptDistribution.explanation;
+    if (selectedDeptMetric) {
+      const deptPct = totalExp > 0 ? (selectedDeptMetric.spent / totalExp) * 100 : 0;
+      contextualExplanation = `🏢 ${selectedDeptMetric.name} Department: ${currency} ${selectedDeptMetric.spent.toLocaleString()} used (${deptPct.toFixed(1)}% of all expenses) • Budget: ${selectedDeptMetric.allocated > 0 ? `${currency} ${selectedDeptMetric.allocated.toLocaleString()}` : "No Cap"} • Remaining: ${selectedDeptMetric.allocated > 0 ? `${currency} ${selectedDeptMetric.remaining.toLocaleString()}` : "Uncapped"} (${selectedDeptMetric.utilizationPct.toFixed(0)}% used).`;
+    }
+
     const isTied = items.length >= 2 && Math.abs(items[0].pct - items[1].pct) < 0.1;
 
     return {
@@ -409,14 +451,14 @@ export function FinancialAnalyticsSuite({
       chartSegments: chartSegs,
       topItem,
       selectedData,
-      explanation: deptDistribution.explanation,
+      explanation: contextualExplanation,
       bentoCol1Label: isTied ? "TOP DEPARTMENTS" : "TOP DEPARTMENT",
       bentoCol1Val: isTied && items.length >= 2 ? `${items[0].name} & ${items[1].name} (Tied)` : topItem ? topItem.name : "None",
       bentoCol1Color: topItem ? topItem.color : "#3B82F6",
       bentoCol3Label: "DEPARTMENTS",
       bentoCol3Val: `${effectiveDeptMetrics.length} Active`,
     };
-  }, [deptDistribution, effectiveDeptMetrics, selectedDistributionItem]);
+  }, [deptDistribution, effectiveDeptMetrics, selectedDistributionItem, currency]);
 
   return (
     <View style={styles.container}>
