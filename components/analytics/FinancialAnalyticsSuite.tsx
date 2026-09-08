@@ -560,7 +560,7 @@ export function FinancialAnalyticsSuite({
               }}
               style={{ flexShrink: 0 }}
             >
-              <Text style={[styles.linkText, { color: colors.primary }]}>View Details</Text>
+              <Text style={[styles.linkText, { color: colors.primary }]}>{isMobile ? "Details →" : "View Details"}</Text>
             </TouchableOpacity>
           </View>
 
@@ -983,7 +983,7 @@ export function FinancialAnalyticsSuite({
               }}
               style={{ flexShrink: 0 }}
             >
-              <Text style={[styles.linkText, { color: colors.primary }]}>View Details</Text>
+              <Text style={[styles.linkText, { color: colors.primary }]}>{isMobile ? "Details →" : "View Details"}</Text>
             </TouchableOpacity>
           </View>
 
@@ -1312,7 +1312,7 @@ export function FinancialAnalyticsSuite({
               }}
               style={{ flexShrink: 0 }}
             >
-              <Text style={[styles.linkText, { color: colors.primary }]}>View Outflows</Text>
+              <Text style={[styles.linkText, { color: colors.primary }]}>{isMobile ? "Outflows →" : "View Outflows"}</Text>
             </TouchableOpacity>
           </View>
 
@@ -1940,7 +1940,7 @@ const styles = StyleSheet.create({
   cardMobile: {
     width: "100%",
     minWidth: "100%",
-    padding: 16,
+    padding: 14,
   },
   cardHeader: {
     flexDirection: "row",
@@ -2079,7 +2079,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    flexShrink: 0,
+    flex: 1,
+    minWidth: 0,
+    flexShrink: 1,
   },
   flowDot: {
     width: 6,

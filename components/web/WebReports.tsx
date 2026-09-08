@@ -1422,10 +1422,14 @@ const styles = StyleSheet.create({
   statementLabel: {
     fontSize: 13,
     fontFamily: "Inter_500Medium",
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 8,
   },
   statementAmount: {
     fontSize: 13.5,
     fontFamily: "Inter_700Bold",
+    flexShrink: 0,
   },
   statementTotalRow: {
     flexDirection: "row",
@@ -1440,10 +1444,14 @@ const styles = StyleSheet.create({
   statementTotalLabel: {
     fontSize: 13,
     fontFamily: "Inter_700Bold",
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 8,
   },
   statementTotalVal: {
     fontSize: 14,
     fontFamily: "Inter_800ExtraBold",
+    flexShrink: 0,
   },
   netSurplusBox: {
     flexDirection: "row",
@@ -1454,6 +1462,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     marginTop: 8,
+    flexWrap: "wrap",
+    gap: 8,
   },
   netSurplusLabel: {
     fontSize: 13,

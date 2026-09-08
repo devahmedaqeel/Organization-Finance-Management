@@ -378,6 +378,8 @@ export function WebDashboard({
                 flexShrink: 1,
               }}
               numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
             >
               {balanceViewMode === "cashflow"
                 ? (isMobile ? "AVAILABLE CASH" : "NET CASH / AVAILABLE CASH")
@@ -444,7 +446,12 @@ export function WebDashboard({
             activeOpacity={0.8}
           >
             <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#10B981" }} />
-            <Text style={{ color: balanceViewMode === "cashflow" ? "#FFFFFF" : "rgba(255, 255, 255, 0.75)", fontSize: isMobile ? 10 : 12, fontFamily: "Inter_700Bold" }} numberOfLines={1}>
+            <Text
+              style={{ color: balanceViewMode === "cashflow" ? "#FFFFFF" : "rgba(255, 255, 255, 0.75)", fontSize: isMobile ? 10 : 12, fontFamily: "Inter_700Bold" }}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+            >
               {`Net Cash (${netCash >= 0 ? "+" : "-"}${settings.currency} ${fmt(Math.abs(netCash))})`}
             </Text>
           </TouchableOpacity>
@@ -468,7 +475,12 @@ export function WebDashboard({
             activeOpacity={0.8}
           >
             <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#F43F5E" }} />
-            <Text style={{ color: balanceViewMode === "expenses" ? "#FFFFFF" : "rgba(255, 255, 255, 0.75)", fontSize: isMobile ? 10 : 12, fontFamily: "Inter_700Bold" }} numberOfLines={1}>
+            <Text
+              style={{ color: balanceViewMode === "expenses" ? "#FFFFFF" : "rgba(255, 255, 255, 0.75)", fontSize: isMobile ? 10 : 12, fontFamily: "Inter_700Bold" }}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+            >
               {`Total Outflows (-${settings.currency} ${fmt(totalExpenses)})`}
             </Text>
           </TouchableOpacity>
@@ -535,34 +547,59 @@ export function WebDashboard({
 
         {/* Dynamic Cash Flow / Budget Status Bar & Labels */}
         <View style={{ gap: 7, marginTop: 2 }}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-            <Text
-              style={{
-                color: "#CBD5E1",
-                fontSize: isMobile ? 10.5 : 11.5,
-                fontFamily: "Inter_500Medium",
-                flexShrink: 1,
-              }}
-              numberOfLines={1}
-            >
-              {totalAllocatedBudget > 0
-                ? `Available to Allocate: ${settings.currency} ${fmt(availableToAllocate)}`
-                : totalExpenses === 0
-                ? "0% Outflows"
-                : (isMobile ? `${expensePctOfIncome}% Spent` : `${expensePctOfIncome}% Income Spent`)}
-            </Text>
+          <View
+            style={{
+              flexDirection: isMobile ? "column" : "row",
+              justifyContent: "space-between",
+              alignItems: isMobile ? "flex-start" : "center",
+              gap: isMobile ? 4 : 8,
+            }}
+          >
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: isMobile ? "100%" : undefined }}>
+              <Text
+                style={{
+                  color: "#CBD5E1",
+                  fontSize: isMobile ? 11 : 11.5,
+                  fontFamily: "Inter_600SemiBold",
+                }}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+              >
+                {totalAllocatedBudget > 0
+                  ? `Available to Allocate: ${settings.currency} ${fmt(availableToAllocate)}`
+                  : totalExpenses === 0
+                  ? "0% Outflows"
+                  : (isMobile ? `${expensePctOfIncome}% Spent` : `${expensePctOfIncome}% Income Spent`)}
+              </Text>
+              {isMobile && totalAllocatedBudget > 0 && (
+                <Text
+                  style={{
+                    color: isEffectiveDeficit || budgetUsedPct > 100 ? "#FB7185" : "#34D399",
+                    fontSize: 11,
+                    fontFamily: "Inter_700Bold",
+                  }}
+                >
+                  {budgetUsedPct}% Spent
+                </Text>
+              )}
+            </View>
+
             <Text
               style={{
                 color: isEffectiveDeficit ? "#FB7185" : "#34D399",
                 fontSize: isMobile ? 10.5 : 11.5,
                 fontFamily: "Inter_700Bold",
-                textAlign: "right",
-                flexShrink: isMobile ? 1 : 0,
+                textAlign: isMobile ? "left" : "right",
               }}
               numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
             >
               {totalAllocatedBudget > 0
-                ? `Allocated: ${settings.currency} ${fmt(totalAllocatedBudget)} · Remaining Budget: ${settings.currency} ${fmt(netBudgetRemaining)} (${budgetUsedPct}% Spent)`
+                ? (isMobile
+                    ? `Allocated: ${settings.currency} ${fmt(totalAllocatedBudget)} · Remaining: ${settings.currency} ${fmt(netBudgetRemaining)}`
+                    : `Allocated: ${settings.currency} ${fmt(totalAllocatedBudget)} · Remaining Budget: ${settings.currency} ${fmt(netBudgetRemaining)} (${budgetUsedPct}% Spent)`)
                 : isDeficit
                 ? (isMobile ? `Deficit (-${settings.currency} ${fmt(totalExpenses - totalIncome)})` : `Operating Deficit (-${settings.currency} ${fmt(totalExpenses - totalIncome)})`)
                 : `${incomeRetainedPct}% Retained`}
@@ -589,7 +626,11 @@ export function WebDashboard({
       <View style={[styles.kpiGrid, isMobile && { gap: 8 }]}>
         {/* Card 1: Total Income */}
         <TouchableOpacity
-          style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }, isMobile && { minWidth: 140, padding: 11 }]}
+          style={[
+            styles.kpiCard,
+            { backgroundColor: colors.card, borderColor: colors.border },
+            isMobile && { minWidth: "47%", flexBasis: "47%", maxWidth: "50%", padding: 11 },
+          ]}
           onPress={() => onNavigate("income")}
           activeOpacity={0.8}
         >
@@ -605,7 +646,7 @@ export function WebDashboard({
             value={totalIncome}
             prefix={`+${settings.currency} `}
             formatter={fmt}
-            style={[styles.kpiBigNumber, { color: colors.foreground }]}
+            style={[styles.kpiBigNumber, { color: colors.foreground, fontSize: isMobile ? 18 : 20 }]}
           />
           <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]} numberOfLines={1}>Total Income</Text>
           <Text
@@ -616,6 +657,8 @@ export function WebDashboard({
               marginTop: -2,
             }}
             numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
           >
             {totalIncome === 0
               ? "No Income (0%)"
@@ -639,7 +682,11 @@ export function WebDashboard({
 
         {/* Card 2: Total Expenses */}
         <TouchableOpacity
-          style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }, isMobile && { minWidth: 140, padding: 11 }]}
+          style={[
+            styles.kpiCard,
+            { backgroundColor: colors.card, borderColor: colors.border },
+            isMobile && { minWidth: "47%", flexBasis: "47%", maxWidth: "50%", padding: 11 },
+          ]}
           onPress={() => onNavigate("expenses")}
           activeOpacity={0.8}
         >
@@ -702,7 +749,7 @@ export function WebDashboard({
             value={totalExpenses}
             prefix={`-${settings.currency} `}
             formatter={fmt}
-            style={[styles.kpiBigNumber, { color: colors.foreground }]}
+            style={[styles.kpiBigNumber, { color: colors.foreground, fontSize: isMobile ? 18 : 20 }]}
           />
           <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]} numberOfLines={1}>Total Expenses</Text>
           <Text
@@ -722,6 +769,8 @@ export function WebDashboard({
               marginTop: -2,
             }}
             numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
           >
             {totalExpenses === 0
               ? "0% Outflow"
@@ -750,7 +799,11 @@ export function WebDashboard({
 
         {/* Card 3: Total Budget */}
         <TouchableOpacity
-          style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }, isMobile && { minWidth: 140, padding: 11 }]}
+          style={[
+            styles.kpiCard,
+            { backgroundColor: colors.card, borderColor: colors.border },
+            isMobile && { minWidth: "47%", flexBasis: "47%", maxWidth: "50%", padding: 11 },
+          ]}
           onPress={() => onNavigate("budgets")}
           activeOpacity={0.8}
         >
@@ -823,7 +876,7 @@ export function WebDashboard({
             value={totalAllocatedBudget}
             prefix={`${settings.currency} `}
             formatter={fmt}
-            style={[styles.kpiBigNumber, { color: colors.foreground }]}
+            style={[styles.kpiBigNumber, { color: colors.foreground, fontSize: isMobile ? 18 : 20 }]}
           />
           <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]} numberOfLines={1}>Department Budget</Text>
           <Text
@@ -834,6 +887,8 @@ export function WebDashboard({
               marginTop: -2,
             }}
             numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
           >
             {totalAllocatedBudget === 0
               ? "No Active Budget"
@@ -860,7 +915,11 @@ export function WebDashboard({
 
         {/* Card 4: Transactions */}
         <TouchableOpacity
-          style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }, isMobile && { minWidth: 140, padding: 11 }]}
+          style={[
+            styles.kpiCard,
+            { backgroundColor: colors.card, borderColor: colors.border },
+            isMobile && { minWidth: "47%", flexBasis: "47%", maxWidth: "50%", padding: 11 },
+          ]}
           onPress={() => onNavigate("transactions")}
           activeOpacity={0.8}
         >
@@ -874,11 +933,13 @@ export function WebDashboard({
               </Text>
             </View>
           </View>
-          <Text style={[styles.kpiBigNumber, { color: colors.foreground }]}>{transactions.length}</Text>
+          <Text style={[styles.kpiBigNumber, { color: colors.foreground, fontSize: isMobile ? 18 : 20 }]}>{transactions.length}</Text>
           <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]} numberOfLines={1}>Transactions</Text>
           <Text
             style={{ fontSize: 10, color: transactions.length > 0 ? colors.primary : colors.mutedForeground, fontFamily: "Inter_600SemiBold", marginTop: -2 }}
             numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
           >
             {transactions.length > 0
               ? `${transactions.filter(t => t.type === 'income').length} In · ${transactions.filter(t => t.type === 'expense').length} Out`
@@ -908,7 +969,11 @@ export function WebDashboard({
 
         {/* Card 5: Staff Payroll */}
         <TouchableOpacity
-          style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }, isMobile && { minWidth: "100%", padding: 11 }]}
+          style={[
+            styles.kpiCard,
+            { backgroundColor: colors.card, borderColor: colors.border },
+            isMobile && { minWidth: "100%", flexBasis: "100%", width: "100%", padding: 11 },
+          ]}
           onPress={() => onNavigate("payroll")}
           activeOpacity={0.8}
         >
@@ -926,12 +991,14 @@ export function WebDashboard({
             value={totalPayroll}
             prefix={`${settings.currency} `}
             formatter={fmt}
-            style={[styles.kpiBigNumber, { color: colors.foreground }]}
+            style={[styles.kpiBigNumber, { color: colors.foreground, fontSize: isMobile ? 18 : 20 }]}
           />
           <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]} numberOfLines={1}>Staff Payroll</Text>
           <Text
             style={{ fontSize: 10, color: payroll.length > 0 ? "#8B5CF6" : colors.mutedForeground, fontFamily: "Inter_600SemiBold", marginTop: -2 }}
             numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
           >
             {payroll.length > 0 ? `${payroll.length} Disbursals` : "No Payroll"}
           </Text>
@@ -1051,21 +1118,83 @@ export function WebDashboard({
             <SvgFileText size={32} color={colors.mutedForeground} />
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No transactions recorded yet.</Text>
           </View>
+        ) : isMobile ? (
+          <View style={{ gap: 8 }}>
+            {recentTransactions.map((tx) => (
+              <View
+                key={tx.id}
+                style={{
+                  padding: 12,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  backgroundColor: colors.card,
+                  gap: 6,
+                }}
+              >
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
+                    <View
+                      style={[
+                        styles.txIconBadge,
+                        {
+                          backgroundColor: tx.type === "income" ? colors.income + "18" : colors.expense + "18",
+                          flexShrink: 0,
+                        },
+                      ]}
+                    >
+                      {tx.type === "income" ? (
+                        <SvgArrowUpRight size={13} color={colors.income} />
+                      ) : (
+                        <SvgArrowDownLeft size={13} color={colors.expense} />
+                      )}
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={[styles.txDesc, { color: colors.foreground, fontSize: 13, lineHeight: 18 }]} numberOfLines={2}>
+                        {tx.description || tx.category}
+                      </Text>
+                      <Text style={[styles.txRef, { color: colors.mutedForeground, marginTop: 2 }]} numberOfLines={1}>
+                        {tx.category} · {tx.department}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={{ alignItems: "flex-end", flexShrink: 0 }}>
+                    <Text
+                      style={[
+                        styles.txAmount,
+                        { color: tx.type === "income" ? colors.income : colors.expense, fontSize: 13.5 },
+                      ]}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.8}
+                    >
+                      {tx.type === "income" ? "+" : "-"}
+                      {settings.currency} {tx.amount.toLocaleString()}
+                    </Text>
+                    <Text style={{ fontSize: 10.5, color: colors.mutedForeground, marginTop: 2 }}>
+                      {tx.date}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            ))}
+          </View>
         ) : (
           <View style={styles.tableContainer}>
             {/* Table Header */}
             <View style={[styles.tableHeaderRow, { borderBottomColor: colors.border, backgroundColor: colors.background }]}>
-              <Text style={[styles.th, { flex: isMobile ? 1 : 2.6, paddingRight: 14, color: colors.mutedForeground }]}>TRANSACTION / MEMO</Text>
-              {!isMobile && <Text style={[styles.th, { width: 145, paddingRight: 12, color: colors.mutedForeground }]}>CATEGORY</Text>}
-              {!isMobile && <Text style={[styles.th, { width: 130, paddingRight: 12, color: colors.mutedForeground }]}>DEPARTMENT</Text>}
-              <Text style={[styles.th, { width: isMobile ? 85 : 100, paddingRight: 10, color: colors.mutedForeground }]}>DATE</Text>
-              <Text style={[styles.th, { width: isMobile ? 95 : 120, color: colors.mutedForeground, textAlign: "right" }]}>AMOUNT</Text>
+              <Text style={[styles.th, { flex: 2.6, paddingRight: 14, color: colors.mutedForeground }]}>TRANSACTION / MEMO</Text>
+              <Text style={[styles.th, { width: 145, paddingRight: 12, color: colors.mutedForeground }]}>CATEGORY</Text>
+              <Text style={[styles.th, { width: 130, paddingRight: 12, color: colors.mutedForeground }]}>DEPARTMENT</Text>
+              <Text style={[styles.th, { width: 100, paddingRight: 10, color: colors.mutedForeground }]}>DATE</Text>
+              <Text style={[styles.th, { width: 120, color: colors.mutedForeground, textAlign: "right" }]}>AMOUNT</Text>
             </View>
 
             {/* Table Rows */}
             {recentTransactions.map((tx) => (
               <View key={tx.id} style={[styles.tableRow, { borderBottomColor: colors.border }]}>
-                <View style={{ flex: isMobile ? 1 : 2.6, flexDirection: "row", alignItems: "center", gap: 10, paddingRight: 14 }}>
+                <View style={{ flex: 2.6, flexDirection: "row", alignItems: "center", gap: 10, paddingRight: 14 }}>
                   <View
                     style={[
                       styles.txIconBadge,
@@ -1090,29 +1219,25 @@ export function WebDashboard({
                   </View>
                 </View>
 
-                {!isMobile && (
-                  <View style={{ width: 145, paddingRight: 12, justifyContent: "center" }}>
-                    <Text style={[styles.tableCellText, { color: colors.foreground }]} numberOfLines={2}>
-                      {tx.category}
-                    </Text>
-                  </View>
-                )}
+                <View style={{ width: 145, paddingRight: 12, justifyContent: "center" }}>
+                  <Text style={[styles.tableCellText, { color: colors.foreground }]} numberOfLines={2}>
+                    {tx.category}
+                  </Text>
+                </View>
 
-                {!isMobile && (
-                  <View style={{ width: 130, paddingRight: 12, justifyContent: "center" }}>
-                    <Text style={[styles.tableCellText, { color: colors.foreground }]} numberOfLines={2}>
-                      {tx.department}
-                    </Text>
-                  </View>
-                )}
+                <View style={{ width: 130, paddingRight: 12, justifyContent: "center" }}>
+                  <Text style={[styles.tableCellText, { color: colors.foreground }]} numberOfLines={2}>
+                    {tx.department}
+                  </Text>
+                </View>
 
-                <View style={{ width: isMobile ? 85 : 100, paddingRight: 10, justifyContent: "center" }}>
+                <View style={{ width: 100, paddingRight: 10, justifyContent: "center" }}>
                   <Text style={[styles.tableCellText, { color: colors.mutedForeground }]}>
                     {tx.date}
                   </Text>
                 </View>
 
-                <View style={{ width: isMobile ? 95 : 120, alignItems: "flex-end", justifyContent: "center" }}>
+                <View style={{ width: 120, alignItems: "flex-end", justifyContent: "center" }}>
                   <Text
                     style={[
                       styles.txAmount,
