@@ -435,10 +435,10 @@ export function NetBalanceBreakdownModal({
                       <TouchableOpacity
                         style={{
                           flex: 1,
-                          flexDirection: "row",
+                          flexDirection: "column",
                           alignItems: "center",
                           justifyContent: "center",
-                          gap: 4,
+                          gap: 2,
                           paddingVertical: 7,
                           paddingHorizontal: 4,
                           borderRadius: 8,
@@ -450,20 +450,44 @@ export function NetBalanceBreakdownModal({
                           if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                           setModalBalanceMode("cashflow");
                         }}
+                        activeOpacity={0.75}
                       >
-                        <Feather name="trending-up" size={11} color={modalBalanceMode === "cashflow" ? "#FFFFFF" : colors.mutedForeground} />
-                        <Text style={{ fontSize: 10, fontFamily: "Inter_700Bold", color: modalBalanceMode === "cashflow" ? "#FFFFFF" : colors.mutedForeground }} numberOfLines={1}>
-                          Cashflow ({actualCashflowNet >= 0 ? "+" : ""}{settings.currency} {fmtShort(actualCashflowNet)})
+                        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                          <Feather name="trending-up" size={11} color={modalBalanceMode === "cashflow" ? "#FFFFFF" : colors.mutedForeground} />
+                          <Text
+                            style={{
+                              fontSize: 10,
+                              fontFamily: "Inter_600SemiBold",
+                              color: modalBalanceMode === "cashflow" ? "#FFFFFF" : colors.mutedForeground,
+                            }}
+                            numberOfLines={1}
+                            adjustsFontSizeToFit
+                            minimumFontScale={0.8}
+                          >
+                            Cashflow
+                          </Text>
+                        </View>
+                        <Text
+                          style={{
+                            fontSize: 10.5,
+                            fontFamily: "Inter_700Bold",
+                            color: modalBalanceMode === "cashflow" ? "#FFFFFF" : colors.foreground,
+                          }}
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                          minimumFontScale={0.8}
+                        >
+                          {actualCashflowNet >= 0 ? "+" : ""}{settings.currency} {fmtShort(actualCashflowNet)}
                         </Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
                         style={{
                           flex: 1,
-                          flexDirection: "row",
+                          flexDirection: "column",
                           alignItems: "center",
                           justifyContent: "center",
-                          gap: 4,
+                          gap: 2,
                           paddingVertical: 7,
                           paddingHorizontal: 4,
                           borderRadius: 8,
@@ -475,20 +499,44 @@ export function NetBalanceBreakdownModal({
                           if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                           setModalBalanceMode("budget");
                         }}
+                        activeOpacity={0.75}
                       >
-                        <Feather name="pie-chart" size={11} color={modalBalanceMode === "budget" ? "#FFFFFF" : colors.mutedForeground} />
-                        <Text style={{ fontSize: 10, fontFamily: "Inter_700Bold", color: modalBalanceMode === "budget" ? "#FFFFFF" : colors.mutedForeground }} numberOfLines={1}>
-                          Budget ({netBudgetRemaining >= 0 ? "+" : ""}{settings.currency} {fmtShort(netBudgetRemaining)})
+                        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                          <Feather name="pie-chart" size={11} color={modalBalanceMode === "budget" ? "#FFFFFF" : colors.mutedForeground} />
+                          <Text
+                            style={{
+                              fontSize: 10,
+                              fontFamily: "Inter_600SemiBold",
+                              color: modalBalanceMode === "budget" ? "#FFFFFF" : colors.mutedForeground,
+                            }}
+                            numberOfLines={1}
+                            adjustsFontSizeToFit
+                            minimumFontScale={0.8}
+                          >
+                            Budget
+                          </Text>
+                        </View>
+                        <Text
+                          style={{
+                            fontSize: 10.5,
+                            fontFamily: "Inter_700Bold",
+                            color: modalBalanceMode === "budget" ? "#FFFFFF" : colors.foreground,
+                          }}
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                          minimumFontScale={0.8}
+                        >
+                          {netBudgetRemaining >= 0 ? "+" : ""}{settings.currency} {fmtShort(netBudgetRemaining)}
                         </Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
                         style={{
                           flex: 1,
-                          flexDirection: "row",
+                          flexDirection: "column",
                           alignItems: "center",
                           justifyContent: "center",
-                          gap: 4,
+                          gap: 2,
                           paddingVertical: 7,
                           paddingHorizontal: 4,
                           borderRadius: 8,
@@ -500,10 +548,34 @@ export function NetBalanceBreakdownModal({
                           if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                           setModalBalanceMode("surplus");
                         }}
+                        activeOpacity={0.75}
                       >
-                        <Feather name="shield" size={11} color={modalBalanceMode === "surplus" ? "#FFFFFF" : colors.mutedForeground} />
-                        <Text style={{ fontSize: 10, fontFamily: "Inter_700Bold", color: modalBalanceMode === "surplus" ? "#FFFFFF" : colors.mutedForeground }} numberOfLines={1}>
-                          Unallocated ({settings.currency} {fmtShort(unallocatedFunds)})
+                        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4 }}>
+                          <Feather name="shield" size={11} color={modalBalanceMode === "surplus" ? "#FFFFFF" : colors.mutedForeground} />
+                          <Text
+                            style={{
+                              fontSize: 10,
+                              fontFamily: "Inter_600SemiBold",
+                              color: modalBalanceMode === "surplus" ? "#FFFFFF" : colors.mutedForeground,
+                            }}
+                            numberOfLines={1}
+                            adjustsFontSizeToFit
+                            minimumFontScale={0.8}
+                          >
+                            Unallocated
+                          </Text>
+                        </View>
+                        <Text
+                          style={{
+                            fontSize: 10.5,
+                            fontFamily: "Inter_700Bold",
+                            color: modalBalanceMode === "surplus" ? "#FFFFFF" : colors.foreground,
+                          }}
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                          minimumFontScale={0.8}
+                        >
+                          {settings.currency} {fmtShort(unallocatedFunds)}
                         </Text>
                       </TouchableOpacity>
                     </View>

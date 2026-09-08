@@ -392,7 +392,8 @@ export function AreaLineChart({
               >
                 <Text
                   numberOfLines={1}
-                  ellipsizeMode="clip"
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.85}
                   style={[
                     styles.rangeText,
                     { color: isSelected ? "#FFFFFF" : colors.mutedForeground },
@@ -843,8 +844,8 @@ const styles = StyleSheet.create({
     paddingRight: 6,
   },
   rangeChip: {
-    minWidth: 38,
-    paddingHorizontal: 10,
+    minWidth: 35,
+    paddingHorizontal: 7,
     paddingVertical: 5,
     borderRadius: 10,
     borderWidth: 1,
