@@ -344,7 +344,11 @@ export function FinancialAnalyticsSuite({
         amount: d.spent,
         pct,
         displayPct: `${pct.toFixed(1)}%`,
-        count: d.payrollHeadcount > 0 ? `${d.payrollHeadcount} Staff` : undefined,
+        count:
+          ((d as any).payrollHeadcount || (d as any).headCount) > 0
+            ? `${(d as any).payrollHeadcount || (d as any).headCount} Staff`
+            : undefined,
+        categoriesBreakdown,
         originText,
         color: palette[idx % palette.length],
       };
@@ -443,8 +447,8 @@ export function FinancialAnalyticsSuite({
                   ? `${((selectedDeptMetric.spent / totalExp) * 100).toFixed(1)}%`
                   : "0.0%",
               count:
-                selectedDeptMetric.payrollHeadcount > 0
-                  ? `${selectedDeptMetric.payrollHeadcount} Staff`
+                ((selectedDeptMetric as any).payrollHeadcount || (selectedDeptMetric as any).headCount) > 0
+                  ? `${(selectedDeptMetric as any).payrollHeadcount || (selectedDeptMetric as any).headCount} Staff`
                   : undefined,
               originText: "Active Cost Center",
               color: "#3B82F6",
@@ -641,8 +645,8 @@ export function FinancialAnalyticsSuite({
               return (
                 <RingProgress
                   percentage={activePct}
-                  size={142}
-                  strokeWidth={12}
+                  size={132}
+                  strokeWidth={11}
                   color={budgetMode === "remaining" ? colors.income : activeBudgetView.statusColor}
                   centerLabel={centerLabel}
                   label={label}
@@ -928,7 +932,7 @@ export function FinancialAnalyticsSuite({
                 <TouchableOpacity
                   onPress={() => {
                     const matchedDept = effectiveDepts.find(
-                      (d) => d.id === activeBudgetView.deptId || d.name.trim().toLowerCase() === activeBudgetView.name.trim().toLowerCase()
+                      (d: any) => d.id === activeBudgetView.deptId || d.name.trim().toLowerCase() === activeBudgetView.name.trim().toLowerCase()
                     );
                     onOpenDepartmentStaff(matchedDept || { id: activeBudgetView.deptId || activeBudgetView.name, name: activeBudgetView.name });
                   }}
@@ -1086,8 +1090,8 @@ export function FinancialAnalyticsSuite({
               return (
                 <RingProgress
                   percentage={activePct}
-                  size={142}
-                  strokeWidth={12}
+                  size={132}
+                  strokeWidth={11}
                   color={ringColor}
                   centerLabel={centerLabel}
                   label={label}
@@ -1341,8 +1345,8 @@ export function FinancialAnalyticsSuite({
             <View style={styles.donutWrap}>
               <DonutChart
                 segments={activeDistView.chartSegments}
-                size={128}
-                strokeWidth={11}
+                size={124}
+                strokeWidth={10}
                 centerLabel={
                   activeDistView.selectedData
                     ? formatCompactCurrency(activeDistView.selectedData.amount, currency)
@@ -1522,70 +1526,86 @@ export function FinancialAnalyticsSuite({
             </ScrollView>
           </View>
 
-          {/* Department Breakdown Cards */}
+          {/* Department Breakdown Ranked List */}
           <ScrollView
             style={styles.categoryRankedScroll}
             contentContainerStyle={styles.categoryRankedList}
             showsVerticalScrollIndicator={false}
             nestedScrollEnabled
           >
-            {effectiveDeptMetrics.length === 0 ? (
+            {activeDistView.items.length === 0 && !selectedDistributionItem ? (
               <View style={[styles.emptyDeptCatBox, { borderColor: colors.border }]}>
                 <Text style={[styles.emptyDeptCatText, { color: colors.mutedForeground }]}>
-                  No departments configured in the organization yet.
+                  {effectiveDeptMetrics.length === 0
+                    ? "No departments configured in the organization yet."
+                    : "No expense disbursements recorded in this period."}
                 </Text>
               </View>
             ) : (
               (selectedDistributionItem
-                ? effectiveDeptMetrics.filter(
-                    (dm) =>
-                      dm.name.toLowerCase() === selectedDistributionItem.toLowerCase() ||
-                      dm.id.toLowerCase() === selectedDistributionItem.toLowerCase()
+                ? (activeDistView.items.some(
+                    (it) =>
+                      it.name.toLowerCase() === selectedDistributionItem.toLowerCase() ||
+                      it.id.toLowerCase() === selectedDistributionItem.toLowerCase()
                   )
-                : effectiveDeptMetrics
-              ).map((dm) => {
+                    ? activeDistView.items.filter(
+                        (it) =>
+                          it.name.toLowerCase() === selectedDistributionItem.toLowerCase() ||
+                          it.id.toLowerCase() === selectedDistributionItem.toLowerCase()
+                      )
+                    : (() => {
+                        const matched = effectiveDeptMetrics.find(
+                          (dm) =>
+                            dm.name.toLowerCase() === selectedDistributionItem.toLowerCase() ||
+                            dm.id.toLowerCase() === selectedDistributionItem.toLowerCase()
+                        );
+                        return matched
+                          ? [
+                              {
+                                id: matched.id,
+                                name: matched.name,
+                                amount: matched.spent,
+                                pct:
+                                  activeDistView.totalExpenses > 0
+                                    ? (matched.spent / activeDistView.totalExpenses) * 100
+                                    : 0,
+                                displayPct:
+                                  activeDistView.totalExpenses > 0
+                                    ? `${((matched.spent / activeDistView.totalExpenses) * 100).toFixed(1)}%`
+                                    : "0.0%",
+                                count:
+                                  ((matched as any).payrollHeadcount || (matched as any).headCount) > 0
+                                    ? `${(matched as any).payrollHeadcount || (matched as any).headCount} Staff`
+                                    : undefined,
+                                categoriesBreakdown:
+                                  (
+                                    deptToCategoriesMap[matched.name.toLowerCase()] ||
+                                    deptToCategoriesMap[matched.id.toLowerCase()]
+                                  )?.categories || [],
+                                color: colors.primary,
+                              },
+                            ]
+                          : [];
+                      })())
+                : activeDistView.items
+              ).map((d) => {
                 const isSelected =
-                  selectedDistributionItem?.toLowerCase() === dm.name.toLowerCase() ||
-                  selectedDistributionItem?.toLowerCase() === dm.id.toLowerCase();
+                  selectedDistributionItem?.toLowerCase() === d.name.toLowerCase() ||
+                  selectedDistributionItem?.toLowerCase() === d.id.toLowerCase();
                 const isExpanded =
                   isSelected ||
-                  expandedDeptId === dm.id ||
-                  (expandedDeptId && expandedDeptId.toLowerCase() === dm.name.toLowerCase());
-                const isOver = dm.allocated > 0 && dm.spent > dm.allocated;
-                const isWarning = dm.utilizationPct >= 80 && !isOver;
-                const usageColor =
-                  dm.allocated <= 0
-                    ? colors.mutedForeground
-                    : isOver
-                    ? colors.expense
-                    : isWarning
-                    ? colors.warning
-                    : "#10B981";
-
-                const catItems =
-                  dm.categories && dm.categories.length > 0
-                    ? dm.categories
-                    : deptToCategoriesMap[dm.name.toLowerCase()]?.categories || [];
-
-                const catPalette = [
-                  "#3B82F6",
-                  "#8B5CF6",
-                  "#06B6D4",
-                  "#F59E0B",
-                  "#EC4899",
-                  "#10B981",
-                  "#6366F1",
-                ];
+                  expandedDeptId === d.id ||
+                  (expandedDeptId && expandedDeptId.toLowerCase() === d.name.toLowerCase());
 
                 return (
                   <TouchableOpacity
-                    key={dm.id || dm.name}
+                    key={d.id || d.name}
                     style={[
-                      styles.deptBreakdownCard,
+                      styles.rankedDistItem,
                       {
-                        backgroundColor: isExpanded ? colors.card : (colors.cardAlt ?? colors.muted) + "18",
-                        borderColor: isExpanded ? colors.primary : colors.border,
-                        borderWidth: isExpanded ? 1.5 : 1,
+                        backgroundColor: isSelected ? d.color + "16" : (colors.cardAlt ?? colors.muted) + "18",
+                        borderColor: isSelected ? d.color : colors.border,
+                        borderWidth: isSelected ? 1.5 : 1,
                       },
                     ]}
                     onPress={() => {
@@ -1594,242 +1614,75 @@ export function FinancialAnalyticsSuite({
                         setSelectedDistributionItem(null);
                         setExpandedDeptId(null);
                       } else {
-                        setSelectedDistributionItem(dm.name);
-                        setExpandedDeptId(dm.id);
+                        setSelectedDistributionItem(d.name);
+                        setExpandedDeptId(d.id);
                       }
                     }}
-                    activeOpacity={0.8}
+                    activeOpacity={0.75}
                   >
-                    {/* Department Header: 🏢 IT Department [▼ / ▲] */}
-                    <View style={styles.deptCardHeader}>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
-                        <Text style={styles.deptIcon}>🏢</Text>
-                        <Text
-                          style={[styles.deptCardTitle, { color: colors.foreground }]}
-                          numberOfLines={1}
-                          adjustsFontSizeToFit
-                          minimumFontScale={0.85}
-                        >
-                          {dm.name} Department
-                        </Text>
-                      </View>
-                      <View style={{ transform: [{ rotate: isExpanded ? "180deg" : "0deg" }] }}>
-                        <SvgChevronDown size={16} color={colors.mutedForeground} />
-                      </View>
-                    </View>
-
-                    {/* 3-Column Metric Box: Budget | Used | Remaining */}
-                    <View style={[styles.deptKpiRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                      <View style={styles.deptKpiCol}>
-                        <Text style={[styles.deptKpiLabel, { color: colors.mutedForeground }]}>Budget</Text>
-                        <Text
-                          style={[styles.deptKpiVal, { color: colors.foreground }]}
-                          numberOfLines={1}
-                          adjustsFontSizeToFit
-                          minimumFontScale={0.72}
-                        >
-                          {dm.allocated > 0 ? formatCompactCurrency(dm.allocated, currency) : "No Cap"}
-                        </Text>
-                      </View>
-                      <View style={[styles.deptKpiDivider, { backgroundColor: colors.border }]} />
-                      <View style={styles.deptKpiCol}>
-                        <Text style={[styles.deptKpiLabel, { color: colors.mutedForeground }]}>Used</Text>
+                    <View style={styles.rankedDistTopRow}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 7, flex: 1, minWidth: 0 }}>
+                        <View style={[styles.flowDot, { backgroundColor: d.color }]} />
                         <Text
                           style={[
-                            styles.deptKpiVal,
-                            { color: isOver ? colors.expense : "#F59E0B" },
+                            styles.rankedDistName,
+                            { color: isSelected ? d.color : colors.foreground },
+                            isSelected && { fontFamily: "Inter_700Bold" },
                           ]}
                           numberOfLines={1}
-                          adjustsFontSizeToFit
-                          minimumFontScale={0.72}
                         >
-                          {formatCompactCurrency(dm.spent, currency)}
+                          {d.name}
                         </Text>
+                        {d.count && (
+                          <View style={[styles.distCountBadge, { backgroundColor: d.color + "18" }]}>
+                            <Text style={[styles.distCountText, { color: d.color }]}>{d.count}</Text>
+                          </View>
+                        )}
                       </View>
-                      <View style={[styles.deptKpiDivider, { backgroundColor: colors.border }]} />
-                      <View style={styles.deptKpiCol}>
-                        <Text style={[styles.deptKpiLabel, { color: colors.mutedForeground }]}>Remaining</Text>
-                        <Text
-                          style={[
-                            styles.deptKpiVal,
-                            {
-                              color: isOver
-                                ? colors.expense
-                                : dm.remaining > 0
-                                ? colors.income
-                                : colors.mutedForeground,
-                            },
-                          ]}
-                          numberOfLines={1}
-                          adjustsFontSizeToFit
-                          minimumFontScale={0.72}
-                        >
-                          {dm.allocated > 0 ? formatCompactCurrency(dm.remaining, currency) : "Uncapped"}
+
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                        <Text style={[styles.rankedDistAmount, { color: colors.foreground }]}>
+                          {formatCompactCurrency(d.amount, currency)}
                         </Text>
-                      </View>
-                    </View>
-
-                    {/* Budget Usage Progress Bar */}
-                    <View style={styles.deptUsageRow}>
-                      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
-                        <Text style={[styles.deptUsageLabel, { color: colors.mutedForeground }]}>Budget Usage</Text>
-                        <Text
-                          style={[
-                            styles.deptUsagePct,
-                            { color: usageColor },
-                          ]}
-                        >
-                          {dm.allocated > 0 ? `${dm.utilizationPct.toFixed(0)}% Used` : "Uncapped"}
-                        </Text>
-                      </View>
-                      <View style={[styles.deptProgressTrack, { backgroundColor: colors.border }]}>
-                        <View
-                          style={[
-                            styles.deptProgressFill,
-                            {
-                              width: `${Math.min(100, Math.max(2, dm.utilizationPct))}%`,
-                              backgroundColor: usageColor,
-                            },
-                          ]}
-                        />
-                      </View>
-                    </View>
-
-                    {/* Collapsed Hint */}
-                    {!isExpanded && (
-                      <View style={styles.deptTapHint}>
-                        <Text style={[styles.deptTapHintText, { color: colors.primary }]}>
-                          Tap to View Breakdown ▼
-                        </Text>
-                      </View>
-                    )}
-
-                    {/* Expanded Details: Financial Overview & Expense Breakdown */}
-                    {isExpanded && (
-                      <View style={styles.deptExpandedContent}>
-                        {/* Financial Overview Subcard */}
-                        <View style={[styles.expandedSectionBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                          <Text style={[styles.expandedSectionHeading, { color: colors.mutedForeground }]}>
-                            FINANCIAL OVERVIEW
-                          </Text>
-
-                          <View style={styles.overviewLine}>
-                            <Text style={[styles.overviewLabel, { color: colors.mutedForeground }]}>Total Budget:</Text>
-                            <Text style={[styles.overviewValue, { color: colors.foreground }]}>
-                              {dm.allocated > 0 ? `${currency} ${dm.allocated.toLocaleString()}` : "No Cap Set"}
-                            </Text>
-                          </View>
-
-                          <View style={styles.overviewLine}>
-                            <Text style={[styles.overviewLabel, { color: colors.mutedForeground }]}>Total Used:</Text>
-                            <Text style={[styles.overviewValue, { color: isOver ? colors.expense : "#F59E0B" }]}>
-                              {currency} {dm.spent.toLocaleString()}
-                            </Text>
-                          </View>
-
-                          <View style={styles.overviewLine}>
-                            <Text style={[styles.overviewLabel, { color: colors.mutedForeground }]}>Remaining Budget:</Text>
-                            <Text style={[styles.overviewValue, { color: isOver ? colors.expense : dm.remaining > 0 ? colors.income : colors.mutedForeground }]}>
-                              {dm.allocated > 0 ? `${currency} ${dm.remaining.toLocaleString()}` : "Uncapped"}
-                            </Text>
-                          </View>
-
-                          <View style={styles.overviewLine}>
-                            <Text style={[styles.overviewLabel, { color: colors.mutedForeground }]}>Budget Usage:</Text>
-                            <Text style={[styles.overviewValue, { color: usageColor }]}>
-                              {dm.allocated > 0 ? `${dm.utilizationPct.toFixed(1)}%` : "0.0%"}
-                            </Text>
-                          </View>
-
-                          {dm.allocated > 0 && (
-                            <View style={[styles.deptProgressTrack, { backgroundColor: colors.border, marginTop: 8 }]}>
-                              <View
-                                style={[
-                                  styles.deptProgressFill,
-                                  {
-                                    width: `${Math.min(100, Math.max(2, dm.utilizationPct))}%`,
-                                    backgroundColor: usageColor,
-                                  },
-                                ]}
-                              />
-                            </View>
-                          )}
+                        <View style={[styles.distPctBadge, { backgroundColor: d.color + "20", borderColor: d.color + "40" }]}>
+                          <Text style={[styles.distPctText, { color: d.color }]}>{d.displayPct}</Text>
                         </View>
+                      </View>
+                    </View>
 
-                        {/* Divider */}
-                        <View style={[styles.expandedDivider, { backgroundColor: colors.border }]} />
+                    {/* Progress Bar */}
+                    <View style={[styles.distBarTrack, { backgroundColor: colors.border }]}>
+                      <View
+                        style={[
+                          styles.distBarFill,
+                          {
+                            width: `${Math.min(100, Math.max(3, d.pct))}%`,
+                            backgroundColor: d.color,
+                          },
+                        ]}
+                      />
+                    </View>
 
-                        {/* Expense Breakdown Subcard */}
-                        <View style={styles.catBreakdownSection}>
-                          <Text style={[styles.expandedSectionHeading, { color: colors.mutedForeground, marginBottom: 8 }]}>
-                            EXPENSE BREAKDOWN
-                          </Text>
-
-                          {catItems.length === 0 ? (
-                            <View style={[styles.emptyDeptCatBox, { borderColor: colors.border }]}>
-                              <Text style={[styles.emptyDeptCatText, { color: colors.mutedForeground }]}>
-                                No expense disbursements recorded for this department yet.
-                              </Text>
-                            </View>
-                          ) : (
-                            catItems.map((c: any, cIdx: number) => {
-                              const catColor = catPalette[cIdx % catPalette.length];
-                              const catName = c.category || c.name;
-                              const catAmt = Number(c.amount || 0);
-                              const catPct = Number(c.pct || 0);
-
-                              return (
-                                <View key={catName} style={styles.deptCatItem}>
-                                  <View style={styles.deptCatHeader}>
-                                    <Text
-                                      style={[styles.deptCatName, { color: colors.foreground }]}
-                                      numberOfLines={1}
-                                      adjustsFontSizeToFit
-                                      minimumFontScale={0.8}
-                                    >
-                                      {catName}
-                                    </Text>
-                                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                                      <Text style={[styles.deptCatAmt, { color: colors.foreground }]}>
-                                        {currency} {catAmt.toLocaleString()}
-                                      </Text>
-                                      <Text style={[styles.deptCatPct, { color: catColor }]}>
-                                        {catPct.toFixed(0)}%
-                                      </Text>
-                                    </View>
-                                  </View>
-
-                                  <View style={[styles.deptCatTrack, { backgroundColor: colors.border }]}>
-                                    <View
-                                      style={[
-                                        styles.deptCatFill,
-                                        {
-                                          width: `${Math.max(3, Math.min(100, catPct))}%`,
-                                          backgroundColor: catColor,
-                                        },
-                                      ]}
-                                    />
-                                  </View>
-                                </View>
-                              );
-                            })
-                          )}
-                        </View>
-
-                        {/* Action Button: View Outflows */}
-                        <TouchableOpacity
-                          style={[styles.deptDrillDownBtn, { borderColor: colors.border }]}
-                          onPress={(e) => {
-                            e.stopPropagation?.();
-                            if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                            onOpenDrillDown("expense", dm.name);
-                          }}
-                          activeOpacity={0.75}
-                        >
-                          <Text style={[styles.deptDrillDownBtnText, { color: colors.primary }]}>
-                            View All {dm.name} Outflows →
-                          </Text>
-                        </TouchableOpacity>
+                    {/* Sub-breakdown if selected/expanded and has categories */}
+                    {isExpanded && d.categoriesBreakdown && d.categoriesBreakdown.length > 0 && (
+                      <View style={styles.distSubCatRow}>
+                        {d.categoriesBreakdown.map((cat: any) => (
+                          <View
+                            key={cat.name}
+                            style={[
+                              styles.distSubCatChip,
+                              { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border },
+                            ]}
+                          >
+                            <Text style={[styles.distSubCatText, { color: colors.mutedForeground }]} numberOfLines={1}>
+                              {cat.name}:{" "}
+                              <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold" }}>
+                                {formatCompactCurrency(cat.amount, currency)}
+                              </Text>{" "}
+                              ({cat.pct.toFixed(0)}%)
+                            </Text>
+                          </View>
+                        ))}
                       </View>
                     )}
                   </TouchableOpacity>
@@ -1915,7 +1768,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 16,
     flexWrap: "wrap",
-    alignItems: "flex-start",
+    alignItems: "stretch",
   },
   gridMobile: {
     flexDirection: "column",
@@ -1927,14 +1780,13 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 16,
     borderWidth: 1,
-    padding: 18,
-    gap: 12,
+    padding: 16,
+    gap: 10,
     justifyContent: "flex-start",
   },
   cardDesktop: {
     flex: 1,
     minWidth: 300,
-    alignSelf: "flex-start",
     overflow: "hidden",
   },
   cardMobile: {
@@ -2042,14 +1894,14 @@ const styles = StyleSheet.create({
   ringCenterWrap: {
     alignItems: "center",
     justifyContent: "center",
-    minHeight: 150,
-    marginVertical: 4,
+    minHeight: 140,
+    marginVertical: 2,
   },
   donutWrap: {
     alignItems: "center",
     justifyContent: "center",
-    minHeight: 150,
-    marginVertical: 4,
+    minHeight: 140,
+    marginVertical: 2,
   },
   flowBarSection: {
     gap: 5,
@@ -2200,7 +2052,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingVertical: 9,
     paddingHorizontal: 4,
-    marginTop: 10,
+    marginTop: "auto",
   },
   bentoCol: {
     flex: 1,
@@ -2226,12 +2078,12 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   categoryRankedScroll: {
-    maxHeight: 285,
-    marginVertical: 4,
+    maxHeight: 125,
+    marginVertical: 2,
   },
   categoryRankedList: {
-    gap: 6,
-    paddingVertical: 2,
+    gap: 5,
+    paddingVertical: 1,
   },
   dimensionToggleRow: {
     flexDirection: "row",
@@ -2268,123 +2120,70 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 2,
   },
-  deptBreakdownCard: {
-    borderRadius: 14,
+  rankedDistItem: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
     borderWidth: 1,
-    padding: 12,
-    marginVertical: 4,
-    overflow: "hidden",
+    gap: 4,
   },
-  deptCardHeader: {
+  rankedDistTopRow: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 10,
-  },
-  deptIcon: {
-    fontSize: 16,
-  },
-  deptCardTitle: {
-    fontSize: 14,
-    fontFamily: "Inter_700Bold",
-  },
-  deptKpiRow: {
-    flexDirection: "row",
     alignItems: "center",
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 6,
-    marginBottom: 10,
   },
-  deptKpiCol: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    minWidth: 0,
-    paddingHorizontal: 2,
-  },
-  deptKpiLabel: {
-    fontSize: 9,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: 0.3,
-    marginBottom: 2,
-    textTransform: "uppercase",
-  },
-  deptKpiVal: {
-    fontSize: 12.5,
-    fontFamily: "Inter_700Bold",
-  },
-  deptKpiDivider: {
-    width: 1,
-    height: "70%",
-  },
-  deptUsageRow: {
-    marginTop: 2,
-  },
-  deptUsageLabel: {
-    fontSize: 10.5,
-    fontFamily: "Inter_500Medium",
-  },
-  deptUsagePct: {
-    fontSize: 11,
-    fontFamily: "Inter_700Bold",
-  },
-  deptProgressTrack: {
-    height: 7,
-    borderRadius: 3.5,
-    overflow: "hidden",
-  },
-  deptProgressFill: {
-    height: "100%",
-    borderRadius: 3.5,
-  },
-  deptTapHint: {
-    alignItems: "center",
-    marginTop: 8,
-    paddingTop: 4,
-  },
-  deptTapHintText: {
+  rankedDistName: {
     fontSize: 11,
     fontFamily: "Inter_600SemiBold",
+    letterSpacing: -0.1,
   },
-  deptExpandedContent: {
-    marginTop: 12,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(128, 128, 128, 0.2)",
-    gap: 10,
+  distCountBadge: {
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 6,
   },
-  expandedSectionBox: {
-    borderRadius: 10,
+  distCountText: {
+    fontSize: 9,
+    fontFamily: "Inter_700Bold",
+  },
+  rankedDistAmount: {
+    fontSize: 11,
+    fontFamily: "Inter_700Bold",
+  },
+  distPctBadge: {
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 6,
     borderWidth: 1,
-    padding: 10,
-    gap: 6,
   },
-  expandedSectionHeading: {
+  distPctText: {
     fontSize: 9.5,
     fontFamily: "Inter_700Bold",
-    letterSpacing: 0.5,
   },
-  overviewLine: {
+  distBarTrack: {
+    height: 4,
+    borderRadius: 2,
+    overflow: "hidden",
+  },
+  distBarFill: {
+    height: "100%",
+    borderRadius: 2,
+  },
+  distSubCatRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 4,
+    marginTop: 3,
   },
-  overviewLabel: {
-    fontSize: 11.5,
-    fontFamily: "Inter_400Regular",
+  distSubCatChip: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
   },
-  overviewValue: {
-    fontSize: 12,
-    fontFamily: "Inter_700Bold",
-  },
-  expandedDivider: {
-    height: 1,
-    marginVertical: 4,
-  },
-  catBreakdownSection: {
-    gap: 8,
+  distSubCatText: {
+    fontSize: 9.5,
+    fontFamily: "Inter_500Medium",
   },
   emptyDeptCatBox: {
     padding: 12,
@@ -2397,47 +2196,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: "Inter_400Regular",
     textAlign: "center",
-  },
-  deptCatItem: {
-    gap: 4,
-  },
-  deptCatHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  deptCatName: {
-    fontSize: 11.5,
-    fontFamily: "Inter_500Medium",
-    flex: 1,
-    marginRight: 8,
-  },
-  deptCatAmt: {
-    fontSize: 11.5,
-    fontFamily: "Inter_600SemiBold",
-  },
-  deptCatPct: {
-    fontSize: 10.5,
-    fontFamily: "Inter_700Bold",
-    minWidth: 26,
-    textAlign: "right",
-  },
-  deptCatTrack: {
-    height: 5,
-    borderRadius: 2.5,
-    overflow: "hidden",
-  },
-  deptCatFill: {
-    height: "100%",
-    borderRadius: 2.5,
-  },
-  deptDrillDownBtn: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 7,
-    borderRadius: 8,
-    borderWidth: 1,
-    marginTop: 4,
   },
   deptDrillDownBtnText: {
     fontSize: 11,
@@ -2523,15 +2281,6 @@ const styles = StyleSheet.create({
   itemPctBadgeText: {
     fontSize: 9.5,
     fontFamily: "Inter_700Bold",
-  },
-  distBarTrack: {
-    height: 4.5,
-    borderRadius: 2.25,
-    overflow: "hidden",
-  },
-  distBarFill: {
-    height: "100%",
-    borderRadius: 2.25,
   },
   distItemBottomRow: {
     flexDirection: "row",
