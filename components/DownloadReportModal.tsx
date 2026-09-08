@@ -185,8 +185,11 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
     if (scope === "custom") {
       return createCustomDatePeriod(customStart, customEnd);
     }
+    if (scope === "all") {
+      return getPresetPeriod("all_time", transactions);
+    }
     return activePeriod;
-  }, [scope, customStart, customEnd, activePeriod]);
+  }, [scope, customStart, customEnd, activePeriod, transactions]);
 
   const compiledEnterpriseData = useMemo(() => {
     return buildEnterpriseReportData(
@@ -196,7 +199,9 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
       departments,
       {
         period: effectivePeriod,
-        scope: scope === "custom" ? "period" : scope,
+        scope: scope === "all" ? "all_time" : scope === "custom" ? "period" : scope,
+        startDate: effectivePeriod?.startDate,
+        endDate: effectivePeriod?.endDate,
         departmentFilter: selectedDept,
         categoryFilter: selectedCategory,
         typeFilter: selectedTypeFilter,

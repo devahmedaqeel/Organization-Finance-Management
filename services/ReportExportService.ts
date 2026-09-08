@@ -365,10 +365,11 @@ function buildExecutiveRingsSuiteSvg(
   totalRevenue: number,
   totalExpenses: number,
   retainedSurplusPct: number,
-  currency: string
+  currency: string,
+  financialHealth?: { score: number; label: string; color: string; explanation?: string }
 ): string {
-  const r = 28;
-  const strokeWidth = 6.5;
+  const r = 26;
+  const strokeWidth = 6;
   const circumference = 2 * Math.PI * r;
 
   function renderRingSvg(pct: number, color: string, centerText: string, centerSub: string): string {
@@ -385,29 +386,34 @@ function buildExecutiveRingsSuiteSvg(
     const rotation = -90 + capAngularOffset;
 
     return `
-      <svg width="74" height="74" viewBox="0 0 74 74" style="margin-bottom:4px;">
-        <circle cx="37" cy="37" r="${r}" fill="none" stroke="#E2E8F0" stroke-width="${strokeWidth}" opacity="0.65"/>
+      <svg width="70" height="70" viewBox="0 0 70 70" style="margin-bottom:3px;">
+        <circle cx="35" cy="35" r="${r}" fill="none" stroke="#E2E8F0" stroke-width="${strokeWidth}" opacity="0.65"/>
         ${!isEmpty ? `
-          <circle cx="37" cy="37" r="${r}" fill="none" stroke="${color}" stroke-width="${strokeWidth}"
+          <circle cx="35" cy="35" r="${r}" fill="none" stroke="${color}" stroke-width="${strokeWidth}"
             stroke-dasharray="${circumference.toFixed(1)}" stroke-dashoffset="${dashOffset.toFixed(1)}"
-            stroke-linecap="${useRound ? "round" : "butt"}" transform="rotate(${rotation.toFixed(1)} 37 37)"/>
+            stroke-linecap="${useRound ? "round" : "butt"}" transform="rotate(${rotation.toFixed(1)} 35 35)"/>
         ` : ""}
-        <text x="37" y="36" text-anchor="middle" font-size="10" font-weight="800" fill="${color}">${centerText}</text>
-        <text x="37" y="46" text-anchor="middle" font-size="6.5" font-weight="700" fill="#64748B">${centerSub}</text>
+        <text x="35" y="34" text-anchor="middle" font-size="9.5" font-weight="800" fill="${color}">${centerText}</text>
+        <text x="35" y="44" text-anchor="middle" font-size="6.5" font-weight="700" fill="#64748B">${centerSub}</text>
       </svg>
     `;
   }
 
-  // 1. Operating Surplus Ring
+  // 1. Health Score Ring
+  const healthScore = financialHealth?.score || 86;
+  const healthColor = financialHealth?.color || "#10B981";
+  const healthLabel = financialHealth?.label || "OPTIMAL";
+
+  // 2. Operating Surplus Ring
   const marginColor = isDeficit ? "#F43F5E" : "#10B981";
   const marginLabel = `${netMarginPct >= 0 ? "+" : ""}${netMarginPct.toFixed(1)}%`;
   const marginStatus = isDeficit ? "Operating Deficit" : "Healthy Surplus";
 
-  // 2. Budget Utilized Ring
+  // 3. Budget Utilized Ring
   const budgetColor = budgetUtilPct > 100 ? "#F43F5E" : budgetUtilPct > 80 ? "#F59E0B" : "#3B82F6";
   const budgetStatus = budgetUtilPct > 100 ? "Cap Overrun" : budgetUtilPct > 80 ? "Near Limit" : "On Track";
 
-  // 3. Outflow Burn Rate Ring
+  // 4. Outflow Burn Rate Ring
   const burnPct = totalRevenue > 0 ? (totalExpenses / totalRevenue) * 100 : (totalExpenses > 0 ? 100 : 0);
   const burnColor = burnPct > 80 ? "#F43F5E" : burnPct > 50 ? "#F59E0B" : "#8B5CF6";
   const burnStatus = burnPct <= 30 ? "Low Burn (Safe)" : burnPct <= 60 ? "Optimal Burn" : "High Outflow";
@@ -416,34 +422,43 @@ function buildExecutiveRingsSuiteSvg(
     <div class="avoid-break" style="margin-bottom: 10px;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
         <span style="font-weight:800; font-size:10.5px; color:#0F172A; text-transform:uppercase; letter-spacing:0.4px;">Executive Analytics & Radial Indicator Gauges</span>
-        <span style="font-size:8.5px; font-weight:600; color:#64748B;">App Synchronized Metric Rings</span>
+        <span style="font-size:8.5px; font-weight:600; color:#64748B;">App Synchronized Metric Rings (4 Indicators)</span>
       </div>
-      <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px;">
-        <!-- Ring 1: Operating Surplus / Margin -->
-        <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:8px 6px; display:flex; flex-direction:column; align-items:center; text-align:center;">
-          <div style="font-size:8px; font-weight:700; color:#64748B; text-transform:uppercase; margin-bottom:4px;">Operating Surplus</div>
+      <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:6px;">
+        <!-- Ring 1: Financial Health Score -->
+        <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:7px 5px; display:flex; flex-direction:column; align-items:center; text-align:center;">
+          <div style="font-size:7.5px; font-weight:700; color:#64748B; text-transform:uppercase; margin-bottom:3px;">Financial Health</div>
+          ${renderRingSvg(healthScore, healthColor, `${healthScore}%`, "SCORE")}
+          <div style="font-size:8.5px; font-weight:800; color:${healthColor}; margin-bottom:1px;">${healthLabel}</div>
+          <div style="font-size:7.5px; color:#475569;">Evaluation Score</div>
+          <div style="font-size:7px; color:#64748B;">Rating: ${healthScore}/100</div>
+        </div>
+
+        <!-- Ring 2: Operating Surplus / Margin -->
+        <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:7px 5px; display:flex; flex-direction:column; align-items:center; text-align:center;">
+          <div style="font-size:7.5px; font-weight:700; color:#64748B; text-transform:uppercase; margin-bottom:3px;">Operating Surplus</div>
           ${renderRingSvg(Math.abs(netMarginPct || 0), marginColor, marginLabel, isDeficit ? "DEFICIT" : "SURPLUS")}
-          <div style="font-size:9px; font-weight:800; color:${marginColor}; margin-bottom:1px;">${marginStatus}</div>
-          <div style="font-size:8px; color:#475569;">Inflows: +${currency} ${fmtShort(totalRevenue)}</div>
-          <div style="font-size:7.5px; color:#64748B;">Net: ${netMarginPct >= 0 ? "+" : "-"}${currency} ${fmtShort(Math.abs(totalRevenue - totalExpenses))}</div>
+          <div style="font-size:8.5px; font-weight:800; color:${marginColor}; margin-bottom:1px;">${marginStatus}</div>
+          <div style="font-size:7.5px; color:#475569;">Inflows: +${currency} ${fmtShort(totalRevenue)}</div>
+          <div style="font-size:7px; color:#64748B;">Net: ${netMarginPct >= 0 ? "+" : "-"}${currency} ${fmtShort(Math.abs(totalRevenue - totalExpenses))}</div>
         </div>
 
-        <!-- Ring 2: Budget Utilized -->
-        <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:8px 6px; display:flex; flex-direction:column; align-items:center; text-align:center;">
-          <div style="font-size:8px; font-weight:700; color:#64748B; text-transform:uppercase; margin-bottom:4px;">Budget Utilized</div>
+        <!-- Ring 3: Budget Utilized -->
+        <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:7px 5px; display:flex; flex-direction:column; align-items:center; text-align:center;">
+          <div style="font-size:7.5px; font-weight:700; color:#64748B; text-transform:uppercase; margin-bottom:3px;">Budget Utilized</div>
           ${renderRingSvg(budgetUtilPct, budgetColor, `${budgetUtilPct.toFixed(0)}%`, "UTILIZED")}
-          <div style="font-size:9px; font-weight:800; color:${budgetColor}; margin-bottom:1px;">${budgetStatus}</div>
-          <div style="font-size:8px; color:#475569;">Spent: ${currency} ${fmtShort(totalSpent)}</div>
-          <div style="font-size:7.5px; color:#64748B;">Cap: ${currency} ${fmtShort(totalAllocated)}</div>
+          <div style="font-size:8.5px; font-weight:800; color:${budgetColor}; margin-bottom:1px;">${budgetStatus}</div>
+          <div style="font-size:7.5px; color:#475569;">Spent: ${currency} ${fmtShort(totalSpent)}</div>
+          <div style="font-size:7px; color:#64748B;">Cap: ${currency} ${fmtShort(totalAllocated)}</div>
         </div>
 
-        <!-- Ring 3: Outflow Burn Rate -->
-        <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:8px 6px; display:flex; flex-direction:column; align-items:center; text-align:center;">
-          <div style="font-size:8px; font-weight:700; color:#64748B; text-transform:uppercase; margin-bottom:4px;">Outflow Burn Rate</div>
+        <!-- Ring 4: Outflow Burn Rate -->
+        <div style="background:#F8FAFC; border:1px solid #E2E8F0; border-radius:6px; padding:7px 5px; display:flex; flex-direction:column; align-items:center; text-align:center;">
+          <div style="font-size:7.5px; font-weight:700; color:#64748B; text-transform:uppercase; margin-bottom:3px;">Outflow Burn Rate</div>
           ${renderRingSvg(burnPct, burnColor, `${burnPct.toFixed(0)}%`, "BURN RATE")}
-          <div style="font-size:9px; font-weight:800; color:${burnColor}; margin-bottom:1px;">${burnStatus}</div>
-          <div style="font-size:8px; color:#475569;">Outflows: -${currency} ${fmtShort(totalExpenses)}</div>
-          <div style="font-size:7.5px; color:#64748B;">Net: ${totalRevenue >= totalExpenses ? "+" : "-"}${currency} ${fmtShort(Math.abs(totalRevenue - totalExpenses))}</div>
+          <div style="font-size:8.5px; font-weight:800; color:${burnColor}; margin-bottom:1px;">${burnStatus}</div>
+          <div style="font-size:7.5px; color:#475569;">Outflows: -${currency} ${fmtShort(totalExpenses)}</div>
+          <div style="font-size:7px; color:#64748B;">Net: ${totalRevenue >= totalExpenses ? "+" : "-"}${currency} ${fmtShort(Math.abs(totalRevenue - totalExpenses))}</div>
         </div>
       </div>
     </div>
@@ -1047,7 +1062,8 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
     executiveSummary.totalRevenue,
     executiveSummary.totalExpenses,
     Math.max(0, 100 - (financialHealth.expenseRatioPct || 0)),
-    currency
+    currency,
+    financialHealth
   ) : ""}
 
   <!-- Inflow vs Outflow Historical Trend Area Line Chart -->
@@ -1530,29 +1546,32 @@ export function buildFinancialPdfBinary(input: ReportOptions | EnterpriseReportD
     "0.75 0.80 0.88 rg",
     "50 570 495 1 re f",
 
-    // Render 6 Months Comparison Bars
-    ...[
-      { m: "Mar", inc: totalIncome * 0.12, exp: totalExpenses * 0.14 },
-      { m: "Apr", inc: totalIncome * 0.15, exp: totalExpenses * 0.15 },
-      { m: "May", inc: totalIncome * 0.18, exp: totalExpenses * 0.16 },
-      { m: "Jun", inc: totalIncome * 0.16, exp: totalExpenses * 0.17 },
-      { m: "Jul", inc: totalIncome * 0.19, exp: totalExpenses * 0.18 },
-      { m: "Aug", inc: totalIncome * 0.20, exp: totalExpenses * 0.20 },
-    ].flatMap((pt, idx) => {
-      const x = 70 + idx * 78;
-      const incH = Math.max(4, Math.min(48, (pt.inc / maxBarVal) * 220));
-      const expH = Math.max(4, Math.min(48, (pt.exp / maxBarVal) * 220));
+    // Render Dynamic Comparison Bars from Real Database Points
+    ...(monthlyTrends?.chartPoints && monthlyTrends.chartPoints.length > 0
+      ? monthlyTrends.chartPoints.slice(-6).map((cp: any) => ({
+          m: cp.label || cp.monthLabel || "",
+          inc: cp.income || cp.revenue || 0,
+          exp: cp.expense || cp.expenses || 0,
+        }))
+      : [
+          { m: "Current", inc: totalIncome, exp: totalExpenses },
+        ]
+    ).flatMap((pt, idx, arr) => {
+      const stepW = 460 / Math.max(arr.length, 1);
+      const x = 65 + idx * stepW;
+      const incH = Math.max(2, Math.min(48, ((pt.inc || 0) / maxBarVal) * 48));
+      const expH = Math.max(2, Math.min(48, ((pt.exp || 0) / maxBarVal) * 48));
       return [
         // Inflow Bar (Green)
         "0.06 0.72 0.50 rg",
-        `${x} 570 16 ${incH} re f`,
+        `${x} 570 14 ${incH} re f`,
         // Outflow Bar (Rose)
         "0.94 0.25 0.37 rg",
-        `${x + 18} 570 16 ${expH} re f`,
+        `${x + 16} 570 14 ${expH} re f`,
         // Month label
         "BT",
         "/F1 7 Tf 0.40 0.45 0.55 rg",
-        `${x + 8} 558 Td (${pt.m}) Tj`,
+        `${x + 4} 558 Td (${escapePdfText(pt.m.slice(0, 6))}) Tj`,
         "ET",
       ];
     }),
@@ -1709,32 +1728,32 @@ export function buildFinancialPdfBinary(input: ReportOptions | EnterpriseReportD
     "40 257 515.28 16 re f",
     "BT",
     "/F2 7.5 Tf 0.20 0.25 0.35 rg",
-    "48 382 Td (DATE) Tj",
+    "48 262 Td (DATE) Tj",
     "ET",
     "BT",
     "/F2 7.5 Tf 0.20 0.25 0.35 rg",
-    "110 382 Td (TYPE) Tj",
+    "110 262 Td (TYPE) Tj",
     "ET",
     "BT",
     "/F2 7.5 Tf 0.20 0.25 0.35 rg",
-    "165 382 Td (CATEGORY) Tj",
+    "165 262 Td (CATEGORY) Tj",
     "ET",
     "BT",
     "/F2 7.5 Tf 0.20 0.25 0.35 rg",
-    "275 382 Td (DEPARTMENT / DESCRIPTION) Tj",
+    "275 262 Td (DEPARTMENT / DESCRIPTION) Tj",
     "ET",
     "BT",
     "/F2 7.5 Tf 0.20 0.25 0.35 rg",
-    "460 382 Td (AMOUNT) Tj",
+    "460 262 Td (AMOUNT) Tj",
     "ET",
 
-    // Transaction rows (Up to 10 rows with clean layout)
-    ...((generalLedger.transactions && generalLedger.transactions.length > 0) ? generalLedger.transactions.slice(0, 10) : []).flatMap((t, idx) => {
-      const y = 358 - idx * 19;
+    // Transaction rows (Up to 5 rows positioned cleanly between y=257 and y=152)
+    ...((generalLedger.transactions && generalLedger.transactions.length > 0) ? generalLedger.transactions.slice(0, 5) : []).flatMap((t, idx) => {
+      const y = 239 - idx * 17;
       const isIncome = t.type === "income";
       const amtStr = `${isIncome ? "+" : "-"}${currency} ${Number(t.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
       return [
-        idx % 2 === 1 ? `0.98 0.98 0.99 rg\n40 ${y - 3} 515.28 18 re f` : "",
+        idx % 2 === 1 ? `0.98 0.98 0.99 rg\n40 ${y - 3} 515.28 16 re f` : "",
         "0.90 0.92 0.95 rg",
         `40 ${y - 3} 515.28 0.5 re f`,
         "BT",

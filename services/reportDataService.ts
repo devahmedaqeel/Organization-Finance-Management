@@ -10,6 +10,7 @@
 import { Transaction, Budget, PayrollEntry, Department } from "@/context/FinanceContext";
 import {
   NormalizedPeriod,
+  getPresetPeriod,
   aggregateTransactionsByGranularity,
   AggregatedPoint,
   parseYMD,
@@ -315,38 +316,49 @@ export function buildEnterpriseReportData(
   const isManager = userRole === "manager";
   const isEmployee = userRole === "employee";
 
-  // 2. Date Filtering
-  const isAllTime = filters.scope === "all" || !filters.period;
-  const startDate = isAllTime ? "1970-01-01" : filters.period?.startDate || "2026-01-01";
-  const endDate = isAllTime ? "2099-12-31" : filters.period?.endDate || "2026-12-31";
-  const periodLabel = isAllTime ? "All-Time Financial Archive" : (filters.period?.label || "Selected Financial Period");
+  // 2. Authoritative Date & Period Filtering
+  const isAllTime =
+    filters.scope === "all" ||
+    (!filters.period && !filters.startDate && !filters.endDate) ||
+    filters.period?.presetId === "all_time";
+  const allTimePeriod = getPresetPeriod("all_time", allTransactions);
+  const startDate = filters.startDate || (isAllTime ? allTimePeriod.startDate : filters.period?.startDate || allTimePeriod.startDate);
+  const endDate = filters.endDate || (isAllTime ? allTimePeriod.endDate : filters.period?.endDate || allTimePeriod.endDate);
+  const periodLabel = isAllTime ? "All-Time Financial Archive" : (filters.period?.label || `${startDate} to ${endDate}`);
 
-  // 3. Filter transactions strictly
+  const deptFilter = filters.departmentFilter || filters.department;
+  const catFilter = filters.categoryFilter || (filters as any).category;
+  const typeFilter = filters.typeFilter;
+
+  // 3. Filter transactions strictly respecting active input criteria
   const scopedTransactions = allTransactions.filter((t) => {
     if (!t.date) return false;
-    if (t.status === "failed") return false;
+    const status = (t as any).status;
+    if (status === "failed" || status === "deleted" || status === "void" || status === "cancelled") return false;
 
     // Date range filter
-    const txDate = t.date.slice(0, 10);
-    if (txDate < startDate || txDate > endDate) return false;
+    const txDate = t.date.slice(0, 10).replace(/\//g, "-");
+    if (!isAllTime) {
+      if (txDate < startDate || txDate > endDate) return false;
+    }
 
     // Department filter
-    if (filters.departmentFilter && filters.departmentFilter !== "all") {
-      if ((t.department || "").trim().toLowerCase() !== filters.departmentFilter.trim().toLowerCase()) {
+    if (deptFilter && deptFilter !== "all") {
+      if ((t.department || "").trim().toLowerCase() !== deptFilter.trim().toLowerCase()) {
         return false;
       }
     }
 
     // Category filter
-    if (filters.categoryFilter && filters.categoryFilter !== "all") {
-      if ((t.category || "").trim().toLowerCase() !== filters.categoryFilter.trim().toLowerCase()) {
+    if (catFilter && catFilter !== "all") {
+      if ((t.category || "").trim().toLowerCase() !== catFilter.trim().toLowerCase()) {
         return false;
       }
     }
 
     // Type filter
-    if (filters.typeFilter && filters.typeFilter !== "all") {
-      if (t.type !== filters.typeFilter) return false;
+    if (typeFilter && typeFilter !== "all") {
+      if (t.type !== typeFilter) return false;
     }
 
     return true;
@@ -368,8 +380,8 @@ export function buildEnterpriseReportData(
 
   // 5. Scoped Payroll calculation strictly respecting department AND selected date period
   const scopedPayroll = allPayroll.filter((p) => {
-    if (filters.departmentFilter && filters.departmentFilter !== "all") {
-      if ((p.department || "").trim().toLowerCase() !== filters.departmentFilter.trim().toLowerCase()) {
+    if (deptFilter && deptFilter !== "all") {
+      if ((p.department || "").trim().toLowerCase() !== deptFilter.trim().toLowerCase()) {
         return false;
       }
     }
@@ -400,13 +412,13 @@ export function buildEnterpriseReportData(
 
   // 6. Scoped Budgets calculation respecting department AND category filters
   const scopedBudgets = allBudgets.filter((b) => {
-    if (filters.departmentFilter && filters.departmentFilter !== "all") {
-      if ((b.department || "").trim().toLowerCase() !== filters.departmentFilter.trim().toLowerCase()) {
+    if (deptFilter && deptFilter !== "all") {
+      if ((b.department || "").trim().toLowerCase() !== deptFilter.trim().toLowerCase()) {
         return false;
       }
     }
-    if (filters.categoryFilter && filters.categoryFilter !== "all") {
-      if ((b.category || "").trim().toLowerCase() !== filters.categoryFilter.trim().toLowerCase()) {
+    if (catFilter && catFilter !== "all") {
+      if ((b.category || "").trim().toLowerCase() !== catFilter.trim().toLowerCase()) {
         return false;
       }
     }
@@ -686,14 +698,16 @@ export function buildEnterpriseReportData(
   // 13. Monthly Trend Aggregation
   const intelligentGranularity = filters.period?.userGranularityOverride ||
     filters.period?.granularity ||
-    calculateIntelligentGranularity(startDate, endDate);
+    (isAllTime ? "month" : calculateIntelligentGranularity(startDate, endDate));
 
-  const effectivePeriod: NormalizedPeriod = filters.period || {
+  const effectivePeriod: NormalizedPeriod = {
     startDate,
     endDate,
     label: periodLabel,
     mode: isAllTime ? "presets" : "days",
+    presetId: isAllTime ? "all_time" : (filters.period?.presetId || "custom"),
     granularity: intelligentGranularity,
+    userGranularityOverride: filters.period?.userGranularityOverride,
   };
 
   const chartPoints = aggregateTransactionsByGranularity(

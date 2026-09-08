@@ -230,6 +230,7 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
         ? "executive_summary"
         : "consolidated_statement";
 
+    const isAllTime = activePeriod.presetId === "all_time";
     const enterpriseData = buildEnterpriseReportData(
       transactions,
       budgets,
@@ -237,8 +238,10 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
       departments,
       {
         period: activePeriod,
-        scope: "period",
+        scope: isAllTime ? "all_time" : "period",
         reportType,
+        startDate: activePeriod.startDate,
+        endDate: activePeriod.endDate,
       },
       {
         organizationName: settings.organizationName || user?.organization || "Organization Finance Management",
@@ -276,6 +279,12 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
         const startDate = params.get("startDate") || undefined;
         const endDate = params.get("endDate") || undefined;
 
+        const effectivePeriod = startDate && endDate
+          ? createCustomDatePeriod(startDate, endDate)
+          : scope === "all_time" || scope === "all"
+          ? getPresetPeriod("all_time", transactions)
+          : activePeriod;
+
         setTimeout(() => {
           const enterpriseData = buildEnterpriseReportData(
             transactions,
@@ -283,12 +292,12 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
             payroll,
             departments,
             {
-              period: activePeriod,
-              scope,
+              period: effectivePeriod,
+              scope: scope === "all_time" || scope === "all" ? "all_time" : "period",
               reportType,
-              department: dept,
-              startDate,
-              endDate,
+              departmentFilter: dept !== "all" ? dept : undefined,
+              startDate: effectivePeriod.startDate,
+              endDate: effectivePeriod.endDate,
             },
             {
               organizationName: settings.organizationName || user?.organization || "Organization Finance Management",
