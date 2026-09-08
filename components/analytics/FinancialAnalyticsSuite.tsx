@@ -123,6 +123,19 @@ export function FinancialAnalyticsSuite({
 
   const activeBudgetView = useMemo(() => {
     if (!activeDepartmentMetric) {
+      const orgPayrollSpending = effectiveDeptMetrics.reduce(
+        (s, dm) => s + (dm.payrollSpending || 0),
+        0
+      );
+      const orgOtherSpending = effectiveDeptMetrics.reduce(
+        (s, dm) => s + (dm.otherSpending || 0),
+        0
+      );
+      const totalStaff = effectiveDeptMetrics.reduce(
+        (s, dm) => s + (dm.payrollHeadcount || 0),
+        0
+      );
+
       return {
         isDept: false,
         name: "All Units",
@@ -138,8 +151,9 @@ export function FinancialAnalyticsSuite({
         statusLabel: budget.statusLabel,
         remainingText: budget.remainingText,
         explanation: budget.explanation,
-        payrollSpending: 0,
-        otherSpending: 0,
+        payrollSpending: orgPayrollSpending,
+        otherSpending: orgOtherSpending,
+        totalStaff,
       };
     }
 
@@ -195,12 +209,13 @@ export function FinancialAnalyticsSuite({
       explanation,
       payrollSpending: d.payrollSpending || 0,
       otherSpending: d.otherSpending || 0,
+      totalStaff: d.payrollHeadcount || 0,
     };
-  }, [activeDepartmentMetric, budget, colors, currency]);
+  }, [activeDepartmentMetric, budget, colors, currency, effectiveDeptMetrics]);
 
   // Active interaction mode states
   const [budgetMode, setBudgetMode] = useState<"used" | "spent" | "remaining">("used");
-  const [marginMode, setMarginMode] = useState<"margin" | "outflow" | "net">("margin");
+  const [marginMode, setMarginMode] = useState<"margin" | "outflow" | "net" | "solvency">("margin");
   const [selectedDistributionItem, setSelectedDistributionItem] = useState<string | null>(null);
   const [showTooltip, setShowTooltip] = useState<"budget" | "margin" | "distribution" | null>(null);
   const [expandedDeptId, setExpandedDeptId] = useState<string | null>(null);
@@ -706,6 +721,47 @@ export function FinancialAnalyticsSuite({
             </View>
           ) : null}
 
+          {/* Executive Spending Composition Matrix (Payroll vs Operations vs Staff) */}
+          <View style={[styles.compositionCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "18", borderColor: colors.border }]}>
+            <View style={styles.compositionItem}>
+              <Text style={styles.compositionIcon}>👥</Text>
+              <View style={{ minWidth: 0, flex: 1 }}>
+                <Text style={[styles.compositionLabel, { color: colors.mutedForeground }]} numberOfLines={1}>
+                  PAYROLL
+                </Text>
+                <Text style={[styles.compositionValue, { color: "#8B5CF6" }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  {formatCompactCurrency(activeBudgetView.payrollSpending, currency)}
+                  {activeBudgetView.actualSpending > 0 ? ` (${((activeBudgetView.payrollSpending / activeBudgetView.actualSpending) * 100).toFixed(0)}%)` : ""}
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.compositionDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.compositionItem}>
+              <Text style={styles.compositionIcon}>🏢</Text>
+              <View style={{ minWidth: 0, flex: 1 }}>
+                <Text style={[styles.compositionLabel, { color: colors.mutedForeground }]} numberOfLines={1}>
+                  OPERATIONS
+                </Text>
+                <Text style={[styles.compositionValue, { color: "#06B6D4" }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  {formatCompactCurrency(activeBudgetView.otherSpending, currency)}
+                  {activeBudgetView.actualSpending > 0 ? ` (${((activeBudgetView.otherSpending / activeBudgetView.actualSpending) * 100).toFixed(0)}%)` : ""}
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.compositionDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.compositionItem}>
+              <Text style={styles.compositionIcon}>💼</Text>
+              <View style={{ minWidth: 0, flex: 1 }}>
+                <Text style={[styles.compositionLabel, { color: colors.mutedForeground }]} numberOfLines={1}>
+                  HEADCOUNT
+                </Text>
+                <Text style={[styles.compositionValue, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  {activeBudgetView.totalStaff} Staff
+                </Text>
+              </View>
+            </View>
+          </View>
+
           {/* Department Selector Option Controls (Requested by User) */}
           {deptOptions.length > 1 && (
             <View style={styles.deptOptionsContainer}>
@@ -1059,6 +1115,17 @@ export function FinancialAnalyticsSuite({
                 centerLabel = `${isLoss ? "-" : "+"}${formatCompactCurrency(Math.abs(income), currency)}`;
                 label = isLoss ? "Net Deficit" : "Net Surplus";
                 sublabel = margin.displayMargin;
+              } else if (marginMode === "solvency") {
+                const covPct =
+                  budget.totalAllocated > 0
+                    ? (revenue / budget.totalAllocated) * 100
+                    : 100;
+                const unalloc = Math.max(0, revenue - budget.totalAllocated);
+                activePct = Math.min(100, Math.max(0, covPct));
+                ringColor = covPct >= 100 ? colors.income : colors.warning;
+                centerLabel = `${covPct.toFixed(1)}%`;
+                label = "Budget Covered";
+                sublabel = `+${formatCompactCurrency(unalloc, currency)} Buffer`;
               } else {
                 // marginMode === "margin" (Profit / Loss %)
                 if (!margin.hasRevenue) {
@@ -1157,12 +1224,54 @@ export function FinancialAnalyticsSuite({
             );
           })()}
 
+          {/* Executive Solvency & Capital Health Matrix (Fills gap and delivers CFO-grade intelligence) */}
+          <View style={[styles.compositionCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "18", borderColor: colors.border }]}>
+            <View style={styles.compositionItem}>
+              <Text style={styles.compositionIcon}>🛡️</Text>
+              <View style={{ minWidth: 0, flex: 1 }}>
+                <Text style={[styles.compositionLabel, { color: colors.mutedForeground }]} numberOfLines={1}>
+                  CAPITAL COVERAGE
+                </Text>
+                <Text style={[styles.compositionValue, { color: colors.income }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  {budget.totalAllocated > 0
+                    ? `${((margin.operatingRevenue / budget.totalAllocated) * 100).toFixed(0)}%`
+                    : "100%"} Covered
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.compositionDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.compositionItem}>
+              <Text style={styles.compositionIcon}>⚡</Text>
+              <View style={{ minWidth: 0, flex: 1 }}>
+                <Text style={[styles.compositionLabel, { color: colors.mutedForeground }]} numberOfLines={1}>
+                  EXPENSE RATIO (OER)
+                </Text>
+                <Text style={[styles.compositionValue, { color: margin.expenseRatioPct > 70 ? colors.expense : colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  {margin.displayExpenseRatio || `${margin.expenseRatioPct.toFixed(1)}%`}
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.compositionDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.compositionItem}>
+              <Text style={styles.compositionIcon}>💎</Text>
+              <View style={{ minWidth: 0, flex: 1 }}>
+                <Text style={[styles.compositionLabel, { color: colors.mutedForeground }]} numberOfLines={1}>
+                  FREE CASH BUFFER
+                </Text>
+                <Text style={[styles.compositionValue, { color: margin.isLoss ? colors.expense : colors.income }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  +{formatCompactCurrency(Math.max(0, margin.operatingRevenue - (budget.totalAllocated || 0)), currency)}
+                </Text>
+              </View>
+            </View>
+          </View>
+
           {/* Segmented Option Controls */}
           <View style={styles.chipsRow}>
             {[
               { id: "margin", label: "Profit / Loss" },
               { id: "outflow", label: "Expenses" },
               { id: "net", label: "Net Surplus" },
+              { id: "solvency", label: "Budget Solvency" },
             ].map((opt) => {
               const isSelected = marginMode === opt.id;
               const chipColor =
@@ -1172,6 +1281,8 @@ export function FinancialAnalyticsSuite({
                   ? margin.isLoss
                     ? colors.expense
                     : colors.income
+                  : opt.id === "solvency"
+                  ? colors.income
                   : margin.statusColor;
 
               return (
@@ -1216,7 +1327,7 @@ export function FinancialAnalyticsSuite({
                 adjustsFontSizeToFit
                 minimumFontScale={0.72}
               >
-                INCOME
+                {marginMode === "solvency" ? "OPERATING REVENUE" : "INCOME"}
               </Text>
               <Text
                 style={[styles.bentoVal, { color: colors.income }]}
@@ -1235,15 +1346,17 @@ export function FinancialAnalyticsSuite({
                 adjustsFontSizeToFit
                 minimumFontScale={0.72}
               >
-                EXPENSES
+                {marginMode === "solvency" ? "AUTHORIZED BUDGET" : "EXPENSES"}
               </Text>
               <Text
-                style={[styles.bentoVal, { color: colors.expense }]}
+                style={[styles.bentoVal, { color: marginMode === "solvency" ? colors.foreground : colors.expense }]}
                 numberOfLines={1}
                 adjustsFontSizeToFit
                 minimumFontScale={0.75}
               >
-                -{formatCompactCurrency(margin.operatingExpenses, currency)}
+                {marginMode === "solvency"
+                  ? formatCompactCurrency(budget.totalAllocated, currency)
+                  : `-${formatCompactCurrency(margin.operatingExpenses, currency)}`}
               </Text>
             </View>
             <View style={[styles.bentoDivider, { backgroundColor: colors.border }]} />
@@ -1254,19 +1367,20 @@ export function FinancialAnalyticsSuite({
                 adjustsFontSizeToFit
                 minimumFontScale={0.72}
               >
-                {margin.isLoss ? "NET DEFICIT" : "NET SURPLUS"}
+                {marginMode === "solvency" ? "UNALLOCATED BUFFER" : margin.isLoss ? "NET DEFICIT" : "NET SURPLUS"}
               </Text>
               <Text
                 style={[
                   styles.bentoVal,
-                  { color: margin.isLoss ? colors.expense : colors.income },
+                  { color: marginMode === "solvency" ? colors.income : margin.isLoss ? colors.expense : colors.income },
                 ]}
                 numberOfLines={1}
                 adjustsFontSizeToFit
                 minimumFontScale={0.75}
               >
-                {margin.isLoss ? "-" : "+"}
-                {formatCompactCurrency(Math.abs(margin.operatingIncome), currency)}
+                {marginMode === "solvency"
+                  ? `+${formatCompactCurrency(Math.max(0, margin.operatingRevenue - budget.totalAllocated), currency)}`
+                  : `${margin.isLoss ? "-" : "+"}${formatCompactCurrency(Math.abs(margin.operatingIncome), currency)}`}
               </Text>
             </View>
           </View>
@@ -2167,6 +2281,44 @@ const styles = StyleSheet.create({
   uncappedNoticeText: {
     fontSize: 10.5,
     fontFamily: "Inter_500Medium",
+  },
+  compositionCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingVertical: 7,
+    paddingHorizontal: 8,
+    marginVertical: 4,
+    gap: 4,
+  },
+  compositionItem: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    minWidth: 0,
+    paddingHorizontal: 2,
+  },
+  compositionIcon: {
+    fontSize: 13.5,
+    flexShrink: 0,
+  },
+  compositionLabel: {
+    fontSize: 8.5,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.3,
+    marginBottom: 1,
+    textTransform: "uppercase",
+  },
+  compositionValue: {
+    fontSize: 11,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: -0.1,
+  },
+  compositionDivider: {
+    width: 1,
+    height: "65%",
   },
   chipsRow: {
     flexDirection: "row",
