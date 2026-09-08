@@ -154,7 +154,7 @@ export default function IncomeScreen() {
         ListEmptyComponent={
           <View style={styles.empty}>
             <Feather name="arrow-up-circle" size={40} color={colors.mutedForeground} />
-            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No income records</Text>
+            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No income records yet.</Text>
             {canEdit && (
               <TouchableOpacity
                 style={[styles.emptyAddBtn, { backgroundColor: colors.income }]}

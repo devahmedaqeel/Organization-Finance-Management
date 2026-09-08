@@ -255,6 +255,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
   const prevTransactionsRef = useRef<Transaction[]>([]);
   const deletedIdsRef = useRef<Set<string>>(new Set());
+  const currentLoadedOrgIdRef = useRef<string>("");
   const hasLiveSnapshotRef = useRef<{
     transactions: boolean;
     budgets: boolean;
@@ -308,6 +309,14 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
   // 1. Organization-Scoped Initial Local Cache Load + Instant REST Cloud Sync
   useEffect(() => {
+    // Immediately clear in-memory state so previous organization's data never leaks
+    setTransactions([]);
+    setBudgets([]);
+    setPayroll([]);
+    setDepartments([]);
+    setLoaded(false);
+    currentLoadedOrgIdRef.current = "";
+
     deletedIdsRef.current.clear();
     hasLiveSnapshotRef.current = {
       transactions: false,
@@ -339,22 +348,32 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         if (t) {
           const parsed: Transaction[] = JSON.parse(t);
           setTransactions(parsed.filter((item) => !deletedIdsRef.current.has(item.id)));
+        } else {
+          setTransactions([]);
         }
         if (b) {
           const parsed: Budget[] = JSON.parse(b);
           setBudgets(parsed.filter((item) => !deletedIdsRef.current.has(item.id)));
+        } else {
+          setBudgets([]);
         }
         if (p) {
           const parsed: PayrollEntry[] = JSON.parse(p);
           setPayroll(parsed.filter((item) => !deletedIdsRef.current.has(item.id)));
+        } else {
+          setPayroll([]);
         }
         if (d) {
           const parsed: Department[] = JSON.parse(d);
           setDepartments(parsed.filter((item) => !deletedIdsRef.current.has(item.id)));
+        } else {
+          setDepartments([]);
         }
+        currentLoadedOrgIdRef.current = activeOrgId;
         setLoaded(true);
       })
       .catch(() => {
+        currentLoadedOrgIdRef.current = activeOrgId;
         setLoaded(true);
       });
 
@@ -365,6 +384,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       fetchCollectionREST<Department>("departments", activeOrgId),
       fetchCollectionREST<PayrollEntry>("payroll", activeOrgId),
     ]).then(([restTxs, restBudgets, restDepts, restPayroll]) => {
+      if (activeOrgId !== (user?.organizationId || "demo-org")) return;
       if (restTxs !== null && !hasLiveSnapshotRef.current.transactions) {
         const validTxs = restTxs.filter((t) => !deletedIdsRef.current.has(t.id));
         validTxs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -544,28 +564,28 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
   // 3. Organization-Scoped Local Cache Write (guarantees deleted records are cleared from cache)
   useEffect(() => {
-    if (loaded && user) {
+    if (loaded && user && currentLoadedOrgIdRef.current === activeOrgId) {
       AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(transactions)).catch(() => {});
     }
-  }, [transactions, loaded, cachePrefix, user]);
+  }, [transactions, loaded, cachePrefix, user, activeOrgId]);
 
   useEffect(() => {
-    if (loaded && user) {
+    if (loaded && user && currentLoadedOrgIdRef.current === activeOrgId) {
       AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(budgets)).catch(() => {});
     }
-  }, [budgets, loaded, cachePrefix, user]);
+  }, [budgets, loaded, cachePrefix, user, activeOrgId]);
 
   useEffect(() => {
-    if (loaded && user) {
+    if (loaded && user && currentLoadedOrgIdRef.current === activeOrgId) {
       AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(payroll)).catch(() => {});
     }
-  }, [payroll, loaded, cachePrefix, user]);
+  }, [payroll, loaded, cachePrefix, user, activeOrgId]);
 
   useEffect(() => {
-    if (loaded && user) {
+    if (loaded && user && currentLoadedOrgIdRef.current === activeOrgId) {
       AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(departments)).catch(() => {});
     }
-  }, [departments, loaded, cachePrefix, user]);
+  }, [departments, loaded, cachePrefix, user, activeOrgId]);
 
   // --- CRUD Operations ---
 

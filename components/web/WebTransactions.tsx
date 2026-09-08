@@ -53,7 +53,7 @@ export function WebTransactions() {
         list.push(name);
       }
     });
-    return list.length > 0 ? list : ["Software Engineering", "Administration", "Finance", "Research & Development"];
+    return list;
   }, [departments]);
 
   // Filtered & Sorted

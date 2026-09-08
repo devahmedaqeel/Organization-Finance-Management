@@ -56,6 +56,11 @@ const testSuites = [
     cmd: "npx",
     args: ["-y", "tsx", "services/__tests__/payrollExpenseIntegration.test.ts"],
   },
+  {
+    name: "10. New Organization Clean State & Tenant Isolation Suite",
+    cmd: "npx",
+    args: ["-y", "tsx", "services/__tests__/newOrgCleanState.test.ts"],
+  },
 ];
 
 console.log("\n=======================================================");

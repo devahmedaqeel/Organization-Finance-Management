@@ -156,7 +156,7 @@ export default function ExpensesScreen() {
         ListEmptyComponent={
           <View style={styles.empty}>
             <Feather name="arrow-down-circle" size={40} color={colors.mutedForeground} />
-            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No expense records</Text>
+            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No expense records yet.</Text>
             {canEdit && (
               <TouchableOpacity
                 style={[styles.emptyAddBtn, { backgroundColor: colors.expense }]}

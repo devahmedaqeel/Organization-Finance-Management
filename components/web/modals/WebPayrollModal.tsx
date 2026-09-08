@@ -95,7 +95,7 @@ export function WebPayrollModal({ visible, onClose, entryToEdit }: WebPayrollMod
     } else {
       setEmployeeName("");
       setEmployeeId(`EMP${Math.floor(100 + Math.random() * 900)}`);
-      setDepartment(departments[0]?.name || "Software Engineering");
+      setDepartment(departments[0]?.name || "");
       setDesignation("Faculty / Staff Member");
       setBaseSalary("");
       setBonus("0");
@@ -304,37 +304,40 @@ export function WebPayrollModal({ visible, onClose, entryToEdit }: WebPayrollMod
 
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={{ flexDirection: "row", gap: 6, paddingVertical: 4 }}>
-                  {(departments.length > 0
-                    ? departments.map((d) => d.name)
-                    : ["Software Engineering", "Administration", "Research & Development", "Finance"]
-                  ).map((dept) => {
-                    const isSelected = department === dept;
-                    const isDisabled = Boolean(matchedStaff && matchedStaff.department && matchedStaff.department !== dept);
-                    return (
-                      <TouchableOpacity
-                        key={dept}
-                        disabled={isDisabled}
-                        style={[
-                          styles.chip,
-                          {
-                            backgroundColor: isSelected ? "#8B5CF6" : colors.background,
-                            borderColor: isSelected ? "transparent" : colors.border,
-                            opacity: isDisabled ? 0.35 : 1,
-                          },
-                        ]}
-                        onPress={() => setDepartment(dept)}
-                      >
-                        <Text
+                  {departments.length === 0 ? (
+                    <Text style={{ color: colors.mutedForeground, fontSize: 13, fontStyle: "italic", paddingVertical: 4 }}>
+                      No departments created yet.
+                    </Text>
+                  ) : (
+                    departments.map((d) => d.name).map((dept) => {
+                      const isSelected = department === dept;
+                      const isDisabled = Boolean(matchedStaff && matchedStaff.department && matchedStaff.department !== dept);
+                      return (
+                        <TouchableOpacity
+                          key={dept}
+                          disabled={isDisabled}
                           style={[
-                            styles.chipText,
-                            { color: isSelected ? "#FFFFFF" : colors.foreground },
+                            styles.chip,
+                            {
+                              backgroundColor: isSelected ? "#8B5CF6" : colors.background,
+                              borderColor: isSelected ? "transparent" : colors.border,
+                              opacity: isDisabled ? 0.35 : 1,
+                            },
                           ]}
+                          onPress={() => setDepartment(dept)}
                         >
-                          {dept}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
+                          <Text
+                            style={[
+                              styles.chipText,
+                              { color: isSelected ? "#FFFFFF" : colors.foreground },
+                            ]}
+                          >
+                            {dept}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })
+                  )}
                 </View>
               </ScrollView>
             </View>

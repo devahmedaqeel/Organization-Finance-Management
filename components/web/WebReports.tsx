@@ -554,14 +554,20 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
             {/* Income Streams */}
             <View style={{ gap: 8 }}>
               <Text style={[styles.sectionHeading, { color: colors.income }]}>REVENUE & INFLOWS</Text>
-              {incomeByCat.map((item) => (
-                <View key={item.category} style={[styles.statementRow, { borderBottomColor: colors.border }]}>
-                  <Text style={[styles.statementLabel, { color: colors.foreground }]}>{item.category}</Text>
-                  <Text style={[styles.statementAmount, { color: colors.income }]}>
-                    +{settings.currency} {fmt(item.total)}
-                  </Text>
-                </View>
-              ))}
+              {incomeByCat.length === 0 ? (
+                <Text style={{ color: colors.mutedForeground, fontSize: 13, fontStyle: "italic", paddingVertical: 4 }}>
+                  No income records yet.
+                </Text>
+              ) : (
+                incomeByCat.map((item) => (
+                  <View key={item.category} style={[styles.statementRow, { borderBottomColor: colors.border }]}>
+                    <Text style={[styles.statementLabel, { color: colors.foreground }]}>{item.category}</Text>
+                    <Text style={[styles.statementAmount, { color: colors.income }]}>
+                      +{settings.currency} {fmt(item.total)}
+                    </Text>
+                  </View>
+                ))
+              )}
               <View style={[styles.statementTotalRow, { backgroundColor: colors.income + "12", borderColor: colors.income + "30" }]}>
                 <Text style={[styles.statementTotalLabel, { color: colors.income }]}>Total Inflows</Text>
                 <Text style={[styles.statementTotalVal, { color: colors.income }]}>
@@ -573,14 +579,20 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
             {/* Expense Streams */}
             <View style={{ gap: 8, marginTop: 12 }}>
               <Text style={[styles.sectionHeading, { color: colors.expense }]}>OPERATIONAL EXPENDITURE & OUTFLOWS</Text>
-              {expenseByCat.map((item) => (
-                <View key={item.category} style={[styles.statementRow, { borderBottomColor: colors.border }]}>
-                  <Text style={[styles.statementLabel, { color: colors.foreground }]}>{item.category}</Text>
-                  <Text style={[styles.statementAmount, { color: colors.expense }]}>
-                    -{settings.currency} {fmt(item.total)}
-                  </Text>
-                </View>
-              ))}
+              {expenseByCat.length === 0 ? (
+                <Text style={{ color: colors.mutedForeground, fontSize: 13, fontStyle: "italic", paddingVertical: 4 }}>
+                  No expense records yet.
+                </Text>
+              ) : (
+                expenseByCat.map((item) => (
+                  <View key={item.category} style={[styles.statementRow, { borderBottomColor: colors.border }]}>
+                    <Text style={[styles.statementLabel, { color: colors.foreground }]}>{item.category}</Text>
+                    <Text style={[styles.statementAmount, { color: colors.expense }]}>
+                      -{settings.currency} {fmt(item.total)}
+                    </Text>
+                  </View>
+                ))
+              )}
               <View style={[styles.statementTotalRow, { backgroundColor: colors.expense + "12", borderColor: colors.expense + "30" }]}>
                 <Text style={[styles.statementTotalLabel, { color: colors.expense }]}>Total Outflows</Text>
                 <Text style={[styles.statementTotalVal, { color: colors.expense }]}>

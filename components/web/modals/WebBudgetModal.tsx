@@ -124,7 +124,7 @@ export function WebBudgetModal({ visible, onClose, budgetToEdit, initialDepartme
       setAlertThreshold(String(budgetToEdit.alertThreshold || 80));
       setNotes(budgetToEdit.notes || "");
     } else {
-      setDepartment(initialDepartment || departments[0]?.name || "Software Engineering");
+      setDepartment(initialDepartment || departments[0]?.name || "");
       setCategory(ALL_CATEGORIES_BUDGET);
       setAllocated("");
       setPeriod(new Date().toISOString().substring(0, 7));
@@ -283,31 +283,34 @@ export function WebBudgetModal({ visible, onClose, budgetToEdit, initialDepartme
               <Text style={[styles.label, { color: colors.mutedForeground }]}>DEPARTMENT / COST CENTER *</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={{ flexDirection: "row", gap: 6, paddingVertical: 4 }}>
-                  {(departments.length > 0
-                    ? departments.map((d) => d.name)
-                    : ["Software Engineering", "Administration", "Research & Development", "Finance"]
-                  ).map((dept) => (
-                    <TouchableOpacity
-                      key={dept}
-                      style={[
-                        styles.chip,
-                        {
-                          backgroundColor: department === dept ? colors.primary : colors.background,
-                          borderColor: department === dept ? "transparent" : colors.border,
-                        },
-                      ]}
-                      onPress={() => setDepartment(dept)}
-                    >
-                      <Text
+                  {departments.length === 0 ? (
+                    <Text style={{ color: colors.mutedForeground, fontSize: 13, fontStyle: "italic", paddingVertical: 4 }}>
+                      No departments created yet.
+                    </Text>
+                  ) : (
+                    departments.map((d) => d.name).map((dept) => (
+                      <TouchableOpacity
+                        key={dept}
                         style={[
-                          styles.chipText,
-                          { color: department === dept ? "#FFFFFF" : colors.foreground },
+                          styles.chip,
+                          {
+                            backgroundColor: department === dept ? colors.primary : colors.background,
+                            borderColor: department === dept ? "transparent" : colors.border,
+                          },
                         ]}
+                        onPress={() => setDepartment(dept)}
                       >
-                        {dept}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                        <Text
+                          style={[
+                            styles.chipText,
+                            { color: department === dept ? "#FFFFFF" : colors.foreground },
+                          ]}
+                        >
+                          {dept}
+                        </Text>
+                      </TouchableOpacity>
+                    ))
+                  )}
                 </View>
               </ScrollView>
             </View>

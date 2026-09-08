@@ -564,6 +564,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             createdAt: Timestamp.now(),
           }).catch(() => {})
         );
+        tasks.push(
+          setDoc(doc(db, "orgSettings", organizationId), {
+            organizationName: organization,
+            organizationAddress: "",
+            organizationEmail: normalizedEmail,
+            organizationPhone: "",
+            currency: "PKR",
+            fiscalYear: `${new Date().getFullYear()}-${new Date().getFullYear() + 1}`,
+            organizationLogo: "",
+            theme: "system",
+            customIncomeCategories: [],
+            customExpenseCategories: [],
+          }).catch(() => {})
+        );
       }
 
       tasks.push(
@@ -571,6 +585,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       );
 
       await Promise.all(tasks);
+
+      // Cleanly purge stale in-memory / local caches from any prior session
+      try {
+        const allKeys = await AsyncStorage.getAllKeys();
+        const staleKeys = allKeys.filter((k) => k.startsWith("ofm_cache:") || k.startsWith("ofm_settings"));
+        if (staleKeys.length > 0) {
+          await AsyncStorage.multiRemove(staleKeys);
+        }
+      } catch (e) {}
 
       await AsyncStorage.setItem("ofm_user", JSON.stringify(newUser));
       setUser(newUser);

@@ -47,14 +47,7 @@ export function AddTransactionModal({
 
   const isEditMode = !!editItem;
 
-  const resolvedDepts = departments && departments.length > 0
-    ? departments
-    : [
-        { id: "d1", name: "Software Engineering", headCount: 45, budgetAllocated: 850000 },
-        { id: "d2", name: "Administration", headCount: 12, budgetAllocated: 250000 },
-        { id: "d3", name: "Research & Development", headCount: 20, budgetAllocated: 650000 },
-        { id: "d4", name: "Finance", headCount: 8, budgetAllocated: 180000 }
-      ];
+  const resolvedDepts = departments || [];
 
   const [department, setDepartment] = useState("");
   const [category, setCategory] = useState("");
@@ -349,27 +342,33 @@ export function AddTransactionModal({
               <>
                 <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>DEPARTMENT</Text>
                 <View style={styles.chips}>
-                  {resolvedDepts.map((d) => (
-                    <TouchableOpacity
-                      key={d.id}
-                      style={[
-                        styles.chip,
-                        {
-                          backgroundColor: department === d.name ? colors.primary : colors.muted,
-                          borderColor: department === d.name ? colors.primary : colors.border,
-                        },
-                      ]}
-                      onPress={() => {
-                        setDepartment(d.name);
-                        setIsCreatingDept(false);
-                        setIsEditingDept(false);
-                      }}
-                    >
-                      <Text style={[styles.chipText, { color: department === d.name ? "#fff" : colors.foreground }]}>
-                        {d.name}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                  {resolvedDepts.length === 0 ? (
+                    <Text style={{ color: colors.mutedForeground, fontSize: 12.5, fontStyle: "italic", marginVertical: 4 }}>
+                      No departments created yet. Tap "+ Add Department" below to register one.
+                    </Text>
+                  ) : (
+                    resolvedDepts.map((d) => (
+                      <TouchableOpacity
+                        key={d.id}
+                        style={[
+                          styles.chip,
+                          {
+                            backgroundColor: department === d.name ? colors.primary : colors.muted,
+                            borderColor: department === d.name ? colors.primary : colors.border,
+                          },
+                        ]}
+                        onPress={() => {
+                          setDepartment(d.name);
+                          setIsCreatingDept(false);
+                          setIsEditingDept(false);
+                        }}
+                      >
+                        <Text style={[styles.chipText, { color: department === d.name ? "#fff" : colors.foreground }]}>
+                          {d.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))
+                  )}
                 </View>
 
                 {/* Inline Department Actions */}

@@ -59,7 +59,7 @@ export default function PayrollScreen() {
   // Form Fields
   const [name, setName] = useState("");
   const [empId, setEmpId] = useState("");
-  const [dept, setDept] = useState(DEPARTMENTS[0]);
+  const [dept, setDept] = useState(departments[0]?.name || "");
   const [salary, setSalary] = useState("");
   const [bonus, setBonus] = useState("");
   const [deductions, setDeductions] = useState("");
@@ -74,7 +74,7 @@ export default function PayrollScreen() {
   const webTop = Platform.OS === "web" ? 67 : 0;
 
   const availableDepts = useMemo(() => {
-    const list = departments && departments.length > 0 ? departments.map((d) => d.name) : DEPARTMENTS;
+    const list = departments && departments.length > 0 ? departments.map((d) => d.name) : [];
     const set = new Set([...list, ...payroll.map((p) => p.department)]);
     return Array.from(set).filter(Boolean);
   }, [departments, payroll]);
@@ -593,7 +593,7 @@ export default function PayrollScreen() {
           <View style={styles.empty}>
             <Feather name="users" size={40} color={colors.mutedForeground} />
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-              {search ? "No staff members match your search" : "No payroll records found"}
+              {search ? "No staff members match your search" : "No payroll records yet."}
             </Text>
             {canEdit && !search && (
               <TouchableOpacity style={[styles.addBtn, { backgroundColor: "#8B5CF6", marginTop: 12, paddingHorizontal: 20 }]} onPress={handleOpenAdd}>
@@ -828,27 +828,33 @@ export default function PayrollScreen() {
               </View>
 
               <View style={styles.chips}>
-                {availableDepts.map((d) => {
-                  const isSelected = dept === d;
-                  const isDeptDisabled = Boolean(matchedStaff && matchedStaff.department && matchedStaff.department !== d);
-                  return (
-                    <TouchableOpacity
-                      key={d}
-                      disabled={isDeptDisabled}
-                      style={[
-                        styles.chip,
-                        {
-                          backgroundColor: isSelected ? "#8B5CF6" : (colors.cardAlt ?? colors.muted),
-                          borderColor: isSelected ? "#8B5CF6" : colors.border,
-                          opacity: isDeptDisabled ? 0.35 : 1,
-                        },
-                      ]}
-                      onPress={() => setDept(d)}
-                    >
-                      <Text style={[styles.chipText, { color: isSelected ? "#fff" : colors.foreground }]}>{d}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
+                {availableDepts.length === 0 ? (
+                  <Text style={{ color: colors.mutedForeground, fontSize: 12.5, fontStyle: "italic", marginVertical: 4 }}>
+                    No departments created yet. Please register a department first.
+                  </Text>
+                ) : (
+                  availableDepts.map((d) => {
+                    const isSelected = dept === d;
+                    const isDeptDisabled = Boolean(matchedStaff && matchedStaff.department && matchedStaff.department !== d);
+                    return (
+                      <TouchableOpacity
+                        key={d}
+                        disabled={isDeptDisabled}
+                        style={[
+                          styles.chip,
+                          {
+                            backgroundColor: isSelected ? "#8B5CF6" : (colors.cardAlt ?? colors.muted),
+                            borderColor: isSelected ? "#8B5CF6" : colors.border,
+                            opacity: isDeptDisabled ? 0.35 : 1,
+                          },
+                        ]}
+                        onPress={() => setDept(d)}
+                      >
+                        <Text style={[styles.chipText, { color: isSelected ? "#fff" : colors.foreground }]}>{d}</Text>
+                      </TouchableOpacity>
+                    );
+                  })
+                )}
               </View>
 
               {/* ─── Real-Time Department Budget Deduction Indicator ─── */}

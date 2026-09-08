@@ -67,7 +67,7 @@ export function WebTeam() {
   const { user } = useAuth();
   const { settings } = useSettings();
 
-  const [members, setMembers] = useState<User[]>(DEFAULT_TEAM_MEMBERS);
+  const [members, setMembers] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<"all" | UserRole>("all");
@@ -80,7 +80,7 @@ export function WebTeam() {
 
   useEffect(() => {
     if (!user) return;
-    const isDemo = user.organizationId === "demo-org";
+    const isDemo = user.organizationId === "demo-org" || user.organizationId === "org-9icgv4ijp" || user.email === "admin@ofm.com";
     const orgName = user.organization || settings.organizationName || "Organization Finance Management";
     const orgId = user.organizationId || "default-org";
 
@@ -117,7 +117,7 @@ export function WebTeam() {
           });
           setMembers(list);
         } else {
-          setMembers(isDemo ? DEFAULT_TEAM_MEMBERS.map((m) => ({ ...m, organization: orgName })) : [user]);
+          setMembers(isDemo ? DEFAULT_TEAM_MEMBERS.map((m) => ({ ...m, organization: orgName })) : (user ? [user] : []));
         }
         setLoading(false);
       },

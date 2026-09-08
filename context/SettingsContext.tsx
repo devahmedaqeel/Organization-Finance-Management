@@ -4,41 +4,14 @@ import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../config/firebase";
 import { useAuth } from "./AuthContext";
 
-export type AppTheme = "system" | "light" | "dark";
+import {
+  AppTheme,
+  Settings,
+  getCleanDefaultSettings,
+} from "../services/settingsHelper";
+export { AppTheme, Settings, getCleanDefaultSettings };
 
-export interface Settings {
-  organizationName: string;
-  organizationAddress: string;
-  organizationEmail: string;
-  organizationPhone: string;
-  currency: string;
-  fiscalYear: string;
-  organizationLogo?: string;
-  emailAutomatedEnabled?: boolean;
-  emailjsServiceId?: string;
-  emailjsTemplateId?: string;
-  emailjsPublicKey?: string;
-  theme?: AppTheme;
-  customIncomeCategories?: string[];
-  customExpenseCategories?: string[];
-}
-
-const DEFAULT_SETTINGS: Settings = {
-  organizationName: "DevOrbit Tech Kotli",
-  organizationAddress: "Kotli, Azad Kashmir",
-  organizationEmail: "",
-  organizationPhone: "+92-586-444111",
-  currency: "PKR",
-  fiscalYear: "2025-2026",
-  organizationLogo: "",
-  emailAutomatedEnabled: false,
-  emailjsServiceId: "",
-  emailjsTemplateId: "",
-  emailjsPublicKey: "",
-  theme: "system",
-  customIncomeCategories: [],
-  customExpenseCategories: [],
-};
+const DEFAULT_SETTINGS: Settings = getCleanDefaultSettings("DevOrbit Tech Kotli", true);
 
 interface SettingsContextValue {
   settings: Settings;
@@ -57,17 +30,33 @@ const SettingsContext = createContext<SettingsContextValue>({
 });
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
-  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
-  const [isLoading, setIsLoading] = useState(true);
   const { user, updateUserOrganization } = useAuth();
+  const isDemoAdmin = user?.organizationId === "org-9icgv4ijp" || user?.email === "admin@ofm.com";
+  const orgKey = user?.organizationId || "default";
+  const settingsStorageKey = `ofm_settings:${orgKey}`;
+  const baseDefaults = useMemo(
+    () => getCleanDefaultSettings(user?.organization, isDemoAdmin),
+    [user?.organization, isDemoAdmin]
+  );
 
-  // Load from AsyncStorage on mount
+  const [settings, setSettings] = useState<Settings>(baseDefaults);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Load from AsyncStorage scoped to active organization on mount or org switch
   useEffect(() => {
-    AsyncStorage.getItem("ofm_settings").then((data) => {
-      if (data) setSettings({ ...DEFAULT_SETTINGS, ...JSON.parse(data) });
+    AsyncStorage.getItem(settingsStorageKey).then((data) => {
+      if (data) {
+        try {
+          setSettings({ ...baseDefaults, ...JSON.parse(data) });
+        } catch (e) {
+          setSettings(baseDefaults);
+        }
+      } else {
+        setSettings(baseDefaults);
+      }
       setIsLoading(false);
     });
-  }, []);
+  }, [settingsStorageKey, baseDefaults]);
 
   // Real-time 2-way sync across Web and Mobile via Firestore
   useEffect(() => {
@@ -80,11 +69,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
         if (snap.exists()) {
           const firebaseSettings = snap.data() as Partial<Settings>;
           setSettings((prev) => {
-            const merged = { ...DEFAULT_SETTINGS, ...prev, ...firebaseSettings };
+            const merged = { ...baseDefaults, ...prev, ...firebaseSettings };
             if (firebaseSettings.organizationLogo === "" || firebaseSettings.organizationLogo === undefined) {
               merged.organizationLogo = firebaseSettings.organizationLogo ?? "";
             }
-            AsyncStorage.setItem("ofm_settings", JSON.stringify(merged));
+            AsyncStorage.setItem(settingsStorageKey, JSON.stringify(merged));
             return merged;
           });
 
@@ -106,13 +95,13 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     );
 
     return () => unsub();
-  }, [user?.id, user?.organizationId, user?.organization]);
+  }, [user?.id, user?.organizationId, user?.organization, baseDefaults, settingsStorageKey]);
 
   const updateSettings = useCallback(async (patch: Partial<Settings>) => {
-    let nextSettings: Settings = DEFAULT_SETTINGS;
+    let nextSettings: Settings = baseDefaults;
     setSettings((prev) => {
       nextSettings = { ...prev, ...patch };
-      AsyncStorage.setItem("ofm_settings", JSON.stringify(nextSettings));
+      AsyncStorage.setItem(settingsStorageKey, JSON.stringify(nextSettings));
       return nextSettings;
     });
 
@@ -126,7 +115,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     if (patch.organizationName && updateUserOrganization) {
       updateUserOrganization(patch.organizationName).catch(() => {});
     }
-  }, [user?.organizationId, user?.organization, updateUserOrganization]);
+  }, [user?.organizationId, user?.organization, updateUserOrganization, baseDefaults, settingsStorageKey]);
 
   const addCustomCategory = useCallback(async (type: "income" | "expense", category: string) => {
     const cleanCat = category.trim();

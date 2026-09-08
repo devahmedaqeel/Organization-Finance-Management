@@ -98,14 +98,14 @@ export function WebTransactionModal({
         setType(transactionToEdit.type);
         setAmount(String(transactionToEdit.amount));
         setCategory(transactionToEdit.category);
-        setDepartment(transactionToEdit.department || "Software Engineering");
+        setDepartment(transactionToEdit.department || (departments[0]?.name || ""));
         setSelectedBudgetId(transactionToEdit.budgetId || "");
         setDescription(transactionToEdit.description || "");
         setReferenceNumber(transactionToEdit.referenceNumber || "");
         setPaymentMethod(transactionToEdit.paymentMethod || "Electronic Transfer");
         setDate(transactionToEdit.date || formatYMD(new Date()));
       } else {
-        const defaultDept = departments.length > 0 ? departments[0].name : "Marketing";
+        const defaultDept = departments.length > 0 ? departments[0].name : "";
         const defaultCats = initialType === "expense"
           ? getDepartmentCategories(defaultDept, departments, settings.customExpenseCategories)
           : getUnifiedCategories("income", settings.customIncomeCategories, settings.customExpenseCategories);
@@ -430,31 +430,34 @@ export function WebTransactionModal({
                 <Text style={[styles.label, { color: colors.mutedForeground }]}>DEPARTMENT COST CENTER *</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   <View style={{ flexDirection: "row", gap: 6, paddingVertical: 4 }}>
-                    {(departments.length > 0
-                      ? departments.map((d) => d.name)
-                      : ["Software Engineering", "Administration", "Research & Development", "Finance"]
-                    ).map((dept) => (
-                      <TouchableOpacity
-                        key={dept}
-                        style={[
-                          styles.chip,
-                          {
-                            backgroundColor: department === dept ? colors.primary : colors.background,
-                            borderColor: department === dept ? "transparent" : colors.border,
-                          },
-                        ]}
-                        onPress={() => setDepartment(dept)}
-                      >
-                        <Text
+                    {departments.length === 0 ? (
+                      <Text style={{ color: colors.mutedForeground, fontSize: 13, fontStyle: "italic", paddingVertical: 4 }}>
+                        No departments created yet. Please register a department first.
+                      </Text>
+                    ) : (
+                      departments.map((d) => d.name).map((dept) => (
+                        <TouchableOpacity
+                          key={dept}
                           style={[
-                            styles.chipText,
-                            { color: department === dept ? "#FFFFFF" : colors.foreground },
+                            styles.chip,
+                            {
+                              backgroundColor: department === dept ? colors.primary : colors.background,
+                              borderColor: department === dept ? "transparent" : colors.border,
+                            },
                           ]}
+                          onPress={() => setDepartment(dept)}
                         >
-                          {dept}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
+                          <Text
+                            style={[
+                              styles.chipText,
+                              { color: department === dept ? "#FFFFFF" : colors.foreground },
+                            ]}
+                          >
+                            {dept}
+                          </Text>
+                        </TouchableOpacity>
+                      ))
+                    )}
                   </View>
                 </ScrollView>
               </View>

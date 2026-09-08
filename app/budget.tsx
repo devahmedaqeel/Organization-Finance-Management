@@ -89,7 +89,7 @@ export default function BudgetScreen() {
   const keyboardHeight = useKeyboardHeight();
 
   const availableDepts = useMemo(() => {
-    const list = departments && departments.length > 0 ? departments.map((d) => d.name) : DEPARTMENTS;
+    const list = departments && departments.length > 0 ? departments.map((d) => d.name) : [];
     const set = new Set([...list, ...(departmentMetrics || []).map((d) => d.name), ...budgets.map((b) => b.department)]);
     return Array.from(set).filter(Boolean);
   }, [departments, departmentMetrics, budgets]);
@@ -99,7 +99,7 @@ export default function BudgetScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
   const [deletingBudget, setDeletingBudget] = useState<Budget | null>(null);
-  const [dept, setDept] = useState(DEPARTMENTS[0]);
+  const [dept, setDept] = useState(departments[0]?.name || "");
   const [cat, setCat] = useState(CATS[0]);
   const [allocated, setAllocated] = useState("");
   const [period, setPeriod] = useState(defaultPeriod);
@@ -657,7 +657,7 @@ export default function BudgetScreen() {
           <View style={styles.empty}>
             <Feather name="pie-chart" size={40} color={colors.mutedForeground} />
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-              No budgets found for this department
+              {budgets.length === 0 ? "No budget created yet." : "No budgets found for this department"}
             </Text>
           </View>
         )}
@@ -705,23 +705,29 @@ export default function BudgetScreen() {
               </View>
 
               <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>SELECT DEPARTMENT</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.modalChipsRow}>
-                {availableDepts.map((d) => (
-                  <TouchableOpacity
-                    key={d}
-                    style={[
-                      styles.modalChip,
-                      {
-                        backgroundColor: dept === d ? colors.primary : (colors.cardAlt ?? colors.muted),
-                        borderColor: dept === d ? colors.primary : colors.border,
-                      },
-                    ]}
-                    onPress={() => setDept(d)}
-                  >
-                    <Text style={[styles.modalChipText, { color: dept === d ? "#fff" : colors.foreground }]}>{d}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
+              {availableDepts.length === 0 ? (
+                <Text style={{ color: colors.mutedForeground, fontSize: 12.5, fontStyle: "italic", marginBottom: 8 }}>
+                  No departments created yet. Please create a department first.
+                </Text>
+              ) : (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.modalChipsRow}>
+                  {availableDepts.map((d) => (
+                    <TouchableOpacity
+                      key={d}
+                      style={[
+                        styles.modalChip,
+                        {
+                          backgroundColor: dept === d ? colors.primary : (colors.cardAlt ?? colors.muted),
+                          borderColor: dept === d ? colors.primary : colors.border,
+                        },
+                      ]}
+                      onPress={() => setDept(d)}
+                    >
+                      <Text style={[styles.modalChipText, { color: dept === d ? "#fff" : colors.foreground }]}>{d}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
 
               <Text style={[styles.fieldLabel, { color: colors.mutedForeground, marginTop: 10 }]}>SELECT CATEGORY</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.modalChipsRow}>

@@ -532,9 +532,11 @@ export default function DepartmentsScreen() {
             <View style={[styles.emptyIcon, { backgroundColor: colors.muted }]}>
               <Feather name="layers" size={32} color={colors.mutedForeground} />
             </View>
-            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No Departments Found</Text>
+            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
+              {departments.length === 0 ? "No departments created yet" : "No Departments Found"}
+            </Text>
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-              No monitored units match your search keyword or selected filter.
+              {departments.length === 0 ? "Create your first department to get started." : "No monitored units match your search keyword or selected filter."}
             </Text>
           </View>
         }
