@@ -338,7 +338,7 @@ export default function SettingsScreen() {
 
             <View style={styles.userAccountDetails}>
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 6 }}>
-                <Text style={[styles.userAccountName, { color: colors.foreground }]} numberOfLines={1}>
+                <Text style={[styles.userAccountName, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                   {user?.name || "Authenticated User"}
                 </Text>
                 <View style={[styles.roleBadgePill, { backgroundColor: colors.primary + "16", borderColor: colors.primary + "35" }]}>
@@ -352,7 +352,7 @@ export default function SettingsScreen() {
               {/* Logged in Email Callout */}
               <View style={[styles.emailCalloutRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
                 <Feather name="mail" size={13} color={colors.primary} />
-                <Text style={[styles.emailCalloutText, { color: colors.foreground }]} numberOfLines={1} selectable>
+                <Text style={[styles.emailCalloutText, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} selectable>
                   {user?.email || "No email detected"}
                 </Text>
               </View>
@@ -364,7 +364,7 @@ export default function SettingsScreen() {
           <View style={styles.userMetaGrid}>
             <View style={styles.userMetaItem}>
               <Text style={[styles.userMetaLabel, { color: colors.mutedForeground }]}>ORGANIZATION</Text>
-              <Text style={[styles.userMetaValue, { color: colors.foreground }]} numberOfLines={1}>
+              <Text style={[styles.userMetaValue, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                 {user?.organization || settings.organizationName || "Devorbit Tech"}
               </Text>
             </View>

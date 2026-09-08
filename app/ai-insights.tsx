@@ -912,10 +912,10 @@ export default function AIInsightsScreen() {
                   : "Operating Deficit"}
               </Text>
             </View>
-            <Text style={styles.ringValueSub} numberOfLines={1}>
+            <Text style={styles.ringValueSub} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
               {authoritativeNetBalance >= 0 ? "+" : "-"}{settings.currency} {fmt(Math.abs(authoritativeNetBalance))}
             </Text>
-            <Text style={{ fontSize: 10, color: colors.mutedForeground, marginTop: 1, fontFamily: "Inter_500Medium" }} numberOfLines={1}>
+            <Text style={{ fontSize: 10, color: colors.mutedForeground, marginTop: 1, fontFamily: "Inter_500Medium" }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
               Net Cash Balance
             </Text>
           </View>
@@ -955,10 +955,10 @@ export default function AIInsightsScreen() {
                   : "Over Budget"}
               </Text>
             </View>
-            <Text style={styles.ringValueSub} numberOfLines={1}>
+            <Text style={styles.ringValueSub} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
               {settings.currency} {fmt(displayedBudgetSpent)} of {fmt(totalAllocatedBudget)}
             </Text>
-            <Text style={{ fontSize: 10, color: colors.mutedForeground, marginTop: 1, fontFamily: "Inter_500Medium" }} numberOfLines={1}>
+            <Text style={{ fontSize: 10, color: colors.mutedForeground, marginTop: 1, fontFamily: "Inter_500Medium" }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
               {settings.currency} {fmt(displayedBudgetRemaining)} Remaining
             </Text>
           </View>
@@ -1000,10 +1000,10 @@ export default function AIInsightsScreen() {
                   : "High Burn Alert"}
               </Text>
             </View>
-            <Text style={styles.ringValueSub} numberOfLines={1}>
+            <Text style={styles.ringValueSub} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
               {settings.currency} {fmt(displayedExpense)} of {fmt(displayedIncome)}
             </Text>
-            <Text style={{ fontSize: 10, color: colors.mutedForeground, marginTop: 1, fontFamily: "Inter_500Medium" }} numberOfLines={1}>
+            <Text style={{ fontSize: 10, color: colors.mutedForeground, marginTop: 1, fontFamily: "Inter_500Medium" }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
               Outflows of Inflow
             </Text>
           </View>

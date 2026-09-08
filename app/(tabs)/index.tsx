@@ -496,11 +496,11 @@ export default function DashboardScreen() {
                   lineHeight: dynamicOrgLineHeight,
                   letterSpacing: orgDisplayName.length > 24 ? -0.2 : 0,
                 },
-                Platform.OS === "web" && ({ wordBreak: "break-word" } as any),
+                Platform.OS === "web" && ({ whiteSpace: "nowrap" } as any),
               ]}
-              numberOfLines={2}
+              numberOfLines={1}
               adjustsFontSizeToFit
-              minimumFontScale={0.75}
+              minimumFontScale={0.72}
             >
               {orgDisplayName}
             </Text>
@@ -840,12 +840,12 @@ export default function DashboardScreen() {
                 textAlign: "right",
                 flexShrink: 1,
               }}
-              numberOfLines={1}
+              numberOfLines={2}
               adjustsFontSizeToFit
-              minimumFontScale={0.7}
+              minimumFontScale={0.75}
             >
               {totalAllocatedBudget > 0
-                ? `Allocated: ${settings.currency} ${fmt(totalAllocatedBudget)} · Remaining Budget: ${settings.currency} ${fmt(netBudgetRemaining)} (${budgetUsedPct}% Spent)`
+                ? `Allocated: ${settings.currency} ${fmt(totalAllocatedBudget)} · Remaining: ${settings.currency} ${fmt(netBudgetRemaining)} (${budgetUsedPct}% Spent)`
                 : isDeficit
                 ? `Deficit (-${settings.currency} ${fmt(totalExpenses - totalIncome)})`
                 : `${incomeRetainedPct}% Retained`}

@@ -644,7 +644,7 @@ ${orgName}`;
                     </View>
                   )}
                 </View>
-                <Text style={[styles.memberEmail, { color: colors.mutedForeground }]} numberOfLines={1}>
+                <Text style={[styles.memberEmail, { color: colors.mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                   {item.email}
                 </Text>
               </View>

@@ -241,7 +241,7 @@ export default function ReportsScreen() {
         <View style={styles.headerRow}>
           <View style={[styles.headerTitleWrap, { flex: 1, marginRight: 8 }]}>
             <Text style={[styles.title, { color: colors.foreground }]}>Financial Analytics</Text>
-            <Text style={[styles.orgText, { color: colors.mutedForeground }]} numberOfLines={1}>
+            <Text style={[styles.orgText, { color: colors.mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
               {settings.organizationName}
             </Text>
           </View>

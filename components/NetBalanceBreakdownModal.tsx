@@ -361,7 +361,7 @@ export function NetBalanceBreakdownModal({
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.title, { color: colors.foreground }]}>Net Operating Balance</Text>
-                <Text style={[styles.sub, { color: colors.mutedForeground }]} numberOfLines={1}>
+                <Text style={[styles.sub, { color: colors.mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                   Executive Fiscal Dossier · {settings.organizationName || "OFM"}
                 </Text>
               </View>
@@ -617,7 +617,7 @@ export function NetBalanceBreakdownModal({
                   {/* Operating Metrics Strip */}
                   <View style={styles.metricsStrip}>
                     <View style={[styles.metricBlock, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                      <Text style={[styles.metricBlockLabel, { color: colors.mutedForeground }]} numberOfLines={1}>
+                      <Text style={[styles.metricBlockLabel, { color: colors.mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                         {modalBalanceMode === "budget" && totalBudgeted > 0
                           ? "Budget Used"
                           : modalBalanceMode === "surplus" && totalBudgeted > 0
@@ -638,6 +638,7 @@ export function NetBalanceBreakdownModal({
                         ]}
                         numberOfLines={1}
                         adjustsFontSizeToFit
+                        minimumFontScale={0.75}
                       >
                         {modalBalanceMode === "budget" && totalBudgeted > 0
                           ? `${netBudgetUtilization.toFixed(1)}%`
@@ -645,7 +646,7 @@ export function NetBalanceBreakdownModal({
                           ? `${unallocatedPct.toFixed(1)}%`
                           : `${actualMarginPct.toFixed(1)}%`}
                       </Text>
-                      <Text style={[styles.metricBlockSub, { color: colors.mutedForeground }]} numberOfLines={1}>
+                      <Text style={[styles.metricBlockSub, { color: colors.mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                         {modalBalanceMode === "budget" && totalBudgeted > 0
                           ? `${settings.currency} ${fmtShort(totalExpenses)} Spend`
                           : modalBalanceMode === "surplus" && totalBudgeted > 0
@@ -655,21 +656,21 @@ export function NetBalanceBreakdownModal({
                     </View>
 
                     <View style={[styles.metricBlock, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                      <Text style={[styles.metricBlockLabel, { color: colors.mutedForeground }]} numberOfLines={1}>
+                      <Text style={[styles.metricBlockLabel, { color: colors.mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                         {modalBalanceMode === "budget" && totalBudgeted > 0
                           ? "Budget Cap"
                           : modalBalanceMode === "surplus" && totalBudgeted > 0
                           ? "Department Budget"
                           : "Coverage Ratio"}
                       </Text>
-                      <Text style={[styles.metricBlockVal, { color: colors.primary }]} numberOfLines={1} adjustsFontSizeToFit>
+                      <Text style={[styles.metricBlockVal, { color: colors.primary }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                         {modalBalanceMode === "budget" && totalBudgeted > 0
                           ? `${settings.currency} ${fmtShort(totalBudgeted)}`
                           : modalBalanceMode === "surplus" && totalBudgeted > 0
                           ? `${settings.currency} ${fmtShort(totalBudgeted)}`
                           : (coverageRatio >= 90 ? "99x" : `${coverageRatio.toFixed(2)}x`)}
                       </Text>
-                      <Text style={[styles.metricBlockSub, { color: colors.mutedForeground }]} numberOfLines={1}>
+                      <Text style={[styles.metricBlockSub, { color: colors.mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                         {modalBalanceMode === "budget" && totalBudgeted > 0
                           ? "Total Allocated"
                           : modalBalanceMode === "surplus" && totalBudgeted > 0
@@ -679,7 +680,7 @@ export function NetBalanceBreakdownModal({
                     </View>
 
                     <View style={[styles.metricBlock, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                      <Text style={[styles.metricBlockLabel, { color: colors.mutedForeground }]} numberOfLines={1}>
+                      <Text style={[styles.metricBlockLabel, { color: colors.mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                         {modalBalanceMode === "budget" && totalBudgeted > 0
                           ? "Remaining"
                           : modalBalanceMode === "surplus" && totalBudgeted > 0
@@ -700,6 +701,7 @@ export function NetBalanceBreakdownModal({
                         ]}
                         numberOfLines={1}
                         adjustsFontSizeToFit
+                        minimumFontScale={0.75}
                       >
                         {modalBalanceMode === "budget" && totalBudgeted > 0
                           ? `${netBudgetRemaining >= 0 ? "+" : "-"}${settings.currency} ${fmtShort(Math.abs(netBudgetRemaining))}`
@@ -707,7 +709,7 @@ export function NetBalanceBreakdownModal({
                           ? `${netBudgetRemaining >= 0 ? "+" : "-"}${settings.currency} ${fmtShort(Math.abs(netBudgetRemaining))}`
                           : latestMoMInfo.text}
                       </Text>
-                      <Text style={[styles.metricBlockSub, { color: colors.mutedForeground }]} numberOfLines={1}>
+                      <Text style={[styles.metricBlockSub, { color: colors.mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                         {modalBalanceMode === "budget" && totalBudgeted > 0
                           ? "Available Buffer"
                           : modalBalanceMode === "surplus" && totalBudgeted > 0
@@ -996,7 +998,7 @@ export function NetBalanceBreakdownModal({
                       <Text style={[styles.milestoneVal, { color: colors.income }]}>
                         {largestInflow ? `+${settings.currency} ${fmt(largestInflow.amount)}` : "None"}
                       </Text>
-                      <Text style={[styles.milestoneSub, { color: colors.mutedForeground }]} numberOfLines={1}>
+                      <Text style={[styles.milestoneSub, { color: colors.mutedForeground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8}>
                         {largestInflow ? (largestInflow.title || largestInflow.category || "Deposit") : "N/A"}
                       </Text>
                     </View>
@@ -1010,7 +1012,7 @@ export function NetBalanceBreakdownModal({
                       <Text style={[styles.milestoneVal, { color: colors.expense }]}>
                         {largestOutflow ? `-${settings.currency} ${fmt(largestOutflow.amount)}` : "None"}
                       </Text>
-                      <Text style={[styles.milestoneSub, { color: colors.mutedForeground }]} numberOfLines={1}>
+                      <Text style={[styles.milestoneSub, { color: colors.mutedForeground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8}>
                         {largestOutflow ? (largestOutflow.title || largestOutflow.category || "Expense") : "N/A"}
                       </Text>
                     </View>
