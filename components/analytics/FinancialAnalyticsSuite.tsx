@@ -201,12 +201,8 @@ export function FinancialAnalyticsSuite({
   // Active interaction mode states
   const [budgetMode, setBudgetMode] = useState<"used" | "spent" | "remaining">("used");
   const [marginMode, setMarginMode] = useState<"margin" | "outflow" | "net">("margin");
-  const [distributionMode, setDistributionMode] = useState<"drivers" | "share" | "all">("drivers");
-  const [distributionDimension, setDistributionDimension] = useState<"category" | "department">("category");
-  const [distDeptFilter, setDistDeptFilter] = useState<string>("ALL");
   const [selectedDistributionItem, setSelectedDistributionItem] = useState<string | null>(null);
   const [showTooltip, setShowTooltip] = useState<"budget" | "margin" | "distribution" | null>(null);
-  const [showAllCategories, setShowAllCategories] = useState(false);
   const [expandedDeptId, setExpandedDeptId] = useState<string | null>(null);
 
   // Authoritative valid expense transactions
@@ -382,213 +378,45 @@ export function FinancialAnalyticsSuite({
     };
   }, [effectiveDeptMetrics, deptToCategoriesMap, currency]);
 
-  // Unified Active View for Card 3 (Category or Department)
+  // Department-Focused Active View for Card 3
   const activeDistView = useMemo(() => {
-    if (distributionDimension === "department") {
-      const totalExp = deptDistribution.totalExpenses;
-      const items = deptDistribution.departments;
-      const chartSegs = deptDistribution.chartSegments;
-      const topItem = deptDistribution.topDept
-        ? {
-            name: deptDistribution.topDept.name,
-            amount: deptDistribution.topDept.amount,
-            displayPct: deptDistribution.topDept.displayPct,
-            color: deptDistribution.topDept.color,
-          }
-        : null;
-
-      const selectedData = selectedDistributionItem
-        ? items.find(
-            (i) => i.name.trim().toLowerCase() === selectedDistributionItem.trim().toLowerCase()
-          ) || null
-        : null;
-
-      const isTied = items.length >= 2 && Math.abs(items[0].pct - items[1].pct) < 0.1;
-
-      return {
-        isDept: true,
-        titleSubtitle: `${items.length} Cost Center${items.length === 1 ? "" : "s"} Active`,
-        hasExpenses: deptDistribution.hasExpenses,
-        totalExpenses: totalExp,
-        items,
-        chartSegments: chartSegs,
-        topItem,
-        selectedData,
-        explanation: deptDistribution.explanation,
-        bentoCol1Label: isTied ? "TOP COST CENTERS" : "TOP COST CENTER",
-        bentoCol1Val: isTied && items.length >= 2 ? `${items[0].name} & ${items[1].name} (Tied)` : topItem ? topItem.name : "None",
-        bentoCol1Color: topItem ? topItem.color : "#3B82F6",
-        bentoCol3Label: "COST CENTERS",
-        bentoCol3Val: `${items.length} Active`,
-      };
-    } else {
-      // By Category: Check if filtered to a specific department
-      if (distDeptFilter !== "ALL") {
-        const deptTxs = validExpenseTxs.filter((t: any) => {
-          const rawDept = (t.department || "General").trim();
-          const matchedDept = effectiveDeptMetrics.find(
-            (dm) => dm.id === rawDept || dm.name.trim().toLowerCase() === rawDept.toLowerCase()
-          );
-          const dName = matchedDept ? matchedDept.name : rawDept;
-          return (
-            dName.toLowerCase() === distDeptFilter.toLowerCase() ||
-            (matchedDept && matchedDept.id === distDeptFilter)
-          );
-        });
-
-        const totalExp = deptTxs.reduce((s: number, t: any) => s + Number(t.amount || 0), 0);
-        const catMap: Record<string, { amount: number; count: number }> = {};
-        deptTxs.forEach((t: any) => {
-          const cat = (t.category || "General").trim();
-          if (!catMap[cat]) catMap[cat] = { amount: 0, count: 0 };
-          catMap[cat].amount += Number(t.amount || 0);
-          catMap[cat].count += 1;
-        });
-
-        const sorted = Object.entries(catMap).sort((a, b) => b[1].amount - a[1].amount);
-        const palette = ["#8B5CF6", "#3B82F6", "#EC4899", "#10B981", "#F59E0B", "#06B6D4", "#6366F1"];
-
-        const items = sorted.map(([category, data], idx) => {
-          const pct = totalExp > 0 ? (data.amount / totalExp) * 100 : 0;
-          return {
-            id: category,
-            name: category,
-            amount: data.amount,
-            pct,
-            displayPct: `${pct.toFixed(1)}%`,
-            count: data.count > 0 ? `${data.count} disbursement${data.count > 1 ? "s" : ""}` : undefined,
-            originText: `🏢 ${distDeptFilter} Unit · ${pct.toFixed(0)}% of department spend`,
-            color: palette[idx % palette.length],
-          };
-        });
-
-        const chartSegs = items.map((i) => ({
-          label: i.name,
-          value: i.amount,
-          color: i.color,
-          pct: i.pct,
-        }));
-
-        const topItem = items[0] || null;
-        let explanation = `Showing ${distDeptFilter} departmental costs: ${formatCompactCurrency(totalExp, currency)} total across ${items.length} categories.`;
-        if (items.length === 1 && topItem) {
-          explanation = `100% of ${distDeptFilter}'s spending is in ${topItem.name} (${formatCompactCurrency(topItem.amount, currency)}).`;
-        } else if (items.length >= 2 && Math.abs(items[0].pct - items[1].pct) < 0.1) {
-          explanation = `⚖️ Equal Cost Distribution: ${distDeptFilter} expenses are evenly split between ${items[0].name} and ${items[1].name}.`;
-        } else if (topItem && topItem.pct >= 70) {
-          explanation = `⚡ Dominant Cost Driver for ${distDeptFilter}: ${topItem.name} accounts for ${topItem.displayPct} of department spend.`;
+    const totalExp = deptDistribution.totalExpenses;
+    const items = deptDistribution.departments;
+    const chartSegs = deptDistribution.chartSegments;
+    const topItem = deptDistribution.topDept
+      ? {
+          name: deptDistribution.topDept.name,
+          amount: deptDistribution.topDept.amount,
+          displayPct: deptDistribution.topDept.displayPct,
+          color: deptDistribution.topDept.color,
         }
+      : null;
 
-        const selectedData = selectedDistributionItem
-          ? items.find(
-              (i) => i.name.trim().toLowerCase() === selectedDistributionItem.trim().toLowerCase()
-            ) || null
-          : null;
+    const selectedData = selectedDistributionItem
+      ? items.find(
+          (i) => i.name.trim().toLowerCase() === selectedDistributionItem.trim().toLowerCase()
+        ) || null
+      : null;
 
-        return {
-          isDept: false,
-          titleSubtitle: `${items.length} Category Cost Driver${items.length === 1 ? "" : "s"} (${distDeptFilter})`,
-          hasExpenses: totalExp > 0,
-          totalExpenses: totalExp,
-          items,
-          chartSegments: chartSegs,
-          topItem,
-          selectedData,
-          explanation,
-          bentoCol1Label: `TOP ${distDeptFilter.toUpperCase().slice(0, 8)} DRIVER`,
-          bentoCol1Val: topItem ? topItem.name : "None",
-          bentoCol1Color: topItem ? topItem.color : "#8B5CF6",
-          bentoCol3Label: "COST DRIVERS",
-          bentoCol3Val: `${items.length} Active`,
-        };
-      }
+    const isTied = items.length >= 2 && Math.abs(items[0].pct - items[1].pct) < 0.1;
 
-      // All Departments View for Categories
-      const totalExp = distribution?.totalExpenses || 0;
-      const items = (distribution?.categories || []).map((c) => {
-        const deptEntry = categoryToDeptsMap[c.category.toLowerCase()] || null;
-        const deptsBreakdown = deptEntry?.depts || [];
-
-        let originText = "Operational Expense Category";
-        if (deptsBreakdown.length === 1) {
-          originText = `🏢 Incurred by: ${deptsBreakdown[0].name} (100%)`;
-        } else if (deptsBreakdown.length > 1) {
-          originText = `🏢 Incurred by: ${deptsBreakdown.map((d) => `${d.name} (${d.pct.toFixed(0)}%)`).join(" · ")}`;
-        } else if (c.category.toLowerCase().includes("salary") || c.category.toLowerCase().includes("payroll")) {
-          originText = "Fixed Staff Compensation & Payroll";
-        }
-
-        return {
-          id: c.category,
-          name: c.category,
-          amount: c.amount,
-          pct: c.pct,
-          displayPct: c.displayPct,
-          count: c.count > 0 ? `${c.count} disbursement${c.count > 1 ? "s" : ""}` : undefined,
-          originText,
-          color: c.color,
-        };
-      });
-
-      const chartSegs = (distribution?.chartSegments || []).map((seg) => ({
-        label: seg.category,
-        value: seg.amount,
-        color: seg.color,
-        pct: seg.pct,
-      }));
-
-      const topItem = distribution?.topCategory
-        ? {
-            name: distribution.topCategory.category,
-            amount: distribution.topCategory.amount,
-            displayPct: distribution.topCategory.displayPct,
-            color: distribution.topCategory.color,
-          }
-        : null;
-
-      const selectedData = selectedDistributionItem
-        ? items.find(
-            (i) => i.name.trim().toLowerCase() === selectedDistributionItem.trim().toLowerCase()
-          ) || null
-        : null;
-
-      let explanation = distribution?.explanation || "";
-      if (topItem && items.length === 1) {
-        explanation = `100% of spending is in ${topItem.name} (${formatCompactCurrency(topItem.amount, currency)}). All current outflows represent payroll disbursements.`;
-      } else if (items.length >= 2 && Math.abs(items[0].pct - items[1].pct) < 0.1) {
-        explanation = `⚖️ Equal Cost Distribution: Outflows are evenly split between ${items[0].name} and ${items[1].name}.`;
-      } else if (topItem && topItem.displayPct && parseFloat(topItem.displayPct) >= 70) {
-        explanation = `⚡ Dominant Cost Driver: ${topItem.name} represents ${topItem.displayPct} of all spending.`;
-      }
-
-      return {
-        isDept: false,
-        titleSubtitle: `${items.length} Cost Driver${items.length === 1 ? "" : "s"} Categorized`,
-        hasExpenses: distribution?.hasExpenses ?? false,
-        totalExpenses: totalExp,
-        items,
-        chartSegments: chartSegs,
-        topItem,
-        selectedData,
-        explanation,
-        bentoCol1Label: "TOP COST DRIVER",
-        bentoCol1Val: topItem ? topItem.name : "None",
-        bentoCol1Color: topItem ? topItem.color : "#8B5CF6",
-        bentoCol3Label: "COST DRIVERS",
-        bentoCol3Val: `${items.length} Active`,
-      };
-    }
-  }, [
-    distributionDimension,
-    distDeptFilter,
-    validExpenseTxs,
-    categoryToDeptsMap,
-    deptDistribution,
-    distribution,
-    selectedDistributionItem,
-    effectiveDeptMetrics,
-    currency,
-  ]);
+    return {
+      isDept: true,
+      titleSubtitle: `${effectiveDeptMetrics.length} Department Cost Center${effectiveDeptMetrics.length === 1 ? "" : "s"} Active`,
+      hasExpenses: deptDistribution.hasExpenses,
+      totalExpenses: totalExp,
+      items,
+      chartSegments: chartSegs,
+      topItem,
+      selectedData,
+      explanation: deptDistribution.explanation,
+      bentoCol1Label: isTied ? "TOP DEPARTMENTS" : "TOP DEPARTMENT",
+      bentoCol1Val: isTied && items.length >= 2 ? `${items[0].name} & ${items[1].name} (Tied)` : topItem ? topItem.name : "None",
+      bentoCol1Color: topItem ? topItem.color : "#3B82F6",
+      bentoCol3Label: "DEPARTMENTS",
+      bentoCol3Val: `${effectiveDeptMetrics.length} Active`,
+    };
+  }, [deptDistribution, effectiveDeptMetrics, selectedDistributionItem]);
 
   return (
     <View style={styles.container}>
@@ -1448,590 +1276,299 @@ export function FinancialAnalyticsSuite({
             </View>
           )}
 
-          {/* Primary View Dimension Switcher: By Category vs By Department */}
-          <View style={styles.dimensionToggleRow}>
-            <TouchableOpacity
-              style={[
-                styles.dimensionTab,
-                {
-                  backgroundColor: distributionDimension === "category" ? "#8B5CF6" : (colors.cardAlt ?? colors.muted) + "30",
-                  borderColor: distributionDimension === "category" ? "#8B5CF6" : colors.border,
-                },
-              ]}
-              onPress={() => {
-                if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setDistributionDimension("category");
-                setSelectedDistributionItem(null);
-              }}
-              activeOpacity={0.75}
-            >
-              <Text
-                style={[
-                  styles.dimensionTabText,
-                  { color: distributionDimension === "category" ? "#FFFFFF" : colors.mutedForeground },
-                  distributionDimension === "category" && { fontFamily: "Inter_700Bold" },
-                ]}
-              >
-                🏷️ By Category
-              </Text>
-            </TouchableOpacity>
+          {/* Department Breakdown Cards */}
+          <View style={styles.categoryRankedList}>
+            {effectiveDeptMetrics.length === 0 ? (
+              <View style={[styles.emptyDeptCatBox, { borderColor: colors.border }]}>
+                <Text style={[styles.emptyDeptCatText, { color: colors.mutedForeground }]}>
+                  No departments configured in the organization yet.
+                </Text>
+              </View>
+            ) : (
+              effectiveDeptMetrics.map((dm) => {
+                const isExpanded =
+                  expandedDeptId === dm.id ||
+                  (expandedDeptId && expandedDeptId.toLowerCase() === dm.name.toLowerCase());
+                const isOver = dm.allocated > 0 && dm.spent > dm.allocated;
+                const isWarning = dm.utilizationPct >= 80 && !isOver;
+                const usageColor =
+                  dm.allocated <= 0
+                    ? colors.mutedForeground
+                    : isOver
+                    ? colors.expense
+                    : isWarning
+                    ? colors.warning
+                    : "#10B981";
 
-            <TouchableOpacity
-              style={[
-                styles.dimensionTab,
-                {
-                  backgroundColor: distributionDimension === "department" ? "#3B82F6" : (colors.cardAlt ?? colors.muted) + "30",
-                  borderColor: distributionDimension === "department" ? "#3B82F6" : colors.border,
-                },
-              ]}
-              onPress={() => {
-                if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setDistributionDimension("department");
-                setSelectedDistributionItem(null);
-              }}
-              activeOpacity={0.75}
-            >
-              <Text
-                style={[
-                  styles.dimensionTabText,
-                  { color: distributionDimension === "department" ? "#FFFFFF" : colors.mutedForeground },
-                  distributionDimension === "department" && { fontFamily: "Inter_700Bold" },
-                ]}
-              >
-                🏢 By Department
-              </Text>
-            </TouchableOpacity>
-          </View>
+                const catItems =
+                  dm.categories && dm.categories.length > 0
+                    ? dm.categories
+                    : deptToCategoriesMap[dm.name.toLowerCase()]?.categories || [];
 
-          {/* Department Quick Filter for Category View */}
-          {distributionDimension === "category" && effectiveDeptMetrics.length > 0 && (
-            <View style={styles.deptFilterSection}>
-              <Text style={[styles.deptFilterLabel, { color: colors.mutedForeground }]}>
-                Filter:
-              </Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.deptFilterScroll}
-              >
-                <TouchableOpacity
-                  style={[
-                    styles.deptFilterChip,
-                    {
-                      backgroundColor:
-                        distDeptFilter === "ALL"
-                          ? "#8B5CF6"
-                          : (colors.cardAlt ?? colors.muted) + "25",
-                      borderColor: distDeptFilter === "ALL" ? "#8B5CF6" : colors.border,
-                    },
-                  ]}
-                  onPress={() => {
-                    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setDistDeptFilter("ALL");
-                    setSelectedDistributionItem(null);
-                  }}
-                  activeOpacity={0.75}
-                >
-                  <Text
-                    style={[
-                      styles.deptFilterChipText,
-                      { color: distDeptFilter === "ALL" ? "#FFFFFF" : colors.foreground },
-                      distDeptFilter === "ALL" && { fontFamily: "Inter_700Bold" },
-                    ]}
-                  >
-                    All Units
-                  </Text>
-                </TouchableOpacity>
-
-                {effectiveDeptMetrics.map((dm) => {
-                  const isSelected =
-                    distDeptFilter.toLowerCase() === dm.name.toLowerCase() ||
-                    distDeptFilter.toLowerCase() === dm.id.toLowerCase();
-                  return (
-                    <TouchableOpacity
-                      key={dm.id}
-                      style={[
-                        styles.deptFilterChip,
-                        {
-                          backgroundColor: isSelected
-                            ? "#3B82F6"
-                            : (colors.cardAlt ?? colors.muted) + "25",
-                          borderColor: isSelected ? "#3B82F6" : colors.border,
-                        },
-                      ]}
-                      onPress={() => {
-                        if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        setDistDeptFilter(isSelected ? "ALL" : dm.name);
-                        setSelectedDistributionItem(null);
-                      }}
-                      activeOpacity={0.75}
-                    >
-                      <Text
-                        style={[
-                          styles.deptFilterChipText,
-                          { color: isSelected ? "#FFFFFF" : colors.foreground },
-                          isSelected && { fontFamily: "Inter_700Bold" },
-                        ]}
-                      >
-                        🏢 {dm.name}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </View>
-          )}
-
-          {/* VIEW A: BY DEPARTMENT - Expandable Department Breakdown Cards */}
-          {distributionDimension === "department" ? (
-            <View style={styles.categoryRankedList}>
-              {effectiveDeptMetrics.length === 0 ? (
-                <View style={[styles.emptyDeptCatBox, { borderColor: colors.border }]}>
-                  <Text style={[styles.emptyDeptCatText, { color: colors.mutedForeground }]}>
-                    No departments configured in the organization yet.
-                  </Text>
-                </View>
-              ) : (
-                effectiveDeptMetrics.map((dm) => {
-                  const isExpanded =
-                    expandedDeptId === dm.id ||
-                    (expandedDeptId && expandedDeptId.toLowerCase() === dm.name.toLowerCase());
-                  const isOver = dm.allocated > 0 && dm.spent > dm.allocated;
-                  const isWarning = dm.utilizationPct >= 80 && !isOver;
-                  const usageColor =
-                    dm.allocated <= 0
-                      ? colors.mutedForeground
-                      : isOver
-                      ? colors.expense
-                      : isWarning
-                      ? colors.warning
-                      : "#10B981";
-
-                  const catItems =
-                    dm.categories && dm.categories.length > 0
-                      ? dm.categories
-                      : deptToCategoriesMap[dm.name.toLowerCase()]?.categories || [];
-
-                  const catPalette = [
-                    "#8B5CF6",
-                    "#06B6D4",
-                    "#F59E0B",
-                    "#EC4899",
-                    "#10B981",
-                    "#3B82F6",
-                    "#6366F1",
-                  ];
-
-                  return (
-                    <TouchableOpacity
-                      key={dm.id || dm.name}
-                      style={[
-                        styles.deptBreakdownCard,
-                        {
-                          backgroundColor: isExpanded ? colors.card : (colors.cardAlt ?? colors.muted) + "18",
-                          borderColor: isExpanded ? colors.primary : colors.border,
-                          borderWidth: isExpanded ? 1.5 : 1,
-                        },
-                      ]}
-                      onPress={() => {
-                        if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        setExpandedDeptId(isExpanded ? null : dm.id);
-                      }}
-                      activeOpacity={0.8}
-                    >
-                      {/* Department Header: 🏢 IT Department [▼ / ▲] */}
-                      <View style={styles.deptCardHeader}>
-                        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
-                          <Text style={styles.deptIcon}>🏢</Text>
-                          <Text
-                            style={[styles.deptCardTitle, { color: colors.foreground }]}
-                            numberOfLines={1}
-                            adjustsFontSizeToFit
-                            minimumFontScale={0.85}
-                          >
-                            {dm.name} Department
-                          </Text>
-                        </View>
-                        <View style={{ transform: [{ rotate: isExpanded ? "180deg" : "0deg" }] }}>
-                          <SvgChevronDown size={16} color={colors.mutedForeground} />
-                        </View>
-                      </View>
-
-                      {/* 3-Column Metric Box: Budget | Used | Remaining */}
-                      <View style={[styles.deptKpiRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                        <View style={styles.deptKpiCol}>
-                          <Text style={[styles.deptKpiLabel, { color: colors.mutedForeground }]}>Budget</Text>
-                          <Text
-                            style={[styles.deptKpiVal, { color: colors.foreground }]}
-                            numberOfLines={1}
-                            adjustsFontSizeToFit
-                            minimumFontScale={0.72}
-                          >
-                            {dm.allocated > 0 ? formatCompactCurrency(dm.allocated, currency) : "No Cap"}
-                          </Text>
-                        </View>
-                        <View style={[styles.deptKpiDivider, { backgroundColor: colors.border }]} />
-                        <View style={styles.deptKpiCol}>
-                          <Text style={[styles.deptKpiLabel, { color: colors.mutedForeground }]}>Used</Text>
-                          <Text
-                            style={[
-                              styles.deptKpiVal,
-                              { color: isOver ? colors.expense : "#F59E0B" },
-                            ]}
-                            numberOfLines={1}
-                            adjustsFontSizeToFit
-                            minimumFontScale={0.72}
-                          >
-                            {formatCompactCurrency(dm.spent, currency)}
-                          </Text>
-                        </View>
-                        <View style={[styles.deptKpiDivider, { backgroundColor: colors.border }]} />
-                        <View style={styles.deptKpiCol}>
-                          <Text style={[styles.deptKpiLabel, { color: colors.mutedForeground }]}>Remaining</Text>
-                          <Text
-                            style={[
-                              styles.deptKpiVal,
-                              {
-                                color: isOver
-                                  ? colors.expense
-                                  : dm.remaining > 0
-                                  ? colors.income
-                                  : colors.mutedForeground,
-                              },
-                            ]}
-                            numberOfLines={1}
-                            adjustsFontSizeToFit
-                            minimumFontScale={0.72}
-                          >
-                            {dm.allocated > 0 ? formatCompactCurrency(dm.remaining, currency) : "Uncapped"}
-                          </Text>
-                        </View>
-                      </View>
-
-                      {/* Budget Usage Progress Bar */}
-                      <View style={styles.deptUsageRow}>
-                        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
-                          <Text style={[styles.deptUsageLabel, { color: colors.mutedForeground }]}>Budget Usage</Text>
-                          <Text
-                            style={[
-                              styles.deptUsagePct,
-                              { color: usageColor },
-                            ]}
-                          >
-                            {dm.allocated > 0 ? `${dm.utilizationPct.toFixed(0)}% Used` : "Uncapped"}
-                          </Text>
-                        </View>
-                        <View style={[styles.deptProgressTrack, { backgroundColor: colors.border }]}>
-                          <View
-                            style={[
-                              styles.deptProgressFill,
-                              {
-                                width: `${Math.min(100, Math.max(2, dm.utilizationPct))}%`,
-                                backgroundColor: usageColor,
-                              },
-                            ]}
-                          />
-                        </View>
-                      </View>
-
-                      {/* Collapsed Hint */}
-                      {!isExpanded && (
-                        <View style={styles.deptTapHint}>
-                          <Text style={[styles.deptTapHintText, { color: colors.primary }]}>
-                            Tap to View Breakdown ▼
-                          </Text>
-                        </View>
-                      )}
-
-                      {/* Expanded Details: Financial Overview & Expense Breakdown */}
-                      {isExpanded && (
-                        <View style={styles.deptExpandedContent}>
-                          {/* Financial Overview Subcard */}
-                          <View style={[styles.expandedSectionBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                            <Text style={[styles.expandedSectionHeading, { color: colors.mutedForeground }]}>
-                              FINANCIAL OVERVIEW
-                            </Text>
-
-                            <View style={styles.overviewLine}>
-                              <Text style={[styles.overviewLabel, { color: colors.mutedForeground }]}>Total Budget:</Text>
-                              <Text style={[styles.overviewValue, { color: colors.foreground }]}>
-                                {dm.allocated > 0 ? `${currency} ${dm.allocated.toLocaleString()}` : "No Cap Set"}
-                              </Text>
-                            </View>
-
-                            <View style={styles.overviewLine}>
-                              <Text style={[styles.overviewLabel, { color: colors.mutedForeground }]}>Total Used:</Text>
-                              <Text style={[styles.overviewValue, { color: isOver ? colors.expense : "#F59E0B" }]}>
-                                {currency} {dm.spent.toLocaleString()}
-                              </Text>
-                            </View>
-
-                            <View style={styles.overviewLine}>
-                              <Text style={[styles.overviewLabel, { color: colors.mutedForeground }]}>Remaining Budget:</Text>
-                              <Text style={[styles.overviewValue, { color: isOver ? colors.expense : dm.remaining > 0 ? colors.income : colors.mutedForeground }]}>
-                                {dm.allocated > 0 ? `${currency} ${dm.remaining.toLocaleString()}` : "Uncapped"}
-                              </Text>
-                            </View>
-
-                            <View style={styles.overviewLine}>
-                              <Text style={[styles.overviewLabel, { color: colors.mutedForeground }]}>Budget Usage:</Text>
-                              <Text style={[styles.overviewValue, { color: usageColor }]}>
-                                {dm.allocated > 0 ? `${dm.utilizationPct.toFixed(1)}%` : "0.0%"}
-                              </Text>
-                            </View>
-
-                            {dm.allocated > 0 && (
-                              <View style={[styles.deptProgressTrack, { backgroundColor: colors.border, marginTop: 8 }]}>
-                                <View
-                                  style={[
-                                    styles.deptProgressFill,
-                                    {
-                                      width: `${Math.min(100, Math.max(2, dm.utilizationPct))}%`,
-                                      backgroundColor: usageColor,
-                                    },
-                                  ]}
-                                />
-                              </View>
-                            )}
-                          </View>
-
-                          {/* Divider */}
-                          <View style={[styles.expandedDivider, { backgroundColor: colors.border }]} />
-
-                          {/* Expense Breakdown Subcard */}
-                          <View style={styles.catBreakdownSection}>
-                            <Text style={[styles.expandedSectionHeading, { color: colors.mutedForeground, marginBottom: 8 }]}>
-                              EXPENSE BREAKDOWN
-                            </Text>
-
-                            {catItems.length === 0 ? (
-                              <View style={[styles.emptyDeptCatBox, { borderColor: colors.border }]}>
-                                <Text style={[styles.emptyDeptCatText, { color: colors.mutedForeground }]}>
-                                  No expense disbursements recorded for this department yet.
-                                </Text>
-                              </View>
-                            ) : (
-                              catItems.map((c: any, cIdx: number) => {
-                                const catColor = catPalette[cIdx % catPalette.length];
-                                const catName = c.category || c.name;
-                                const catAmt = Number(c.amount || 0);
-                                const catPct = Number(c.pct || 0);
-
-                                return (
-                                  <View key={catName} style={styles.deptCatItem}>
-                                    <View style={styles.deptCatHeader}>
-                                      <Text
-                                        style={[styles.deptCatName, { color: colors.foreground }]}
-                                        numberOfLines={1}
-                                        adjustsFontSizeToFit
-                                        minimumFontScale={0.8}
-                                      >
-                                        {catName}
-                                      </Text>
-                                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                                        <Text style={[styles.deptCatAmt, { color: colors.foreground }]}>
-                                          {currency} {catAmt.toLocaleString()}
-                                        </Text>
-                                        <Text style={[styles.deptCatPct, { color: catColor }]}>
-                                          {catPct.toFixed(0)}%
-                                        </Text>
-                                      </View>
-                                    </View>
-
-                                    <View style={[styles.deptCatTrack, { backgroundColor: colors.border }]}>
-                                      <View
-                                        style={[
-                                          styles.deptCatFill,
-                                          {
-                                            width: `${Math.max(3, Math.min(100, catPct))}%`,
-                                            backgroundColor: catColor,
-                                          },
-                                        ]}
-                                      />
-                                    </View>
-                                  </View>
-                                );
-                              })
-                            )}
-                          </View>
-
-                          {/* Action Button: View Outflows */}
-                          <TouchableOpacity
-                            style={[styles.deptDrillDownBtn, { borderColor: colors.border }]}
-                            onPress={(e) => {
-                              e.stopPropagation?.();
-                              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                              onOpenDrillDown("expense", dm.name);
-                            }}
-                            activeOpacity={0.75}
-                          >
-                            <Text style={[styles.deptDrillDownBtnText, { color: colors.primary }]}>
-                              View All {dm.name} Outflows →
-                            </Text>
-                          </TouchableOpacity>
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                  );
-                })
-              )}
-            </View>
-          ) : (
-            /* VIEW B: BY CATEGORY - Ranked Category List (Clean, Sleek 3-Line Layout) */
-            <View style={styles.categoryRankedList}>
-              {(showAllCategories || distributionMode === "all"
-                ? activeDistView.items
-                : activeDistView.items.slice(0, 3)
-              ).map((item) => {
-                const isSelected = selectedDistributionItem?.trim().toLowerCase() === item.name.trim().toLowerCase();
-                const isAnySelected = selectedDistributionItem !== null;
+                const catPalette = [
+                  "#3B82F6",
+                  "#8B5CF6",
+                  "#06B6D4",
+                  "#F59E0B",
+                  "#EC4899",
+                  "#10B981",
+                  "#6366F1",
+                ];
 
                 return (
                   <TouchableOpacity
-                    key={item.id || item.name}
+                    key={dm.id || dm.name}
                     style={[
-                      styles.distItemCard,
+                      styles.deptBreakdownCard,
                       {
-                        backgroundColor: isSelected ? item.color + "16" : (colors.cardAlt ?? colors.muted) + "18",
-                        borderColor: isSelected ? item.color : colors.border,
-                        borderWidth: isSelected ? 1.5 : 1,
-                        opacity: isAnySelected ? (isSelected ? 1.0 : 0.7) : 1.0,
+                        backgroundColor: isExpanded ? colors.card : (colors.cardAlt ?? colors.muted) + "18",
+                        borderColor: isExpanded ? colors.primary : colors.border,
+                        borderWidth: isExpanded ? 1.5 : 1,
                       },
                     ]}
                     onPress={() => {
                       if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      setSelectedDistributionItem(isSelected ? null : item.name);
+                      setExpandedDeptId(isExpanded ? null : dm.id);
                     }}
-                    activeOpacity={0.75}
+                    activeOpacity={0.8}
                   >
-                    {/* Line 1: Dot + Name + Count (Left) | Amount + % Badge (Right) */}
-                    <View style={styles.distItemTopRow}>
-                      <View style={styles.rankedLeft}>
-                        <View
-                          style={[
-                            styles.catColorDot,
-                            {
-                              backgroundColor: item.color,
-                              transform: [{ scale: isSelected ? 1.35 : 1.0 }],
-                            },
-                          ]}
-                        />
+                    {/* Department Header: 🏢 IT Department [▼ / ▲] */}
+                    <View style={styles.deptCardHeader}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
+                        <Text style={styles.deptIcon}>🏢</Text>
                         <Text
-                          style={[
-                            styles.rankedCatName,
-                            {
-                              color: isSelected ? item.color : colors.foreground,
-                              fontFamily: isSelected ? "Inter_700Bold" : "Inter_600SemiBold",
-                            },
-                          ]}
-                          numberOfLines={2}
+                          style={[styles.deptCardTitle, { color: colors.foreground }]}
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                          minimumFontScale={0.85}
                         >
-                          {item.name}
+                          {dm.name} Department
                         </Text>
-                        {item.count && (
-                          <View style={[styles.itemCountBadge, { backgroundColor: item.color + "18" }]}>
-                            <Text style={[styles.itemCountText, { color: item.color }]}>{item.count}</Text>
-                          </View>
-                        )}
                       </View>
+                      <View style={{ transform: [{ rotate: isExpanded ? "180deg" : "0deg" }] }}>
+                        <SvgChevronDown size={16} color={colors.mutedForeground} />
+                      </View>
+                    </View>
 
-                      <View style={styles.rankedRight}>
+                    {/* 3-Column Metric Box: Budget | Used | Remaining */}
+                    <View style={[styles.deptKpiRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                      <View style={styles.deptKpiCol}>
+                        <Text style={[styles.deptKpiLabel, { color: colors.mutedForeground }]}>Budget</Text>
+                        <Text
+                          style={[styles.deptKpiVal, { color: colors.foreground }]}
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                          minimumFontScale={0.72}
+                        >
+                          {dm.allocated > 0 ? formatCompactCurrency(dm.allocated, currency) : "No Cap"}
+                        </Text>
+                      </View>
+                      <View style={[styles.deptKpiDivider, { backgroundColor: colors.border }]} />
+                      <View style={styles.deptKpiCol}>
+                        <Text style={[styles.deptKpiLabel, { color: colors.mutedForeground }]}>Used</Text>
                         <Text
                           style={[
-                            styles.rankedAmount,
+                            styles.deptKpiVal,
+                            { color: isOver ? colors.expense : "#F59E0B" },
+                          ]}
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                          minimumFontScale={0.72}
+                        >
+                          {formatCompactCurrency(dm.spent, currency)}
+                        </Text>
+                      </View>
+                      <View style={[styles.deptKpiDivider, { backgroundColor: colors.border }]} />
+                      <View style={styles.deptKpiCol}>
+                        <Text style={[styles.deptKpiLabel, { color: colors.mutedForeground }]}>Remaining</Text>
+                        <Text
+                          style={[
+                            styles.deptKpiVal,
                             {
-                              color: colors.foreground,
-                              fontFamily: isSelected ? "Inter_700Bold" : "Inter_600SemiBold",
+                              color: isOver
+                                ? colors.expense
+                                : dm.remaining > 0
+                                ? colors.income
+                                : colors.mutedForeground,
                             },
                           ]}
                           numberOfLines={1}
+                          adjustsFontSizeToFit
+                          minimumFontScale={0.72}
                         >
-                          {formatCompactCurrency(item.amount, currency)}
+                          {dm.allocated > 0 ? formatCompactCurrency(dm.remaining, currency) : "Uncapped"}
                         </Text>
-                        <View style={[styles.itemPctBadge, { backgroundColor: item.color + "22", borderColor: item.color + "45" }]}>
-                          <Text
-                            style={[
-                              styles.itemPctBadgeText,
-                              { color: item.color },
-                            ]}
-                            numberOfLines={1}
-                          >
-                            {item.displayPct}
-                          </Text>
-                        </View>
                       </View>
                     </View>
 
-                    {/* Line 2: Proportion Progress Bar */}
-                    <View style={[styles.distBarTrack, { backgroundColor: (colors.cardAlt ?? colors.muted) + "50" }]}>
-                      <View
-                        style={[
-                          styles.distBarFill,
-                          {
-                            width: `${Math.max(3, Math.min(100, item.pct))}%`,
-                            backgroundColor: item.color,
-                          },
-                        ]}
-                      />
+                    {/* Budget Usage Progress Bar */}
+                    <View style={styles.deptUsageRow}>
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
+                        <Text style={[styles.deptUsageLabel, { color: colors.mutedForeground }]}>Budget Usage</Text>
+                        <Text
+                          style={[
+                            styles.deptUsagePct,
+                            { color: usageColor },
+                          ]}
+                        >
+                          {dm.allocated > 0 ? `${dm.utilizationPct.toFixed(0)}% Used` : "Uncapped"}
+                        </Text>
+                      </View>
+                      <View style={[styles.deptProgressTrack, { backgroundColor: colors.border }]}>
+                        <View
+                          style={[
+                            styles.deptProgressFill,
+                            {
+                              width: `${Math.min(100, Math.max(2, dm.utilizationPct))}%`,
+                              backgroundColor: usageColor,
+                            },
+                          ]}
+                        />
+                      </View>
                     </View>
 
-                    {/* Line 3: Clear Origin Subtitle (Left) & Direct Drill-Down Action (Right) */}
-                    <View style={styles.distItemBottomRow}>
-                      <Text
-                        style={[
-                          styles.distItemSubtext,
-                          { color: isSelected ? colors.foreground : colors.mutedForeground },
-                        ]}
-                        numberOfLines={3}
-                      >
-                        {item.originText || (activeDistView.isDept ? "Operational Unit" : "Expense Driver")}
-                      </Text>
-                      <TouchableOpacity
-                        onPress={(e) => {
-                          e.stopPropagation?.();
-                          if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                          onOpenDrillDown("expense", item.name);
-                        }}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      >
-                        <Text style={[styles.distItemLink, { color: item.color }]}>
-                          View Outflows →
+                    {/* Collapsed Hint */}
+                    {!isExpanded && (
+                      <View style={styles.deptTapHint}>
+                        <Text style={[styles.deptTapHintText, { color: colors.primary }]}>
+                          Tap to View Breakdown ▼
                         </Text>
-                      </TouchableOpacity>
-                    </View>
+                      </View>
+                    )}
+
+                    {/* Expanded Details: Financial Overview & Expense Breakdown */}
+                    {isExpanded && (
+                      <View style={styles.deptExpandedContent}>
+                        {/* Financial Overview Subcard */}
+                        <View style={[styles.expandedSectionBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                          <Text style={[styles.expandedSectionHeading, { color: colors.mutedForeground }]}>
+                            FINANCIAL OVERVIEW
+                          </Text>
+
+                          <View style={styles.overviewLine}>
+                            <Text style={[styles.overviewLabel, { color: colors.mutedForeground }]}>Total Budget:</Text>
+                            <Text style={[styles.overviewValue, { color: colors.foreground }]}>
+                              {dm.allocated > 0 ? `${currency} ${dm.allocated.toLocaleString()}` : "No Cap Set"}
+                            </Text>
+                          </View>
+
+                          <View style={styles.overviewLine}>
+                            <Text style={[styles.overviewLabel, { color: colors.mutedForeground }]}>Total Used:</Text>
+                            <Text style={[styles.overviewValue, { color: isOver ? colors.expense : "#F59E0B" }]}>
+                              {currency} {dm.spent.toLocaleString()}
+                            </Text>
+                          </View>
+
+                          <View style={styles.overviewLine}>
+                            <Text style={[styles.overviewLabel, { color: colors.mutedForeground }]}>Remaining Budget:</Text>
+                            <Text style={[styles.overviewValue, { color: isOver ? colors.expense : dm.remaining > 0 ? colors.income : colors.mutedForeground }]}>
+                              {dm.allocated > 0 ? `${currency} ${dm.remaining.toLocaleString()}` : "Uncapped"}
+                            </Text>
+                          </View>
+
+                          <View style={styles.overviewLine}>
+                            <Text style={[styles.overviewLabel, { color: colors.mutedForeground }]}>Budget Usage:</Text>
+                            <Text style={[styles.overviewValue, { color: usageColor }]}>
+                              {dm.allocated > 0 ? `${dm.utilizationPct.toFixed(1)}%` : "0.0%"}
+                            </Text>
+                          </View>
+
+                          {dm.allocated > 0 && (
+                            <View style={[styles.deptProgressTrack, { backgroundColor: colors.border, marginTop: 8 }]}>
+                              <View
+                                style={[
+                                  styles.deptProgressFill,
+                                  {
+                                    width: `${Math.min(100, Math.max(2, dm.utilizationPct))}%`,
+                                    backgroundColor: usageColor,
+                                  },
+                                ]}
+                              />
+                            </View>
+                          )}
+                        </View>
+
+                        {/* Divider */}
+                        <View style={[styles.expandedDivider, { backgroundColor: colors.border }]} />
+
+                        {/* Expense Breakdown Subcard */}
+                        <View style={styles.catBreakdownSection}>
+                          <Text style={[styles.expandedSectionHeading, { color: colors.mutedForeground, marginBottom: 8 }]}>
+                            EXPENSE BREAKDOWN
+                          </Text>
+
+                          {catItems.length === 0 ? (
+                            <View style={[styles.emptyDeptCatBox, { borderColor: colors.border }]}>
+                              <Text style={[styles.emptyDeptCatText, { color: colors.mutedForeground }]}>
+                                No expense disbursements recorded for this department yet.
+                              </Text>
+                            </View>
+                          ) : (
+                            catItems.map((c: any, cIdx: number) => {
+                              const catColor = catPalette[cIdx % catPalette.length];
+                              const catName = c.category || c.name;
+                              const catAmt = Number(c.amount || 0);
+                              const catPct = Number(c.pct || 0);
+
+                              return (
+                                <View key={catName} style={styles.deptCatItem}>
+                                  <View style={styles.deptCatHeader}>
+                                    <Text
+                                      style={[styles.deptCatName, { color: colors.foreground }]}
+                                      numberOfLines={1}
+                                      adjustsFontSizeToFit
+                                      minimumFontScale={0.8}
+                                    >
+                                      {catName}
+                                    </Text>
+                                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                                      <Text style={[styles.deptCatAmt, { color: colors.foreground }]}>
+                                        {currency} {catAmt.toLocaleString()}
+                                      </Text>
+                                      <Text style={[styles.deptCatPct, { color: catColor }]}>
+                                        {catPct.toFixed(0)}%
+                                      </Text>
+                                    </View>
+                                  </View>
+
+                                  <View style={[styles.deptCatTrack, { backgroundColor: colors.border }]}>
+                                    <View
+                                      style={[
+                                        styles.deptCatFill,
+                                        {
+                                          width: `${Math.max(3, Math.min(100, catPct))}%`,
+                                          backgroundColor: catColor,
+                                        },
+                                      ]}
+                                    />
+                                  </View>
+                                </View>
+                              );
+                            })
+                          )}
+                        </View>
+
+                        {/* Action Button: View Outflows */}
+                        <TouchableOpacity
+                          style={[styles.deptDrillDownBtn, { borderColor: colors.border }]}
+                          onPress={(e) => {
+                            e.stopPropagation?.();
+                            if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            onOpenDrillDown("expense", dm.name);
+                          }}
+                          activeOpacity={0.75}
+                        >
+                          <Text style={[styles.deptDrillDownBtnText, { color: colors.primary }]}>
+                            View All {dm.name} Outflows →
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
                   </TouchableOpacity>
                 );
-              })}
-
-              {activeDistView.items.length > 3 && !showAllCategories && distributionMode !== "all" && (
-                <TouchableOpacity
-                  style={styles.expandRow}
-                  onPress={() => {
-                    setShowAllCategories(true);
-                    setDistributionMode("all");
-                  }}
-                >
-                  <Text style={[styles.expandText, { color: colors.primary }]}>
-                    +{activeDistView.items.length - 3} More {activeDistView.isDept ? "Cost Centers" : "Cost Drivers"} ▼
-                  </Text>
-                </TouchableOpacity>
-              )}
-
-              {showAllCategories && activeDistView.items.length > 3 && (
-                <TouchableOpacity
-                  style={styles.expandRow}
-                  onPress={() => {
-                    setShowAllCategories(false);
-                    setDistributionMode("drivers");
-                  }}
-                >
-                  <Text style={[styles.expandText, { color: colors.primary }]}>
-                    ▲ Show Top 3 Only
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
+              })
+            )}
+          </View>
 
           {/* Authoritative 3-Metric Bento Box for Card 3 (Clean, Non-Alarmist, Harmonious) */}
           <View style={[styles.bentoRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
