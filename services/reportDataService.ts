@@ -486,13 +486,13 @@ export function buildEnterpriseReportData(
   }
 
   const whyThisMatters = budgetTotal > 0
-    ? `Operating revenue of ${currency} ${formatCompactCurrency(totalRevenue)} funds authorized department budgets of ${currency} ${formatCompactCurrency(budgetTotal)}, leaving ${currency} ${formatCompactCurrency(unallocatedFunds)} in unallocated funds. Disbursements of ${currency} ${formatCompactCurrency(totalExpenses)} leave net operating cashflow of ${currency} ${formatCompactCurrency(netOperatingBalance)} (${netProfitMarginPct.toFixed(1)}% operating margin) with ${budgetUtilizationPct.toFixed(1)}% department budget utilized.`
+    ? `Operating revenue of ${formatCompactCurrency(totalRevenue, currency)} funds authorized department budgets of ${formatCompactCurrency(budgetTotal, currency)}, leaving ${formatCompactCurrency(unallocatedFunds, currency)} in unallocated funds. Disbursements of ${formatCompactCurrency(totalExpenses, currency)} leave net operating cashflow of ${formatCompactCurrency(netOperatingBalance, currency)} (${netProfitMarginPct.toFixed(1)}% operating margin) with ${budgetUtilizationPct.toFixed(1)}% department budget utilized.`
     : isNetPositive
-    ? `Operating revenue of ${currency} ${formatCompactCurrency(totalRevenue)} exceeds expenses of ${currency} ${formatCompactCurrency(totalExpenses)} by ${currency} ${formatCompactCurrency(netOperatingBalance)} (${netProfitMarginPct.toFixed(1)}% operating margin), maintaining strong cash liquidity.`
-    : `Operating expenditures (${currency} ${formatCompactCurrency(totalExpenses)}) exceed realized revenues (${currency} ${formatCompactCurrency(totalRevenue)}) by ${currency} ${formatCompactCurrency(Math.abs(netOperatingBalance))}, causing an operating deficit.`;
+    ? `Operating revenue of ${formatCompactCurrency(totalRevenue, currency)} exceeds expenses of ${formatCompactCurrency(totalExpenses, currency)} by ${formatCompactCurrency(netOperatingBalance, currency)} (${netProfitMarginPct.toFixed(1)}% operating margin), maintaining strong cash liquidity.`
+    : `Operating expenditures (${formatCompactCurrency(totalExpenses, currency)}) exceed realized revenues (${formatCompactCurrency(totalRevenue, currency)}) by ${formatCompactCurrency(Math.abs(netOperatingBalance), currency)}, causing an operating deficit.`;
 
   const healthExplanation = budgetTotal > 0
-    ? `${whyThisMatters} Budget utilization stands at ${budgetUtilizationPct.toFixed(1)}% of the ${currency} ${formatCompactCurrency(budgetTotal)} authorized ceiling.`
+    ? `${whyThisMatters} Budget utilization stands at ${budgetUtilizationPct.toFixed(1)}% of the ${formatCompactCurrency(budgetTotal, currency)} authorized ceiling.`
     : whyThisMatters;
 
   // 8. Revenue breakdown by Category & Department

@@ -359,17 +359,17 @@ export function FinancialAnalyticsSuite({
 
       const zeroText =
         zeroSpendDepts.length > 0
-          ? ` ${zeroSpendDepts.map((d) => `${d.name}: ${currency} 0 used`).join(", ")} (${currency} ${formatCompactCurrency(
+          ? ` ${zeroSpendDepts.map((d) => `${d.name}: ${currency} 0 used`).join(", ")} (${formatCompactCurrency(
               zeroSpendDepts.reduce((s, d) => s + d.remaining, 0),
               currency
             )} budget remaining).`
           : "";
 
       if (activeSpendDepts.length === 1) {
-        explanation = `🏢 100% of spending is in ${topDept.name} (${currency} ${formatCompactCurrency(
+        explanation = `🏢 100% of spending is in ${topDept.name} (${formatCompactCurrency(
           topDept.amount,
           currency
-        )} used of ${currency} ${formatCompactCurrency(total, currency)} total).${zeroText}`;
+        )} used of ${formatCompactCurrency(total, currency)} total).${zeroText}`;
       } else if (
         activeSpendDepts.length >= 2 &&
         Math.abs(activeSpendDepts[0].pct - activeSpendDepts[1].pct) < 0.5
@@ -377,14 +377,14 @@ export function FinancialAnalyticsSuite({
         explanation = `⚖️ Balanced Spending: ${activeSpendDepts
           .map(
             (d) =>
-              `${d.name}: ${currency} ${formatCompactCurrency(d.amount, currency)} (${d.displayPct})`
+              `${d.name}: ${formatCompactCurrency(d.amount, currency)} (${d.displayPct})`
           )
-          .join(" · ")} (${currency} ${formatCompactCurrency(total, currency)} total spent).${zeroText}`;
+          .join(" · ")} (${formatCompactCurrency(total, currency)} total spent).${zeroText}`;
       } else {
-        explanation = `🏢 Primary Cost Center: ${topDept.name} leads with ${currency} ${formatCompactCurrency(
+        explanation = `🏢 Primary Cost Center: ${topDept.name} leads with ${formatCompactCurrency(
           topDept.amount,
           currency
-        )} (${topDept.displayPct} of ${currency} ${formatCompactCurrency(
+        )} (${topDept.displayPct} of ${formatCompactCurrency(
           total,
           currency
         )} total spent).${zeroText}`;
@@ -420,12 +420,6 @@ export function FinancialAnalyticsSuite({
         }
       : null;
 
-    const selectedData = selectedDistributionItem
-      ? items.find(
-          (i) => i.name.trim().toLowerCase() === selectedDistributionItem.trim().toLowerCase()
-        ) || null
-      : null;
-
     const selectedDeptMetric = selectedDistributionItem
       ? effectiveDeptMetrics.find(
           (dm) =>
@@ -434,13 +428,67 @@ export function FinancialAnalyticsSuite({
         ) || null
       : null;
 
+    const selectedData = selectedDistributionItem
+      ? items.find(
+          (i) => i.name.trim().toLowerCase() === selectedDistributionItem.trim().toLowerCase()
+        ) ||
+        (selectedDeptMetric
+          ? {
+              id: selectedDeptMetric.id,
+              name: selectedDeptMetric.name,
+              amount: selectedDeptMetric.spent,
+              pct: totalExp > 0 ? (selectedDeptMetric.spent / totalExp) * 100 : 0,
+              displayPct:
+                totalExp > 0
+                  ? `${((selectedDeptMetric.spent / totalExp) * 100).toFixed(1)}%`
+                  : "0.0%",
+              count:
+                selectedDeptMetric.payrollHeadcount > 0
+                  ? `${selectedDeptMetric.payrollHeadcount} Staff`
+                  : undefined,
+              originText: "Active Cost Center",
+              color: "#3B82F6",
+            }
+          : null)
+      : null;
+
     let contextualExplanation = deptDistribution.explanation;
     if (selectedDeptMetric) {
       const deptPct = totalExp > 0 ? (selectedDeptMetric.spent / totalExp) * 100 : 0;
-      contextualExplanation = `🏢 ${selectedDeptMetric.name} Department: ${currency} ${selectedDeptMetric.spent.toLocaleString()} used (${deptPct.toFixed(1)}% of all expenses) • Budget: ${selectedDeptMetric.allocated > 0 ? `${currency} ${selectedDeptMetric.allocated.toLocaleString()}` : "No Cap"} • Remaining: ${selectedDeptMetric.allocated > 0 ? `${currency} ${selectedDeptMetric.remaining.toLocaleString()}` : "Uncapped"} (${selectedDeptMetric.utilizationPct.toFixed(0)}% used).`;
+      contextualExplanation = `🏢 ${selectedDeptMetric.name} Department: ${currency} ${selectedDeptMetric.spent.toLocaleString()} used (${deptPct.toFixed(1)}% of total expenses) • Budget: ${selectedDeptMetric.allocated > 0 ? `${currency} ${selectedDeptMetric.allocated.toLocaleString()}` : "No Cap"} • Remaining: ${selectedDeptMetric.allocated > 0 ? `${currency} ${selectedDeptMetric.remaining.toLocaleString()}` : "Uncapped"} (${selectedDeptMetric.utilizationPct.toFixed(0)}% used).`;
     }
 
     const isTied = items.length >= 2 && Math.abs(items[0].pct - items[1].pct) < 0.1;
+
+    const bentoCol1Label = selectedDeptMetric
+      ? "SELECTED DEPT"
+      : isTied
+      ? "TOP DEPARTMENTS"
+      : "TOP DEPARTMENT";
+    const bentoCol1Val = selectedDeptMetric
+      ? selectedDeptMetric.name
+      : isTied && items.length >= 2
+      ? `${items[0].name} & ${items[1].name} (Tied)`
+      : topItem
+      ? topItem.name
+      : "None";
+    const bentoCol1Color = selectedData
+      ? selectedData.color
+      : topItem
+      ? topItem.color
+      : "#3B82F6";
+
+    const bentoCol2Label = selectedDeptMetric ? "DEPT SPENT" : "TOTAL SPENT";
+    const bentoCol2Val = selectedDeptMetric
+      ? formatCompactCurrency(selectedDeptMetric.spent, currency)
+      : formatCompactCurrency(totalExp, currency);
+
+    const bentoCol3Label = selectedDeptMetric ? "SHARE OF TOTAL" : "DEPARTMENTS";
+    const bentoCol3Val = selectedDeptMetric
+      ? totalExp > 0
+        ? `${((selectedDeptMetric.spent / totalExp) * 100).toFixed(1)}%`
+        : "0.0%"
+      : `${effectiveDeptMetrics.length} Active`;
 
     return {
       isDept: true,
@@ -452,11 +500,13 @@ export function FinancialAnalyticsSuite({
       topItem,
       selectedData,
       explanation: contextualExplanation,
-      bentoCol1Label: isTied ? "TOP DEPARTMENTS" : "TOP DEPARTMENT",
-      bentoCol1Val: isTied && items.length >= 2 ? `${items[0].name} & ${items[1].name} (Tied)` : topItem ? topItem.name : "None",
-      bentoCol1Color: topItem ? topItem.color : "#3B82F6",
-      bentoCol3Label: "DEPARTMENTS",
-      bentoCol3Val: `${effectiveDeptMetrics.length} Active`,
+      bentoCol1Label,
+      bentoCol1Val,
+      bentoCol1Color,
+      bentoCol2Label,
+      bentoCol2Val,
+      bentoCol3Label,
+      bentoCol3Val,
     };
   }, [deptDistribution, effectiveDeptMetrics, selectedDistributionItem, currency]);
 
@@ -1307,7 +1357,23 @@ export function FinancialAnalyticsSuite({
                 showChips={false}
                 showLegend={false}
                 selectedLabel={selectedDistributionItem}
-                onSelectLabel={(lbl) => setSelectedDistributionItem(lbl)}
+                onSelectLabel={(lbl) => {
+                  if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  if (!lbl || selectedDistributionItem?.toLowerCase() === lbl.toLowerCase()) {
+                    setSelectedDistributionItem(null);
+                    setExpandedDeptId(null);
+                  } else {
+                    setSelectedDistributionItem(lbl);
+                    const matched = effectiveDeptMetrics.find(
+                      (dm) =>
+                        dm.name.toLowerCase() === lbl.toLowerCase() ||
+                        dm.id.toLowerCase() === lbl.toLowerCase()
+                    );
+                    if (matched) {
+                      setExpandedDeptId(matched.id);
+                    }
+                  }
+                }}
               />
             </View>
           ) : (
@@ -1318,6 +1384,144 @@ export function FinancialAnalyticsSuite({
             </View>
           )}
 
+          {/* Quick Department Filter Chips */}
+          <View style={styles.deptOptionsContainer}>
+            <View style={styles.deptOptionsHeader}>
+              <Text style={[styles.deptOptionsLabel, { color: colors.mutedForeground }]}>
+                {selectedDistributionItem ? "FILTERED BREAKDOWN" : "DEPARTMENT BREAKDOWN"}
+              </Text>
+              {selectedDistributionItem ? (
+                <TouchableOpacity
+                  onPress={() => {
+                    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setSelectedDistributionItem(null);
+                    setExpandedDeptId(null);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.resetDeptText, { color: colors.primary }]}>
+                    Show All Units ✕
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.deptChipsScroll}
+            >
+              <TouchableOpacity
+                style={[
+                  styles.deptChip,
+                  {
+                    backgroundColor: !selectedDistributionItem ? colors.primary : (colors.cardAlt ?? colors.muted) + "30",
+                    borderColor: !selectedDistributionItem ? colors.primary : colors.border,
+                  },
+                ]}
+                onPress={() => {
+                  if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setSelectedDistributionItem(null);
+                  setExpandedDeptId(null);
+                }}
+                activeOpacity={0.75}
+              >
+                <Text
+                  style={[
+                    styles.deptChipText,
+                    { color: !selectedDistributionItem ? "#FFFFFF" : colors.foreground },
+                    !selectedDistributionItem && { fontFamily: "Inter_700Bold" },
+                  ]}
+                >
+                  🏢 All Units
+                </Text>
+                <View
+                  style={[
+                    styles.deptChipBadge,
+                    {
+                      backgroundColor: !selectedDistributionItem
+                        ? "rgba(255, 255, 255, 0.25)"
+                        : (colors.cardAlt ?? colors.muted) + "60",
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.deptChipBadgeText,
+                      { color: !selectedDistributionItem ? "#FFFFFF" : colors.mutedForeground },
+                    ]}
+                  >
+                    {formatCompactCurrency(activeDistView.totalExpenses, currency)}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {effectiveDeptMetrics.map((dm) => {
+                const isSelected =
+                  selectedDistributionItem?.toLowerCase() === dm.name.toLowerCase() ||
+                  selectedDistributionItem?.toLowerCase() === dm.id.toLowerCase();
+                const matchedSeg = activeDistView.chartSegments.find(
+                  (s) => s.label.toLowerCase() === dm.name.toLowerCase()
+                );
+                const dotColor = matchedSeg?.color || colors.primary;
+
+                return (
+                  <TouchableOpacity
+                    key={dm.id || dm.name}
+                    style={[
+                      styles.deptChip,
+                      {
+                        backgroundColor: isSelected ? colors.primary : (colors.cardAlt ?? colors.muted) + "30",
+                        borderColor: isSelected ? colors.primary : colors.border,
+                      },
+                    ]}
+                    onPress={() => {
+                      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      if (isSelected) {
+                        setSelectedDistributionItem(null);
+                        setExpandedDeptId(null);
+                      } else {
+                        setSelectedDistributionItem(dm.name);
+                        setExpandedDeptId(dm.id);
+                      }
+                    }}
+                    activeOpacity={0.75}
+                  >
+                    <View style={[styles.flowDot, { backgroundColor: isSelected ? "#FFFFFF" : dotColor }]} />
+                    <Text
+                      style={[
+                        styles.deptChipText,
+                        { color: isSelected ? "#FFFFFF" : colors.foreground },
+                        isSelected && { fontFamily: "Inter_700Bold" },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {dm.name}
+                    </Text>
+                    <View
+                      style={[
+                        styles.deptChipBadge,
+                        {
+                          backgroundColor: isSelected
+                            ? "rgba(255, 255, 255, 0.25)"
+                            : (colors.cardAlt ?? colors.muted) + "60",
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.deptChipBadgeText,
+                          { color: isSelected ? "#FFFFFF" : colors.mutedForeground },
+                        ]}
+                      >
+                        {formatCompactCurrency(dm.spent, currency)}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+
           {/* Department Breakdown Cards */}
           <View style={styles.categoryRankedList}>
             {effectiveDeptMetrics.length === 0 ? (
@@ -1327,8 +1531,19 @@ export function FinancialAnalyticsSuite({
                 </Text>
               </View>
             ) : (
-              effectiveDeptMetrics.map((dm) => {
+              (selectedDistributionItem
+                ? effectiveDeptMetrics.filter(
+                    (dm) =>
+                      dm.name.toLowerCase() === selectedDistributionItem.toLowerCase() ||
+                      dm.id.toLowerCase() === selectedDistributionItem.toLowerCase()
+                  )
+                : effectiveDeptMetrics
+              ).map((dm) => {
+                const isSelected =
+                  selectedDistributionItem?.toLowerCase() === dm.name.toLowerCase() ||
+                  selectedDistributionItem?.toLowerCase() === dm.id.toLowerCase();
                 const isExpanded =
+                  isSelected ||
                   expandedDeptId === dm.id ||
                   (expandedDeptId && expandedDeptId.toLowerCase() === dm.name.toLowerCase());
                 const isOver = dm.allocated > 0 && dm.spent > dm.allocated;
@@ -1370,7 +1585,13 @@ export function FinancialAnalyticsSuite({
                     ]}
                     onPress={() => {
                       if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      setExpandedDeptId(isExpanded ? null : dm.id);
+                      if (isSelected) {
+                        setSelectedDistributionItem(null);
+                        setExpandedDeptId(null);
+                      } else {
+                        setSelectedDistributionItem(dm.name);
+                        setExpandedDeptId(dm.id);
+                      }
                     }}
                     activeOpacity={0.8}
                   >
@@ -1643,7 +1864,7 @@ export function FinancialAnalyticsSuite({
                 adjustsFontSizeToFit
                 minimumFontScale={0.72}
               >
-                TOTAL SPENT
+                {activeDistView.bentoCol2Label}
               </Text>
               <Text
                 style={[styles.bentoVal, { color: colors.foreground }]}
@@ -1651,7 +1872,7 @@ export function FinancialAnalyticsSuite({
                 adjustsFontSizeToFit
                 minimumFontScale={0.75}
               >
-                {formatCompactCurrency(activeDistView.totalExpenses, currency)}
+                {activeDistView.bentoCol2Val}
               </Text>
             </View>
             <View style={[styles.bentoDivider, { backgroundColor: colors.border }]} />
