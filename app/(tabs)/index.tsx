@@ -58,9 +58,29 @@ import { FinancialAnalyticsSuite } from "@/components/analytics/FinancialAnalyti
 
 const SCREEN_W = Dimensions.get("window").width;
 const ROLE_COLORS: Record<string, string> = {
-  admin: "#3B82F6",
-  accountant: "#10B981",
-  manager: "#F59E0B",
+  admin: "#2563EB",
+  accountant: "#059669",
+  manager: "#D97706",
+  employee: "#7C3AED",
+};
+
+const ROLE_BADGE_STYLES: Record<string, { light: { bg: string; border: string; text: string }; dark: { bg: string; border: string; text: string } }> = {
+  admin: {
+    light: { bg: "#EFF6FF", border: "#93C5FD", text: "#1D4ED8" },
+    dark: { bg: "rgba(59, 130, 246, 0.20)", border: "rgba(96, 165, 250, 0.45)", text: "#60A5FA" },
+  },
+  accountant: {
+    light: { bg: "#ECFDF5", border: "#6EE7B7", text: "#047857" },
+    dark: { bg: "rgba(16, 185, 129, 0.20)", border: "rgba(52, 211, 153, 0.45)", text: "#34D399" },
+  },
+  manager: {
+    light: { bg: "#FFFBEB", border: "#FCD34D", text: "#B45309" },
+    dark: { bg: "rgba(245, 158, 11, 0.20)", border: "rgba(251, 191, 36, 0.45)", text: "#FBBF24" },
+  },
+  employee: {
+    light: { bg: "#F5F3FF", border: "#C4B5FD", text: "#6D28D9" },
+    dark: { bg: "rgba(139, 92, 246, 0.20)", border: "rgba(167, 139, 250, 0.45)", text: "#A78BFA" },
+  },
 };
 
 function fmt(n: number) {
@@ -223,7 +243,10 @@ export default function DashboardScreen() {
     return 12.8;
   }, [orgDisplayName]);
   const webTop = Platform.OS === "web" ? 67 : 0;
-  const roleColor = ROLE_COLORS[user?.role ?? "admin"];
+  const isDark = colors.background === "#0B1120" || (settings.theme === "dark");
+  const roleKey = (user?.role || "admin").toLowerCase();
+  const activeRoleBadgeStyle = (ROLE_BADGE_STYLES[roleKey] ?? ROLE_BADGE_STYLES.admin)[isDark ? "dark" : "light"];
+  const roleColor = activeRoleBadgeStyle.text;
   const [balanceViewMode, setBalanceViewMode] = useState<"cashflow" | "expenses">("cashflow");
   const totalLineBudgeted = calculateBudgetAllocation(budgets);
   const totalDeptBudgeted = calculateBudgetAllocation([], departments);
@@ -526,14 +549,25 @@ export default function DashboardScreen() {
               )}
             </TouchableOpacity>
 
-            <View style={[styles.roleBadge, { backgroundColor: roleColor + "18", borderColor: roleColor + "45" }]}>
+            <View
+              style={[
+                styles.roleBadge,
+                {
+                  backgroundColor: activeRoleBadgeStyle.bg,
+                  borderColor: activeRoleBadgeStyle.border,
+                },
+              ]}
+            >
               <Text
-                style={[styles.roleText, { color: roleColor }]}
+                style={[
+                  styles.roleText,
+                  { color: activeRoleBadgeStyle.text },
+                ]}
                 numberOfLines={1}
                 adjustsFontSizeToFit
-                minimumFontScale={0.8}
+                minimumFontScale={0.85}
               >
-                {user?.role?.toUpperCase()}
+                {(user?.role || "admin").toUpperCase()}
               </Text>
             </View>
 
@@ -670,10 +704,11 @@ export default function DashboardScreen() {
             }}
             activeOpacity={0.8}
           >
-            <Feather name="bar-chart-2" size={10} color="#38BDF8" />
+            <Feather name="bar-chart-2" size={10.5} color="#38BDF8" />
             <Text style={{ color: "#FFFFFF", fontSize: 10.5, fontFamily: "Inter_700Bold", letterSpacing: 0.2 }}>
-              Fiscal Dossier →
+              Fiscal Dossier
             </Text>
+            <Feather name="arrow-right" size={11} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
 
@@ -1933,18 +1968,18 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   roleBadge: {
-    paddingHorizontal: 8.5,
-    paddingVertical: 4,
-    borderRadius: 12,
+    height: 32,
+    paddingHorizontal: 10,
+    borderRadius: 10,
     borderWidth: 1.2,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
   },
   roleText: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: "Inter_800ExtraBold",
-    letterSpacing: 0.4,
+    letterSpacing: 0.5,
     textAlign: "center",
   },
   iconBtn: {

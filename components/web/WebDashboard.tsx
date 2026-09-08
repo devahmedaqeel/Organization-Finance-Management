@@ -419,8 +419,9 @@ export function WebDashboard({
           >
             <SvgChart size={11} color="#38BDF8" />
             <Text style={{ color: "#FFFFFF", fontSize: isMobile ? 10.5 : 12, fontFamily: "Inter_700Bold", letterSpacing: 0.2 }}>
-              {isMobile ? "Dossier →" : "Fiscal Dossier →"}
+              {isMobile ? "Dossier" : "Fiscal Dossier"}
             </Text>
+            <Feather name="arrow-right" size={isMobile ? 11 : 12} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
 
