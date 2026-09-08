@@ -1523,7 +1523,12 @@ export function FinancialAnalyticsSuite({
           </View>
 
           {/* Department Breakdown Cards */}
-          <View style={styles.categoryRankedList}>
+          <ScrollView
+            style={styles.categoryRankedScroll}
+            contentContainerStyle={styles.categoryRankedList}
+            showsVerticalScrollIndicator={false}
+            nestedScrollEnabled
+          >
             {effectiveDeptMetrics.length === 0 ? (
               <View style={[styles.emptyDeptCatBox, { borderColor: colors.border }]}>
                 <Text style={[styles.emptyDeptCatText, { color: colors.mutedForeground }]}>
@@ -1831,7 +1836,7 @@ export function FinancialAnalyticsSuite({
                 );
               })
             )}
-          </View>
+          </ScrollView>
 
           {/* Authoritative 3-Metric Bento Box for Card 3 (Clean, Non-Alarmist, Harmonious) */}
           <View style={[styles.bentoRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
@@ -1910,7 +1915,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 16,
     flexWrap: "wrap",
-    alignItems: "stretch",
+    alignItems: "flex-start",
   },
   gridMobile: {
     flexDirection: "column",
@@ -1929,6 +1934,7 @@ const styles = StyleSheet.create({
   cardDesktop: {
     flex: 1,
     minWidth: 300,
+    alignSelf: "flex-start",
     overflow: "hidden",
   },
   cardMobile: {
@@ -2217,9 +2223,13 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     textAlign: "center",
   },
+  categoryRankedScroll: {
+    maxHeight: 285,
+    marginVertical: 4,
+  },
   categoryRankedList: {
     gap: 6,
-    marginVertical: 4,
+    paddingVertical: 2,
   },
   dimensionToggleRow: {
     flexDirection: "row",
