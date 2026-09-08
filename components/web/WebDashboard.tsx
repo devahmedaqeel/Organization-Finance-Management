@@ -562,7 +562,7 @@ export function WebDashboard({
               numberOfLines={1}
             >
               {totalAllocatedBudget > 0
-                ? (isMobile ? `Allocated: ${settings.currency} ${fmt(totalAllocatedBudget)} · Remaining: ${settings.currency} ${fmt(netBudgetRemaining)} (${budgetUsedPct}%)` : `Allocated: ${settings.currency} ${fmt(totalAllocatedBudget)} · Remaining Budget: ${settings.currency} ${fmt(netBudgetRemaining)} (${budgetUsedPct}% Spent)`)
+                ? `Allocated: ${settings.currency} ${fmt(totalAllocatedBudget)} · Remaining Budget: ${settings.currency} ${fmt(netBudgetRemaining)} (${budgetUsedPct}% Spent)`
                 : isDeficit
                 ? (isMobile ? `Deficit (-${settings.currency} ${fmt(totalExpenses - totalIncome)})` : `Operating Deficit (-${settings.currency} ${fmt(totalExpenses - totalIncome)})`)
                 : `${incomeRetainedPct}% Retained`}

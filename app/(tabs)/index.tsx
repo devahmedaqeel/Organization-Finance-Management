@@ -842,10 +842,10 @@ export default function DashboardScreen() {
               }}
               numberOfLines={1}
               adjustsFontSizeToFit
-              minimumFontScale={0.75}
+              minimumFontScale={0.7}
             >
               {totalAllocatedBudget > 0
-                ? `Allocated: ${settings.currency} ${fmt(totalAllocatedBudget)} · Remaining: ${settings.currency} ${fmt(netBudgetRemaining)} (${budgetUsedPct}% Spent)`
+                ? `Allocated: ${settings.currency} ${fmt(totalAllocatedBudget)} · Remaining Budget: ${settings.currency} ${fmt(netBudgetRemaining)} (${budgetUsedPct}% Spent)`
                 : isDeficit
                 ? `Deficit (-${settings.currency} ${fmt(totalExpenses - totalIncome)})`
                 : `${incomeRetainedPct}% Retained`}
