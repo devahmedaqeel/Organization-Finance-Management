@@ -377,7 +377,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         setLoaded(true);
       });
 
-    // Instant direct REST sync with Firebase Cloud (scoped to activeOrgId)
+    // Instant direct REST sync with Firebase Cloud (scoped to activeOrgId) with direct Firestore SDK fallback
     Promise.all([
       fetchCollectionREST<Transaction>("transactions", activeOrgId),
       fetchCollectionREST<Budget>("budgets", activeOrgId),
@@ -390,6 +390,20 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         validTxs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         setTransactions(validTxs);
         AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(validTxs)).catch(() => {});
+      } else if ((restTxs === null || restTxs.length === 0) && !hasLiveSnapshotRef.current.transactions) {
+        getDocs(query(collection(db, "transactions"), where("organizationId", "==", activeOrgId)))
+          .then((snap) => {
+            if (!hasLiveSnapshotRef.current.transactions && !snap.empty) {
+              const list: Transaction[] = [];
+              snap.forEach((d) => {
+                if (!deletedIdsRef.current.has(d.id)) list.push({ id: d.id, ...d.data() } as Transaction);
+              });
+              list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+              setTransactions(list);
+              AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(list)).catch(() => {});
+            }
+          })
+          .catch(() => {});
       }
 
       if (restBudgets !== null && !hasLiveSnapshotRef.current.budgets) {
@@ -402,12 +416,38 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         const validDepts = restDepts.filter((d) => !deletedIdsRef.current.has(d.id));
         setDepartments(validDepts);
         AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(validDepts)).catch(() => {});
+      } else if ((restDepts === null || restDepts.length === 0) && !hasLiveSnapshotRef.current.departments) {
+        getDocs(query(collection(db, "departments"), where("organizationId", "==", activeOrgId)))
+          .then((snap) => {
+            if (!hasLiveSnapshotRef.current.departments && !snap.empty) {
+              const list: Department[] = [];
+              snap.forEach((d) => {
+                if (!deletedIdsRef.current.has(d.id)) list.push({ id: d.id, ...d.data() } as Department);
+              });
+              setDepartments(list);
+              AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(list)).catch(() => {});
+            }
+          })
+          .catch(() => {});
       }
 
       if (restPayroll !== null && !hasLiveSnapshotRef.current.payroll) {
         const validPayroll = restPayroll.filter((p) => !deletedIdsRef.current.has(p.id));
         setPayroll(validPayroll);
         AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(validPayroll)).catch(() => {});
+      } else if ((restPayroll === null || restPayroll.length === 0) && !hasLiveSnapshotRef.current.payroll) {
+        getDocs(query(collection(db, "payroll"), where("organizationId", "==", activeOrgId)))
+          .then((snap) => {
+            if (!hasLiveSnapshotRef.current.payroll && !snap.empty) {
+              const list: PayrollEntry[] = [];
+              snap.forEach((d) => {
+                if (!deletedIdsRef.current.has(d.id)) list.push({ id: d.id, ...d.data() } as PayrollEntry);
+              });
+              setPayroll(list);
+              AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(list)).catch(() => {});
+            }
+          })
+          .catch(() => {});
       }
 
       if (restTxs !== null || restBudgets !== null || restDepts !== null || restPayroll !== null) {
@@ -673,6 +713,15 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     // Direct background REST write for instant cloud sync across mobile & web
     saveDocREST("transactions", id, newTx).then(() => setSyncStatus("synced")).catch(() => {});
 
+    // Cross-tenant mirror between demo-org and org-9icgv4ijp so both stay 100% in sync
+    if (orgId === "demo-org" || orgId === "org-9icgv4ijp") {
+      const counterpartOrgId = orgId === "demo-org" ? "org-9icgv4ijp" : "demo-org";
+      const mirrorId = id.startsWith("sync_") ? id.replace("sync_", "") : `sync_${id}`;
+      const mirroredTx = { ...newTx, id: mirrorId, organizationId: counterpartOrgId };
+      setDoc(doc(db, "transactions", mirrorId), mirroredTx).catch(() => {});
+      saveDocREST("transactions", mirrorId, mirroredTx).catch(() => {});
+    }
+
     // Budget overrun real-time validation & automated notification evaluation
     if (newTx.type === "expense") {
       // 1. Unusual Outflow Event Evaluation
@@ -771,6 +820,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     try {
       await setDoc(doc(db, "transactions", id), enrichedUpdates, { merge: true });
       saveDocREST("transactions", id, enrichedUpdates).catch(() => {});
+      if (activeOrgId === "demo-org" || activeOrgId === "org-9icgv4ijp") {
+        const mirrorId = id.startsWith("sync_") ? id.replace("sync_", "") : `sync_${id}`;
+        setDoc(doc(db, "transactions", mirrorId), enrichedUpdates, { merge: true }).catch(() => {});
+        saveDocREST("transactions", mirrorId, enrichedUpdates).catch(() => {});
+      }
       recordAuditLog({
         organizationId: activeOrgId,
         actorUid: user?.id || "anonymous",
@@ -794,7 +848,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
     const orgKey = (user?.organizationId || "demo-org").replace(/[^a-zA-Z0-9]/g, "_");
     const aliasId = `tx_${id}_${orgKey}`;
+    const mirrorId = id.startsWith("sync_") ? id.replace("sync_", "") : `sync_${id}`;
     const targetIds = [id, aliasId];
+    if (activeOrgId === "demo-org" || activeOrgId === "org-9icgv4ijp") {
+      targetIds.push(mirrorId);
+    }
 
     // If deleting a salary transaction, also clean up linked payroll record
     const targetTx = transactions.find((t) => t.id === id);
@@ -818,6 +876,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       await Promise.all([
         deleteDoc(doc(db, "transactions", id)).catch((err) => { failureReason = err; }),
         deleteDoc(doc(db, "transactions", aliasId)).catch(() => {}),
+        (activeOrgId === "demo-org" || activeOrgId === "org-9icgv4ijp") ? deleteDoc(doc(db, "transactions", mirrorId)).catch(() => {}) : Promise.resolve(),
       ]);
       deleteSucceeded = true;
     } catch (err: any) {
@@ -827,6 +886,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     // Direct REST deletion fallback with auth
     const restSuccess = await deleteDocREST("transactions", id).catch(() => false);
     await deleteDocREST("transactions", aliasId).catch(() => false);
+    if (activeOrgId === "demo-org" || activeOrgId === "org-9icgv4ijp") {
+      await deleteDocREST("transactions", mirrorId).catch(() => false);
+    }
     if (restSuccess) deleteSucceeded = true;
 
     // Strict safety check: if Firestore threw permission denied, do not delete from UI
@@ -1483,6 +1545,13 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     try {
       await setDoc(doc(db, "departments", id), newDept);
       saveDocREST("departments", id, newDept).catch(() => {});
+      if (orgId === "demo-org" || orgId === "org-9icgv4ijp") {
+        const counterpartOrgId = orgId === "demo-org" ? "org-9icgv4ijp" : "demo-org";
+        const mirrorId = id.startsWith("sync_") ? id.replace("sync_", "") : `sync_${id}`;
+        const mirroredDept = { ...newDept, id: mirrorId, organizationId: counterpartOrgId };
+        setDoc(doc(db, "departments", mirrorId), mirroredDept).catch(() => {});
+        saveDocREST("departments", mirrorId, mirroredDept).catch(() => {});
+      }
       recordAuditLog({
         organizationId: orgId,
         actorUid: user?.id || "anonymous",
@@ -1535,6 +1604,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     try {
       await setDoc(doc(db, "departments", id), enrichedUpdates, { merge: true });
       saveDocREST("departments", id, enrichedUpdates).catch(() => {});
+      if (activeOrgId === "demo-org" || activeOrgId === "org-9icgv4ijp") {
+        const mirrorId = id.startsWith("sync_") ? id.replace("sync_", "") : `sync_${id}`;
+        setDoc(doc(db, "departments", mirrorId), enrichedUpdates, { merge: true }).catch(() => {});
+        saveDocREST("departments", mirrorId, enrichedUpdates).catch(() => {});
+      }
       recordAuditLog({
         organizationId: activeOrgId,
         actorUid: user?.id || "anonymous",
@@ -1558,7 +1632,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
     const orgKey = (user?.organizationId || "demo-org").replace(/[^a-zA-Z0-9]/g, "_");
     const aliasId = `dept_${id}_${orgKey}`;
+    const mirrorId = id.startsWith("sync_") ? id.replace("sync_", "") : `sync_${id}`;
     const targetIds = [id, aliasId];
+    if (activeOrgId === "demo-org" || activeOrgId === "org-9icgv4ijp") {
+      targetIds.push(mirrorId);
+    }
 
     let deleteSucceeded = false;
     let failureReason: any = null;
@@ -1567,6 +1645,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       await Promise.all([
         deleteDoc(doc(db, "departments", id)).catch((err) => { failureReason = err; }),
         deleteDoc(doc(db, "departments", aliasId)).catch(() => {}),
+        (activeOrgId === "demo-org" || activeOrgId === "org-9icgv4ijp") ? deleteDoc(doc(db, "departments", mirrorId)).catch(() => {}) : Promise.resolve(),
       ]);
       deleteSucceeded = true;
     } catch (err: any) {
@@ -1575,6 +1654,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
     const restSuccess = await deleteDocREST("departments", id).catch(() => false);
     await deleteDocREST("departments", aliasId).catch(() => false);
+    if (activeOrgId === "demo-org" || activeOrgId === "org-9icgv4ijp") {
+      await deleteDocREST("departments", mirrorId).catch(() => false);
+    }
     if (restSuccess) deleteSucceeded = true;
 
     if (!deleteSucceeded && failureReason?.code === "permission-denied") {
@@ -1750,9 +1832,23 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           getDocs(query(collection(db, "departments"), where("organizationId", "==", activeOrgId))).catch(() => null),
           getDocs(query(collection(db, "payroll"), where("organizationId", "==", activeOrgId))).catch(() => null),
         ]);
-        if (qTxSnap) {
+        let effectiveTxDocs = qTxSnap?.docs || [];
+        if (effectiveTxDocs.length === 0 && (activeOrgId === "demo-org" || activeOrgId === "org-9icgv4ijp")) {
+          const altOrg = activeOrgId === "demo-org" ? "org-9icgv4ijp" : "demo-org";
+          const altSnap = await getDocs(query(collection(db, "transactions"), where("organizationId", "==", altOrg))).catch(() => null);
+          if (altSnap && !altSnap.empty) effectiveTxDocs = altSnap.docs;
+        }
+
+        let effectiveDeptDocs = qDSnap?.docs || [];
+        if (effectiveDeptDocs.length === 0 && (activeOrgId === "demo-org" || activeOrgId === "org-9icgv4ijp")) {
+          const altOrg = activeOrgId === "demo-org" ? "org-9icgv4ijp" : "demo-org";
+          const altSnap = await getDocs(query(collection(db, "departments"), where("organizationId", "==", altOrg))).catch(() => null);
+          if (altSnap && !altSnap.empty) effectiveDeptDocs = altSnap.docs;
+        }
+
+        if (effectiveTxDocs.length > 0) {
           const list: Transaction[] = [];
-          qTxSnap.forEach((d) => {
+          effectiveTxDocs.forEach((d) => {
             if (!deletedIdsRef.current.has(d.id)) list.push({ id: d.id, ...d.data() } as Transaction);
           });
           list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -1767,9 +1863,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           setBudgets(list);
           AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(list)).catch(() => {});
         }
-        if (qDSnap) {
+        if (effectiveDeptDocs.length > 0) {
           const list: Department[] = [];
-          qDSnap.forEach((d) => {
+          effectiveDeptDocs.forEach((d) => {
             if (!deletedIdsRef.current.has(d.id)) list.push({ id: d.id, ...d.data() } as Department);
           });
           setDepartments(list);

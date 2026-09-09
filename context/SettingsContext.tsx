@@ -31,7 +31,7 @@ const SettingsContext = createContext<SettingsContextValue>({
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const { user, updateUserOrganization } = useAuth();
-  const isDemoAdmin = user?.organizationId === "org-9icgv4ijp" || user?.email === "admin@ofm.com";
+  const isDemoAdmin = user?.organizationId === "org-9icgv4ijp" || user?.organizationId === "demo-org" || user?.email === "admin@ofm.com";
   const orgKey = user?.organizationId || "default";
   const settingsStorageKey = `ofm_settings:${orgKey}`;
   const baseDefaults = useMemo(

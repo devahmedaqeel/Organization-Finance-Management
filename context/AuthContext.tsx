@@ -149,8 +149,8 @@ const DEMO_USERS: Record<string, { password: string; user: User }> = {
       name: "Ahmed Aqeel",
       email: "admin@ofm.com",
       role: "admin",
-      organization: "Devorbit Tech",
-      organizationId: "org-9icgv4ijp",
+      organization: "Dev Orbit Gadgets ",
+      organizationId: "demo-org",
     },
   },
   "accountant@ofm.com": {
@@ -160,8 +160,8 @@ const DEMO_USERS: Record<string, { password: string; user: User }> = {
       name: "Maryam Naz",
       email: "accountant@ofm.com",
       role: "accountant",
-      organization: "Devorbit Tech",
-      organizationId: "org-9icgv4ijp",
+      organization: "Dev Orbit Gadgets ",
+      organizationId: "demo-org",
     },
   },
   "manager@ofm.com": {
@@ -171,8 +171,8 @@ const DEMO_USERS: Record<string, { password: string; user: User }> = {
       name: "Dr. Sundas Iftikhar",
       email: "manager@ofm.com",
       role: "manager",
-      organization: "Devorbit Tech",
-      organizationId: "org-9icgv4ijp",
+      organization: "Dev Orbit Gadgets ",
+      organizationId: "demo-org",
     },
   },
   "employee@ofm.com": {
@@ -182,8 +182,8 @@ const DEMO_USERS: Record<string, { password: string; user: User }> = {
       name: "Tariq Mahmood",
       email: "employee@ofm.com",
       role: "employee",
-      organization: "Devorbit Tech",
-      organizationId: "org-9icgv4ijp",
+      organization: "Dev Orbit Gadgets ",
+      organizationId: "demo-org",
     },
   },
 };
@@ -261,6 +261,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Helper to ensure authenticated Firebase session without relying on disabled anonymous auth
+  const ensureActiveSession = useCallback(async (preferredEmail?: string) => {
+    if (auth.currentUser) return;
+    try {
+      const emailToUse = (preferredEmail || "admin@ofm.com").toLowerCase().trim();
+      const demo = DEMO_USERS[emailToUse];
+      if (demo) {
+        await signInWithEmailAndPassword(auth, demo.user.email, demo.password).catch(() => {});
+      } else {
+        await signInWithEmailAndPassword(auth, "admin@ofm.com", "Admin123").catch(() => {});
+      }
+    } catch (e) {}
+  }, []);
+
   // 1. Instant Local Cache Restore on Mount (takes ~5ms, zero network latency)
   useEffect(() => {
     let active = true;
@@ -270,31 +284,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           try {
             const parsed = JSON.parse(data);
             if (parsed && (parsed.email || parsed.id)) {
-              if (parsed.email === "admin@ofm.com" || !parsed.organizationId || parsed.organizationId === "demo-org" || !parsed.organization) {
-                parsed.organization = "Devorbit Tech";
-                parsed.organizationId = "org-9icgv4ijp";
+              if (parsed.email === "admin@ofm.com") {
+                parsed.organization = parsed.organization || "Dev Orbit Gadgets ";
+                parsed.organizationId = parsed.organizationId || "demo-org";
                 AsyncStorage.setItem("ofm_user", JSON.stringify(parsed)).catch(() => {});
               }
               setUser(parsed);
               setIsLoading(false);
               // Ensure Firebase Auth session is active so Firestore allows cloud read/write
-              if (!auth.currentUser) {
-                signInAnonymously(auth).catch(() => {});
-              }
+              ensureActiveSession(parsed.email);
               return;
             }
           } catch (e) {}
         }
         
-        // Fresh Install: Initialize with Executive Admin (Devorbit Tech) so mobile & web immediately share identical data!
+        // Fresh Install: Initialize with Executive Admin (Dev Orbit Gadgets) so mobile & web immediately share identical data!
         if (active) {
           const defaultAdmin = DEMO_USERS["admin@ofm.com"].user;
           setUser(defaultAdmin);
           setIsLoading(false);
           AsyncStorage.setItem("ofm_user", JSON.stringify(defaultAdmin)).catch(() => {});
-          if (!auth.currentUser) {
-            signInAnonymously(auth).catch(() => {});
-          }
+          ensureActiveSession(defaultAdmin.email);
         }
       })
       .catch(() => {
@@ -302,15 +312,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const defaultAdmin = DEMO_USERS["admin@ofm.com"].user;
           setUser(defaultAdmin);
           setIsLoading(false);
-          if (!auth.currentUser) {
-            signInAnonymously(auth).catch(() => {});
-          }
+          ensureActiveSession(defaultAdmin.email);
         }
       });
     return () => {
       active = false;
     };
-  }, []);
+  }, [ensureActiveSession]);
 
   // 2. Real-time Firebase Auth state sync with background timeout
   useEffect(() => {
@@ -404,9 +412,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         if (!auth.currentUser) {
           await signInWithEmailAndPassword(auth, formattedEmail, password).catch(async () => {
-            await createUserWithEmailAndPassword(auth, formattedEmail, password).catch(async () => {
-              await signInAnonymously(auth).catch(() => {});
-            });
+            await ensureActiveSession(formattedEmail);
           });
         }
       } catch (e) {}

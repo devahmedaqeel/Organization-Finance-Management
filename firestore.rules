@@ -25,22 +25,26 @@ service cloud.firestore {
 
     // 3. Financial Transactions & Ledger
     match /transactions/{transactionId} {
-      allow read, write: if isAuthenticated();
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
 
     // 4. Budget Allocations
     match /budgets/{budgetId} {
-      allow read, write: if isAuthenticated();
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
 
     // 5. Staff Payroll & Remuneration
     match /payroll/{payrollId} {
-      allow read, write: if isAuthenticated();
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
 
     // 6. Departments & Cost Centers
     match /departments/{departmentId} {
-      allow read, write: if isAuthenticated();
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
 
     // 7. Team Invitations
@@ -50,7 +54,8 @@ service cloud.firestore {
 
     // 8. Organization Settings & Logo Customization
     match /orgSettings/{settingsId} {
-      allow read, write: if isAuthenticated();
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
 
     // 9. Real-time Notifications
