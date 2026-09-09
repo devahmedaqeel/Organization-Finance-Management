@@ -263,7 +263,7 @@ export default function MoreScreen() {
             </View>
           </View>
           <Text style={[styles.profileEmail, { color: colors.mutedForeground }]} numberOfLines={2}>
-            {user?.email || "admin@ofm.com"}
+            {user?.email || ""}
           </Text>
           <View style={styles.orgRow}>
             <Text style={{ fontSize: 13 }}>{selectedCurrency?.flag ?? "🌐"}</Text>

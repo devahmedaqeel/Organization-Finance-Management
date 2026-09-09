@@ -554,10 +554,10 @@ export function WebShell() {
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={[styles.userName, { color: colors.foreground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8}>
-                      {user?.name || "Admin"}
+                      {user?.name || "User"}
                     </Text>
                     <Text style={[styles.userEmail, { color: colors.primary }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
-                      {user?.email || "admin@ofm.com"}
+                      {user?.email || ""}
                     </Text>
                     <Text style={[styles.userRole, { color: colors.mutedForeground }]}>
                       {(user?.role || "admin").toUpperCase()}
@@ -644,10 +644,10 @@ export function WebShell() {
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={[styles.userName, { color: colors.foreground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8}>
-                      {user?.name || "Admin"}
+                      {user?.name || "User"}
                     </Text>
                     <Text style={[styles.userEmail, { color: colors.primary }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
-                      {user?.email || "admin@ofm.com"}
+                      {user?.email || ""}
                     </Text>
                     <Text style={[styles.userRole, { color: colors.mutedForeground }]}>
                       {(user?.role || "admin").toUpperCase()}

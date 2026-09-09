@@ -420,7 +420,7 @@ export function WebSettings() {
                 <View style={[styles.userSessionEmailRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
                   <SvgMail size={13} color={colors.primary} />
                   <Text style={[styles.userSessionEmailText, { color: colors.foreground }]} numberOfLines={1} selectable>
-                    {user?.email || "admin@ofm.com"}
+                    {user?.email || ""}
                   </Text>
                 </View>
               </View>

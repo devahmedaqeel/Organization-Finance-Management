@@ -202,6 +202,25 @@ const AuthContext = createContext<AuthContextValue>({
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  // Reliable cross-platform session persistence helper
+  const persistUserSession = useCallback(async (userToPersist: User | null) => {
+    if (userToPersist) {
+      await AsyncStorage.setItem("ofm_user", JSON.stringify(userToPersist));
+      if (Platform.OS === "web" && typeof window !== "undefined") {
+        try {
+          localStorage.setItem("ofm_user", JSON.stringify(userToPersist));
+        } catch (e) {}
+      }
+    } else {
+      await AsyncStorage.removeItem("ofm_user");
+      if (Platform.OS === "web" && typeof window !== "undefined") {
+        try {
+          localStorage.removeItem("ofm_user");
+        } catch (e) {}
+      }
+    }
+  }, []);
+
   // Synchronous optimistic state initialization for Web & Mobile to eliminate blank screen loading delays
   const [user, setUser] = useState<User | null>(() => {
     if (Platform.OS === "web" && typeof window !== "undefined") {
@@ -209,14 +228,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const local = localStorage.getItem("ofm_user");
         if (local) {
           const parsed = JSON.parse(local);
-          if (parsed && parsed.email) return parsed;
+          if (parsed && (parsed.email || parsed.id)) return parsed;
         }
       } catch (e) {}
     }
-    // Default to authoritative Devorbit Tech Admin for instant cross-device parity
-    return DEMO_USERS["admin@ofm.com"].user;
+    return null;
   });
-  const [isLoading, setIsLoading] = useState(() => false);
+  const [isLoading, setIsLoading] = useState<boolean>(() => {
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      try {
+        const local = localStorage.getItem("ofm_user");
+        if (local) {
+          const parsed = JSON.parse(local);
+          if (parsed && (parsed.email || parsed.id)) return false;
+        }
+      } catch (e) {}
+    }
+    return true;
+  });
 
   // Centralized canonical profile resolver ensuring 100% identity and organization parity across Web and Mobile
   const resolveCanonicalUserProfile = useCallback(async (firebaseUser: any, defaultRole: UserRole = "admin"): Promise<User> => {
@@ -277,10 +306,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
             const role: UserRole = savedRole || "admin";
             const activeUser = await resolveCanonicalUserProfile(firebaseUser, role);
-            await AsyncStorage.setItem("ofm_user", JSON.stringify(activeUser));
-            if (typeof window !== "undefined") {
-              try { localStorage.setItem("ofm_user", JSON.stringify(activeUser)); } catch (e) {}
-            }
+            await persistUserSession(activeUser);
             setUser(activeUser);
           }
         })
@@ -288,66 +314,76 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log("Redirect result notice:", err?.message || err);
         });
     }
-  }, [resolveCanonicalUserProfile]);
+  }, [resolveCanonicalUserProfile, persistUserSession]);
 
-  // Helper to ensure authenticated Firebase session without relying on disabled anonymous auth
+  // Helper to ensure authenticated Firebase session ONLY for demo accounts that need Firestore transport
   const ensureActiveSession = useCallback(async (preferredEmail?: string) => {
     if (auth.currentUser) return;
+    if (!preferredEmail) return;
     try {
-      const emailToUse = (preferredEmail || "admin@ofm.com").toLowerCase().trim();
+      const emailToUse = preferredEmail.toLowerCase().trim();
       const demo = DEMO_USERS[emailToUse];
+      // Only sign in if this is explicitly a configured demo user account!
       if (demo) {
         await signInWithEmailAndPassword(auth, demo.user.email, demo.password).catch(() => {});
-      } else {
-        await signInWithEmailAndPassword(auth, "admin@ofm.com", "Admin123").catch(() => {});
       }
+      // If it's a real user account, NEVER sign in as admin@ofm.com.
+      // Firebase Auth will restore the real user session from local persistence (IndexedDB/AsyncStorage).
     } catch (e) {}
   }, []);
 
   // 1. Instant Local Cache Restore on Mount (takes ~5ms, zero network latency)
   useEffect(() => {
     let active = true;
-    AsyncStorage.getItem("ofm_user")
-      .then((data) => {
-        if (active && data) {
+
+    const restoreSession = async () => {
+      try {
+        let cachedData: string | null = null;
+        if (Platform.OS === "web" && typeof window !== "undefined") {
           try {
-            const parsed = JSON.parse(data);
+            cachedData = localStorage.getItem("ofm_user");
+          } catch (e) {}
+        }
+        if (!cachedData) {
+          cachedData = await AsyncStorage.getItem("ofm_user");
+        }
+
+        if (active && cachedData) {
+          try {
+            const parsed = JSON.parse(cachedData);
             if (parsed && (parsed.email || parsed.id)) {
               if (parsed.email === "admin@ofm.com" || parsed.organizationId === "demo-org") {
                 parsed.organization = parsed.organization || "Devorbit Tech";
                 parsed.organizationId = "org-9icgv4ijp";
-                AsyncStorage.setItem("ofm_user", JSON.stringify(parsed)).catch(() => {});
               }
               setUser(parsed);
               setIsLoading(false);
-              // Ensure Firebase Auth session is active so Firestore allows cloud read/write
-              ensureActiveSession(parsed.email);
+              persistUserSession(parsed).catch(() => {});
+              // If this is a demo user, ensure Firebase Auth session is connected
+              if (DEMO_USERS[parsed.email?.toLowerCase()?.trim()]) {
+                ensureActiveSession(parsed.email);
+              }
               return;
             }
           } catch (e) {}
         }
-        
-        // Fresh Install: Initialize with Executive Admin (Dev Orbit Gadgets) so mobile & web immediately share identical data!
+
         if (active) {
-          const defaultAdmin = DEMO_USERS["admin@ofm.com"].user;
-          setUser(defaultAdmin);
           setIsLoading(false);
-          AsyncStorage.setItem("ofm_user", JSON.stringify(defaultAdmin)).catch(() => {});
-          ensureActiveSession(defaultAdmin.email);
         }
-      })
-      .catch(() => {
+      } catch (e) {
         if (active) {
-          const defaultAdmin = DEMO_USERS["admin@ofm.com"].user;
-          setUser(defaultAdmin);
           setIsLoading(false);
-          ensureActiveSession(defaultAdmin.email);
         }
-      });
+      }
+    };
+
+    restoreSession();
+
     return () => {
       active = false;
     };
-  }, [ensureActiveSession]);
+  }, [ensureActiveSession, persistUserSession]);
 
   // 2. Real-time Firebase Auth state sync with background timeout
   useEffect(() => {
@@ -369,13 +405,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           if (remoteUser) {
             setUser(remoteUser);
-            await AsyncStorage.setItem("ofm_user", JSON.stringify(remoteUser));
-            if (Platform.OS === "web" && typeof window !== "undefined") {
-              try { localStorage.setItem("ofm_user", JSON.stringify(remoteUser)); } catch (e) {}
-            }
+            await persistUserSession(remoteUser);
           }
         } catch (error) {
-          const localData = await AsyncStorage.getItem("ofm_user");
+          let localData: string | null = null;
+          if (Platform.OS === "web" && typeof window !== "undefined") {
+            try { localData = localStorage.getItem("ofm_user"); } catch (e) {}
+          }
+          if (!localData) {
+            localData = await AsyncStorage.getItem("ofm_user");
+          }
           if (localData) {
             try {
               setUser(JSON.parse(localData));
@@ -385,7 +424,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         // Browser Refresh / Offline: Retain valid cached session from storage
         try {
-          const localData = await AsyncStorage.getItem("ofm_user");
+          let localData: string | null = null;
+          if (Platform.OS === "web" && typeof window !== "undefined") {
+            try { localData = localStorage.getItem("ofm_user"); } catch (e) {}
+          }
+          if (!localData) {
+            localData = await AsyncStorage.getItem("ofm_user");
+          }
           if (localData) {
             const parsed = JSON.parse(localData);
             if (parsed && (parsed.email || parsed.id)) {
@@ -408,7 +453,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => unsubscribe();
-  }, [resolveCanonicalUserProfile]);
+  }, [resolveCanonicalUserProfile, persistUserSession]);
 
   const login = async (email: string, password: string, role?: UserRole): Promise<boolean> => {
     const formattedEmail = email.toLowerCase().trim();
@@ -424,7 +469,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (e) {}
 
-      await AsyncStorage.setItem("ofm_user", JSON.stringify(demoRecord.user));
+      await persistUserSession(demoRecord.user);
       setUser(demoRecord.user);
       return true;
     }
@@ -445,7 +490,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (e) {}
 
       if (!activeUser) {
-        const cached = await AsyncStorage.getItem("ofm_user");
+        let cached: string | null = null;
+        if (Platform.OS === "web" && typeof window !== "undefined") {
+          try { cached = localStorage.getItem("ofm_user"); } catch (e) {}
+        }
+        if (!cached) {
+          cached = await AsyncStorage.getItem("ofm_user");
+        }
         if (cached) {
           try {
             const parsed = JSON.parse(cached);
@@ -468,7 +519,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setDoc(doc(db, "users", firebaseUser.uid), activeUser, { merge: true }).catch(() => {});
       }
 
-      await AsyncStorage.setItem("ofm_user", JSON.stringify(activeUser));
+      await persistUserSession(activeUser);
       setUser(activeUser);
       return true;
     } catch (error) {
@@ -608,7 +659,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } catch (e) {}
 
-      await AsyncStorage.setItem("ofm_user", JSON.stringify(newUser));
+      await persistUserSession(newUser);
       setUser(newUser);
       return { success: true };
     } catch (error: any) {
@@ -651,10 +702,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const activeUser = await resolveCanonicalUserProfile(firebaseUser, role);
-    await AsyncStorage.setItem("ofm_user", JSON.stringify(activeUser));
-    if (typeof window !== "undefined") {
-      try { localStorage.setItem("ofm_user", JSON.stringify(activeUser)); } catch (e) {}
-    }
+    await persistUserSession(activeUser);
     setUser(activeUser);
     return true;
   };
@@ -732,7 +780,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const firebaseUser = userCredential.user;
 
       const activeUser = await resolveCanonicalUserProfile(firebaseUser, role);
-      await AsyncStorage.setItem("ofm_user", JSON.stringify(activeUser));
+      await persistUserSession(activeUser);
       setUser(activeUser);
       return true;
     } catch (error) {
