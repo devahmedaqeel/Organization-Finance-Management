@@ -847,22 +847,30 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     }
 
     const orgKey = (user?.organizationId || "demo-org").replace(/[^a-zA-Z0-9]/g, "_");
+    const rawTxId = id.replace(/^sync_/, "");
     const aliasId = `tx_${id}_${orgKey}`;
-    const mirrorId = id.startsWith("sync_") ? id.replace("sync_", "") : `sync_${id}`;
+    const mirrorId = id.startsWith("sync_") ? rawTxId : `sync_${id}`;
     const targetIds = [id, aliasId];
     if (activeOrgId === "demo-org" || activeOrgId === "org-9icgv4ijp") {
-      targetIds.push(mirrorId);
+      targetIds.push(mirrorId, `sync_tx_pay_${rawTxId}`, `tx_pay_${rawTxId}`);
     }
 
     // If deleting a salary transaction, also clean up linked payroll record
-    const targetTx = transactions.find((t) => t.id === id);
-    const linkedPayrollId = targetTx?.payrollId || (id.startsWith("tx_pay_") ? id.replace("tx_pay_", "") : "");
+    const targetTx = transactions.find((t) => t.id === id || t.id === rawTxId);
+    const linkedPayrollId =
+      targetTx?.payrollId ||
+      (id.startsWith("tx_pay_") ? id.replace("tx_pay_", "") : "") ||
+      (id.startsWith("sync_tx_pay_") ? id.replace("sync_tx_pay_", "") : "");
     if (linkedPayrollId) {
-      targetIds.push(linkedPayrollId, `tx_pay_${linkedPayrollId}`);
+      const rawPayId = linkedPayrollId.replace(/^sync_/, "");
+      const mirrorPayrollId = linkedPayrollId.startsWith("sync_") ? rawPayId : `sync_${linkedPayrollId}`;
+      targetIds.push(linkedPayrollId, mirrorPayrollId, `tx_pay_${rawPayId}`, `sync_tx_pay_${rawPayId}`);
       deleteDoc(doc(db, "payroll", linkedPayrollId)).catch(() => {});
+      deleteDoc(doc(db, "payroll", mirrorPayrollId)).catch(() => {});
       deleteDocREST("payroll", linkedPayrollId).catch(() => {});
+      deleteDocREST("payroll", mirrorPayrollId).catch(() => {});
       setPayroll((prev) => {
-        const remaining = prev.filter((p) => p.id !== linkedPayrollId && p.id !== id);
+        const remaining = prev.filter((p) => !targetIds.includes(p.id));
         AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(remaining)).catch(() => {});
         return remaining;
       });
@@ -873,23 +881,17 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     let failureReason: any = null;
 
     try {
-      await Promise.all([
-        deleteDoc(doc(db, "transactions", id)).catch((err) => { failureReason = err; }),
-        deleteDoc(doc(db, "transactions", aliasId)).catch(() => {}),
-        (activeOrgId === "demo-org" || activeOrgId === "org-9icgv4ijp") ? deleteDoc(doc(db, "transactions", mirrorId)).catch(() => {}) : Promise.resolve(),
-      ]);
+      await Promise.all(
+        targetIds.map((tid) => deleteDoc(doc(db, "transactions", tid)).catch((err) => { failureReason = err; }))
+      );
       deleteSucceeded = true;
     } catch (err: any) {
       failureReason = err;
     }
 
     // Direct REST deletion fallback with auth
-    const restSuccess = await deleteDocREST("transactions", id).catch(() => false);
-    await deleteDocREST("transactions", aliasId).catch(() => false);
-    if (activeOrgId === "demo-org" || activeOrgId === "org-9icgv4ijp") {
-      await deleteDocREST("transactions", mirrorId).catch(() => false);
-    }
-    if (restSuccess) deleteSucceeded = true;
+    const restSuccessResults = await Promise.all(targetIds.map((tid) => deleteDocREST("transactions", tid).catch(() => false)));
+    if (restSuccessResults.some(Boolean)) deleteSucceeded = true;
 
     // Strict safety check: if Firestore threw permission denied, do not delete from UI
     if (!deleteSucceeded && failureReason?.code === "permission-denied") {
@@ -969,6 +971,13 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     try {
       await setDoc(doc(db, "budgets", id), newBudget);
       saveDocREST("budgets", id, newBudget).catch(() => {});
+      if (orgId === "demo-org" || orgId === "org-9icgv4ijp") {
+        const counterpartOrgId = orgId === "demo-org" ? "org-9icgv4ijp" : "demo-org";
+        const mirrorId = id.startsWith("sync_") ? id.replace("sync_", "") : `sync_${id}`;
+        const mirroredBudget: Budget = { ...newBudget, id: mirrorId, organizationId: counterpartOrgId };
+        setDoc(doc(db, "budgets", mirrorId), mirroredBudget).catch(() => {});
+        saveDocREST("budgets", mirrorId, mirroredBudget).catch(() => {});
+      }
       recordAuditLog({
         organizationId: orgId,
         actorUid: user?.id || "anonymous",
@@ -1034,6 +1043,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     try {
       await setDoc(doc(db, "budgets", id), enrichedUpdates, { merge: true });
       saveDocREST("budgets", id, enrichedUpdates).catch(() => {});
+      if (activeOrgId === "demo-org" || activeOrgId === "org-9icgv4ijp") {
+        const mirrorId = id.startsWith("sync_") ? id.replace("sync_", "") : `sync_${id}`;
+        setDoc(doc(db, "budgets", mirrorId), enrichedUpdates, { merge: true }).catch(() => {});
+        saveDocREST("budgets", mirrorId, enrichedUpdates).catch(() => {});
+      }
       recordAuditLog({
         organizationId: activeOrgId,
         actorUid: user?.id || "anonymous",
@@ -1069,25 +1083,28 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     }
 
     const orgKey = (user?.organizationId || "demo-org").replace(/[^a-zA-Z0-9]/g, "_");
-    const aliasId = `budget_${id}_${orgKey}`;
+    const rawBudgetId = id.replace(/^sync_/, "");
+    const aliasId = `budget_${rawBudgetId}_${orgKey}`;
+    const mirrorId = id.startsWith("sync_") ? rawBudgetId : `sync_${id}`;
     const targetIds = [id, aliasId];
+    if (activeOrgId === "demo-org" || activeOrgId === "org-9icgv4ijp") {
+      targetIds.push(mirrorId, `sync_${rawBudgetId}`);
+    }
 
     let deleteSucceeded = false;
     let failureReason: any = null;
 
     try {
-      await Promise.all([
-        deleteDoc(doc(db, "budgets", id)).catch((err) => { failureReason = err; }),
-        deleteDoc(doc(db, "budgets", aliasId)).catch(() => {}),
-      ]);
+      await Promise.all(
+        targetIds.map((tid) => deleteDoc(doc(db, "budgets", tid)).catch((err) => { failureReason = err; }))
+      );
       deleteSucceeded = true;
     } catch (err: any) {
       failureReason = err;
     }
 
-    const restSuccess = await deleteDocREST("budgets", id).catch(() => false);
-    await deleteDocREST("budgets", aliasId).catch(() => false);
-    if (restSuccess) deleteSucceeded = true;
+    const restSuccessResults = await Promise.all(targetIds.map((tid) => deleteDocREST("budgets", tid).catch(() => false)));
+    if (restSuccessResults.some(Boolean)) deleteSucceeded = true;
 
     if (!deleteSucceeded && failureReason?.code === "permission-denied") {
       showFloatingToast("Permission Denied", "Database rejected delete: insufficient permissions.");
@@ -1226,7 +1243,18 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
       saveDocREST("payroll", id, newPayroll).catch(() => {});
       saveDocREST("transactions", txId, salaryTx).catch(() => {});
-
+      if (orgId === "demo-org" || orgId === "org-9icgv4ijp") {
+        const counterpartOrgId = orgId === "demo-org" ? "org-9icgv4ijp" : "demo-org";
+        const rawId = id.replace(/^sync_/, "");
+        const mirrorPayrollId = id.startsWith("sync_") ? rawId : `sync_${id}`;
+        const mirrorTxId = `sync_tx_pay_${rawId}`;
+        const mirroredPayroll: PayrollEntry = { ...newPayroll, id: mirrorPayrollId, organizationId: counterpartOrgId, expenseId: mirrorTxId };
+        const mirroredTx: Transaction = { ...salaryTx, id: mirrorTxId, organizationId: counterpartOrgId, payrollId: mirrorPayrollId };
+        setDoc(doc(db, "payroll", mirrorPayrollId), mirroredPayroll).catch(() => {});
+        saveDocREST("payroll", mirrorPayrollId, mirroredPayroll).catch(() => {});
+        setDoc(doc(db, "transactions", mirrorTxId), mirroredTx).catch(() => {});
+        saveDocREST("transactions", mirrorTxId, mirroredTx).catch(() => {});
+      }
       recordAuditLog({
         organizationId: orgId,
         actorUid: user?.id || "anonymous",
@@ -1397,7 +1425,15 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
       saveDocREST("payroll", id, enrichedUpdates).catch(() => {});
       saveDocREST("transactions", txId, txUpdates).catch(() => {});
-
+      if (activeOrgId === "demo-org" || activeOrgId === "org-9icgv4ijp") {
+        const rawId = id.replace(/^sync_/, "");
+        const mirrorPayrollId = id.startsWith("sync_") ? rawId : `sync_${id}`;
+        const mirrorTxId = `sync_tx_pay_${rawId}`;
+        setDoc(doc(db, "payroll", mirrorPayrollId), enrichedUpdates, { merge: true }).catch(() => {});
+        saveDocREST("payroll", mirrorPayrollId, enrichedUpdates).catch(() => {});
+        setDoc(doc(db, "transactions", mirrorTxId), txUpdates, { merge: true }).catch(() => {});
+        saveDocREST("transactions", mirrorTxId, txUpdates).catch(() => {});
+      }
       recordAuditLog({
         organizationId: activeOrgId,
         actorUid: user?.id || "anonymous",
@@ -1420,50 +1456,40 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     }
 
     const orgKey = (user?.organizationId || "demo-org").replace(/[^a-zA-Z0-9]/g, "_");
-    const aliasId = `payroll_${id}_${orgKey}`;
-    const txId = `tx_pay_${id}`;
-    const targetIds = [id, aliasId, txId];
+    const rawId = id.replace(/^sync_/, "");
+    const aliasId = `payroll_${rawId}_${orgKey}`;
+    const txId = `tx_pay_${rawId}`;
+    const syncTxId = `sync_tx_pay_${rawId}`;
+    const targetPayrollIds = [id, `sync_${rawId}`, aliasId];
+    const targetTxIds = [txId, syncTxId, `tx_pay_${id}`, `sync_tx_pay_${id}`];
 
-    const targetPay = payroll.find((p) => p.id === id);
+    const targetPay = payroll.find((p) => p.id === id || p.id === rawId);
+    if (targetPay?.expenseId && !targetTxIds.includes(targetPay.expenseId)) {
+      targetTxIds.push(targetPay.expenseId);
+    }
     const linkedTxIds = transactions
-      .filter((t) => t.payrollId === id || t.id === txId || (targetPay?.expenseId && t.id === targetPay.expenseId))
+      .filter((t) => t.payrollId === id || t.payrollId === rawId || t.id === txId || t.id === syncTxId)
       .map((t) => t.id);
     linkedTxIds.forEach((tid) => {
-      if (!targetIds.includes(tid)) targetIds.push(tid);
+      if (!targetTxIds.includes(tid)) targetTxIds.push(tid);
     });
+
+    const allTargetIds = [...targetPayrollIds, ...targetTxIds];
 
     let deleteSucceeded = false;
     let failureReason: any = null;
 
     try {
-      const batch = writeBatch(db);
-      batch.delete(doc(db, "payroll", id));
-      if (aliasId !== id) {
-        batch.delete(doc(db, "payroll", aliasId));
-      }
-      targetIds.forEach((tid) => {
-        if (tid.startsWith("tx_") || linkedTxIds.includes(tid)) {
-          batch.delete(doc(db, "transactions", tid));
-        }
-      });
-      await batch.commit();
+      await Promise.all([
+        ...targetPayrollIds.map((pid) => deleteDoc(doc(db, "payroll", pid)).catch((e) => { failureReason = e; })),
+        ...targetTxIds.map((tid) => deleteDoc(doc(db, "transactions", tid)).catch(() => {})),
+      ]);
       deleteSucceeded = true;
-    } catch (err: any) {
-      failureReason = err;
-      try {
-        await Promise.all([
-          deleteDoc(doc(db, "payroll", id)).catch((e) => { failureReason = e; }),
-          deleteDoc(doc(db, "payroll", aliasId)).catch(() => {}),
-          ...targetIds.map((tid) => deleteDoc(doc(db, "transactions", tid)).catch(() => {})),
-        ]);
-        deleteSucceeded = true;
-      } catch (e2) {}
-    }
+    } catch (e2) {}
 
-    const restSuccess = await deleteDocREST("payroll", id).catch(() => false);
-    await deleteDocREST("payroll", aliasId).catch(() => false);
-    await Promise.all(targetIds.map((tid) => deleteDocREST("transactions", tid).catch(() => false)));
-    if (restSuccess) deleteSucceeded = true;
+    const restPayrollResults = await Promise.all(targetPayrollIds.map((pid) => deleteDocREST("payroll", pid).catch(() => false)));
+    await Promise.all(targetTxIds.map((tid) => deleteDocREST("transactions", tid).catch(() => false)));
+    if (restPayrollResults.some(Boolean)) deleteSucceeded = true;
 
     if (!deleteSucceeded && failureReason?.code === "permission-denied") {
       showFloatingToast("Permission Denied", "Database rejected delete: insufficient permissions.");
@@ -1631,32 +1657,28 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     }
 
     const orgKey = (user?.organizationId || "demo-org").replace(/[^a-zA-Z0-9]/g, "_");
-    const aliasId = `dept_${id}_${orgKey}`;
-    const mirrorId = id.startsWith("sync_") ? id.replace("sync_", "") : `sync_${id}`;
+    const rawDeptId = id.replace(/^sync_/, "");
+    const aliasId = `dept_${rawDeptId}_${orgKey}`;
+    const mirrorId = id.startsWith("sync_") ? rawDeptId : `sync_${id}`;
     const targetIds = [id, aliasId];
     if (activeOrgId === "demo-org" || activeOrgId === "org-9icgv4ijp") {
-      targetIds.push(mirrorId);
+      targetIds.push(mirrorId, `sync_${rawDeptId}`);
     }
 
     let deleteSucceeded = false;
     let failureReason: any = null;
 
     try {
-      await Promise.all([
-        deleteDoc(doc(db, "departments", id)).catch((err) => { failureReason = err; }),
-        deleteDoc(doc(db, "departments", aliasId)).catch(() => {}),
-        (activeOrgId === "demo-org" || activeOrgId === "org-9icgv4ijp") ? deleteDoc(doc(db, "departments", mirrorId)).catch(() => {}) : Promise.resolve(),
-      ]);
+      await Promise.all(
+        targetIds.map((tid) => deleteDoc(doc(db, "departments", tid)).catch((err) => { failureReason = err; }))
+      );
       deleteSucceeded = true;
     } catch (err: any) {
       failureReason = err;
     }
 
     const restSuccess = await deleteDocREST("departments", id).catch(() => false);
-    await deleteDocREST("departments", aliasId).catch(() => false);
-    if (activeOrgId === "demo-org" || activeOrgId === "org-9icgv4ijp") {
-      await deleteDocREST("departments", mirrorId).catch(() => false);
-    }
+    await Promise.all(targetIds.map((tid) => deleteDocREST("departments", tid).catch(() => false)));
     if (restSuccess) deleteSucceeded = true;
 
     if (!deleteSucceeded && failureReason?.code === "permission-denied") {
@@ -1699,7 +1721,14 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     // 2. Guarantee every active payroll record has an authoritative ledger transaction
     for (const p of payroll) {
       if (!p || !p.id) continue;
-      if (deletedIdsRef.current.has(p.id) || deletedIdsRef.current.has(`tx_pay_${p.id}`)) continue;
+      const rawId = p.id.replace(/^sync_/, "");
+      if (
+        deletedIdsRef.current.has(p.id) ||
+        deletedIdsRef.current.has(rawId) ||
+        deletedIdsRef.current.has(`tx_pay_${rawId}`) ||
+        deletedIdsRef.current.has(`sync_tx_pay_${rawId}`) ||
+        deletedIdsRef.current.has(`tx_pay_${p.id}`)
+      ) continue;
       if ((p as any).paymentStatus === "failed") continue;
 
       const netSalary = safeNumber(
@@ -1708,12 +1737,29 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       );
       if (netSalary <= 0) continue;
 
-      const txId = `tx_pay_${p.id}`;
-      const existing = txMap.get(txId) || txMap.get(p.id);
+      const txId = `tx_pay_${rawId}`;
+      const syncTxId = `sync_tx_pay_${rawId}`;
+      const legacyTxId = `tx_pay_${p.id}`;
+
+      // Check all possible ID variants and payrollId links to prevent ANY duplicate counting
+      const existing =
+        txMap.get(txId) ||
+        txMap.get(syncTxId) ||
+        txMap.get(legacyTxId) ||
+        txMap.get(p.id) ||
+        (p.expenseId ? txMap.get(p.expenseId) : undefined) ||
+        Array.from(txMap.values()).find(
+          (t) =>
+            (t.payrollId && (t.payrollId === p.id || t.payrollId === rawId || t.payrollId === `sync_${rawId}`)) ||
+            t.id === txId ||
+            t.id === syncTxId ||
+            t.id === legacyTxId ||
+            (p.expenseId && t.id === p.expenseId)
+        );
 
       if (!existing) {
         const salaryTx: Transaction = {
-          id: txId,
+          id: p.id.startsWith("sync_") ? syncTxId : txId,
           type: "expense",
           amount: netSalary,
           category: "Salaries",
@@ -1722,6 +1768,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           title: `Salary — ${p.employeeName} (${p.month || "Current"})`,
           description: `Staff payroll disbursement for ${p.employeeName} (${p.employeeId || "Staff"}). Base: ${p.baseSalary}, Bonus: ${p.bonus || 0}, Deductions: ${p.deductions || 0}`,
           addedBy: "Payroll System",
+          payrollId: p.id,
           organizationId: activeOrgId,
           organization: p.organization || user?.organization || "Organization Finance Management",
           createdAt: p.createdAt || new Date().toISOString(),
@@ -1729,12 +1776,11 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           paymentMethod: "Bank Transfer",
           status: "completed",
         };
-        txMap.set(txId, salaryTx);
+        txMap.set(salaryTx.id, salaryTx);
       } else if (existing.type === "expense" && existing.amount !== netSalary) {
         txMap.set(existing.id, { ...existing, amount: netSalary, category: "Salaries" });
       }
     }
-
     const result = Array.from(txMap.values());
     result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     return result;
