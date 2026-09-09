@@ -28,6 +28,8 @@ import { WebShell } from "@/components/web/WebShell";
 import { requestNotificationPermissions } from "@/hooks/NotificationHelper";
 
 LogBox.ignoreLogs([
+  /Cannot connect to Expo CLI/,
+  /Cannot connect to Metro/,
   /Require cycle:/,
   /Can't perform a React state update/,
   /\[NOTIFICATIONS\] Firestore save/,
@@ -68,9 +70,11 @@ if (__DEV__) {
     const raw = typeof args[0] === "string" ? args[0] : "";
     if (
       raw.includes("[NOTIFICATIONS] Firestore save") ||
-      raw.includes("Missing or insufficient permissions")
+      raw.includes("Missing or insufficient permissions") ||
+      raw.includes("Cannot connect to Expo CLI") ||
+      raw.includes("Cannot connect to Metro")
     ) {
-      console.log("[Notifications Note]:", ...args);
+      console.log("[Expo Dev Note]:", ...args);
       return;
     }
     originalWarn(...args);
