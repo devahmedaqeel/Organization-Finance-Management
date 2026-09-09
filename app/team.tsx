@@ -153,7 +153,7 @@ export default function TeamScreen() {
       return;
     }
 
-    const isDemo = user.organizationId === "demo-org";
+    const isDemo = user.organizationId === "demo-org" || user.organizationId === "org-9icgv4ijp" || user.email === "admin@ofm.com";
     const orgName = user.organization || settings.organizationName || "Organization Finance Management";
     const orgId = user.organizationId || "default-org";
 
@@ -163,6 +163,7 @@ export default function TeamScreen() {
           collection(db, "users"),
           where("organization", "in", [
             orgName,
+            "Devorbit Tech",
             "Organization Finance Management",
             "OFM — Organization Finance Management",
             "OFM — Organization Finance Manager",
@@ -197,10 +198,10 @@ export default function TeamScreen() {
           setMembers(
             isDemo
               ? [
-                  { id: "u1", name: "Ahmed Aqeel", email: "admin@ofm.com", role: "admin", organization: orgName, organizationId: "demo-org" },
-                  { id: "u2", name: "Maryam Naz", email: "accountant@ofm.com", role: "accountant", organization: orgName, organizationId: "demo-org" },
-                  { id: "u3", name: "Dr. Sundas Iftikhar", email: "manager@ofm.com", role: "manager", organization: orgName, organizationId: "demo-org" },
-                  { id: "u4", name: "Ali Hassan", email: "employee@ofm.com", role: "employee", organization: orgName, organizationId: "demo-org" },
+                  { id: "u1", name: "Ahmed Aqeel", email: "admin@ofm.com", role: "admin", organization: orgName, organizationId: "org-9icgv4ijp" },
+                  { id: "u2", name: "Maryam Naz", email: "accountant@ofm.com", role: "accountant", organization: orgName, organizationId: "org-9icgv4ijp" },
+                  { id: "u3", name: "Dr. Sundas Iftikhar", email: "manager@ofm.com", role: "manager", organization: orgName, organizationId: "org-9icgv4ijp" },
+                  { id: "u4", name: "Ali Hassan", email: "employee@ofm.com", role: "employee", organization: orgName, organizationId: "org-9icgv4ijp" },
                 ]
               : [user]
           );

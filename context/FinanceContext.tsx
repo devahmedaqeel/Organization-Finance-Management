@@ -325,7 +325,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     departments: false,
   });
 
-  const activeOrgId = user?.organizationId || "demo-org";
+  const activeOrgId = (user?.organizationId === "demo-org" ? "org-9icgv4ijp" : user?.organizationId) || "org-9icgv4ijp";
   const cachePrefix = `ofm_cache:${activeOrgId}:`;
 
   // Push Token Registration
@@ -526,7 +526,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     }
 
     setSyncStatus("synced");
-    const canonicalOrgId = user.organizationId;
+    const canonicalOrgId = (user.organizationId === "demo-org" ? "org-9icgv4ijp" : user.organizationId) || "org-9icgv4ijp";
 
     // Real-time listener for Transactions strictly scoped to organization
     const qTransactions = query(

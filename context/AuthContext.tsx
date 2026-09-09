@@ -149,8 +149,8 @@ const DEMO_USERS: Record<string, { password: string; user: User }> = {
       name: "Ahmed Aqeel",
       email: "admin@ofm.com",
       role: "admin",
-      organization: "Dev Orbit Gadgets ",
-      organizationId: "demo-org",
+      organization: "Devorbit Tech",
+      organizationId: "org-9icgv4ijp",
     },
   },
   "accountant@ofm.com": {
@@ -160,8 +160,8 @@ const DEMO_USERS: Record<string, { password: string; user: User }> = {
       name: "Maryam Naz",
       email: "accountant@ofm.com",
       role: "accountant",
-      organization: "Dev Orbit Gadgets ",
-      organizationId: "demo-org",
+      organization: "Devorbit Tech",
+      organizationId: "org-9icgv4ijp",
     },
   },
   "manager@ofm.com": {
@@ -171,8 +171,8 @@ const DEMO_USERS: Record<string, { password: string; user: User }> = {
       name: "Dr. Sundas Iftikhar",
       email: "manager@ofm.com",
       role: "manager",
-      organization: "Dev Orbit Gadgets ",
-      organizationId: "demo-org",
+      organization: "Devorbit Tech",
+      organizationId: "org-9icgv4ijp",
     },
   },
   "employee@ofm.com": {
@@ -182,8 +182,8 @@ const DEMO_USERS: Record<string, { password: string; user: User }> = {
       name: "Tariq Mahmood",
       email: "employee@ofm.com",
       role: "employee",
-      organization: "Dev Orbit Gadgets ",
-      organizationId: "demo-org",
+      organization: "Devorbit Tech",
+      organizationId: "org-9icgv4ijp",
     },
   },
 };
@@ -284,9 +284,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           try {
             const parsed = JSON.parse(data);
             if (parsed && (parsed.email || parsed.id)) {
-              if (parsed.email === "admin@ofm.com") {
-                parsed.organization = parsed.organization || "Dev Orbit Gadgets ";
-                parsed.organizationId = parsed.organizationId || "demo-org";
+              if (parsed.email === "admin@ofm.com" || parsed.organizationId === "demo-org") {
+                parsed.organization = parsed.organization || "Devorbit Tech";
+                parsed.organizationId = "org-9icgv4ijp";
                 AsyncStorage.setItem("ofm_user", JSON.stringify(parsed)).catch(() => {});
               }
               setUser(parsed);
