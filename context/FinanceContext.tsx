@@ -1496,17 +1496,17 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       throw new Error("Database rejected delete: insufficient permissions");
     }
 
-    targetIds.forEach((tid) => deletedIdsRef.current.add(tid));
-    recordPersistedTombstones(activeOrgId, targetIds).catch(() => {});
+    allTargetIds.forEach((tid: string) => deletedIdsRef.current.add(tid));
+    recordPersistedTombstones(activeOrgId, allTargetIds).catch(() => {});
 
     setPayroll((prev) => {
-      const remaining = prev.filter((p) => !targetIds.includes(p.id));
+      const remaining = prev.filter((p) => !allTargetIds.includes(p.id));
       AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(remaining)).catch(() => {});
       return remaining;
     });
 
     setTransactions((prev) => {
-      const remaining = prev.filter((t) => !targetIds.includes(t.id));
+      const remaining = prev.filter((t) => !allTargetIds.includes(t.id));
       AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(remaining)).catch(() => {});
       return remaining;
     });
