@@ -1,205 +1,230 @@
 # OFM — Organization Finance Management
-### Enterprise Institutional Accounting, Real-Time Cloud Synchronization, Multi-Role Access Control & Executive Financial Dossiers
 
-[![Live Web Application](https://img.shields.io/badge/Live_Web_App-ofmapp--main.web.app-38BDF8?style=for-the-badge&logo=firebase&logoColor=white)](https://ofmapp-main.web.app/)
+> **Enterprise Institutional Accounting, Real-Time Cloud Synchronization, Multi-Role Access Control & Executive Financial Dossiers**
+
+[![Live Production Web App](https://img.shields.io/badge/Live_Web_App-ofmapp--main.web.app-38BDF8?style=for-the-badge&logo=firebase&logoColor=white)](https://ofmapp-main.web.app/)
 [![Platform](https://img.shields.io/badge/Platform-Native_Android_%7C_iOS_%7C_Web_%7C_Tablet-10B981?style=for-the-badge&logo=expo&logoColor=white)](https://expo.dev/)
 [![Cloud Firestore](https://img.shields.io/badge/Database-Firebase_Cloud_Firestore-F59E0B?style=for-the-badge&logo=firebase&logoColor=white)](https://firebase.google.com/)
-[![License](https://img.shields.io/badge/License-MIT-8B5CF6?style=for-the-badge)](LICENSE)
-
-**OFM (Organization Finance Management)** is an enterprise financial intelligence and general ledger ecosystem built with **React Native / Expo SDK 54**, **React Native Web**, and **Google Cloud Firestore**. It delivers real-time double-entry ledger accounting, department budget allocation ceilings, staff payroll and automated payslip generation (PDF & High-Res Image), multi-period compliance reporting, role-based personnel security matrix, and **instant 2-way real-time data synchronization between Mobile and Web platforms**.
-
----
-
-## 🌐 Live Production Deployments
-
-* **Official Production Web App**: [https://ofmapp-main.web.app/](https://ofmapp-main.web.app/)
-* **GitHub Repository**: [https://github.com/devahmedaqeel/Organization-Finance-Management](https://github.com/devahmedaqeel/Organization-Finance-Management)
-* **Firebase Console**: [Project `ofmapp-main`](https://console.firebase.google.com/project/ofmapp-main/overview)
+[![EAS Build](https://img.shields.io/badge/EAS_Build-Android_APK_Ready-8B5CF6?style=for-the-badge&logo=expo&logoColor=white)](https://expo.dev/)
+[![License](https://img.shields.io/badge/License-MIT-3B82F6?style=for-the-badge)](LICENSE)
 
 ---
 
-## ⚡ Architecture & Real-Time Sync
+## Project Overview
+
+**OFM (Organization Finance Management)** is an enterprise financial intelligence and general ledger platform built with **React Native / Expo SDK 54**, **React Native Web**, and **Google Cloud Firestore**. 
+
+It delivers real-time double-entry ledger accounting, department budget allocation ceilings, staff payroll and automated payslip generation (PDF & High-Resolution Image), multi-period compliance reporting, a granular role-based personnel security matrix, and **instant two-way real-time data synchronization between Mobile and Web platforms**.
+
+---
+
+## Features
+
+- **Double-Entry General Ledger**: Record Revenue Inflows and Operational Expense Outflows with voucher references, category tagging, and receipt verification.
+- **Department Cost Centers**: Allocate fiscal expenditure ceilings, track department burn rates, and receive real-time budget overrun warnings.
+- **Staff Payroll & Payslip Engine**: Automated calculation of base salaries, allowances, bonuses, and statutory deductions with 1-click official PDF & High-Res Image exports.
+- **Executive Financial Dossiers**: Real-time Net Operating Balance, Operating Surplus, Retention Margin, Savings Velocity, and Runway estimation.
+- **Two-Way Real-Time Synchronization**: Central Cloud Firestore serves as the single source of truth; any change created, edited, or deleted on Web immediately updates Mobile, and vice-versa.
+- **Permanent Deletion Guarantee**: Successfully deleted records are purged from the database and registered in persistent tombstones, ensuring deleted records never resurrect after logout, login, refresh, or restart.
+- **Multi-Role Security (RBAC)**: Distinct permissions for Administrator, Accountant, Manager, and Employee.
+- **Institutional Branding & Customization**: Support for 150+ international currencies (with default PKR formatting), custom organization logo upload, and dark/light adaptive themes.
+- **0ms Instant Startup**: Ultra-lightweight root redirector prevents bundle stalls on native startup.
+
+---
+
+## Technology Stack
+
+- **Framework**: [React Native](https://reactnative.dev/) with [Expo SDK 54](https://docs.expo.dev/)
+- **Routing**: [Expo Router v4](https://docs.expo.dev/router/introduction/) (file-based navigation with typed routes)
+- **Web Engine**: React Native for Web with custom enterprise desktop shell (`WebShell.tsx`, `WebDashboard.tsx`)
+- **Database**: [Google Cloud Firestore](https://firebase.google.com/docs/firestore) (real-time NoSQL document store)
+- **Authentication**: [Firebase Authentication](https://firebase.google.com/docs/auth) (Email/Password, Google OAuth federation, session rehydration via IndexedDB and Browser Local Persistence)
+- **Hosting**: [Firebase Hosting](https://firebase.google.com/docs/hosting) (global CDN with automated SSL)
+- **Build Pipeline**: [EAS Build](https://docs.expo.dev/build/introduction/) for native Android standalone APK generation and iOS client bundles
+- **PDF & Graphic Exports**: Native print compiler via `expo-print`, base64 image rendering, and institutional payslip templating
+
+---
+
+## Project Structure
 
 ```
-                           FIREBASE FIRESTORE CLOUD
-                                      │
-           ┌──────────────────────────┼──────────────────────────┐
-           │                          │                          │
-      DESKTOP WEB              MOBILE WEB / PWA            NATIVE MOBILE
-    (1080px - 1920px)           (320px - 480px)         (Android APK / iOS)
-           │                          │                          │
-           └─────────────── 2-WAY REAL-TIME SYNC ────────────────┘
-```
-
-* **Instant Propagation**: Any revenue inflow, expense outflow, budget change, or payroll disbursal recorded on Mobile immediately reflects on Web in real-time without requiring a page refresh.
-* **Resilient Offline Cache**: Scoped to the organization boundary with optimistic UI mutations and automatic `@react-native-async-storage/async-storage` local caching.
-* **Instant Root Resolution**: Features a 0ms root redirect in `app/index.tsx` preventing initial bundle locks and ensuring smooth startup across Expo Go and Native APK builds.
-
----
-
-## 🛡️ Multi-Role Security & Permissions Matrix
-
-| Feature / Module | Admin | Accountant | Manager | Employee |
-| :--- | :---: | :---: | :---: | :---: |
-| **Executive Financial Dashboard & KPIs** | ✅ Full Access | ✅ Full Access | ✅ Department Only | ✅ Personal View |
-| **Record Inflow (Revenue & Grants)** | ✅ Create / Edit | ✅ Create / Edit | ❌ Restricted | ❌ Restricted |
-| **Record Outflow (Operational Expenses)** | ✅ Create / Edit | ✅ Create / Edit | ✅ Department Only | ✅ Claim Submission |
-| **General Ledger & Double-Entry Audit Trail** | ✅ Full Audit | ✅ Full Audit | ✅ View Only | ❌ Restricted |
-| **Department Budget Allocation Ceilings** | ✅ Manage | ✅ Manage | ✅ View & Track | ❌ Restricted |
-| **Monitored Cost Centers & Headcounts** | ✅ Full Control | ✅ View & Audit | ✅ View & Audit | ❌ Restricted |
-| **Staff Payroll & Disbursals** | ✅ Full Control | ✅ Full Control | ✅ View Only | ✅ View Own Slip |
-| **Official Payslip Generation (PDF & Image)** | ✅ All Staff | ✅ All Staff | ✅ Department Staff | ✅ Own Salary Slip |
-| **Institutional Audit Dossiers & PDF Statements** | ✅ Full Suite | ✅ Full Suite | ✅ Department View | ❌ Restricted |
-| **Team Management & Role Reassignment** | ✅ Full Control | ❌ Restricted | ❌ Restricted | ❌ Restricted |
-| **AI Fiscal Forecasting & Health Metrics** | ✅ Full Suite | ❌ Restricted | ✅ Department View | ❌ Restricted |
-| **Organization Identity & Global Branding** | ✅ Full Control | ❌ Restricted | ❌ Restricted | ❌ Restricted |
-
----
-
-## 📱 Key Modules & Capabilities
-
-### 1. 📊 Executive Financial Overview & Dossier
-* **Dynamic Operating Result Card**: Real-time Surplus Retained vs Total Outflows toggling with interactive growth badges and retention margin meters.
-* **Net Operating Balance Health Engine**: Mathematical evaluation of liquidity ratios, cash burn rates, savings velocity, and runway estimation.
-
-### 2. 📑 Universal General Ledger & Transaction Trail
-* Double-entry bookkeeping ledger supporting voucher references, department cost centers, and multi-category filters.
-* One-click PDF & CSV statement exports with cryptographic ledger timestamps.
-
-### 3. 🎯 Department Budget Ceilings & Allocations
-* Visual utilization gauges, expenditure ceilings, and real-time overrun alert thresholds.
-* Interactive symmetrical concentric Donut charts with multi-metric toggling (`% Used`, `Spent Amount`, `Remaining Budget`).
-
-### 4. 👥 Staff Payroll & Instant Payslip Generator
-* Base salary, allowances, overtime bonuses, and statutory deduction breakdowns.
-* Direct generation of **Official Salary Slips** as both formatted **PDFs** and **High-Resolution Images** saved directly to the device Gallery.
-
-### 5. 🏢 Institutional Branding & Customization
-* Direct 1-click device logo upload (PNG, JPG, SVG, WEBP).
-* Multi-currency support across 150+ international currencies with live formatting.
-* Dark, Light, and System adaptive theme switching.
-
----
-
-## 📁 Repository Directory Structure
-
-```
-├── app/                                 # Expo Router file-based mobile navigation
-│   ├── index.tsx                        # ⚡ Instant lightweight root redirect handler
-│   ├── _layout.tsx                      # Root layout with platform safety & splash unlock
-│   ├── (tabs)/                          # Bottom navigation stack
+├── app/                                 # Expo Router file-based navigation
+│   ├── index.tsx                        # ⚡ Instant 0ms root redirect handler
+│   ├── _layout.tsx                      # Root provider shell & platform safe areas
+│   ├── (tabs)/                          # Bottom tab navigator (Mobile)
 │   │   ├── index.tsx                    # Executive Financial Dashboard
 │   │   ├── income.tsx                   # Revenue & Grant Inflow Ledger
 │   │   ├── expenses.tsx                 # Expenditure & Claim Outflows
 │   │   ├── reports.tsx                  # Financial Auditing & Multi-Period Reports
-│   │   └── more.tsx                     # Extended Features & Navigation Matrix
+│   │   └── more.tsx                     # Extended Features & Module Switcher
 │   ├── login.tsx                        # Authentication & Multi-Role Demo Switcher
-│   ├── onboarding.tsx                   # Institutional Onboarding Presentation
 │   ├── budget.tsx                       # Department Budget Allocations
-│   ├── departments.tsx                  # Monitored Cost Centers
+│   ├── departments.tsx                  # Monitored Cost Centers & Headcounts
 │   ├── payroll.tsx                      # Staff Payroll & Remuneration Audit
-│   ├── team.tsx                         # Personnel Permissions & Role Assignment
-│   ├── settings.tsx                     # Organization Identity & System Settings
-│   └── ai-insights.tsx                  # Predictive Fiscal Intelligence Engine
-├── components/                          # Core UI components & charts
-│   ├── analytics/                       # Financial Analytics & Donut Suite
-│   ├── web/                             # Enterprise Web Platform Architecture
-│   │   ├── WebShell.tsx                 # Responsive Header, Sidebar & Bottom Nav
-│   │   ├── WebDashboard.tsx             # Widescreen Dashboard with Live KPIs
-│   │   ├── WebIncome.tsx                # Institutional Revenue Suite
-│   │   ├── WebExpenses.tsx              # Outflow Tracking & Category Filters
-│   │   ├── WebTransactions.tsx          # Double-Entry General Ledger Table
-│   │   ├── WebBudgets.tsx               # Budget Allocation Ceilings
-│   │   ├── WebDepartments.tsx           # Cost Center Headcounts & Stats
-│   │   ├── WebPayroll.tsx               # Staff Payroll & Compensation
-│   │   ├── WebTeam.tsx                  # Personnel & Security Matrix
-│   │   ├── WebReports.tsx               # Statement Generator & Export Suite
-│   │   ├── WebAIInsights.tsx            # Fiscal Health Analysis
-│   │   ├── WebSettings.tsx              # Organization Identity & Theme Settings
-│   │   ├── SvgIcons.tsx                 # Pure Vector SVG System for Web
-│   │   └── modals/                      # Responsive Form & Confirmation Modals
-│   ├── DonutChart.tsx                   # Concentric Circular Donut Chart
-│   ├── RingProgress.tsx                 # Proportional Circular Gauge
-│   └── ErrorBoundary.tsx                # React Exception Isolation Boundary
-├── context/                             # React State & Real-Time Context
-│   ├── AuthContext.tsx                  # User Authentication & Role Matrix
-│   ├── FinanceContext.tsx               # Firestore Real-Time Synchronizer
-│   └── SettingsContext.tsx              # Organization Branding & Currency State
-├── services/                            # Financial & Export Engines
-│   ├── DatePeriodService.ts             # Multi-Period Normalization Engine
-│   ├── FinancialCalculationEngine.ts    # Authoritative Mathematical Models
-│   ├── payslipExportService.ts          # Payslip PDF & Image Generator
-│   └── ReportExportService.ts           # PDF Financial Statement Compiler
-├── config/                              # Firebase Configuration & Security
-├── firestore.rules                      # Cloud Firestore Security Rules
-├── firebase.json                        # Firebase Hosting & Rewrites
-├── eas.json                             # EAS Android APK Build Profiles
-└── package.json                         # Project Dependencies & Scripts
+│   ├── team.tsx                         # Personnel Management & Role Invites
+│   ├── settings.tsx                     # Organization Profile, Currency & Branding
+│   └── ai-insights.tsx                  # Predictive Intelligence & Health Engine
+├── components/                          # UI Component Hierarchy
+│   ├── web/                             # Enterprise Desktop Widescreen Shell & Views
+│   │   ├── WebShell.tsx                 # Desktop layout, auth gate & loading spinner
+│   │   ├── WebDashboard.tsx             # Desktop KPI cards & charts
+│   │   ├── WebIncome.tsx                # Desktop revenue tabular ledger
+│   │   ├── WebExpenses.tsx              # Desktop expense tabular ledger
+│   │   ├── WebDepartments.tsx           # Desktop cost center allocation matrix
+│   │   ├── WebPayroll.tsx               # Desktop staff payroll and batch slips
+│   │   └── WebReports.tsx               # Desktop statement generator & exports
+│   ├── analytics/                       # Donut & Radial Fiscal Health Gauges
+│   └── modals/                          # Responsive Modal Dialogs
+├── context/                             # Global State Providers
+│   ├── AuthContext.tsx                  # Firebase Auth, token persistence & RBAC
+│   ├── FinanceContext.tsx               # Firestore live sync, ledger CRUD & tombstones
+│   └── ThemeContext.tsx                 # Dark/Light theme tokens & styling
+├── services/                            # Business Logic & Authoritative Engines
+│   ├── FinancialCalculationEngine.ts    # Authoritative financial math & KPI formulas
+│   ├── DatePeriodService.ts             # Fiscal period filtering & date range maths
+│   ├── ReportExportService.ts           # PDF dossier generator & compiler
+│   └── payslipExportService.ts          # Native PDF & PNG slip exporter
+├── config/firebase.ts                   # Firebase initialization & multi-persistence setup
+├── eas.json                             # EAS Android APK & production build profiles
+└── firestore.rules                      # Cloud Firestore security rules
 ```
 
 ---
 
-## 🚀 Development & Build Guide
+## Architecture
 
-### 1. Prerequisites & Installation
+OFM employs a **Single Unified Backend Architecture** where the Central Google Cloud Firestore database is the single authoritative source of truth for all clients:
+
+```
+                 WEB APPLICATION (Desktop / Tablet / PWA)
+                                  │
+                                  ▼
+                        FIREBASE CLIENT SDK
+                                  │
+                                  ▼
+                 CENTRAL FIRESTORE CLOUD DATABASE
+                                  ▲
+                                  │
+                        FIREBASE CLIENT SDK
+                                  ▲
+                                  │
+                MOBILE APPLICATION (Android APK / iOS)
+```
+
+Both clients share:
+1. The same central database collections (`transactions`, `budgets`, `departments`, `payroll`, `settings`).
+2. The same organization-scoped tenant boundaries (`organizationId`).
+3. The same authoritative financial calculation engine (`services/FinancialCalculationEngine.ts`).
+
+---
+
+## Data Synchronization
+
+Data synchronization between Web and Mobile is bidirectional and real-time:
+* **Web → Mobile**: When an Admin or Accountant records or updates an item on Web, Firestore dispatches the modification event through active WebSocket listeners (`onSnapshot`). The Mobile application immediately receives the change and re-evaluates all KPIs without manual refresh.
+* **Mobile → Web**: When an expense or department allocation is submitted on Mobile, Firestore immediately emits the change to the Web client, updating tables and charts instantly.
+* **Delete Synchronization**: When a record is deleted on either platform, it is confirmed removed from Firestore, purged from counterpart mirrors, and indexed in persistent local tombstones (`AsyncStorage` / `localStorage`). **Deleted records never return** after refresh, logout/login, or app restart.
+
+---
+
+## Authentication
+
+Authentication is powered by **Firebase Authentication** with multi-tier persistence:
+* **Web Persistence**: Configured with `[indexedDBLocalPersistence, browserLocalPersistence]` to guarantee sessions survive browser refreshes and tab closures.
+* **Mobile Persistence**: Managed via `@react-native-async-storage/async-storage` for seamless instant resume.
+* **Canonical Profile Resolution**: Resolves user email and UID against `users/{uid}` in Firestore to associate the account with the correct canonical organization ID (`org-9icgv4ijp`).
+* **Session Lifecycle**: Explicit `logout()` purges local tokens without altering central database records. On subsequent login, the latest records are streamed directly from Firestore.
+
+---
+
+## User Roles
+
+| Role | Access Level | Responsibilities |
+| :--- | :--- | :--- |
+| **Super Administrator** | Full Access | Organization branding, personnel roles, general ledger, budgets, payroll, compliance audits. |
+| **Accountant** | Financial Operations | Revenue inflows, operational expenses, ledger audit, budget ceilings, payslips, financial reports. |
+| **Manager** | Departmental Oversight | Departmental expense monitoring, staff headcount tracking, department budget review. |
+| **Employee** | Personal Access | Expense claim submission, personal payslip download (PDF/Image), self profile. |
+
+---
+
+## Installation
+
+### Prerequisites
+- Node.js (v18 or higher)
+- npm or yarn
+- Expo CLI (`npm install -g expo-cli eas-cli`)
+
+### Setup
 ```bash
-# Clone the repository
+# Clone repository
 git clone https://github.com/devahmedaqeel/Organization-Finance-Management.git
+
+# Enter project directory
 cd Organization-Finance-Management
 
-# Install project dependencies
+# Install dependencies
 npm install
 ```
 
-### 2. Run Local Development Server
+---
+
+## Environment Variables
+
+Create a `.env` file in the root directory with your Firebase configuration:
+
+```env
+EXPO_PUBLIC_FIREBASE_API_KEY=AIzaSyDPpbHAUApFuyq-u1L891fvl95C5mHeSKY
+EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=ofmapp-main.firebaseapp.com
+EXPO_PUBLIC_FIREBASE_PROJECT_ID=ofmapp-main
+EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=ofmapp-main.firebasestorage.app
+EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=940511583527
+EXPO_PUBLIC_FIREBASE_APP_ID=1:940511583527:web:7aa8d59fc3e2a8939c1d02
+EXPO_PUBLIC_CRAFTMYPDF_API_KEY=7832MjA6MTE6UjlkM3h4emxpTExzeFR0aQ=
+```
+
+---
+
+## Development
+
 ```bash
-# Start Expo development server (cleans Metro cache)
+# Start local Metro bundler with cleared cache
 npx expo start -c
 
-# Press 'w' in terminal for Web Browser (http://localhost:8081/)
-# Press 'a' in terminal for Android Emulator / Expo Go
-# Press 'i' in terminal for iOS Simulator
+# Run on Web (Browser)
+Press 'w' in terminal or navigate to http://localhost:8081
+
+# Run on Android Emulator / Physical Device
+Press 'a' in terminal (requires Expo Go or Android SDK)
+
+# Run Automated Test Suite (10 Comprehensive Suites)
+npm test
 ```
 
-### 3. 📱 Build Standalone Android APK (EAS Build)
+---
+
+## Build
+
+### Web Production Export
 ```bash
-# Direct Cloud APK Build (Recommended)
-npx eas-cli build -p android --profile preview
-
-# Or Local Build (Requires Android SDK & Studio)
-npx eas-cli build -p android --profile preview --local
+# Build production web bundle into 'dist' directory
+npm run build:web
 ```
 
-### 4. 🌐 Export Web Bundle & Deploy to Firebase Hosting
+### Mobile Android Standalone APK Build (via EAS)
 ```bash
-# Export static web bundle
-npx expo export -p web
-
-# Deploy to Firebase Hosting
-npx firebase deploy --only hosting
+# Generate standalone Android APK (configured in eas.json)
+eas build --platform android --profile preview
 ```
 
 ---
 
-## 🔐 Instant Demo Testing Credentials
+## Production Deployment
 
-| Role | Email | Password | Access Scope |
-| :--- | :--- | :--- | :--- |
-| **Executive Admin** | `admin@ofm.com` | `Admin123` | Full Institutional Superuser |
-| **Staff Accountant** | `accountant@ofm.com` | `Account123` | General Ledger & Financial Dossiers |
-| **Department Manager** | `manager@ofm.com` | `Manager123` | Department Cost Centers & Outflows |
-| **Standard Employee** | `employee@ofm.com` | `Employee123` | Personal Salary Slip & Expense Claims |
-
----
-
-## 👨‍💻 Author & Repository
-
-* **Project**: Organization Finance Management (OFM)
-* **GitHub**: [@devahmedaqeel](https://github.com/devahmedaqeel)
-* **Live Deployment**: [https://ofmapp-main.web.app/](https://ofmapp-main.web.app/)
-
----
-
-## 📄 License
-
-This project is licensed under the **MIT License** — open and extensible for institutional finance management.
+### Deploy Web Application to Firebase Hosting
+```bash
+# Deploy static bundle to production hosting URL
+npx firebase-tools deploy --only hosting
+```
+- **Live Production URL**: [https://ofmapp-main.web.app/](https://ofmapp-main.web.app/)
+- **Console**: [https://console.firebase.google.com/project/ofmapp-main/overview](https://console.firebase.google.com/project/ofmapp-main/overview)

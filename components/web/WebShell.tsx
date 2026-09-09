@@ -184,7 +184,7 @@ export function WebShell() {
   const isMobile = width < 768;
   const isTablet = width >= 768 && width < 1080;
 
-  const { user, logout } = useAuth();
+  const { user, logout, isLoading } = useAuth();
   const { settings, updateSettings } = useSettings();
   const { transactions, budgets, departments, payroll, notifications, unreadNotificationCount } = useFinance();
 
@@ -307,6 +307,15 @@ export function WebShell() {
       setSidebarCollapsed(false);
     }
   }, [isTablet, isMobile]);
+
+  // Elegant non-blocking loader while restoring session on refresh
+  if (isLoading && !user) {
+    return (
+      <View style={{ flex: 1, backgroundColor: "#0f172a", justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator size="large" color="#3b82f6" />
+      </View>
+    );
+  }
 
   // If unauthenticated or after logout on Web, present the Web Sign In & Create Account screen
   if (!user) {
@@ -479,10 +488,10 @@ export function WebShell() {
 
               {!sidebarCollapsed && (
                 <View style={{ flex: 1, minWidth: 0, paddingRight: 6 }}>
-                  <Text style={[styles.brandTitle, { color: colors.foreground }]} numberOfLines={1}>
+                  <Text style={[styles.brandTitle, { color: colors.foreground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8}>
                     OFM Cloud
                   </Text>
-                  <Text style={[styles.brandSubtitle, { color: colors.mutedForeground }]} numberOfLines={1}>
+                  <Text style={[styles.brandSubtitle, { color: colors.mutedForeground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
                     {settings.organizationName || "Financial Management"}
                   </Text>
                 </View>
@@ -544,10 +553,10 @@ export function WebShell() {
                     </Text>
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={[styles.userName, { color: colors.foreground }]} numberOfLines={1}>
+                    <Text style={[styles.userName, { color: colors.foreground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8}>
                       {user?.name || "Admin"}
                     </Text>
-                    <Text style={[styles.userEmail, { color: colors.primary }]} numberOfLines={1}>
+                    <Text style={[styles.userEmail, { color: colors.primary }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
                       {user?.email || "admin@ofm.com"}
                     </Text>
                     <Text style={[styles.userRole, { color: colors.mutedForeground }]}>
@@ -634,10 +643,10 @@ export function WebShell() {
                     </Text>
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={[styles.userName, { color: colors.foreground }]} numberOfLines={1}>
+                    <Text style={[styles.userName, { color: colors.foreground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8}>
                       {user?.name || "Admin"}
                     </Text>
-                    <Text style={[styles.userEmail, { color: colors.primary }]} numberOfLines={1}>
+                    <Text style={[styles.userEmail, { color: colors.primary }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
                       {user?.email || "admin@ofm.com"}
                     </Text>
                     <Text style={[styles.userRole, { color: colors.mutedForeground }]}>
@@ -713,10 +722,10 @@ export function WebShell() {
                   )}
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={[styles.breadcrumbCurrent, { color: colors.foreground, fontSize: 13.5 }]} numberOfLines={1}>
+                  <Text style={[styles.breadcrumbCurrent, { color: colors.foreground, fontSize: 13.5 }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8}>
                     {NAV_ITEMS.find((n) => n.id === activeTab)?.label || "Overview"}
                   </Text>
-                  <Text style={{ color: colors.mutedForeground, fontSize: 9.5, fontFamily: "Inter_500Medium" }} numberOfLines={1}>
+                  <Text style={{ color: colors.mutedForeground, fontSize: 9.5, fontFamily: "Inter_500Medium" }} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
                     {settings.organizationName || "OFM Cloud"}
                   </Text>
                 </View>

@@ -103,7 +103,7 @@ export function TransactionItem(props: TransactionItemProps) {
 
       {/* Amount + Actions */}
       <View style={styles.right}>
-        <Text style={[styles.amount, { color: amountColor }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+        <Text style={[styles.amount, { color: amountColor }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
           {isIncome ? "+" : "-"}{settings.currency} {formatAmountVal(tx.amount)}
         </Text>
 
@@ -194,7 +194,8 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     gap: 6,
     flexShrink: 0,
-    minWidth: 70,
+    minWidth: 90,
+    maxWidth: "48%",
   },
   amount: {
     fontSize: 14,

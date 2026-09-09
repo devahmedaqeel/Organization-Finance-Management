@@ -82,7 +82,7 @@ export default function ExpensesScreen() {
           <View style={styles.headerRight}>
             <View style={[styles.totalBadge, { backgroundColor: colors.expense + "22" }]}>
               <Feather name="trending-down" size={12} color={colors.expense} />
-              <Text style={[styles.totalText, { color: colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{formatAmt(total)}</Text>
+              <Text style={[styles.totalText, { color: colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>{formatAmt(total)}</Text>
             </View>
             {canEdit && (
               <TouchableOpacity

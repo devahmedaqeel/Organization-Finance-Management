@@ -521,10 +521,10 @@ export function FinancialDrillDownModal({
                           <View style={[styles.breakdownRow, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border, padding: 12, borderRadius: 12, gap: 8 }]}>
                             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
                               <View style={{ flex: 1, minWidth: 0 }}>
-                                <Text style={[styles.rowTitle, { color: colors.foreground }]} numberOfLines={1}>
+                                <Text style={[styles.rowTitle, { color: colors.foreground }]} numberOfLines={2}>
                                   {selectedDepartment}
                                 </Text>
-                                <Text style={{ fontSize: 11, color: colors.mutedForeground, fontFamily: "Inter_500Medium", marginTop: 1 }} numberOfLines={1}>
+                                <Text style={{ fontSize: 11, color: colors.mutedForeground, fontFamily: "Inter_500Medium", marginTop: 1 }} numberOfLines={2}>
                                   Consolidated Department Operations
                                 </Text>
                               </View>
@@ -572,10 +572,10 @@ export function FinancialDrillDownModal({
                         <View key={b.id} style={[styles.breakdownRow, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border, padding: 12, borderRadius: 12, gap: 8 }]}>
                           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
                             <View style={{ flex: 1, minWidth: 0 }}>
-                              <Text style={[styles.rowTitle, { color: colors.foreground }]} numberOfLines={1} ellipsizeMode="tail">
+                              <Text style={[styles.rowTitle, { color: colors.foreground }]} numberOfLines={2}>
                                 {b.department}
                               </Text>
-                              <Text style={{ fontSize: 11, color: colors.mutedForeground, fontFamily: "Inter_500Medium", marginTop: 1 }} numberOfLines={1} ellipsizeMode="tail">
+                              <Text style={{ fontSize: 11, color: colors.mutedForeground, fontFamily: "Inter_500Medium", marginTop: 1 }} numberOfLines={2}>
                                 {b.category || "General"}
                               </Text>
                             </View>
@@ -620,7 +620,7 @@ export function FinancialDrillDownModal({
                     >
                       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
                         <View style={{ flex: 1, minWidth: 0 }}>
-                          <Text style={[styles.rowTitle, { color: colors.foreground }]} numberOfLines={1} ellipsizeMode="tail">
+                          <Text style={[styles.rowTitle, { color: colors.foreground }]} numberOfLines={2}>
                             {c.category}
                           </Text>
                           <Text style={{ fontSize: 11, color: colors.mutedForeground, fontFamily: "Inter_500Medium", marginTop: 1 }}>

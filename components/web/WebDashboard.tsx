@@ -640,7 +640,7 @@ export function WebDashboard({
               <Feather name="arrow-up-circle" size={17} color={colors.income} />
             </View>
             <View style={[styles.kpiTag, { backgroundColor: colors.income + "15" }]}>
-              <Text style={[styles.kpiTagText, { color: colors.income }]} numberOfLines={1}>Inflow</Text>
+              <Text style={[styles.kpiTagText, { color: colors.income }]} numberOfLines={2}>Inflow</Text>
             </View>
           </View>
           <WebCountUp
@@ -649,7 +649,7 @@ export function WebDashboard({
             formatter={fmt}
             style={[styles.kpiBigNumber, { color: colors.foreground, fontSize: isMobile ? 18 : 20 }]}
           />
-          <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]} numberOfLines={1}>Total Income</Text>
+          <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]} numberOfLines={2}>Total Income</Text>
           <Text
             style={{
               fontSize: 10,
@@ -657,9 +657,9 @@ export function WebDashboard({
               fontFamily: "Inter_600SemiBold",
               marginTop: -2,
             }}
-            numberOfLines={1}
+            numberOfLines={2}
             adjustsFontSizeToFit
-            minimumFontScale={0.8}
+            minimumFontScale={0.7}
           >
             {totalIncome === 0
               ? "No Income (0%)"
@@ -732,7 +732,7 @@ export function WebDashboard({
                         : colors.primary,
                   },
                 ]}
-                numberOfLines={1}
+                numberOfLines={2}
               >
                 {totalExpenses === 0
                   ? "No Outflows"
@@ -752,7 +752,7 @@ export function WebDashboard({
             formatter={fmt}
             style={[styles.kpiBigNumber, { color: colors.foreground, fontSize: isMobile ? 18 : 20 }]}
           />
-          <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]} numberOfLines={1}>Total Expenses</Text>
+          <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]} numberOfLines={2}>Total Expenses</Text>
           <Text
             style={{
               fontSize: 10,
@@ -769,9 +769,9 @@ export function WebDashboard({
               fontFamily: "Inter_600SemiBold",
               marginTop: -2,
             }}
-            numberOfLines={1}
+            numberOfLines={2}
             adjustsFontSizeToFit
-            minimumFontScale={0.8}
+            minimumFontScale={0.7}
           >
             {totalExpenses === 0
               ? "0% Outflow"
@@ -867,7 +867,9 @@ export function WebDashboard({
                         : "#3B82F6",
                   },
                 ]}
-                numberOfLines={1}
+                numberOfLines={2}
+                adjustsFontSizeToFit
+                minimumFontScale={0.7}
               >
                 {totalAllocatedBudget === 0 ? "No Budget" : budgetUsedPct > 100 ? "Over Limit" : `${budgetUsedPct}% Used`}
               </Text>
@@ -879,7 +881,7 @@ export function WebDashboard({
             formatter={fmt}
             style={[styles.kpiBigNumber, { color: colors.foreground, fontSize: isMobile ? 18 : 20 }]}
           />
-          <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]} numberOfLines={1}>Department Budget</Text>
+          <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>Department Budget</Text>
           <Text
             style={{
               fontSize: 10,
@@ -887,9 +889,9 @@ export function WebDashboard({
               fontFamily: "Inter_600SemiBold",
               marginTop: -2,
             }}
-            numberOfLines={1}
+            numberOfLines={2}
             adjustsFontSizeToFit
-            minimumFontScale={0.8}
+            minimumFontScale={0.7}
           >
             {totalAllocatedBudget === 0
               ? "No Active Budget"
@@ -929,18 +931,18 @@ export function WebDashboard({
               <Feather name="list" size={17} color={colors.primary} />
             </View>
             <View style={[styles.kpiTag, { backgroundColor: (transactions.length > 0 ? colors.primary : colors.muted) + "15" }]}>
-              <Text style={[styles.kpiTagText, { color: transactions.length > 0 ? colors.primary : colors.mutedForeground }]} numberOfLines={1}>
+              <Text style={[styles.kpiTagText, { color: transactions.length > 0 ? colors.primary : colors.mutedForeground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
                 {transactions.length > 0 ? "Active" : "Empty"}
               </Text>
             </View>
           </View>
           <Text style={[styles.kpiBigNumber, { color: colors.foreground, fontSize: isMobile ? 18 : 20 }]}>{transactions.length}</Text>
-          <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]} numberOfLines={1}>Transactions</Text>
+          <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>Transactions</Text>
           <Text
             style={{ fontSize: 10, color: transactions.length > 0 ? colors.primary : colors.mutedForeground, fontFamily: "Inter_600SemiBold", marginTop: -2 }}
-            numberOfLines={1}
+            numberOfLines={2}
             adjustsFontSizeToFit
-            minimumFontScale={0.8}
+            minimumFontScale={0.7}
           >
             {transactions.length > 0
               ? `${transactions.filter(t => t.type === 'income').length} In · ${transactions.filter(t => t.type === 'expense').length} Out`
@@ -983,7 +985,7 @@ export function WebDashboard({
               <Feather name="users" size={17} color="#8B5CF6" />
             </View>
             <View style={[styles.kpiTag, { backgroundColor: (payroll.length > 0 ? "#8B5CF6" : colors.muted) + "15" }]}>
-              <Text style={[styles.kpiTagText, { color: payroll.length > 0 ? "#8B5CF6" : colors.mutedForeground }]} numberOfLines={1}>
+              <Text style={[styles.kpiTagText, { color: payroll.length > 0 ? "#8B5CF6" : colors.mutedForeground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
                 {payroll.length} Staff
               </Text>
             </View>
@@ -994,12 +996,12 @@ export function WebDashboard({
             formatter={fmt}
             style={[styles.kpiBigNumber, { color: colors.foreground, fontSize: isMobile ? 18 : 20 }]}
           />
-          <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]} numberOfLines={1}>Staff Payroll</Text>
+          <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>Staff Payroll</Text>
           <Text
             style={{ fontSize: 10, color: payroll.length > 0 ? "#8B5CF6" : colors.mutedForeground, fontFamily: "Inter_600SemiBold", marginTop: -2 }}
-            numberOfLines={1}
+            numberOfLines={2}
             adjustsFontSizeToFit
-            minimumFontScale={0.8}
+            minimumFontScale={0.7}
           >
             {payroll.length > 0 ? `${payroll.length} Disbursals` : "No Payroll"}
           </Text>
@@ -1594,6 +1596,8 @@ const styles = StyleSheet.create({
   kpiCard: {
     flex: 1,
     minWidth: 165,
+    minHeight: 130,
+    justifyContent: "space-between",
     borderRadius: 16,
     borderWidth: 1,
     padding: 14,

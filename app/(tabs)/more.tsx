@@ -255,19 +255,19 @@ export default function MoreScreen() {
         </View>
         <View style={styles.profileInfo}>
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-            <Text style={[styles.profileName, { color: colors.foreground, flex: 1, minWidth: 0, marginRight: 8 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+            <Text style={[styles.profileName, { color: colors.foreground, flex: 1, minWidth: 0, marginRight: 8 }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
               {user?.name || "Administrator"}
             </Text>
             <View style={[styles.rolePill, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "35", flexShrink: 0 }]}>
               <Text style={[styles.roleText, { color: colors.primary }]}>{user?.role?.toUpperCase() || "ADMIN"}</Text>
             </View>
           </View>
-          <Text style={[styles.profileEmail, { color: colors.mutedForeground }]} numberOfLines={1}>
+          <Text style={[styles.profileEmail, { color: colors.mutedForeground }]} numberOfLines={2}>
             {user?.email || "admin@ofm.com"}
           </Text>
           <View style={styles.orgRow}>
             <Text style={{ fontSize: 13 }}>{selectedCurrency?.flag ?? "🌐"}</Text>
-            <Text style={[styles.profileOrg, { color: colors.mutedForeground, flex: 1 }]} numberOfLines={1}>
+            <Text style={[styles.profileOrg, { color: colors.mutedForeground, flex: 1 }]} numberOfLines={2}>
               {settings.organizationName || "Organization"}
             </Text>
           </View>
@@ -309,7 +309,7 @@ export default function MoreScreen() {
                   </View>
                   <View style={styles.cardFullTextWrap}>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                      <Text style={[styles.featureLabel, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{f.label}</Text>
+                      <Text style={[styles.featureLabel, { color: colors.foreground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.85}>{f.label}</Text>
                       <View style={[styles.cardTagPill, { backgroundColor: f.color + "16", borderColor: f.color + "32" }]}>
                         <Text style={[styles.cardTagText, { color: f.color }]}>{f.tag}</Text>
                       </View>
@@ -350,7 +350,7 @@ export default function MoreScreen() {
               </View>
 
               {/* Title */}
-              <Text style={[styles.featureLabel, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+              <Text style={[styles.featureLabel, { color: colors.foreground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.85}>
                 {f.label}
               </Text>
 
@@ -399,8 +399,8 @@ export default function MoreScreen() {
                   <Feather name={stat.icon} size={16} color={stat.color} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.summaryLabel, { color: colors.foreground }]} numberOfLines={1}>{stat.label}</Text>
-                  <Text style={[styles.summarySub, { color: colors.mutedForeground }]} numberOfLines={1}>
+                  <Text style={[styles.summaryLabel, { color: colors.foreground }]} numberOfLines={2}>{stat.label}</Text>
+                  <Text style={[styles.summarySub, { color: colors.mutedForeground }]} numberOfLines={2}>
                     {stat.sub}
                   </Text>
                 </View>

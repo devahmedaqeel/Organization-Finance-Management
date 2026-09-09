@@ -233,7 +233,7 @@ export function FinancialStatementViewerModal({
               />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.topHeaderTitle} numberOfLines={1}>
+              <Text style={styles.topHeaderTitle} numberOfLines={2}>
                 {title ||
                   (reportOpts.reportMode === "payroll_audit"
                     ? "Staff Payroll & Remuneration Audit"
@@ -249,7 +249,7 @@ export function FinancialStatementViewerModal({
                     ? "Audited General Ledger Trail"
                     : "Official Consolidated Financial Statement")}
               </Text>
-              <Text style={styles.topHeaderSub} numberOfLines={1}>{organizationName} · {periodLabel}</Text>
+              <Text style={styles.topHeaderSub} numberOfLines={2}>{organizationName} · {periodLabel}</Text>
             </View>
           </View>
           <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.8}>
@@ -350,19 +350,19 @@ export function FinancialStatementViewerModal({
               <View style={styles.executiveMatrix}>
                 <View style={styles.matrixBox}>
                   <Text style={styles.matrixLabel}>GROSS REVENUES</Text>
-                  <Text style={[styles.matrixVal, { color: "#10B981" }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>+{currency} {fmtShort(totalIncome)}</Text>
+                  <Text style={[styles.matrixVal, { color: "#10B981" }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>+{currency} {fmtShort(totalIncome)}</Text>
                   <Text style={styles.matrixSub}>{transactions.filter(t => t.type === "income").length} Deposits</Text>
                 </View>
 
                 <View style={styles.matrixBox}>
                   <Text style={styles.matrixLabel}>TOTAL EXPENSES</Text>
-                  <Text style={[styles.matrixVal, { color: "#E11D48" }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>-{currency} {fmtShort(totalExpenses)}</Text>
+                  <Text style={[styles.matrixVal, { color: "#E11D48" }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>-{currency} {fmtShort(totalExpenses)}</Text>
                   <Text style={styles.matrixSub}>{transactions.filter(t => t.type === "expense").length} Outflows</Text>
                 </View>
 
                 <View style={styles.matrixBox}>
                   <Text style={styles.matrixLabel}>NET POSITION</Text>
-                  <Text style={[styles.matrixVal, { color: isNetPositive ? "#10B981" : "#E11D48" }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  <Text style={[styles.matrixVal, { color: isNetPositive ? "#10B981" : "#E11D48" }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
                     {isNetPositive ? "+" : "-"}{currency} {fmtShort(Math.abs(netBalance))}
                   </Text>
                   <Text style={styles.matrixSub}>{isNetPositive ? "Surplus Buffer" : "Deficit Drain"}</Text>
@@ -370,7 +370,7 @@ export function FinancialStatementViewerModal({
 
                 <View style={styles.matrixBox}>
                   <Text style={styles.matrixLabel}>PROFIT MARGIN</Text>
-                  <Text style={[styles.matrixVal, { color: profitMargin >= 0 ? "#10B981" : "#E11D48" }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  <Text style={[styles.matrixVal, { color: profitMargin >= 0 ? "#10B981" : "#E11D48" }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
                     {profitMargin.toFixed(1)}%
                   </Text>
                   <Text style={styles.matrixSub}>{coverageRatio >= 90 ? "99x" : `${coverageRatio.toFixed(1)}x`} Coverage</Text>
@@ -401,7 +401,7 @@ export function FinancialStatementViewerModal({
 
                 {Object.entries(incomeCatMap).length === 0 ? (
                   <View style={styles.formalTableRow}>
-                    <Text style={[styles.ftd, { flex: 2.5, fontStyle: "italic", color: "#94A3B8" }]} numberOfLines={1}>No income recorded</Text>
+                    <Text style={[styles.ftd, { flex: 2.5, fontStyle: "italic", color: "#94A3B8" }]} numberOfLines={2}>No income recorded</Text>
                     <Text style={[styles.ftd, { flex: 0.8, textAlign: "center" }]}>-</Text>
                     <Text style={[styles.ftd, { flex: 1.5, textAlign: "right" }]}>{currency} 0</Text>
                     <Text style={[styles.ftd, { flex: 1.5, textAlign: "right" }]}>-</Text>
@@ -409,29 +409,29 @@ export function FinancialStatementViewerModal({
                 ) : (
                   Object.entries(incomeCatMap).map(([cat, val], idx) => (
                     <View key={cat} style={[styles.formalTableRow, idx % 2 === 1 && styles.rowZebra]}>
-                      <Text style={[styles.ftd, { flex: 2.5, fontWeight: "600" }]} numberOfLines={1}>{cat}</Text>
+                      <Text style={[styles.ftd, { flex: 2.5, fontWeight: "600" }]} numberOfLines={2}>{cat}</Text>
                       <Text style={[styles.ftd, { flex: 0.8, textAlign: "center", color: "#64748B" }]}>{val.count}</Text>
-                      <Text style={[styles.ftd, { flex: 1.5, textAlign: "right", color: "#10B981", fontWeight: "700" }]} numberOfLines={1}>+{currency} {fmtShort(val.amount)}</Text>
+                      <Text style={[styles.ftd, { flex: 1.5, textAlign: "right", color: "#10B981", fontWeight: "700" }]} numberOfLines={2}>+{currency} {fmtShort(val.amount)}</Text>
                       <Text style={[styles.ftd, { flex: 1.5, textAlign: "right", color: "#94A3B8" }]}>-</Text>
                     </View>
                   ))
                 )}
 
                 <View style={styles.subtotalRow}>
-                  <Text style={[styles.ftd, { flex: 2.5, fontWeight: "700" }]} numberOfLines={1}>TOTAL REVENUES (A)</Text>
+                  <Text style={[styles.ftd, { flex: 2.5, fontWeight: "700" }]} numberOfLines={2}>TOTAL REVENUES (A)</Text>
                   <Text style={[styles.ftd, { flex: 0.8, textAlign: "center", fontWeight: "700" }]}>{transactions.filter(t => t.type === "income").length}</Text>
-                  <Text style={[styles.ftd, { flex: 1.5, textAlign: "right", color: "#10B981", fontWeight: "800" }]} numberOfLines={1}>+{currency} {fmt(totalIncome)}</Text>
+                  <Text style={[styles.ftd, { flex: 1.5, textAlign: "right", color: "#10B981", fontWeight: "800" }]} numberOfLines={2}>+{currency} {fmt(totalIncome)}</Text>
                   <Text style={[styles.ftd, { flex: 1.5, textAlign: "right" }]}>-</Text>
                 </View>
 
                 {/* Sub-header: Expenditure Sinks */}
                 <View style={styles.tableCategoryHeaderRow}>
-                  <Text style={styles.tableCategoryHeaderLabel} numberOfLines={1}>B. OPERATING EXPENDITURES (OUTFLOWS)</Text>
+                  <Text style={styles.tableCategoryHeaderLabel} numberOfLines={2}>B. OPERATING EXPENDITURES (OUTFLOWS)</Text>
                 </View>
 
                 {Object.entries(expenseCatMap).length === 0 ? (
                   <View style={styles.formalTableRow}>
-                    <Text style={[styles.ftd, { flex: 2.5, fontStyle: "italic", color: "#94A3B8" }]} numberOfLines={1}>No expenditures recorded</Text>
+                    <Text style={[styles.ftd, { flex: 2.5, fontStyle: "italic", color: "#94A3B8" }]} numberOfLines={2}>No expenditures recorded</Text>
                     <Text style={[styles.ftd, { flex: 0.8, textAlign: "center" }]}>-</Text>
                     <Text style={[styles.ftd, { flex: 1.5, textAlign: "right" }]}>-</Text>
                     <Text style={[styles.ftd, { flex: 1.5, textAlign: "right" }]}>{currency} 0</Text>
@@ -439,27 +439,27 @@ export function FinancialStatementViewerModal({
                 ) : (
                   Object.entries(expenseCatMap).map(([cat, val], idx) => (
                     <View key={cat} style={[styles.formalTableRow, idx % 2 === 1 && styles.rowZebra]}>
-                      <Text style={[styles.ftd, { flex: 2.5, fontWeight: "600" }]} numberOfLines={1}>{cat}</Text>
+                      <Text style={[styles.ftd, { flex: 2.5, fontWeight: "600" }]} numberOfLines={2}>{cat}</Text>
                       <Text style={[styles.ftd, { flex: 0.8, textAlign: "center", color: "#64748B" }]}>{val.count}</Text>
                       <Text style={[styles.ftd, { flex: 1.5, textAlign: "right", color: "#94A3B8" }]}>-</Text>
-                      <Text style={[styles.ftd, { flex: 1.5, textAlign: "right", color: "#E11D48", fontWeight: "700" }]} numberOfLines={1}>-{currency} {fmtShort(val.amount)}</Text>
+                      <Text style={[styles.ftd, { flex: 1.5, textAlign: "right", color: "#E11D48", fontWeight: "700" }]} numberOfLines={2}>-{currency} {fmtShort(val.amount)}</Text>
                     </View>
                   ))
                 )}
 
                 <View style={styles.subtotalRow}>
-                  <Text style={[styles.ftd, { flex: 2.5, fontWeight: "700" }]} numberOfLines={1}>TOTAL EXPENDITURES (B)</Text>
+                  <Text style={[styles.ftd, { flex: 2.5, fontWeight: "700" }]} numberOfLines={2}>TOTAL EXPENDITURES (B)</Text>
                   <Text style={[styles.ftd, { flex: 0.8, textAlign: "center", fontWeight: "700" }]}>{transactions.filter(t => t.type === "expense").length}</Text>
                   <Text style={[styles.ftd, { flex: 1.5, textAlign: "right" }]}>-</Text>
-                  <Text style={[styles.ftd, { flex: 1.5, textAlign: "right", color: "#E11D48", fontWeight: "800" }]} numberOfLines={1}>-{currency} {fmt(totalExpenses)}</Text>
+                  <Text style={[styles.ftd, { flex: 1.5, textAlign: "right", color: "#E11D48", fontWeight: "800" }]} numberOfLines={2}>-{currency} {fmt(totalExpenses)}</Text>
                 </View>
 
                 {/* Final Net Operating Position Footer */}
                 <View style={styles.grandTotalDoubleRow}>
-                  <Text style={[styles.ftd, { flex: 3.3, fontWeight: "900", color: "#0F172A", fontSize: 10.5 }]} numberOfLines={1}>
+                  <Text style={[styles.ftd, { flex: 3.3, fontWeight: "900", color: "#0F172A", fontSize: 10.5 }]} numberOfLines={2}>
                     NET OPERATING BALANCE (A − B)
                   </Text>
-                  <Text style={[styles.ftd, { flex: 3.0, textAlign: "right", fontWeight: "900", color: isNetPositive ? "#10B981" : "#E11D48", fontSize: 11.5 }]} numberOfLines={1}>
+                  <Text style={[styles.ftd, { flex: 3.0, textAlign: "right", fontWeight: "900", color: isNetPositive ? "#10B981" : "#E11D48", fontSize: 11.5 }]} numberOfLines={2}>
                     {isNetPositive ? "+" : "-"}{currency} {fmt(Math.abs(netBalance))}
                   </Text>
                 </View>
@@ -491,10 +491,10 @@ export function FinancialStatementViewerModal({
 
                     return (
                       <View key={d.id || i} style={[styles.formalTableRow, i % 2 === 1 && styles.rowZebra]}>
-                        <Text style={[styles.ftd, { flex: 2.2, fontWeight: "700" }]} numberOfLines={1}>{d.name}</Text>
+                        <Text style={[styles.ftd, { flex: 2.2, fontWeight: "700" }]} numberOfLines={2}>{d.name}</Text>
                         <Text style={[styles.ftd, { flex: 0.7, textAlign: "center", color: "#64748B" }]}>{d.headCount || 0}</Text>
-                        <Text style={[styles.ftd, { flex: 1.3, textAlign: "right", fontWeight: "600" }]} numberOfLines={1}>{currency} {fmtShort(allocated)}</Text>
-                        <Text style={[styles.ftd, { flex: 1.3, textAlign: "right", color: "#E11D48", fontWeight: "700" }]} numberOfLines={1}>{currency} {fmtShort(spent)}</Text>
+                        <Text style={[styles.ftd, { flex: 1.3, textAlign: "right", fontWeight: "600" }]} numberOfLines={2}>{currency} {fmtShort(allocated)}</Text>
+                        <Text style={[styles.ftd, { flex: 1.3, textAlign: "right", color: "#E11D48", fontWeight: "700" }]} numberOfLines={2}>{currency} {fmtShort(spent)}</Text>
                         <View style={{ flex: 0.9, alignItems: "center" }}>
                           <View style={[styles.formalStatusBadge, { backgroundColor: utilColor + "18", borderColor: utilColor + "44" }]}>
                             <Text style={[styles.formalStatusText, { color: utilColor }]}>{util.toFixed(0)}%</Text>
@@ -506,10 +506,10 @@ export function FinancialStatementViewerModal({
 
                   {/* Summary Totals */}
                   <View style={styles.grandTotalDoubleRow}>
-                    <Text style={[styles.ftd, { flex: 2.2, fontWeight: "800" }]} numberOfLines={1}>TOTALS</Text>
+                    <Text style={[styles.ftd, { flex: 2.2, fontWeight: "800" }]} numberOfLines={2}>TOTALS</Text>
                     <Text style={[styles.ftd, { flex: 0.7, textAlign: "center", fontWeight: "800" }]}>{totalEmployees}</Text>
-                    <Text style={[styles.ftd, { flex: 1.3, textAlign: "right", fontWeight: "800" }]} numberOfLines={1}>{currency} {fmtShort(totalAllocatedBudget)}</Text>
-                    <Text style={[styles.ftd, { flex: 1.3, textAlign: "right", fontWeight: "800", color: "#E11D48" }]} numberOfLines={1}>{currency} {fmtShort(totalExpenses)}</Text>
+                    <Text style={[styles.ftd, { flex: 1.3, textAlign: "right", fontWeight: "800" }]} numberOfLines={2}>{currency} {fmtShort(totalAllocatedBudget)}</Text>
+                    <Text style={[styles.ftd, { flex: 1.3, textAlign: "right", fontWeight: "800", color: "#E11D48" }]} numberOfLines={2}>{currency} {fmtShort(totalExpenses)}</Text>
                     <View style={{ flex: 0.9, alignItems: "center" }}>
                       <View style={[styles.formalStatusBadge, { backgroundColor: "#0284C718", borderColor: "#0284C744" }]}>
                         <Text style={[styles.formalStatusText, { color: "#0284C7" }]}>{budgetUtilization.toFixed(0)}%</Text>
@@ -530,10 +530,10 @@ export function FinancialStatementViewerModal({
 
                 <View style={styles.formalTable}>
                   <View style={styles.formalTableHeader}>
-                    <Text style={[styles.fth, { flex: 2.0, textAlign: "left" }]} numberOfLines={1}>EMPLOYEE</Text>
-                    <Text style={[styles.fth, { flex: 1.7, textAlign: "left" }]} numberOfLines={1}>DEPARTMENT</Text>
-                    <Text style={[styles.fth, { flex: 1.3, textAlign: "right" }]} numberOfLines={1}>BASE</Text>
-                    <Text style={[styles.fth, { flex: 1.4, textAlign: "right" }]} numberOfLines={1}>NET PAY</Text>
+                    <Text style={[styles.fth, { flex: 2.0, textAlign: "left" }]} numberOfLines={2}>EMPLOYEE</Text>
+                    <Text style={[styles.fth, { flex: 1.7, textAlign: "left" }]} numberOfLines={2}>DEPARTMENT</Text>
+                    <Text style={[styles.fth, { flex: 1.3, textAlign: "right" }]} numberOfLines={2}>BASE</Text>
+                    <Text style={[styles.fth, { flex: 1.4, textAlign: "right" }]} numberOfLines={2}>NET PAY</Text>
                   </View>
 
                   {payroll.map((p, i) => {
@@ -541,12 +541,12 @@ export function FinancialStatementViewerModal({
                     return (
                       <View key={p.id || i} style={[styles.formalTableRow, i % 2 === 1 && styles.rowZebra]}>
                         <View style={{ flex: 2.0, minWidth: 0 }}>
-                          <Text style={[styles.ftd, { fontWeight: "700" }]} numberOfLines={1}>{p.employeeName}</Text>
-                          <Text style={styles.ftdSub} numberOfLines={1}>{p.employeeId}</Text>
+                          <Text style={[styles.ftd, { fontWeight: "700" }]} numberOfLines={2}>{p.employeeName}</Text>
+                          <Text style={styles.ftdSub} numberOfLines={2}>{p.employeeId}</Text>
                         </View>
-                        <Text style={[styles.ftd, { flex: 1.7, color: "#475569" }]} numberOfLines={1}>{p.department}</Text>
-                        <Text style={[styles.ftd, { flex: 1.3, textAlign: "right" }]} numberOfLines={1}>{currency} {fmtShort(p.baseSalary)}</Text>
-                        <Text style={[styles.ftd, { flex: 1.4, textAlign: "right", fontWeight: "800", color: "#4338CA" }]} numberOfLines={1}>
+                        <Text style={[styles.ftd, { flex: 1.7, color: "#475569" }]} numberOfLines={2}>{p.department}</Text>
+                        <Text style={[styles.ftd, { flex: 1.3, textAlign: "right" }]} numberOfLines={2}>{currency} {fmtShort(p.baseSalary)}</Text>
+                        <Text style={[styles.ftd, { flex: 1.4, textAlign: "right", fontWeight: "800", color: "#4338CA" }]} numberOfLines={2}>
                           {currency} {fmt(net)}
                         </Text>
                       </View>
@@ -554,9 +554,9 @@ export function FinancialStatementViewerModal({
                   })}
 
                   <View style={styles.grandTotalDoubleRow}>
-                    <Text style={[styles.ftd, { flex: 3.7, fontWeight: "800" }]} numberOfLines={1}>TOTAL PAYROLL</Text>
-                    <Text style={[styles.ftd, { flex: 1.3, textAlign: "right", fontWeight: "800" }]} numberOfLines={1}>{currency} {fmtShort(totalGrossSalary)}</Text>
-                    <Text style={[styles.ftd, { flex: 1.4, textAlign: "right", fontWeight: "900", color: "#4338CA" }]} numberOfLines={1}>
+                    <Text style={[styles.ftd, { flex: 3.7, fontWeight: "800" }]} numberOfLines={2}>TOTAL PAYROLL</Text>
+                    <Text style={[styles.ftd, { flex: 1.3, textAlign: "right", fontWeight: "800" }]} numberOfLines={2}>{currency} {fmtShort(totalGrossSalary)}</Text>
+                    <Text style={[styles.ftd, { flex: 1.4, textAlign: "right", fontWeight: "900", color: "#4338CA" }]} numberOfLines={2}>
                       {currency} {fmt(totalNetPayroll)}
                     </Text>
                   </View>
@@ -574,9 +574,9 @@ export function FinancialStatementViewerModal({
 
                 <View style={styles.formalTable}>
                   <View style={styles.formalTableHeader}>
-                    <Text style={[styles.fth, { flex: 2.2, textAlign: "left" }]} numberOfLines={1}>OFFICER NAME</Text>
-                    <Text style={[styles.fth, { flex: 2.0, textAlign: "left" }]} numberOfLines={1}>ASSIGNED UNIT</Text>
-                    <Text style={[styles.fth, { flex: 1.2, textAlign: "center" }]} numberOfLines={1}>ROLE</Text>
+                    <Text style={[styles.fth, { flex: 2.2, textAlign: "left" }]} numberOfLines={2}>OFFICER NAME</Text>
+                    <Text style={[styles.fth, { flex: 2.0, textAlign: "left" }]} numberOfLines={2}>ASSIGNED UNIT</Text>
+                    <Text style={[styles.fth, { flex: 1.2, textAlign: "center" }]} numberOfLines={2}>ROLE</Text>
                   </View>
 
                   {fallbackMembers.map((m, i) => {
@@ -584,10 +584,10 @@ export function FinancialStatementViewerModal({
                     return (
                       <View key={m.id || i} style={[styles.formalTableRow, i % 2 === 1 && styles.rowZebra]}>
                         <View style={{ flex: 2.2, minWidth: 0 }}>
-                          <Text style={[styles.ftd, { fontWeight: "700" }]} numberOfLines={1}>{m.name}</Text>
-                          <Text style={styles.ftdSub} numberOfLines={1}>{m.email}</Text>
+                          <Text style={[styles.ftd, { fontWeight: "700" }]} numberOfLines={2}>{m.name}</Text>
+                          <Text style={styles.ftdSub} numberOfLines={2}>{m.email}</Text>
                         </View>
-                        <Text style={[styles.ftd, { flex: 2.0, color: "#475569" }]} numberOfLines={1}>{m.department || "Executive Office"}</Text>
+                        <Text style={[styles.ftd, { flex: 2.0, color: "#475569" }]} numberOfLines={2}>{m.department || "Executive Office"}</Text>
                         <View style={{ flex: 1.2, alignItems: "center" }}>
                           <View style={[styles.formalStatusBadge, { backgroundColor: roleColor + "18", borderColor: roleColor + "40" }]}>
                             <Text style={[styles.formalStatusText, { color: roleColor }]}>{(m.role || "MEMBER").toUpperCase()}</Text>
@@ -610,18 +610,18 @@ export function FinancialStatementViewerModal({
 
                 <View style={styles.formalTable}>
                   <View style={styles.formalTableHeader}>
-                    <Text style={[styles.fth, { flex: 1.1, textAlign: "left" }]} numberOfLines={1}>DATE</Text>
-                    <Text style={[styles.fth, { flex: 0.9, textAlign: "center" }]} numberOfLines={1}>TYPE</Text>
-                    <Text style={[styles.fth, { flex: 2.2, textAlign: "left" }]} numberOfLines={1}>CATEGORY & NOTE</Text>
-                    <Text style={[styles.fth, { flex: 1.5, textAlign: "left" }]} numberOfLines={1}>DEPARTMENT</Text>
-                    <Text style={[styles.fth, { flex: 1.6, textAlign: "right" }]} numberOfLines={1}>AMOUNT</Text>
+                    <Text style={[styles.fth, { flex: 1.1, textAlign: "left" }]} numberOfLines={2}>DATE</Text>
+                    <Text style={[styles.fth, { flex: 0.9, textAlign: "center" }]} numberOfLines={2}>TYPE</Text>
+                    <Text style={[styles.fth, { flex: 2.2, textAlign: "left" }]} numberOfLines={2}>CATEGORY & NOTE</Text>
+                    <Text style={[styles.fth, { flex: 1.5, textAlign: "left" }]} numberOfLines={2}>DEPARTMENT</Text>
+                    <Text style={[styles.fth, { flex: 1.6, textAlign: "right" }]} numberOfLines={2}>AMOUNT</Text>
                   </View>
 
                   {transactions.map((t, i) => {
                     const isInc = t.type === "income";
                     return (
                       <View key={t.id || i} style={[styles.formalTableRow, i % 2 === 1 && styles.rowZebra]}>
-                        <Text style={[styles.ftd, { flex: 1.1, fontSize: 8.5, color: "#64748B" }]} numberOfLines={1}>{t.date}</Text>
+                        <Text style={[styles.ftd, { flex: 1.1, fontSize: 8.5, color: "#64748B" }]} numberOfLines={2}>{t.date}</Text>
                         <View style={{ flex: 0.9, alignItems: "center" }}>
                           <View style={[styles.formalStatusBadge, { backgroundColor: isInc ? "#10B98118" : "#E11D4818", borderColor: isInc ? "#10B98140" : "#E11D4840" }]}>
                             <Text style={[styles.formalStatusText, { color: isInc ? "#10B981" : "#E11D48", fontSize: 7.5 }]}>
@@ -630,13 +630,13 @@ export function FinancialStatementViewerModal({
                           </View>
                         </View>
                         <View style={{ flex: 2.2, minWidth: 0, paddingRight: 4 }}>
-                          <Text style={[styles.ftd, { fontWeight: "700" }]} numberOfLines={1}>{t.category}</Text>
+                          <Text style={[styles.ftd, { fontWeight: "700" }]} numberOfLines={2}>{t.category}</Text>
                           {Boolean(t.description || t.title) && (
-                            <Text style={styles.ftdSub} numberOfLines={1}>{t.title ? `${t.title} · ` : ""}{t.description || ""}</Text>
+                            <Text style={styles.ftdSub} numberOfLines={2}>{t.title ? `${t.title} · ` : ""}{t.description || ""}</Text>
                           )}
                         </View>
-                        <Text style={[styles.ftd, { flex: 1.5, color: "#475569", fontSize: 9 }]} numberOfLines={1}>{t.department}</Text>
-                        <Text style={[styles.ftd, { flex: 1.6, textAlign: "right", fontWeight: "800", color: isInc ? "#10B981" : "#E11D48" }]} numberOfLines={1}>
+                        <Text style={[styles.ftd, { flex: 1.5, color: "#475569", fontSize: 9 }]} numberOfLines={2}>{t.department}</Text>
+                        <Text style={[styles.ftd, { flex: 1.6, textAlign: "right", fontWeight: "800", color: isInc ? "#10B981" : "#E11D48" }]} numberOfLines={2}>
                           {isInc ? "+" : "-"}{currency} {fmt(t.amount)}
                         </Text>
                       </View>
@@ -644,8 +644,8 @@ export function FinancialStatementViewerModal({
                   })}
 
                   <View style={styles.grandTotalDoubleRow}>
-                    <Text style={[styles.ftd, { flex: 5.7, fontWeight: "800" }]} numberOfLines={1}>TOTAL GENERAL LEDGER POSITION</Text>
-                    <Text style={[styles.ftd, { flex: 1.6, textAlign: "right", fontWeight: "900", color: isNetPositive ? "#10B981" : "#E11D48" }]} numberOfLines={1}>
+                    <Text style={[styles.ftd, { flex: 5.7, fontWeight: "800" }]} numberOfLines={2}>TOTAL GENERAL LEDGER POSITION</Text>
+                    <Text style={[styles.ftd, { flex: 1.6, textAlign: "right", fontWeight: "900", color: isNetPositive ? "#10B981" : "#E11D48" }]} numberOfLines={2}>
                       {isNetPositive ? "+" : "-"}{currency} {fmt(Math.abs(netBalance))}
                     </Text>
                   </View>

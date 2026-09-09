@@ -218,6 +218,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
   const [isLoading, setIsLoading] = useState(() => false);
 
+  // Centralized canonical profile resolver ensuring 100% identity and organization parity across Web and Mobile
+  const resolveCanonicalUserProfile = useCallback(async (firebaseUser: any, defaultRole: UserRole = "admin"): Promise<User> => {
+    const formattedEmail = (firebaseUser.email || "").toLowerCase().trim();
+    let existingData: Partial<User> = {};
+
+    try {
+      const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+      if (userDoc.exists()) {
+        existingData = userDoc.data() as Partial<User>;
+      } else {
+        const q = query(collection(db, "users"), where("email", "==", formattedEmail));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          existingData = snap.docs[0].data() as Partial<User>;
+        }
+      }
+    } catch (e) {}
+
+    let org = existingData.organization || "";
+    let orgId = existingData.organizationId || "";
+    const userRole = existingData.role || defaultRole;
+
+    // Canonical organization mapping: primary accounts and demo-org aliases map to org-9icgv4ijp
+    if (!orgId || orgId === "demo-org" || formattedEmail === "admin@ofm.com" || formattedEmail === "engrahmedaqeel14@gmail.com") {
+      org = org || "Devorbit Tech";
+      orgId = "org-9icgv4ijp";
+    }
+
+    const resolvedUser: User = {
+      id: firebaseUser.uid,
+      name: existingData.name || firebaseUser.displayName || formattedEmail.split("@")[0] || "User",
+      email: formattedEmail,
+      role: userRole,
+      organization: org || "Devorbit Tech",
+      organizationId: orgId || "org-9icgv4ijp",
+    };
+
+    setDoc(doc(db, "users", firebaseUser.uid), resolvedUser, { merge: true }).catch(() => {});
+    return resolvedUser;
+  }, []);
+
   // Handle Google redirect result on web (after signInWithRedirect completes)
   useEffect(() => {
     if (Platform.OS === "web") {
@@ -235,23 +276,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               } catch (e) {}
             }
             const role: UserRole = savedRole || "admin";
-
-            const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
-            let activeUser: User;
-            if (userDoc.exists()) {
-              activeUser = userDoc.data() as User;
-            } else {
-              activeUser = {
-                id: firebaseUser.uid,
-                name: firebaseUser.displayName || firebaseUser.email?.split("@")[0] || "Google User",
-                email: firebaseUser.email || "",
-                role,
-                organization: "Devorbit Tech",
-                organizationId: "org-9icgv4ijp",
-              };
-              await setDoc(doc(db, "users", firebaseUser.uid), activeUser);
-            }
+            const activeUser = await resolveCanonicalUserProfile(firebaseUser, role);
             await AsyncStorage.setItem("ofm_user", JSON.stringify(activeUser));
+            if (typeof window !== "undefined") {
+              try { localStorage.setItem("ofm_user", JSON.stringify(activeUser)); } catch (e) {}
+            }
             setUser(activeUser);
           }
         })
@@ -259,7 +288,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log("Redirect result notice:", err?.message || err);
         });
     }
-  }, []);
+  }, [resolveCanonicalUserProfile]);
 
   // Helper to ensure authenticated Firebase session without relying on disabled anonymous auth
   const ensureActiveSession = useCallback(async (preferredEmail?: string) => {
@@ -331,46 +360,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         try {
-          const formattedEmail = (firebaseUser.email || "").toLowerCase().trim();
-
-          const fetchUserPromise = async () => {
-            const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
-            if (userDoc.exists()) {
-              return { id: firebaseUser.uid, ...userDoc.data() } as User;
-            }
-            const q = query(collection(db, "users"), where("email", "==", formattedEmail));
-            const snap = await getDocs(q);
-            if (!snap.empty) {
-              return { id: firebaseUser.uid, ...snap.docs[0].data() } as User;
-            }
-            return null;
-          };
-
           // 3-second timeout so slow mobile connection never hangs the app launch
           const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000));
-          const remoteUser = await Promise.race([fetchUserPromise(), timeoutPromise]);
+          const remoteUser = await Promise.race([
+            resolveCanonicalUserProfile(firebaseUser),
+            timeoutPromise,
+          ]);
 
           if (remoteUser) {
             setUser(remoteUser);
             await AsyncStorage.setItem("ofm_user", JSON.stringify(remoteUser));
-          } else {
-            setUser((curr) => {
-              // If user already has an active session with valid organizationId, preserve it!
-              if (curr && (curr.id === firebaseUser.uid || curr.email === formattedEmail || curr.organizationId)) {
-                return curr;
-              }
-              const activeUser: User = {
-                id: firebaseUser.uid,
-                name: firebaseUser.displayName || formattedEmail.split("@")[0] || "User",
-                email: formattedEmail,
-                role: "admin",
-                organization: "My Organization",
-                organizationId: `org_${firebaseUser.uid.slice(0, 8)}`,
-              };
-              AsyncStorage.setItem("ofm_user", JSON.stringify(activeUser)).catch(() => {});
-              setDoc(doc(db, "users", firebaseUser.uid), activeUser, { merge: true }).catch(() => {});
-              return activeUser;
-            });
+            if (Platform.OS === "web" && typeof window !== "undefined") {
+              try { localStorage.setItem("ofm_user", JSON.stringify(remoteUser)); } catch (e) {}
+            }
           }
         } catch (error) {
           const localData = await AsyncStorage.getItem("ofm_user");
@@ -381,11 +383,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
       } else {
+        // Browser Refresh / Offline: Retain valid cached session from storage
         try {
           const localData = await AsyncStorage.getItem("ofm_user");
           if (localData) {
             const parsed = JSON.parse(localData);
-            if (parsed && parsed.email && Object.values(DEMO_USERS).some((d) => d.user.email.toLowerCase() === parsed.email.toLowerCase())) {
+            if (parsed && (parsed.email || parsed.id)) {
+              if (parsed.email === "admin@ofm.com" || parsed.email === "engrahmedaqeel14@gmail.com" || parsed.organizationId === "demo-org") {
+                parsed.organization = parsed.organization || "Devorbit Tech";
+                parsed.organizationId = "org-9icgv4ijp";
+              }
               setUser(parsed);
             } else {
               setUser(null);
@@ -401,7 +408,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [resolveCanonicalUserProfile]);
 
   const login = async (email: string, password: string, role?: UserRole): Promise<boolean> => {
     const formattedEmail = email.toLowerCase().trim();
@@ -643,24 +650,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
-    let activeUser: User;
-
-    if (userDoc.exists()) {
-      activeUser = userDoc.data() as User;
-    } else {
-      activeUser = {
-        id: firebaseUser.uid,
-        name: firebaseUser.displayName || firebaseUser.email?.split("@")[0] || "Google User",
-        email: firebaseUser.email || "",
-        role,
-        organization: "",
-        organizationId: "",
-      };
-      await setDoc(doc(db, "users", firebaseUser.uid), activeUser);
-    }
-
+    const activeUser = await resolveCanonicalUserProfile(firebaseUser, role);
     await AsyncStorage.setItem("ofm_user", JSON.stringify(activeUser));
+    if (typeof window !== "undefined") {
+      try { localStorage.setItem("ofm_user", JSON.stringify(activeUser)); } catch (e) {}
+    }
     setUser(activeUser);
     return true;
   };
@@ -737,23 +731,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userCredential = await signInWithCredential(auth, credential);
       const firebaseUser = userCredential.user;
 
-      const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
-      let activeUser: User;
-
-      if (userDoc.exists()) {
-        activeUser = userDoc.data() as User;
-      } else {
-        activeUser = {
-          id: firebaseUser.uid,
-          name: firebaseUser.displayName || firebaseUser.email?.split("@")[0] || "Google User",
-          email: firebaseUser.email || "",
-          role,
-          organization: "",
-          organizationId: "",
-        };
-        await setDoc(doc(db, "users", firebaseUser.uid), activeUser);
-      }
-
+      const activeUser = await resolveCanonicalUserProfile(firebaseUser, role);
       await AsyncStorage.setItem("ofm_user", JSON.stringify(activeUser));
       setUser(activeUser);
       return true;
@@ -772,6 +750,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("Firebase logout error:", e);
     }
     await AsyncStorage.removeItem("ofm_user");
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem("ofm_user");
+      } catch (e) {}
+    }
 
     // Purge all organization-scoped caches from AsyncStorage (Preserve tombstones so deleted items NEVER resurrect)
     try {

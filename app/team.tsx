@@ -636,7 +636,7 @@ ${orgName}`;
               {/* Information */}
               <View style={[styles.memberInfo, { flex: 1, minWidth: 0, marginRight: 8 }]}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  <Text style={[styles.memberName, { color: colors.foreground, flexShrink: 1 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+                  <Text style={[styles.memberName, { color: colors.foreground, flexShrink: 1 }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
                     {item.name}
                   </Text>
                   {isCurrentUser && (
@@ -645,7 +645,7 @@ ${orgName}`;
                     </View>
                   )}
                 </View>
-                <Text style={[styles.memberEmail, { color: colors.mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                <Text style={[styles.memberEmail, { color: colors.mutedForeground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
                   {item.email}
                 </Text>
               </View>

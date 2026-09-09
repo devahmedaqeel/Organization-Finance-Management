@@ -453,7 +453,7 @@ export default function PayrollScreen() {
             <Text style={[styles.totalLabel, { color: colors.mutedForeground }]}>
               {isEmployee ? "My Net Take-Home Salary" : "Total Organization Net Pay"}
             </Text>
-            <Text style={[styles.totalValue, { color: "#8B5CF6" }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{fmt(totalNetPay)}</Text>
+            <Text style={[styles.totalValue, { color: "#8B5CF6" }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>{fmt(totalNetPay)}</Text>
           </View>
           <View style={{ alignItems: "flex-end" }}>
             <Text style={[styles.empCount, { color: colors.mutedForeground }]}>
@@ -497,12 +497,12 @@ export default function PayrollScreen() {
                   <Text style={[styles.payAvatarText, { color: "#8B5CF6" }]}>{(item.employeeName || item.employeeId || "E").charAt(0).toUpperCase()}</Text>
                 </View>
                 <View style={styles.payInfo}>
-                  <Text style={[styles.payName, { color: colors.foreground }]}>{item.employeeName}</Text>
-                  <Text style={[styles.payMeta, { color: colors.mutedForeground }]}>{item.employeeId} · {item.department}</Text>
+                  <Text style={[styles.payName, { color: colors.foreground }]} numberOfLines={2}>{item.employeeName}</Text>
+                  <Text style={[styles.payMeta, { color: colors.mutedForeground }]} numberOfLines={2}>{item.employeeId} · {item.department}</Text>
                   <Text style={[styles.payMonth, { color: colors.mutedForeground }]}>Period: {item.month}</Text>
                 </View>
                 <View style={styles.payRight}>
-                  <Text style={[styles.payNet, { color: "#8B5CF6" }]}>{fmt(netPay)}</Text>
+                  <Text style={[styles.payNet, { color: "#8B5CF6" }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>{fmt(netPay)}</Text>
                   
                   {/* Action Buttons Row */}
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}>
@@ -575,15 +575,15 @@ export default function PayrollScreen() {
               <View style={[styles.payBreakdown, { borderTopColor: colors.border, backgroundColor: colors.background + "66" }]}>
                 <View style={styles.payBreakdownItem}>
                   <Text style={[styles.bLabel, { color: colors.mutedForeground }]}>Base Salary</Text>
-                  <Text style={[styles.bValue, { color: colors.foreground }]}>{fmt(item.baseSalary)}</Text>
+                  <Text style={[styles.bValue, { color: colors.foreground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>{fmt(item.baseSalary)}</Text>
                 </View>
                 <View style={styles.payBreakdownItem}>
                   <Text style={[styles.bLabel, { color: colors.mutedForeground }]}>Bonus</Text>
-                  <Text style={[styles.bValue, { color: colors.income }]}>+{fmt(item.bonus || 0)}</Text>
+                  <Text style={[styles.bValue, { color: colors.income }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>+{fmt(item.bonus || 0)}</Text>
                 </View>
                 <View style={styles.payBreakdownItem}>
                   <Text style={[styles.bLabel, { color: colors.mutedForeground }]}>Deductions</Text>
-                  <Text style={[styles.bValue, { color: colors.expense }]}>-{fmt(item.deductions || 0)}</Text>
+                  <Text style={[styles.bValue, { color: colors.expense }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>-{fmt(item.deductions || 0)}</Text>
                 </View>
               </View>
             </View>

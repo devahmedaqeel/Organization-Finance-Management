@@ -374,7 +374,7 @@ export function DonutChart({
                     styles.centerCategoryTitle,
                     { color: colors.foreground, fontSize: catFontSize },
                   ]}
-                  numberOfLines={1}
+                  numberOfLines={2}
                 >
                   {activeSegment.label}
                 </Text>
@@ -412,8 +412,9 @@ export function DonutChart({
                     styles.centerAmount,
                     { color: colors.foreground, fontSize: amountFontSize },
                   ]}
-                  numberOfLines={1}
+                  numberOfLines={2}
                   adjustsFontSizeToFit
+                  minimumFontScale={0.65}
                 >
                   {centerLabel || `${currency} ${Number(total || 0).toLocaleString()}`}
                 </Text>
@@ -422,7 +423,7 @@ export function DonutChart({
                     styles.centerSubText,
                     { color: colors.mutedForeground, fontSize: catFontSize - 1 },
                   ]}
-                  numberOfLines={1}
+                  numberOfLines={2}
                 >
                   {centerSub}
                 </Text>

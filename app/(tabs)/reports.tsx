@@ -241,7 +241,7 @@ export default function ReportsScreen() {
         <View style={styles.headerRow}>
           <View style={[styles.headerTitleWrap, { flex: 1, marginRight: 8 }]}>
             <Text style={[styles.title, { color: colors.foreground }]}>Financial Analytics</Text>
-            <Text style={[styles.orgText, { color: colors.mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+            <Text style={[styles.orgText, { color: colors.mutedForeground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
               {settings.organizationName}
             </Text>
           </View>
@@ -329,7 +329,7 @@ export default function ReportsScreen() {
             <View style={styles.kpiRow}>
               <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>INCOME</Text>
-                <Text style={[styles.kpiVal, { color: colors.income }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                <Text style={[styles.kpiVal, { color: colors.income }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
                   +{settings.currency} {fmt(metrics.totalIncome)}
                 </Text>
                 <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
@@ -339,7 +339,7 @@ export default function ReportsScreen() {
 
               <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>EXPENSES</Text>
-                <Text style={[styles.kpiVal, { color: colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                <Text style={[styles.kpiVal, { color: colors.expense }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
                   -{settings.currency} {fmt(metrics.totalExpense)}
                 </Text>
                 <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
@@ -351,7 +351,7 @@ export default function ReportsScreen() {
             <View style={styles.kpiRow}>
               <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>DEPARTMENT BUDGET</Text>
-                <Text style={[styles.kpiVal, { color: colors.primary }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                <Text style={[styles.kpiVal, { color: colors.primary }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
                   {settings.currency} {fmt(totalAllocatedBudget)}
                 </Text>
                 <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
@@ -361,7 +361,7 @@ export default function ReportsScreen() {
 
               <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>NET CASH POSITION</Text>
-                <Text style={[styles.kpiVal, { color: netCapitalSurplus >= 0 ? colors.income : colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                <Text style={[styles.kpiVal, { color: netCapitalSurplus >= 0 ? colors.income : colors.expense }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
                   {netCapitalSurplus >= 0 ? "+" : "-"}
                   {settings.currency} {fmt(Math.abs(netCapitalSurplus))}
                 </Text>
@@ -375,7 +375,7 @@ export default function ReportsScreen() {
           <View style={styles.kpiRow}>
             <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>INCOME</Text>
-              <Text style={[styles.kpiVal, { color: colors.income }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+              <Text style={[styles.kpiVal, { color: colors.income }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
                 {settings.currency} {fmt(metrics.totalIncome)}
               </Text>
               <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
@@ -385,7 +385,7 @@ export default function ReportsScreen() {
 
             <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>EXPENSES</Text>
-              <Text style={[styles.kpiVal, { color: colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+              <Text style={[styles.kpiVal, { color: colors.expense }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
                 {settings.currency} {fmt(metrics.totalExpense)}
               </Text>
               <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
@@ -395,7 +395,7 @@ export default function ReportsScreen() {
 
             <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>NET SURPLUS</Text>
-              <Text style={[styles.kpiVal, { color: metrics.netBalance >= 0 ? colors.income : colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+              <Text style={[styles.kpiVal, { color: metrics.netBalance >= 0 ? colors.income : colors.expense }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
                 {metrics.netBalance >= 0 ? "+" : ""}
                 {settings.currency} {fmt(metrics.netBalance)}
               </Text>

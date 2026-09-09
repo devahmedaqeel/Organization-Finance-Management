@@ -1,6 +1,12 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 // @ts-expect-error - getReactNativePersistence is native-only but available at runtime in React Native
-import { initializeAuth, getReactNativePersistence, getAuth } from "firebase/auth";
+import {
+  initializeAuth,
+  getReactNativePersistence,
+  getAuth,
+  browserLocalPersistence,
+  indexedDBLocalPersistence,
+} from "firebase/auth";
 import {
   initializeFirestore,
   getFirestore,
@@ -22,23 +28,25 @@ const firebaseConfig = {
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// Auth: Web uses getAuth, Native uses AsyncStorage persistence
-export const auth =
-  Platform.OS === "web"
-    ? getAuth(app)
-    : (() => {
-        try {
-          if (typeof getReactNativePersistence === "function") {
-            return initializeAuth(app, {
-              persistence: getReactNativePersistence(AsyncStorage),
-            });
-          }
-          return getAuth(app);
-        } catch (e: any) {
-          // If already initialized (hot reload) or persistence fallback needed, get existing/default instance
-          return getAuth(app);
-        }
-      })();
+// Auth: Web uses initializeAuth with indexedDB + browserLocalPersistence fallback, Native uses AsyncStorage persistence
+export const auth = (() => {
+  try {
+    if (Platform.OS === "web") {
+      return initializeAuth(app, {
+        persistence: [indexedDBLocalPersistence, browserLocalPersistence],
+      });
+    }
+    if (typeof getReactNativePersistence === "function") {
+      return initializeAuth(app, {
+        persistence: getReactNativePersistence(AsyncStorage),
+      });
+    }
+    return getAuth(app);
+  } catch (e: any) {
+    // If already initialized (hot reload) or persistence fallback needed, get existing/default instance
+    return getAuth(app);
+  }
+})();
 
 // Firestore: Web = persistent cache, Native = memory cache + long-polling fallback for mobile ISPs
 export const db = (() => {

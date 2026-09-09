@@ -181,6 +181,7 @@ export function RingProgress({
           ]}
           numberOfLines={1}
           adjustsFontSizeToFit
+          minimumFontScale={0.65}
         >
           {centerLabel ? centerLabel : `${rawPct < 0 ? rawPct : displayPct}%`}
         </Text>
@@ -192,7 +193,7 @@ export function RingProgress({
               fontSize: size >= 135 ? 10 : 9,
             },
           ]}
-          numberOfLines={1}
+          numberOfLines={2}
           adjustsFontSizeToFit
           minimumFontScale={0.7}
         >
@@ -222,6 +223,7 @@ export function RingProgress({
             ]}
             numberOfLines={1}
             adjustsFontSizeToFit
+            minimumFontScale={0.7}
           >
             {sublabel || statusLabel}
           </Text>

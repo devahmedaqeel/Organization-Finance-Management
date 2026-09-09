@@ -515,7 +515,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
   // 2. Real-time Firebase Synchronization (Web <-> Mobile)
   useEffect(() => {
-    if (!loaded || !user || !user.organizationId) {
+    if (!loaded || !user) {
       if (!user) {
         setTransactions([]);
         setBudgets([]);
@@ -728,7 +728,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     const id = generateSafeId("transactions");
     const now = new Date().toISOString();
     const orgName = settings.organizationName || user?.organization || "OFM — Organization Finance Management";
-    const orgId = user?.organizationId || activeOrgId || "default_org";
+    const orgId = activeOrgId;
 
     const newTx: Transaction = {
       ...t,
@@ -949,10 +949,20 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     let failureReason: any = null;
 
     try {
-      await Promise.all(
-        targetIds.map((tid) => deleteDoc(doc(db, "transactions", tid)).catch((err) => { failureReason = err; }))
+      const deleteResults = await Promise.all(
+        targetIds.map(async (tid) => {
+          try {
+            await deleteDoc(doc(db, "transactions", tid));
+            return true;
+          } catch (err: any) {
+            failureReason = err;
+            return false;
+          }
+        })
       );
-      deleteSucceeded = true;
+      if (deleteResults.some(Boolean)) {
+        deleteSucceeded = true;
+      }
     } catch (err: any) {
       failureReason = err;
     }
@@ -1018,7 +1028,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     const id = generateSafeId("budgets");
     const now = new Date().toISOString();
     const orgName = settings.organizationName || user?.organization || "OFM — Organization Finance Management";
-    const orgId = user?.organizationId || activeOrgId || "default_org";
+    const orgId = activeOrgId;
 
     const newBudget: Budget = {
       ...b,
@@ -1166,10 +1176,20 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     let failureReason: any = null;
 
     try {
-      await Promise.all(
-        targetIds.map((tid) => deleteDoc(doc(db, "budgets", tid)).catch((err) => { failureReason = err; }))
+      const deleteResults = await Promise.all(
+        targetIds.map(async (tid) => {
+          try {
+            await deleteDoc(doc(db, "budgets", tid));
+            return true;
+          } catch (err: any) {
+            failureReason = err;
+            return false;
+          }
+        })
       );
-      deleteSucceeded = true;
+      if (deleteResults.some(Boolean)) {
+        deleteSucceeded = true;
+      }
     } catch (err: any) {
       failureReason = err;
     }
@@ -1250,7 +1270,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     const txId = `tx_pay_${id}`;
     const now = new Date().toISOString();
     const orgName = settings.organizationName || user?.organization || "OFM — Organization Finance Management";
-    const orgId = user?.organizationId || activeOrgId || "default_org";
+    const orgId = activeOrgId;
 
     const newPayroll: PayrollEntry = {
       ...p,
@@ -1560,11 +1580,26 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     let failureReason: any = null;
 
     try {
-      await Promise.all([
-        ...targetPayrollIds.map((pid) => deleteDoc(doc(db, "payroll", pid)).catch((e) => { failureReason = e; })),
-        ...targetTxIds.map((tid) => deleteDoc(doc(db, "transactions", tid)).catch(() => {})),
+      const deleteResults = await Promise.all([
+        ...targetPayrollIds.map(async (pid) => {
+          try {
+            await deleteDoc(doc(db, "payroll", pid));
+            return true;
+          } catch (e: any) {
+            failureReason = e;
+            return false;
+          }
+        }),
+        ...targetTxIds.map(async (tid) => {
+          try {
+            await deleteDoc(doc(db, "transactions", tid));
+            return true;
+          } catch (e) {
+            return false;
+          }
+        }),
       ]);
-      deleteSucceeded = true;
+      if (deleteResults.some(Boolean)) deleteSucceeded = true;
     } catch (e2) {}
 
     const restPayrollResults = await Promise.all(targetPayrollIds.map((pid) => deleteDocREST("payroll", pid).catch(() => false)));
@@ -1631,7 +1666,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     const id = generateSafeId("departments");
     const now = new Date().toISOString();
     const orgName = settings.organizationName || user?.organization || "OFM — Organization Finance Management";
-    const orgId = user?.organizationId || activeOrgId || "default_org";
+    const orgId = activeOrgId;
 
     const newDept: Department = {
       ...d,
@@ -1751,10 +1786,18 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     let failureReason: any = null;
 
     try {
-      await Promise.all(
-        targetIds.map((tid) => deleteDoc(doc(db, "departments", tid)).catch((err) => { failureReason = err; }))
+      const deleteResults = await Promise.all(
+        targetIds.map(async (tid) => {
+          try {
+            await deleteDoc(doc(db, "departments", tid));
+            return true;
+          } catch (err: any) {
+            failureReason = err;
+            return false;
+          }
+        })
       );
-      deleteSucceeded = true;
+      if (deleteResults.some(Boolean)) deleteSucceeded = true;
     } catch (err: any) {
       failureReason = err;
     }

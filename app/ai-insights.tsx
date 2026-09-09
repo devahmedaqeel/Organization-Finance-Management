@@ -668,7 +668,7 @@ export default function AIInsightsScreen() {
                 },
               ].map((s, i) => (
                 <View key={i} style={[styles.healthStat, { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7, flexGrow: 1, minWidth: 95 }]}>
-                  <Text style={[styles.healthStatValue, { color: s.color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{s.value}</Text>
+                  <Text style={[styles.healthStatValue, { color: s.color }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>{s.value}</Text>
                   <Text style={[styles.healthStatLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
                 </View>
               ))}
@@ -767,7 +767,7 @@ export default function AIInsightsScreen() {
         <View style={styles.cardHeaderRow}>
           <View style={{ flex: 1, paddingRight: 6 }}>
             <Text style={[styles.cardTitle, { color: colors.foreground }]}>Financial Trend</Text>
-            <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>
+            <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={2}>
               Income vs Expenses · {activePeriod.label}
             </Text>
           </View>
@@ -912,10 +912,10 @@ export default function AIInsightsScreen() {
                   : "Operating Deficit"}
               </Text>
             </View>
-            <Text style={styles.ringValueSub} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+            <Text style={styles.ringValueSub} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
               {authoritativeNetBalance >= 0 ? "+" : "-"}{settings.currency} {fmt(Math.abs(authoritativeNetBalance))}
             </Text>
-            <Text style={{ fontSize: 10, color: colors.mutedForeground, marginTop: 1, fontFamily: "Inter_500Medium" }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+            <Text style={{ fontSize: 10, color: colors.mutedForeground, marginTop: 1, fontFamily: "Inter_500Medium" }} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
               Net Cash Balance
             </Text>
           </View>
@@ -955,10 +955,10 @@ export default function AIInsightsScreen() {
                   : "Over Budget"}
               </Text>
             </View>
-            <Text style={styles.ringValueSub} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+            <Text style={styles.ringValueSub} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
               {settings.currency} {fmt(displayedBudgetSpent)} of {fmt(totalAllocatedBudget)}
             </Text>
-            <Text style={{ fontSize: 10, color: colors.mutedForeground, marginTop: 1, fontFamily: "Inter_500Medium" }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+            <Text style={{ fontSize: 10, color: colors.mutedForeground, marginTop: 1, fontFamily: "Inter_500Medium" }} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
               {settings.currency} {fmt(displayedBudgetRemaining)} Remaining
             </Text>
           </View>
@@ -1000,10 +1000,10 @@ export default function AIInsightsScreen() {
                   : "High Burn Alert"}
               </Text>
             </View>
-            <Text style={styles.ringValueSub} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+            <Text style={styles.ringValueSub} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
               {settings.currency} {fmt(displayedExpense)} of {fmt(displayedIncome)}
             </Text>
-            <Text style={{ fontSize: 10, color: colors.mutedForeground, marginTop: 1, fontFamily: "Inter_500Medium" }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+            <Text style={{ fontSize: 10, color: colors.mutedForeground, marginTop: 1, fontFamily: "Inter_500Medium" }} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
               Outflows of Inflow
             </Text>
           </View>
@@ -1088,7 +1088,7 @@ export default function AIInsightsScreen() {
               { label: "Remaining", value: `${settings.currency} ${fmt(displayedBudgetRemaining)}`, color: colors.income },
             ].map((s, i) => (
               <View key={i} style={[styles.budgetSumCard, { backgroundColor: s.color + "15", borderColor: s.color + "33" }]}>
-                <Text style={[styles.budgetSumValue, { color: s.color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{s.value}</Text>
+                <Text style={[styles.budgetSumValue, { color: s.color }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>{s.value}</Text>
                 <Text style={[styles.budgetSumLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
               </View>
             ))}
@@ -1180,7 +1180,7 @@ export default function AIInsightsScreen() {
               </Text>
             </View>
             <Text style={[styles.txStatLabel, { color: colors.mutedForeground }]}>Net Cash Flow</Text>
-            <Text style={[styles.txStatVal, { color: txStats.netFlow >= 0 ? colors.income : colors.expense }]}>
+            <Text style={[styles.txStatVal, { color: txStats.netFlow >= 0 ? colors.income : colors.expense }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
               {txStats.netFlow >= 0 ? "+" : "-"}{settings.currency} {fmt(Math.abs(txStats.netFlow))}
             </Text>
             <Text style={{ fontSize: 9.5, color: colors.mutedForeground }}>
@@ -1206,10 +1206,10 @@ export default function AIInsightsScreen() {
               </Text>
             </View>
             <Text style={[styles.txStatLabel, { color: colors.mutedForeground }]}>Max Transaction</Text>
-            <Text style={[styles.txStatVal, { color: "#F59E0B" }]} numberOfLines={1}>
+            <Text style={[styles.txStatVal, { color: "#F59E0B" }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
               {txStats.maxTx ? `${settings.currency} ${fmt(txStats.maxTx.amount)}` : "None"}
             </Text>
-            <Text style={{ fontSize: 9.5, color: colors.mutedForeground }} numberOfLines={1}>
+            <Text style={{ fontSize: 9.5, color: colors.mutedForeground }} numberOfLines={2}>
               {txStats.maxTx ? `${txStats.maxTx.category || txStats.maxTx.title || "Transaction"}` : "No records"}
             </Text>
           </TouchableOpacity>

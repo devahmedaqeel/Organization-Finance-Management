@@ -144,22 +144,22 @@ export function NetOperatingBalanceHealthCard({ data, currency, periodLabel }: P
       {/* ─── Compact Metrics Bar ─── */}
       <View style={[styles.kpiBar, { backgroundColor: colors.background, borderColor: colors.border }]}>
         <View style={styles.kpiCol}>
-          <Text style={[styles.kpiLabel, { color: colors.mutedForeground, textAlign: "center" }]}>Operating Margin</Text>
-          <Text style={[styles.kpiNum, { color: data.isDeficit ? colors.expense : colors.income }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+          <Text style={[styles.kpiLabel, { color: colors.mutedForeground, textAlign: "center" }]} numberOfLines={2}>Operating Margin</Text>
+          <Text style={[styles.kpiNum, { color: data.isDeficit ? colors.expense : colors.income }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
             {data.operatingMargin.toFixed(1)}%
           </Text>
         </View>
         <View style={[styles.kpiDivider, { backgroundColor: colors.border }]} />
         <View style={styles.kpiCol}>
-          <Text style={[styles.kpiLabel, { color: colors.mutedForeground, textAlign: "center" }]}>Expense Ratio</Text>
-          <Text style={[styles.kpiNum, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+          <Text style={[styles.kpiLabel, { color: colors.mutedForeground, textAlign: "center" }]} numberOfLines={2}>Expense Ratio</Text>
+          <Text style={[styles.kpiNum, { color: colors.foreground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
             {data.expenseRatio.toFixed(1)}%
           </Text>
         </View>
         <View style={[styles.kpiDivider, { backgroundColor: colors.border }]} />
         <View style={styles.kpiCol}>
-          <Text style={[styles.kpiLabel, { color: colors.mutedForeground, textAlign: "center" }]}>Transactions</Text>
-          <Text style={[styles.kpiNum, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+          <Text style={[styles.kpiLabel, { color: colors.mutedForeground, textAlign: "center" }]} numberOfLines={2}>Transactions</Text>
+          <Text style={[styles.kpiNum, { color: colors.foreground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
             {data.transactionCount}
           </Text>
         </View>
