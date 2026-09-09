@@ -662,14 +662,20 @@ export default function DashboardScreen() {
               <Feather name="shield" size={11} color="#38BDF8" />
             </View>
             <Text
-              style={{ color: "#FFFFFF", fontSize: 11.5, fontFamily: "Inter_800ExtraBold", letterSpacing: 0.5, flexShrink: 1 }}
+              style={{
+                color: "#FFFFFF",
+                fontSize: width < 380 ? 11 : 12,
+                fontFamily: "Inter_800ExtraBold",
+                letterSpacing: 0.4,
+                flexShrink: 1,
+              }}
               numberOfLines={1}
               adjustsFontSizeToFit
               minimumFontScale={0.8}
             >
               {balanceViewMode === "cashflow"
-                ? "NET CASH / AVAILABLE CASH"
-                : "OUTFLOW AUDIT"}
+                ? (width < 400 ? "AVAILABLE CASH" : "NET CASH / AVAILABLE CASH")
+                : (width < 400 ? "OUTFLOW AUDIT" : "TOTAL DISBURSEMENTS")}
             </Text>
             <TouchableOpacity
               onPress={() => {
@@ -689,13 +695,13 @@ export default function DashboardScreen() {
             style={{
               flexDirection: "row",
               alignItems: "center",
-              gap: 4,
-              backgroundColor: "rgba(255, 255, 255, 0.10)",
-              paddingHorizontal: 8,
-              paddingVertical: 4.5,
-              borderRadius: 16,
+              gap: 5.5,
+              backgroundColor: "rgba(255, 255, 255, 0.12)",
+              paddingHorizontal: 12,
+              paddingVertical: 5.5,
+              borderRadius: 20,
               borderWidth: 1,
-              borderColor: "rgba(255, 255, 255, 0.22)",
+              borderColor: "rgba(255, 255, 255, 0.25)",
               flexShrink: 0,
             }}
             onPress={() => {
@@ -704,11 +710,11 @@ export default function DashboardScreen() {
             }}
             activeOpacity={0.8}
           >
-            <Feather name="bar-chart-2" size={10.5} color="#38BDF8" />
-            <Text style={{ color: "#FFFFFF", fontSize: 10.5, fontFamily: "Inter_700Bold", letterSpacing: 0.2 }}>
+            <Feather name="bar-chart-2" size={11.5} color="#38BDF8" style={{ flexShrink: 0 }} />
+            <Text style={{ color: "#FFFFFF", fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.2, flexShrink: 0 }}>
               Fiscal Dossier
             </Text>
-            <Feather name="arrow-right" size={11} color="#FFFFFF" />
+            <Feather name="arrow-right" size={12} color="#FFFFFF" style={{ flexShrink: 0, marginLeft: 1 }} />
           </TouchableOpacity>
         </View>
 
@@ -913,7 +919,7 @@ export default function DashboardScreen() {
               {
                 backgroundColor: colors.card,
                 borderColor: colors.border,
-                width: Math.max(statCardW, 160),
+                width: Math.max(statCardW, 178),
               },
             ]}
             onPress={() => {
@@ -974,7 +980,7 @@ export default function DashboardScreen() {
               {
                 backgroundColor: colors.card,
                 borderColor: colors.border,
-                width: Math.max(statCardW, 160),
+                width: Math.max(statCardW, 178),
               },
             ]}
             onPress={() => {
@@ -1094,7 +1100,7 @@ export default function DashboardScreen() {
               {
                 backgroundColor: colors.card,
                 borderColor: colors.border,
-                width: Math.max(statCardW, 160),
+                width: Math.max(statCardW, 178),
               },
             ]}
             onPress={() => {
@@ -1225,7 +1231,7 @@ export default function DashboardScreen() {
               {
                 backgroundColor: colors.card,
                 borderColor: colors.border,
-                width: Math.max(statCardW, 160),
+                width: Math.max(statCardW, 178),
               },
             ]}
             onPress={() => {
@@ -2341,6 +2347,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 7.5,
     paddingVertical: 3.5,
     borderRadius: 8,
+    flexShrink: 0,
   },
   kpiTagText: {
     fontSize: 9.5,
@@ -2366,7 +2373,7 @@ const styles = StyleSheet.create({
   cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   cardTitle: { fontSize: 15, fontFamily: "Inter_700Bold" },
   cardSub: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2 },
-  seeAllBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1 },
+  seeAllBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1, flexShrink: 0 },
   seeAllText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   miniViewPill: {
     paddingHorizontal: 8,

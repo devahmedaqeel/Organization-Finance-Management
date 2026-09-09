@@ -404,24 +404,24 @@ export function WebDashboard({
             style={{
               flexDirection: "row",
               alignItems: "center",
-              gap: 4,
-              backgroundColor: "rgba(255, 255, 255, 0.10)",
-              paddingHorizontal: isMobile ? 8 : 14,
-              paddingVertical: isMobile ? 4.5 : 7,
+              gap: 5,
+              backgroundColor: "rgba(255, 255, 255, 0.12)",
+              paddingHorizontal: isMobile ? 12 : 14,
+              paddingVertical: isMobile ? 5.5 : 7,
               borderRadius: 20,
               borderWidth: 1,
-              borderColor: "rgba(255, 255, 255, 0.22)",
+              borderColor: "rgba(255, 255, 255, 0.25)",
               cursor: "pointer" as any,
               flexShrink: 0,
             }}
             onPress={() => setNetModalVisible(true)}
             activeOpacity={0.8}
           >
-            <SvgChart size={11} color="#38BDF8" />
-            <Text style={{ color: "#FFFFFF", fontSize: isMobile ? 10.5 : 12, fontFamily: "Inter_700Bold", letterSpacing: 0.2 }}>
-              {isMobile ? "Dossier" : "Fiscal Dossier"}
+            <SvgChart size={11.5} color="#38BDF8" />
+            <Text style={{ color: "#FFFFFF", fontSize: isMobile ? 11 : 12, fontFamily: "Inter_700Bold", letterSpacing: 0.2 }}>
+              Fiscal Dossier
             </Text>
-            <Feather name="arrow-right" size={isMobile ? 11 : 12} color="#FFFFFF" />
+            <Feather name="arrow-right" size={isMobile ? 12 : 12} color="#FFFFFF" style={{ marginLeft: 1 }} />
           </TouchableOpacity>
         </View>
 
