@@ -85,16 +85,17 @@ export default function GoogleAuthBridgeWebScreen() {
           handleAuthSuccess(res, role, targetRedirectUri);
         }
       } catch (popupErr: any) {
-        if (popupErr.code === "auth/popup-blocked") {
-          // If popup is blocked by mobile browser, seamlessly use redirect
-          await signInWithRedirect(auth, provider);
-          return;
-        }
         if (popupErr.code === "auth/popup-closed-by-user" || popupErr.code === "auth/cancelled-popup-request") {
           setStatus("initial");
           return;
         }
-        throw popupErr;
+        // Seamless fallback to redirect on mobile browsers or blocked popups
+        try {
+          await signInWithRedirect(auth, provider);
+          return;
+        } catch (redirectErr) {
+          throw popupErr;
+        }
       }
     } catch (err: any) {
       console.error("Google Sign-in Error:", err);
