@@ -377,6 +377,8 @@ export function AreaLineChart({
         >
           {ranges.map((r) => {
             const isSelected = currentSelectedRange === r;
+            const isAll = r === "ALL" || r === "Full";
+            const displayText = isAll ? "Full" : r;
             return (
               <TouchableOpacity
                 key={r}
@@ -400,8 +402,16 @@ export function AreaLineChart({
                     isSelected && { fontFamily: "Inter_700Bold" },
                   ]}
                 >
-                  {r}
+                  {displayText}
                 </Text>
+                {isAll && (
+                  <Feather
+                    name="arrow-right"
+                    size={10.5}
+                    color={isSelected ? "#FFFFFF" : colors.mutedForeground}
+                    style={{ flexShrink: 0, marginLeft: 1 }}
+                  />
+                )}
               </TouchableOpacity>
             );
           })}
@@ -844,13 +854,15 @@ const styles = StyleSheet.create({
     paddingRight: 6,
   },
   rangeChip: {
-    minWidth: 35,
-    paddingHorizontal: 7,
-    paddingVertical: 5,
+    minWidth: 38,
+    paddingHorizontal: 8,
+    paddingVertical: 5.5,
     borderRadius: 10,
     borderWidth: 1,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 3,
     flexShrink: 0,
   },
   rangeText: {
@@ -862,15 +874,15 @@ const styles = StyleSheet.create({
   calendarBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5.5,
     borderRadius: 10,
     borderWidth: 1,
     flexShrink: 0,
   },
   calendarBtnText: {
-    fontSize: 10.5,
+    fontSize: 11,
     fontFamily: "Inter_600SemiBold",
   },
   inspectorCard: {
