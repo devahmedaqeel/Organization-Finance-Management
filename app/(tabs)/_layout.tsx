@@ -1,7 +1,7 @@
 import { BlurView } from "expo-blur";
-import { Tabs } from "expo-router";
+import { Tabs, router } from "expo-router";
 import { Feather } from "@/components/UniversalIcon";
-import React from "react";
+import React, { useEffect } from "react";
 import { Platform, StyleSheet, Text, View, useColorScheme } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -15,8 +15,15 @@ export default function TabLayout() {
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
   const safeAreaInsets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const isEmployee = user?.role === "employee";
+
+  // Auth Guard: Unauthenticated mobile users must see the Login/Signup screen first
+  useEffect(() => {
+    if (!isLoading && !user && Platform.OS !== "web") {
+      router.replace("/login");
+    }
+  }, [user, isLoading]);
 
   return (
     <Tabs

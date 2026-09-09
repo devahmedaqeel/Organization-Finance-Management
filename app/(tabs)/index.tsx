@@ -153,15 +153,22 @@ function AnimatedQuickAction({
           </View>
           {badge && (
             <View style={[styles.actionBadge, { backgroundColor: color + "18", borderColor: color + "35" }]}>
-              <Text style={[styles.actionBadgeText, { color }]}>{badge}</Text>
+              <Text
+                style={[styles.actionBadgeText, { color }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.75}
+              >
+                {badge}
+              </Text>
             </View>
           )}
         </View>
         <View style={{ gap: 2 }}>
-          <Text style={[styles.actionTitleText, { color: colors.foreground }]}>
+          <Text style={[styles.actionTitleText, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
             {label}
           </Text>
-          <Text style={[styles.actionSubText, { color: colors.mutedForeground }]}>
+          <Text style={[styles.actionSubText, { color: colors.mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
             {sub}
           </Text>
         </View>
@@ -277,6 +284,11 @@ export default function DashboardScreen() {
   const incomeRetainedPct = totalIncome > 0
     ? Math.max(0, Math.round((incomeRetainedAmount / totalIncome) * 100))
     : 0;
+
+  // Real, live counts for Quick Actions
+  const incomeCount = useMemo(() => transactions.filter((t) => t.type === "income").length, [transactions]);
+  const expenseCount = useMemo(() => transactions.filter((t) => t.type === "expense").length, [transactions]);
+  const budgetPlanCount = useMemo(() => budgets.length > 0 ? budgets.length : departments.filter((d) => (d.budgetAllocated || 0) > 0).length, [budgets, departments]);
 
   // 2. Kitna Percent Expense: percentage of income consumed by expenses
   const expensePctOfIncome = totalIncome > 0
@@ -694,9 +706,9 @@ export default function DashboardScreen() {
             style={{
               flexDirection: "row",
               alignItems: "center",
-              gap: 5.5,
+              gap: 4.5,
               backgroundColor: "rgba(255, 255, 255, 0.12)",
-              paddingHorizontal: 12,
+              paddingHorizontal: 8.5,
               paddingVertical: 5.5,
               borderRadius: 20,
               borderWidth: 1,
@@ -709,11 +721,22 @@ export default function DashboardScreen() {
             }}
             activeOpacity={0.8}
           >
-            <Feather name="bar-chart-2" size={11.5} color="#38BDF8" style={{ flexShrink: 0 }} />
-            <Text style={{ color: "#FFFFFF", fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.2, flexShrink: 0 }}>
+            <Feather name="bar-chart-2" size={11} color="#38BDF8" style={{ flexShrink: 0 }} />
+            <Text
+              style={{
+                color: "#FFFFFF",
+                fontSize: 10.5,
+                fontFamily: "Inter_700Bold",
+                letterSpacing: 0.2,
+                flexShrink: 0,
+              }}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.85}
+            >
               Fiscal Dossier
             </Text>
-            <Feather name="arrow-right" size={12} color="#FFFFFF" style={{ flexShrink: 0, marginLeft: 1 }} />
+            <Feather name="arrow-right" size={11} color="#FFFFFF" style={{ flexShrink: 0, marginLeft: 1 }} />
           </TouchableOpacity>
         </View>
 
@@ -934,8 +957,8 @@ export default function DashboardScreen() {
                 <Feather name="arrow-up-circle" size={17} color={colors.income} />
               </View>
               <View style={[styles.kpiTag, { backgroundColor: colors.income + "18" }]}>
-                <Text style={[styles.kpiTagText, { color: colors.income }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
-                  Inflow
+                <Text style={[styles.kpiTagText, { color: colors.income }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                  Inflows
                 </Text>
               </View>
             </View>
@@ -1034,7 +1057,7 @@ export default function DashboardScreen() {
                           : colors.primary,
                     },
                   ]}
-                  numberOfLines={2}
+                  numberOfLines={1}
                   adjustsFontSizeToFit
                   minimumFontScale={0.75}
                 >
@@ -1177,7 +1200,7 @@ export default function DashboardScreen() {
                           : "#3B82F6",
                     },
                   ]}
-                  numberOfLines={2}
+                  numberOfLines={1}
                   adjustsFontSizeToFit
                   minimumFontScale={0.75}
                 >
@@ -1506,13 +1529,19 @@ export default function DashboardScreen() {
       {/* Quick Actions Section */}
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.cardHeader}>
-          <View>
-            <Text style={[styles.cardTitle, { color: colors.foreground }]}>Quick Actions</Text>
-            <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>1-tap financial workflows</Text>
+          <View style={{ flex: 1, minWidth: 0, marginRight: 8 }}>
+            <Text style={[styles.cardTitle, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+              Quick Actions
+            </Text>
+            <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+              1-tap financial workflows
+            </Text>
           </View>
-          <View style={[styles.actionSectionPill, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "30" }]}>
+          <View style={[styles.actionSectionPill, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "30", flexShrink: 0, paddingHorizontal: 7 }]}>
             <Feather name="zap" size={12} color={colors.primary} />
-            <Text style={[styles.actionSectionPillText, { color: colors.primary }]}>Active</Text>
+            <Text style={[styles.actionSectionPillText, { color: colors.primary }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+              Active
+            </Text>
           </View>
         </View>
 
@@ -1520,7 +1549,7 @@ export default function DashboardScreen() {
           <AnimatedQuickAction
             label="Add Income"
             sub="Deposit & grant"
-            badge="+ Inflow"
+            badge={`${incomeCount} ${incomeCount === 1 ? "Record" : "Records"}`}
             icon="plus-circle"
             color={colors.income}
             onPress={() => router.push("/(tabs)/income")}
@@ -1528,7 +1557,7 @@ export default function DashboardScreen() {
           <AnimatedQuickAction
             label="Add Expense"
             sub="Bills & supplies"
-            badge="- Outflow"
+            badge={`${expenseCount} ${expenseCount === 1 ? "Record" : "Records"}`}
             icon="minus-circle"
             color={colors.expense}
             onPress={() => router.push("/(tabs)/expenses")}
@@ -1544,7 +1573,7 @@ export default function DashboardScreen() {
           <AnimatedQuickAction
             label="AI Insights"
             sub="Smart burn audit"
-            badge="AI Scan"
+            badge="AI Active"
             icon="zap"
             color="#10B981"
             onPress={() => router.push("/ai-insights")}
@@ -1552,7 +1581,7 @@ export default function DashboardScreen() {
           <AnimatedQuickAction
             label="Staff Payroll"
             sub="Salaries & bonus"
-            badge={`${payroll.length} Staff`}
+            badge={`${payroll.length} ${payroll.length === 1 ? "Staff" : "Staff"}`}
             icon="users"
             color="#8B5CF6"
             onPress={() => router.push("/payroll")}
@@ -1560,7 +1589,7 @@ export default function DashboardScreen() {
           <AnimatedQuickAction
             label="Budget Plan"
             sub="Dept allocations"
-            badge={`${budgets.length} Targets`}
+            badge={`${budgetPlanCount} ${budgetPlanCount === 1 ? "Plan" : "Plans"}`}
             icon="pie-chart"
             color={colors.warning}
             onPress={() => router.push("/budget")}
@@ -1570,15 +1599,21 @@ export default function DashboardScreen() {
 
       {/* Recent Transactions */}
       <View style={styles.cardHeader}>
-        <Text style={[styles.cardTitle, { color: colors.foreground }]}>Recent Transactions</Text>
+        <View style={{ flex: 1, minWidth: 0, marginRight: 8 }}>
+          <Text style={[styles.cardTitle, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+            Recent Transactions
+          </Text>
+        </View>
         <TouchableOpacity
-          style={[styles.seeAllBtn, { borderColor: colors.border }]}
+          style={[styles.seeAllBtn, { borderColor: colors.border, flexShrink: 0, paddingHorizontal: 8 }]}
           onPress={() => {
             if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             setTxModalVisible(true);
           }}
         >
-          <Text style={[styles.seeAllText, { color: colors.primary }]}>See All</Text>
+          <Text style={[styles.seeAllText, { color: colors.primary }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+            See All
+          </Text>
           <Feather name="arrow-right" size={12} color={colors.primary} />
         </TouchableOpacity>
       </View>

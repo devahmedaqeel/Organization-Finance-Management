@@ -442,6 +442,9 @@ export function AreaLineChart({
               { color: currentPeriod.mode !== "presets" ? "#FFFFFF" : colors.foreground },
               currentPeriod.mode !== "presets" && { fontFamily: "Inter_700Bold" },
             ]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.8}
           >
             Custom
           </Text>
@@ -493,9 +496,9 @@ export function AreaLineChart({
         {/* Bottom Badges: Income and Expense */}
         <View style={styles.inspectorBadgesRow}>
           <View style={[styles.statBadge, { backgroundColor: colors.income + "14", borderColor: colors.income + "30" }]}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 3.5, flexShrink: 0 }}>
               <View style={[styles.legendDot, { backgroundColor: colors.income }]} />
-              <Text style={[styles.statBadgeLabel, { color: colors.income }]}>Income</Text>
+              <Text style={[styles.statBadgeLabel, { color: colors.income }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>Income</Text>
             </View>
             <Text
               style={[styles.statBadgeValue, { color: colors.income }]}
@@ -508,9 +511,9 @@ export function AreaLineChart({
           </View>
 
           <View style={[styles.statBadge, { backgroundColor: colors.expense + "14", borderColor: colors.expense + "30" }]}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 0 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 3.5, flexShrink: 0 }}>
               <View style={[styles.legendDot, { backgroundColor: colors.expense }]} />
-              <Text style={[styles.statBadgeLabel, { color: colors.expense }]}>Expenses</Text>
+              <Text style={[styles.statBadgeLabel, { color: colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>Expenses</Text>
             </View>
             <Text
               style={[styles.statBadgeValue, { color: colors.expense }]}
@@ -875,8 +878,8 @@ const styles = StyleSheet.create({
   calendarBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 10,
+    gap: 4,
+    paddingHorizontal: 7.5,
     paddingVertical: 5.5,
     borderRadius: 10,
     borderWidth: 1,
