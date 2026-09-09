@@ -249,7 +249,7 @@ export function WebBudgets() {
             <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>TOTAL INCOME</Text>
             <Feather name="trending-up" size={14} color={colors.income} />
           </View>
-          <Text style={[styles.metricValue, { color: colors.income }]}>
+          <Text style={[styles.metricValue, { color: colors.income }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
             {settings.currency} {totalIncome.toLocaleString()}
           </Text>
           <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
@@ -268,7 +268,7 @@ export function WebBudgets() {
             <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>TOTAL ALLOCATED</Text>
             <Feather name="pie-chart" size={14} color={colors.primary} />
           </View>
-          <Text style={[styles.metricValue, { color: colors.foreground }]}>
+          <Text style={[styles.metricValue, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
             {settings.currency} {totalAllocatedBudget.toLocaleString()}
           </Text>
           <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
@@ -300,6 +300,9 @@ export function WebBudgets() {
               styles.metricValue,
               { color: availableToAllocate > 0 ? colors.income : colors.warning },
             ]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
           >
             {settings.currency} {availableToAllocate.toLocaleString()}
           </Text>
@@ -319,7 +322,7 @@ export function WebBudgets() {
             <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>TOTAL DEPARTMENT SPENDING</Text>
             <Feather name="arrow-up-right" size={14} color={colors.expense} />
           </View>
-          <Text style={[styles.metricValue, { color: colors.expense }]}>
+          <Text style={[styles.metricValue, { color: colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
             {settings.currency} {totalBudgetSpent.toLocaleString()}
           </Text>
           <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
@@ -347,6 +350,9 @@ export function WebBudgets() {
               styles.metricValue,
               { color: totalBudgetRemaining >= 0 ? colors.foreground : colors.expense },
             ]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
           >
             {settings.currency} {totalBudgetRemaining.toLocaleString()}
           </Text>
@@ -450,7 +456,7 @@ export function WebBudgets() {
       {/* ─── Visual Budget Allocation Donut Chart ─── */}
       <View style={[styles.chartCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.chartHeader}>
-          <View>
+          <View style={{ flex: 1, minWidth: 180 }}>
             <Text style={[styles.chartTitle, { color: colors.foreground }]}>Department Budget Distribution</Text>
             <Text style={[styles.chartSubtitle, { color: colors.mutedForeground }]}>
               Authoritative fund distribution across organization departments
@@ -542,10 +548,10 @@ export function WebBudgets() {
               </TouchableOpacity>
             </View>
 
-            <View style={[styles.activeDeptKpisRow, { borderColor: colors.border }]}>
-              <View style={styles.activeDeptKpiCol}>
+            <View style={[styles.activeDeptKpisRow, { borderColor: colors.border }, isMobile && { flexWrap: "wrap", gap: 10 }]}>
+              <View style={[styles.activeDeptKpiCol, isMobile && { minWidth: "45%" }]}>
                 <Text style={[styles.activeDeptKpiLabel, { color: colors.mutedForeground }]}>ALLOCATED</Text>
-                <Text style={[styles.activeDeptKpiVal, { color: colors.foreground }]}>
+                <Text style={[styles.activeDeptKpiVal, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                   {settings.currency} {activeSelectedDeptMetric.allocated.toLocaleString()}
                 </Text>
                 <Text style={[styles.activeDeptKpiSub, { color: colors.mutedForeground }]}>
@@ -555,11 +561,11 @@ export function WebBudgets() {
                 </Text>
               </View>
 
-              <View style={[styles.valDivider, { backgroundColor: colors.border }]} />
+              {!isMobile && <View style={[styles.valDivider, { backgroundColor: colors.border }]} />}
 
-              <View style={styles.activeDeptKpiCol}>
+              <View style={[styles.activeDeptKpiCol, isMobile && { minWidth: "45%" }]}>
                 <Text style={[styles.activeDeptKpiLabel, { color: colors.mutedForeground }]}>USED / SPENT</Text>
-                <Text style={[styles.activeDeptKpiVal, { color: colors.expense }]}>
+                <Text style={[styles.activeDeptKpiVal, { color: colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                   {settings.currency} {activeSelectedDeptMetric.spent.toLocaleString()}
                 </Text>
                 <Text style={[styles.activeDeptKpiSub, { color: colors.mutedForeground }]}>
@@ -567,15 +573,18 @@ export function WebBudgets() {
                 </Text>
               </View>
 
-              <View style={[styles.valDivider, { backgroundColor: colors.border }]} />
+              {!isMobile && <View style={[styles.valDivider, { backgroundColor: colors.border }]} />}
 
-              <View style={styles.activeDeptKpiCol}>
+              <View style={[styles.activeDeptKpiCol, isMobile && { minWidth: "45%" }]}>
                 <Text style={[styles.activeDeptKpiLabel, { color: colors.mutedForeground }]}>REMAINING</Text>
                 <Text
                   style={[
                     styles.activeDeptKpiVal,
                     { color: activeSelectedDeptMetric.remaining >= 0 ? colors.income : colors.expense },
                   ]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.75}
                 >
                   {settings.currency} {activeSelectedDeptMetric.remaining.toLocaleString()}
                 </Text>
@@ -584,9 +593,9 @@ export function WebBudgets() {
                 </Text>
               </View>
 
-              <View style={[styles.valDivider, { backgroundColor: colors.border }]} />
+              {!isMobile && <View style={[styles.valDivider, { backgroundColor: colors.border }]} />}
 
-              <View style={styles.activeDeptKpiCol}>
+              <View style={[styles.activeDeptKpiCol, isMobile && { minWidth: "45%" }]}>
                 <Text style={[styles.activeDeptKpiLabel, { color: colors.mutedForeground }]}>UTILIZATION</Text>
                 <Text
                   style={[
@@ -600,6 +609,9 @@ export function WebBudgets() {
                           : colors.income,
                     },
                   ]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.75}
                 >
                   {activeSelectedDeptMetric.utilizationPct.toFixed(1)}%
                 </Text>
@@ -615,7 +627,7 @@ export function WebBudgets() {
       {/* ─── Section 8: Department Allocation Table ─── */}
       <View style={[styles.tableContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.tableHeaderSection}>
-          <View>
+          <View style={{ flex: 1, minWidth: 180 }}>
             <Text style={[styles.tableSectionTitle, { color: colors.foreground }]}>
               Department Allocation Table
             </Text>
@@ -711,21 +723,21 @@ export function WebBudgets() {
                   <View style={[styles.deptNumbersGrid, { backgroundColor: colors.card, borderColor: colors.border }]}>
                     <View style={styles.deptNumCol}>
                       <Text style={[styles.deptNumLabel, { color: colors.mutedForeground }]}>ALLOCATED</Text>
-                      <Text style={[styles.deptNumVal, { color: colors.foreground }]}>
+                      <Text style={[styles.deptNumVal, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                         {settings.currency} {dept.allocated.toLocaleString()}
                       </Text>
                     </View>
                     <View style={[styles.valDivider, { backgroundColor: colors.border }]} />
                     <View style={styles.deptNumCol}>
                       <Text style={[styles.deptNumLabel, { color: colors.mutedForeground }]}>PAYROLL</Text>
-                      <Text style={[styles.deptNumVal, { color: colors.primary }]}>
+                      <Text style={[styles.deptNumVal, { color: colors.primary }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                         {settings.currency} {dept.payrollSpending.toLocaleString()}
                       </Text>
                     </View>
                     <View style={[styles.valDivider, { backgroundColor: colors.border }]} />
                     <View style={styles.deptNumCol}>
                       <Text style={[styles.deptNumLabel, { color: colors.mutedForeground }]}>OTHER</Text>
-                      <Text style={[styles.deptNumVal, { color: colors.expense }]}>
+                      <Text style={[styles.deptNumVal, { color: colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                         {settings.currency} {dept.otherSpending.toLocaleString()}
                       </Text>
                     </View>
@@ -1020,14 +1032,14 @@ export function WebBudgets() {
                   >
                     <View style={styles.valCol}>
                       <Text style={[styles.valLabel, { color: colors.mutedForeground }]}>ALLOCATED</Text>
-                      <Text style={[styles.valText, { color: colors.foreground }]} numberOfLines={1}>
+                      <Text style={[styles.valText, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                         {settings.currency} {b.allocated.toLocaleString()}
                       </Text>
                     </View>
                     <View style={[styles.valDivider, { backgroundColor: colors.border }]} />
                     <View style={styles.valCol}>
                       <Text style={[styles.valLabel, { color: colors.mutedForeground }]}>DISBURSED</Text>
-                      <Text style={[styles.valText, { color: colors.expense }]} numberOfLines={1}>
+                      <Text style={[styles.valText, { color: colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
                         {settings.currency} {b.liveSpent.toLocaleString()}
                       </Text>
                     </View>

@@ -771,7 +771,7 @@ export function WebShell() {
                   flexShrink: 0,
                 }}
               />
-              {width >= 420 && (
+              {width >= 600 && (
                 <Text
                   style={{
                     fontSize: 10.5,
@@ -787,7 +787,7 @@ export function WebShell() {
             </View>
 
             {/* Header User Role Badge (ADMIN / etc.) */}
-            {width >= 390 && (
+            {width >= 480 && (
               <View
                 style={{
                   paddingHorizontal: isMobile ? 6 : 9,

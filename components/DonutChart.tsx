@@ -366,8 +366,9 @@ export function DonutChart({
                   ]}
                   numberOfLines={1}
                   adjustsFontSizeToFit
+                  minimumFontScale={0.7}
                 >
-                  {centerLabel ? centerLabel : `${currency} ${Number(activeSegment.value || 0).toLocaleString()}`}
+                  {`${currency} ${Number(activeSegment.value || 0).toLocaleString()}`}
                 </Text>
                 <Text
                   style={[
@@ -375,6 +376,8 @@ export function DonutChart({
                     { color: colors.foreground, fontSize: catFontSize },
                   ]}
                   numberOfLines={2}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.75}
                 >
                   {activeSegment.label}
                 </Text>
@@ -612,7 +615,7 @@ const styles = StyleSheet.create({
   },
   legend: {
     flex: 1,
-    minWidth: 180,
+    minWidth: 130,
     maxWidth: 340,
     gap: 5,
   },
