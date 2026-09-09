@@ -1,9 +1,10 @@
 import { Feather } from "@/components/UniversalIcon";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -46,6 +47,42 @@ export default function LoginScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Keyboard avoidance and auto-scroll handling
+  const scrollViewRef = useRef<ScrollView>(null);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  const handleInputFocus = (field: "name" | "org" | "email" | "password" | "confirm") => {
+    if (Platform.OS === "web") return;
+    setTimeout(() => {
+      if (field === "confirm") {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      } else if (field === "password") {
+        scrollViewRef.current?.scrollTo({ y: 380, animated: true });
+      } else if (field === "email" && mode === "signup") {
+        scrollViewRef.current?.scrollTo({ y: 260, animated: true });
+      } else if (field === "org") {
+        scrollViewRef.current?.scrollTo({ y: 190, animated: true });
+      }
+    }, 120);
+  };
 
   // Forgot Password Modal
   const [forgotModal, setForgotModal] = useState(false);
@@ -219,11 +256,12 @@ export default function LoginScreen() {
       keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
     >
       <ScrollView
+        ref={scrollViewRef}
         contentContainerStyle={[
           styles.container,
           {
             paddingTop: Math.max(insets.top, 20) + 16,
-            paddingBottom: Math.max(insets.bottom, 16) + 30,
+            paddingBottom: Math.max(insets.bottom, 16) + 30 + (keyboardHeight > 0 ? keyboardHeight + 36 : 0),
           },
         ]}
         keyboardShouldPersistTaps="handled"
@@ -303,6 +341,7 @@ export default function LoginScreen() {
                   placeholderTextColor="#64748B"
                   value={name}
                   onChangeText={(v) => { setName(v); setError(""); }}
+                  onFocus={() => handleInputFocus("name")}
                   autoCapitalize="words"
                 />
               </View>
@@ -323,6 +362,7 @@ export default function LoginScreen() {
                   placeholderTextColor="#64748B"
                   value={orgNameOrInvite}
                   onChangeText={(v) => { setOrgNameOrInvite(v); setError(""); }}
+                  onFocus={() => handleInputFocus("org")}
                   autoCapitalize={selectedRole === "admin" ? "words" : "none"}
                 />
               </View>
@@ -387,6 +427,7 @@ export default function LoginScreen() {
                 autoCorrect={false}
                 value={email}
                 onChangeText={(v) => { setEmail(v); setError(""); }}
+                onFocus={() => handleInputFocus("email")}
               />
             </View>
           </View>
@@ -413,6 +454,7 @@ export default function LoginScreen() {
                 secureTextEntry={!showPassword}
                 value={password}
                 onChangeText={(v) => { setPassword(v); setError(""); }}
+                onFocus={() => handleInputFocus("password")}
               />
               <TouchableOpacity onPress={() => setShowPassword((p) => !p)} hitSlop={8}>
                 <Feather name={showPassword ? "eye-off" : "eye"} size={17} color="#94A3B8" />
@@ -433,6 +475,7 @@ export default function LoginScreen() {
                   secureTextEntry={!showConfirmPassword}
                   value={confirmPassword}
                   onChangeText={(v) => { setConfirmPassword(v); setError(""); }}
+                  onFocus={() => handleInputFocus("confirm")}
                 />
                 <TouchableOpacity onPress={() => setShowConfirmPassword((p) => !p)} hitSlop={8}>
                   <Feather name={showConfirmPassword ? "eye-off" : "eye"} size={17} color="#94A3B8" />
