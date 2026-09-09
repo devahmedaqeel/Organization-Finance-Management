@@ -48,17 +48,47 @@ export default function LoginScreen() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Keyboard avoidance and auto-scroll handling
+  // Keyboard avoidance, layout measurement, and auto-scroll handling
   const scrollViewRef = useRef<ScrollView>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const activeFieldRef = useRef<"name" | "org" | "email" | "password" | "confirm" | null>(null);
+  const cardY = useRef(150);
+  const fieldPositions = useRef<Record<string, number>>({});
+
+  const scrollToActiveField = (targetField?: string) => {
+    if (Platform.OS === "web") return;
+    const field = targetField || activeFieldRef.current;
+    if (!field || !scrollViewRef.current) return;
+
+    // Fallback Y coordinate estimates relative to ScrollView if onLayout hasn't fired yet
+    const fallbackY: Record<string, number> =
+      mode === "signup"
+        ? { name: 320, org: 400, email: 480, password: 560, confirm: 640 }
+        : { email: 250, password: 330 };
+
+    const measuredY = fieldPositions.current[field];
+    const fieldAbsoluteY =
+      measuredY !== undefined ? cardY.current + measuredY : (fallbackY[field] ?? 320);
+
+    // Scroll so the active field sits comfortably in the upper-middle visible area (leaving 60px breathing room above)
+    const targetOffset = Math.max(0, fieldAbsoluteY - 60);
+    scrollViewRef.current.scrollTo({ y: targetOffset, animated: true });
+  };
 
   useEffect(() => {
     const showEvent = Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
     const hideEvent = Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
 
     const showSub = Keyboard.addListener(showEvent, (e) => {
-      setKeyboardHeight(e.endCoordinates.height);
+      const h = e.endCoordinates.height;
+      setKeyboardHeight(h);
+      // Auto-scroll the active field above the newly opened keyboard across frames
+      scrollToActiveField();
+      setTimeout(() => scrollToActiveField(), 60);
+      setTimeout(() => scrollToActiveField(), 180);
+      setTimeout(() => scrollToActiveField(), 320);
     });
+
     const hideSub = Keyboard.addListener(hideEvent, () => {
       setKeyboardHeight(0);
     });
@@ -67,21 +97,21 @@ export default function LoginScreen() {
       showSub.remove();
       hideSub.remove();
     };
-  }, []);
+  }, [mode]);
 
   const handleInputFocus = (field: "name" | "org" | "email" | "password" | "confirm") => {
+    activeFieldRef.current = field;
     if (Platform.OS === "web") return;
-    setTimeout(() => {
-      if (field === "confirm") {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
-      } else if (field === "password") {
-        scrollViewRef.current?.scrollTo({ y: 380, animated: true });
-      } else if (field === "email" && mode === "signup") {
-        scrollViewRef.current?.scrollTo({ y: 260, animated: true });
-      } else if (field === "org") {
-        scrollViewRef.current?.scrollTo({ y: 190, animated: true });
-      }
-    }, 120);
+    scrollToActiveField(field);
+    setTimeout(() => scrollToActiveField(field), 60);
+    setTimeout(() => scrollToActiveField(field), 180);
+    setTimeout(() => scrollToActiveField(field), 320);
+  };
+
+  const handleInputBlur = (field: "name" | "org" | "email" | "password" | "confirm") => {
+    if (activeFieldRef.current === field) {
+      activeFieldRef.current = null;
+    }
   };
 
   // Forgot Password Modal
@@ -152,6 +182,8 @@ export default function LoginScreen() {
     setEmail("");
     setPassword("");
     setConfirmPassword("");
+    activeFieldRef.current = null;
+    fieldPositions.current = {};
     safeHapticSelection();
   };
 
@@ -261,10 +293,18 @@ export default function LoginScreen() {
           styles.container,
           {
             paddingTop: Math.max(insets.top, 20) + 16,
-            paddingBottom: Math.max(insets.bottom, 16) + 30 + (keyboardHeight > 0 ? keyboardHeight + 36 : 0),
+            paddingBottom:
+              Math.max(insets.bottom, 16) +
+              30 +
+              (keyboardHeight > 0
+                ? Platform.OS === "android"
+                  ? keyboardHeight + 80
+                  : 60
+                : 0),
           },
         ]}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
       >
         {/* ─── Header & Enterprise Branding ─── */}
@@ -275,7 +315,12 @@ export default function LoginScreen() {
         </View>
 
         {/* ─── Authentication Card ─── */}
-        <View style={styles.card}>
+        <View
+          style={styles.card}
+          onLayout={(e) => {
+            cardY.current = e.nativeEvent.layout.y;
+          }}
+        >
           {/* Segmented Mode Switcher */}
           <View style={styles.modeToggle}>
             <TouchableOpacity
@@ -331,7 +376,12 @@ export default function LoginScreen() {
 
           {/* Full Name (Sign Up only) */}
           {mode === "signup" && (
-            <View style={styles.fieldGroup}>
+            <View
+              style={styles.fieldGroup}
+              onLayout={(e) => {
+                fieldPositions.current["name"] = e.nativeEvent.layout.y;
+              }}
+            >
               <Text style={styles.fieldLabel}>FULL NAME</Text>
               <View style={styles.inputBox}>
                 <Feather name="user" size={16} color="#94A3B8" />
@@ -342,6 +392,7 @@ export default function LoginScreen() {
                   value={name}
                   onChangeText={(v) => { setName(v); setError(""); }}
                   onFocus={() => handleInputFocus("name")}
+                  onBlur={() => handleInputBlur("name")}
                   autoCapitalize="words"
                 />
               </View>
@@ -350,7 +401,12 @@ export default function LoginScreen() {
 
           {/* Organization / Invite Code (Sign Up only) */}
           {mode === "signup" && (
-            <View style={styles.fieldGroup}>
+            <View
+              style={styles.fieldGroup}
+              onLayout={(e) => {
+                fieldPositions.current["org"] = e.nativeEvent.layout.y;
+              }}
+            >
               <Text style={styles.fieldLabel}>
                 {selectedRole === "admin" ? "ORGANIZATION NAME" : "INVITE CODE (ADMIN'S EMAIL)"}
               </Text>
@@ -363,6 +419,7 @@ export default function LoginScreen() {
                   value={orgNameOrInvite}
                   onChangeText={(v) => { setOrgNameOrInvite(v); setError(""); }}
                   onFocus={() => handleInputFocus("org")}
+                  onBlur={() => handleInputBlur("org")}
                   autoCapitalize={selectedRole === "admin" ? "words" : "none"}
                 />
               </View>
@@ -414,7 +471,12 @@ export default function LoginScreen() {
           )}
 
           {/* Email Field */}
-          <View style={styles.fieldGroup}>
+          <View
+            style={styles.fieldGroup}
+            onLayout={(e) => {
+              fieldPositions.current["email"] = e.nativeEvent.layout.y;
+            }}
+          >
             <Text style={styles.fieldLabel}>{mode === "signup" ? "WORK EMAIL" : "EMAIL ADDRESS"}</Text>
             <View style={styles.inputBox}>
               <Feather name="mail" size={16} color="#94A3B8" />
@@ -428,12 +490,18 @@ export default function LoginScreen() {
                 value={email}
                 onChangeText={(v) => { setEmail(v); setError(""); }}
                 onFocus={() => handleInputFocus("email")}
+                onBlur={() => handleInputBlur("email")}
               />
             </View>
           </View>
 
           {/* Password Field */}
-          <View style={styles.fieldGroup}>
+          <View
+            style={styles.fieldGroup}
+            onLayout={(e) => {
+              fieldPositions.current["password"] = e.nativeEvent.layout.y;
+            }}
+          >
             <View style={styles.labelRow}>
               <Text style={styles.fieldLabel}>PASSWORD</Text>
               {mode === "signin" && (
@@ -455,6 +523,7 @@ export default function LoginScreen() {
                 value={password}
                 onChangeText={(v) => { setPassword(v); setError(""); }}
                 onFocus={() => handleInputFocus("password")}
+                onBlur={() => handleInputBlur("password")}
               />
               <TouchableOpacity onPress={() => setShowPassword((p) => !p)} hitSlop={8}>
                 <Feather name={showPassword ? "eye-off" : "eye"} size={17} color="#94A3B8" />
@@ -464,7 +533,12 @@ export default function LoginScreen() {
 
           {/* Confirm Password (Sign Up only) */}
           {mode === "signup" && (
-            <View style={styles.fieldGroup}>
+            <View
+              style={styles.fieldGroup}
+              onLayout={(e) => {
+                fieldPositions.current["confirm"] = e.nativeEvent.layout.y;
+              }}
+            >
               <Text style={styles.fieldLabel}>CONFIRM PASSWORD</Text>
               <View style={styles.inputBox}>
                 <Feather name="lock" size={16} color="#94A3B8" />
@@ -476,6 +550,7 @@ export default function LoginScreen() {
                   value={confirmPassword}
                   onChangeText={(v) => { setConfirmPassword(v); setError(""); }}
                   onFocus={() => handleInputFocus("confirm")}
+                  onBlur={() => handleInputBlur("confirm")}
                 />
                 <TouchableOpacity onPress={() => setShowConfirmPassword((p) => !p)} hitSlop={8}>
                   <Feather name={showConfirmPassword ? "eye-off" : "eye"} size={17} color="#94A3B8" />
