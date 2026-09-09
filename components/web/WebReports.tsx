@@ -238,7 +238,7 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
       departments,
       {
         period: activePeriod,
-        scope: isAllTime ? "all_time" : "period",
+        scope: isAllTime ? "all" : "period",
         reportType,
         startDate: activePeriod.startDate,
         endDate: activePeriod.endDate,
@@ -293,7 +293,7 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
             departments,
             {
               period: effectivePeriod,
-              scope: scope === "all_time" || scope === "all" ? "all_time" : "period",
+              scope: scope === "all_time" || scope === "all" ? "all" : "period",
               reportType,
               departmentFilter: dept !== "all" ? dept : undefined,
               startDate: effectivePeriod.startDate,

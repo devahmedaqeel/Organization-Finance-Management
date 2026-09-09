@@ -1402,7 +1402,7 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
  */
 export function buildFinancialPdfBinary(input: ReportOptions | EnterpriseReportData): string {
   const data = normalizeToEnterpriseData(input);
-  const { metadata, executiveSummary, generalLedger, departmentFinancials, payrollSection } = data;
+  const { metadata, executiveSummary, generalLedger, departmentFinancials, payrollSection, monthlyTrends } = data;
   const currency = metadata.currency;
   const totalIncome = executiveSummary.totalRevenue;
   const totalExpenses = executiveSummary.totalExpenses;
@@ -1556,7 +1556,7 @@ export function buildFinancialPdfBinary(input: ReportOptions | EnterpriseReportD
       : [
           { m: "Current", inc: totalIncome, exp: totalExpenses },
         ]
-    ).flatMap((pt, idx, arr) => {
+    ).flatMap((pt: any, idx: number, arr: any[]) => {
       const stepW = 460 / Math.max(arr.length, 1);
       const x = 65 + idx * stepW;
       const incH = Math.max(2, Math.min(48, ((pt.inc || 0) / maxBarVal) * 48));

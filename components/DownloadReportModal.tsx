@@ -21,7 +21,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useFinance } from "@/context/FinanceContext";
 import { useSettings } from "@/context/SettingsContext";
 import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
-import { NormalizedPeriod, createCustomDatePeriod } from "@/services/DatePeriodService";
+import { NormalizedPeriod, createCustomDatePeriod, getPresetPeriod } from "@/services/DatePeriodService";
 import {
   generateFinancialHtmlReport,
   downloadCsvReport,
@@ -199,7 +199,7 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
       departments,
       {
         period: effectivePeriod,
-        scope: scope === "all" ? "all_time" : scope === "custom" ? "period" : scope,
+        scope: scope === "all" ? "all" : "period",
         startDate: effectivePeriod?.startDate,
         endDate: effectivePeriod?.endDate,
         departmentFilter: selectedDept,
