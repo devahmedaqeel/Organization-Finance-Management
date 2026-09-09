@@ -234,10 +234,67 @@ async function recordPersistedTombstones(orgId: string, ids: string[]): Promise<
           deletedAt: new Date().toISOString(),
         };
         saveDocREST("tombstones", id, payload).catch(() => {});
-        return setDoc(doc(db, "tombstones", id), payload).catch(() => {});
+        return safeSetDoc(doc(db, "tombstones", id), payload).catch(() => {});
       })
     );
   } catch {}
+}
+
+/**
+ * Deeply strips undefined values from plain objects and arrays
+ * so Firestore setDoc / writeBatch never throw:
+ * "Unsupported field value: undefined"
+ */
+export function sanitizeForFirestore<T>(data: T): T {
+  if (data === null || data === undefined) {
+    return null as unknown as T;
+  }
+  if (typeof data !== "object") {
+    return data;
+  }
+  if (data instanceof Date) {
+    return data.toISOString() as unknown as T;
+  }
+  if (Array.isArray(data)) {
+    return data
+      .filter((item) => item !== undefined)
+      .map((item) => sanitizeForFirestore(item)) as unknown as T;
+  }
+  // Check for plain JavaScript object vs special Firestore classes (e.g. FieldValue)
+  const isPlainObject =
+    Object.prototype.toString.call(data) === "[object Object]" &&
+    (data.constructor === Object || !data.constructor);
+  if (!isPlainObject) {
+    return data;
+  }
+
+  const cleanObj: Record<string, any> = {};
+  for (const [key, value] of Object.entries(data as Record<string, any>)) {
+    if (value === undefined) {
+      continue;
+    }
+    cleanObj[key] = sanitizeForFirestore(value);
+  }
+  return cleanObj as T;
+}
+
+/**
+ * Robust wrapper around Firestore setDoc that:
+ * 1. Deep-sanitizes the payload to prevent any undefined field error.
+ * 2. Ensures any synchronous or asynchronous error is returned as a catchable Promise.
+ */
+async function safeSetDoc(docRef: any, data: any, options?: any): Promise<void> {
+  try {
+    const clean = sanitizeForFirestore(data);
+    if (options) {
+      await setDoc(docRef, clean, options);
+    } else {
+      await setDoc(docRef, clean);
+    }
+  } catch (err) {
+    console.warn(`safeSetDoc notice for path ${docRef?.path || "unknown"}:`, err);
+    throw err;
+  }
 }
 
 const FinanceContext = createContext<FinanceContextValue>({} as FinanceContextValue);
@@ -676,6 +733,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     const newTx: Transaction = {
       ...t,
       id,
+      budgetId: t.budgetId ? t.budgetId.trim() : null,
       addedBy: user?.name || user?.email || t.addedBy || "Finance Officer",
       organizationId: orgId,
       organization: orgName,
@@ -692,8 +750,10 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       return updated;
     });
 
+    const cleanNewTx = sanitizeForFirestore(newTx);
+
     try {
-      await setDoc(doc(db, "transactions", id), newTx);
+      await safeSetDoc(doc(db, "transactions", id), cleanNewTx);
       setSyncStatus("synced");
       recordAuditLog({
         organizationId: orgId,
@@ -711,14 +771,14 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     }
 
     // Direct background REST write for instant cloud sync across mobile & web
-    saveDocREST("transactions", id, newTx).then(() => setSyncStatus("synced")).catch(() => {});
+    saveDocREST("transactions", id, cleanNewTx).then(() => setSyncStatus("synced")).catch(() => {});
 
     // Cross-tenant mirror between demo-org and org-9icgv4ijp so both stay 100% in sync
     if (orgId === "demo-org" || orgId === "org-9icgv4ijp") {
       const counterpartOrgId = orgId === "demo-org" ? "org-9icgv4ijp" : "demo-org";
       const mirrorId = id.startsWith("sync_") ? id.replace("sync_", "") : `sync_${id}`;
-      const mirroredTx = { ...newTx, id: mirrorId, organizationId: counterpartOrgId };
-      setDoc(doc(db, "transactions", mirrorId), mirroredTx).catch(() => {});
+      const mirroredTx = sanitizeForFirestore({ ...cleanNewTx, id: mirrorId, organizationId: counterpartOrgId });
+      safeSetDoc(doc(db, "transactions", mirrorId), mirroredTx).catch(() => {});
       saveDocREST("transactions", mirrorId, mirroredTx).catch(() => {});
     }
 
@@ -811,19 +871,27 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    const enrichedUpdates = { ...updates, updatedAt: new Date().toISOString() };
+    const enrichedUpdates: any = {
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    };
+    if ("budgetId" in updates) {
+      enrichedUpdates.budgetId = updates.budgetId ? updates.budgetId.trim() : null;
+    }
+    const cleanUpdates = sanitizeForFirestore(enrichedUpdates);
+
     setTransactions((prev) => {
       const updated = prev.map((t) => (t.id === id ? { ...t, ...enrichedUpdates } : t));
       AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(updated)).catch(() => {});
       return updated;
     });
     try {
-      await setDoc(doc(db, "transactions", id), enrichedUpdates, { merge: true });
-      saveDocREST("transactions", id, enrichedUpdates).catch(() => {});
+      await safeSetDoc(doc(db, "transactions", id), cleanUpdates, { merge: true });
+      saveDocREST("transactions", id, cleanUpdates).catch(() => {});
       if (activeOrgId === "demo-org" || activeOrgId === "org-9icgv4ijp") {
         const mirrorId = id.startsWith("sync_") ? id.replace("sync_", "") : `sync_${id}`;
-        setDoc(doc(db, "transactions", mirrorId), enrichedUpdates, { merge: true }).catch(() => {});
-        saveDocREST("transactions", mirrorId, enrichedUpdates).catch(() => {});
+        safeSetDoc(doc(db, "transactions", mirrorId), cleanUpdates, { merge: true }).catch(() => {});
+        saveDocREST("transactions", mirrorId, cleanUpdates).catch(() => {});
       }
       recordAuditLog({
         organizationId: activeOrgId,
@@ -963,19 +1031,21 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       alertThreshold: b.alertThreshold || 80,
     };
 
+    const cleanBudget = sanitizeForFirestore(newBudget);
+
     setBudgets((prev) => {
       const updated = [{ ...newBudget, spent: 0 }, ...prev.filter((item) => item.id !== id)];
       AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(updated)).catch(() => {});
       return updated;
     });
     try {
-      await setDoc(doc(db, "budgets", id), newBudget);
-      saveDocREST("budgets", id, newBudget).catch(() => {});
+      await safeSetDoc(doc(db, "budgets", id), cleanBudget);
+      saveDocREST("budgets", id, cleanBudget).catch(() => {});
       if (orgId === "demo-org" || orgId === "org-9icgv4ijp") {
         const counterpartOrgId = orgId === "demo-org" ? "org-9icgv4ijp" : "demo-org";
         const mirrorId = id.startsWith("sync_") ? id.replace("sync_", "") : `sync_${id}`;
-        const mirroredBudget: Budget = { ...newBudget, id: mirrorId, organizationId: counterpartOrgId };
-        setDoc(doc(db, "budgets", mirrorId), mirroredBudget).catch(() => {});
+        const mirroredBudget: Budget = sanitizeForFirestore({ ...cleanBudget, id: mirrorId, organizationId: counterpartOrgId });
+        safeSetDoc(doc(db, "budgets", mirrorId), mirroredBudget).catch(() => {});
         saveDocREST("budgets", mirrorId, mirroredBudget).catch(() => {});
       }
       recordAuditLog({
@@ -1035,18 +1105,19 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     }
 
     const enrichedUpdates = { ...updates, updatedAt: new Date().toISOString() };
+    const cleanUpdates = sanitizeForFirestore(enrichedUpdates);
     setBudgets((prev) => {
       const updated = prev.map((b) => (b.id === id ? { ...b, ...enrichedUpdates } : b));
       AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(updated)).catch(() => {});
       return updated;
     });
     try {
-      await setDoc(doc(db, "budgets", id), enrichedUpdates, { merge: true });
-      saveDocREST("budgets", id, enrichedUpdates).catch(() => {});
+      await safeSetDoc(doc(db, "budgets", id), cleanUpdates, { merge: true });
+      saveDocREST("budgets", id, cleanUpdates).catch(() => {});
       if (activeOrgId === "demo-org" || activeOrgId === "org-9icgv4ijp") {
         const mirrorId = id.startsWith("sync_") ? id.replace("sync_", "") : `sync_${id}`;
-        setDoc(doc(db, "budgets", mirrorId), enrichedUpdates, { merge: true }).catch(() => {});
-        saveDocREST("budgets", mirrorId, enrichedUpdates).catch(() => {});
+        safeSetDoc(doc(db, "budgets", mirrorId), cleanUpdates, { merge: true }).catch(() => {});
+        saveDocREST("budgets", mirrorId, cleanUpdates).catch(() => {});
       }
       recordAuditLog({
         organizationId: activeOrgId,
@@ -1229,30 +1300,36 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       return updated;
     });
 
+    const cleanPayroll = sanitizeForFirestore(newPayroll);
+    const cleanSalaryTx = sanitizeForFirestore({
+      ...salaryTx,
+      budgetId: null,
+    });
+
     try {
       const batch = writeBatch(db);
-      batch.set(doc(db, "payroll", id), newPayroll);
-      batch.set(doc(db, "transactions", txId), salaryTx);
+      batch.set(doc(db, "payroll", id), cleanPayroll);
+      batch.set(doc(db, "transactions", txId), cleanSalaryTx);
       await batch.commit().catch(async (err) => {
         console.log("Batch commit failed, attempting Promise.all fallback:", err);
         await Promise.all([
-          setDoc(doc(db, "payroll", id), newPayroll),
-          setDoc(doc(db, "transactions", txId), salaryTx).catch(() => {}),
+          safeSetDoc(doc(db, "payroll", id), cleanPayroll),
+          safeSetDoc(doc(db, "transactions", txId), cleanSalaryTx).catch(() => {}),
         ]);
       });
 
-      saveDocREST("payroll", id, newPayroll).catch(() => {});
-      saveDocREST("transactions", txId, salaryTx).catch(() => {});
+      saveDocREST("payroll", id, cleanPayroll).catch(() => {});
+      saveDocREST("transactions", txId, cleanSalaryTx).catch(() => {});
       if (orgId === "demo-org" || orgId === "org-9icgv4ijp") {
         const counterpartOrgId = orgId === "demo-org" ? "org-9icgv4ijp" : "demo-org";
         const rawId = id.replace(/^sync_/, "");
         const mirrorPayrollId = id.startsWith("sync_") ? rawId : `sync_${id}`;
         const mirrorTxId = `sync_tx_pay_${rawId}`;
-        const mirroredPayroll: PayrollEntry = { ...newPayroll, id: mirrorPayrollId, organizationId: counterpartOrgId, expenseId: mirrorTxId };
-        const mirroredTx: Transaction = { ...salaryTx, id: mirrorTxId, organizationId: counterpartOrgId, payrollId: mirrorPayrollId };
-        setDoc(doc(db, "payroll", mirrorPayrollId), mirroredPayroll).catch(() => {});
+        const mirroredPayroll: PayrollEntry = sanitizeForFirestore({ ...newPayroll, id: mirrorPayrollId, organizationId: counterpartOrgId, expenseId: mirrorTxId });
+        const mirroredTx: Transaction = sanitizeForFirestore({ ...salaryTx, id: mirrorTxId, organizationId: counterpartOrgId, payrollId: mirrorPayrollId, budgetId: null });
+        safeSetDoc(doc(db, "payroll", mirrorPayrollId), mirroredPayroll).catch(() => {});
         saveDocREST("payroll", mirrorPayrollId, mirroredPayroll).catch(() => {});
-        setDoc(doc(db, "transactions", mirrorTxId), mirroredTx).catch(() => {});
+        safeSetDoc(doc(db, "transactions", mirrorTxId), mirroredTx).catch(() => {});
         saveDocREST("transactions", mirrorTxId, mirroredTx).catch(() => {});
       }
       recordAuditLog({
@@ -1413,26 +1490,29 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         updatedAt: new Date().toISOString(),
       };
 
+      const cleanPayrollUpdates = sanitizeForFirestore(enrichedUpdates);
+      const cleanTxUpdates = sanitizeForFirestore(txUpdates);
+
       const batch = writeBatch(db);
-      batch.set(doc(db, "payroll", id), enrichedUpdates, { merge: true });
-      batch.set(doc(db, "transactions", txId), txUpdates, { merge: true });
+      batch.set(doc(db, "payroll", id), cleanPayrollUpdates, { merge: true });
+      batch.set(doc(db, "transactions", txId), cleanTxUpdates, { merge: true });
       await batch.commit().catch(async () => {
         await Promise.all([
-          setDoc(doc(db, "payroll", id), enrichedUpdates, { merge: true }),
-          setDoc(doc(db, "transactions", txId), txUpdates, { merge: true }),
+          safeSetDoc(doc(db, "payroll", id), cleanPayrollUpdates, { merge: true }),
+          safeSetDoc(doc(db, "transactions", txId), cleanTxUpdates, { merge: true }),
         ]);
       });
 
-      saveDocREST("payroll", id, enrichedUpdates).catch(() => {});
-      saveDocREST("transactions", txId, txUpdates).catch(() => {});
+      saveDocREST("payroll", id, cleanPayrollUpdates).catch(() => {});
+      saveDocREST("transactions", txId, cleanTxUpdates).catch(() => {});
       if (activeOrgId === "demo-org" || activeOrgId === "org-9icgv4ijp") {
         const rawId = id.replace(/^sync_/, "");
         const mirrorPayrollId = id.startsWith("sync_") ? rawId : `sync_${id}`;
         const mirrorTxId = `sync_tx_pay_${rawId}`;
-        setDoc(doc(db, "payroll", mirrorPayrollId), enrichedUpdates, { merge: true }).catch(() => {});
-        saveDocREST("payroll", mirrorPayrollId, enrichedUpdates).catch(() => {});
-        setDoc(doc(db, "transactions", mirrorTxId), txUpdates, { merge: true }).catch(() => {});
-        saveDocREST("transactions", mirrorTxId, txUpdates).catch(() => {});
+        safeSetDoc(doc(db, "payroll", mirrorPayrollId), cleanPayrollUpdates, { merge: true }).catch(() => {});
+        saveDocREST("payroll", mirrorPayrollId, cleanPayrollUpdates).catch(() => {});
+        safeSetDoc(doc(db, "transactions", mirrorTxId), cleanTxUpdates, { merge: true }).catch(() => {});
+        saveDocREST("transactions", mirrorTxId, cleanTxUpdates).catch(() => {});
       }
       recordAuditLog({
         organizationId: activeOrgId,
@@ -1568,14 +1648,15 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(updated)).catch(() => {});
       return updated;
     });
+    const cleanDept = sanitizeForFirestore(newDept);
     try {
-      await setDoc(doc(db, "departments", id), newDept);
-      saveDocREST("departments", id, newDept).catch(() => {});
+      await safeSetDoc(doc(db, "departments", id), cleanDept);
+      saveDocREST("departments", id, cleanDept).catch(() => {});
       if (orgId === "demo-org" || orgId === "org-9icgv4ijp") {
         const counterpartOrgId = orgId === "demo-org" ? "org-9icgv4ijp" : "demo-org";
         const mirrorId = id.startsWith("sync_") ? id.replace("sync_", "") : `sync_${id}`;
-        const mirroredDept = { ...newDept, id: mirrorId, organizationId: counterpartOrgId };
-        setDoc(doc(db, "departments", mirrorId), mirroredDept).catch(() => {});
+        const mirroredDept = sanitizeForFirestore({ ...cleanDept, id: mirrorId, organizationId: counterpartOrgId });
+        safeSetDoc(doc(db, "departments", mirrorId), mirroredDept).catch(() => {});
         saveDocREST("departments", mirrorId, mirroredDept).catch(() => {});
       }
       recordAuditLog({
@@ -1627,13 +1708,14 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(updated)).catch(() => {});
       return updated;
     });
+    const cleanUpdates = sanitizeForFirestore(enrichedUpdates);
     try {
-      await setDoc(doc(db, "departments", id), enrichedUpdates, { merge: true });
-      saveDocREST("departments", id, enrichedUpdates).catch(() => {});
+      await safeSetDoc(doc(db, "departments", id), cleanUpdates, { merge: true });
+      saveDocREST("departments", id, cleanUpdates).catch(() => {});
       if (activeOrgId === "demo-org" || activeOrgId === "org-9icgv4ijp") {
         const mirrorId = id.startsWith("sync_") ? id.replace("sync_", "") : `sync_${id}`;
-        setDoc(doc(db, "departments", mirrorId), enrichedUpdates, { merge: true }).catch(() => {});
-        saveDocREST("departments", mirrorId, enrichedUpdates).catch(() => {});
+        safeSetDoc(doc(db, "departments", mirrorId), cleanUpdates, { merge: true }).catch(() => {});
+        saveDocREST("departments", mirrorId, cleanUpdates).catch(() => {});
       }
       recordAuditLog({
         organizationId: activeOrgId,

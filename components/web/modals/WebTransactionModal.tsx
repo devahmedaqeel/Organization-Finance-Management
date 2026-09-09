@@ -178,7 +178,7 @@ export function WebTransactionModal({
           referenceNumber: referenceNumber.trim(),
           paymentMethod,
           date,
-          budgetId: type === "expense" ? (selectedBudgetId.trim() || undefined) : undefined,
+          budgetId: type === "expense" ? (selectedBudgetId.trim() || null) : null,
         });
       }
       onClose();

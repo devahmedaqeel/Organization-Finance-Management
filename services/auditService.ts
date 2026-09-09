@@ -15,8 +15,22 @@ export interface AuditLogEntry {
 export async function recordAuditLog(entry: AuditLogEntry): Promise<void> {
   try {
     const logId = doc(collection(db, "auditLogs")).id;
+    const cleanEntry: Record<string, any> = {};
+    for (const [k, v] of Object.entries(entry)) {
+      if (v === undefined) continue;
+      if (k === "metadata" && typeof v === "object" && v !== null) {
+        const cleanMeta: Record<string, any> = {};
+        for (const [mk, mv] of Object.entries(v)) {
+          if (mv !== undefined) cleanMeta[mk] = mv;
+        }
+        cleanEntry[k] = cleanMeta;
+      } else {
+        cleanEntry[k] = v;
+      }
+    }
+
     await setDoc(doc(db, "auditLogs", logId), {
-      ...entry,
+      ...cleanEntry,
       id: logId,
       timestamp: serverTimestamp(),
       createdAt: new Date().toISOString(),

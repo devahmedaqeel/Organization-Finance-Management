@@ -166,7 +166,11 @@ export async function dispatchNotification(
   // 2. Persist to Firestore asynchronously
   try {
     const notifRef = doc(db, "notifications", notifId);
-    await setDoc(notifRef, notification);
+    const cleanNotification: Record<string, any> = {};
+    for (const [k, v] of Object.entries(notification)) {
+      if (v !== undefined) cleanNotification[k] = v;
+    }
+    await setDoc(notifRef, cleanNotification);
   } catch (err: any) {
     console.log("[NOTIFICATIONS] Firestore save note:", err?.message || err);
   }

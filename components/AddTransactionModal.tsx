@@ -164,7 +164,7 @@ export function AddTransactionModal({
       department: isIncome ? (editItem?.department || "Institutional") : department,
       description,
       addedBy,
-      budgetId: type === "expense" && selectedBudgetId.trim() ? selectedBudgetId.trim() : undefined,
+      budgetId: type === "expense" && selectedBudgetId.trim() ? selectedBudgetId.trim() : null,
     };
 
     if (isEditMode && editItem && onUpdate) {
