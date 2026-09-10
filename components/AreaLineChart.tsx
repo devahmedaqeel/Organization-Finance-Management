@@ -443,8 +443,6 @@ export function AreaLineChart({
               currentPeriod.mode !== "presets" && { fontFamily: "Inter_700Bold" },
             ]}
             numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.8}
           >
             Custom
           </Text>
@@ -879,15 +877,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    paddingHorizontal: 7.5,
+    paddingHorizontal: 9,
     paddingVertical: 5.5,
     borderRadius: 10,
     borderWidth: 1,
     flexShrink: 0,
   },
   calendarBtnText: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontFamily: "Inter_600SemiBold",
+    includeFontPadding: false,
   },
   inspectorCard: {
     paddingHorizontal: 10,
@@ -932,8 +931,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 7,
-    paddingVertical: 4.5,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
     borderRadius: 8,
     borderWidth: 1,
   },
@@ -943,12 +942,15 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   statBadgeLabel: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontFamily: "Inter_600SemiBold",
+    includeFontPadding: false,
+    flexShrink: 0,
   },
   statBadgeValue: {
-    fontSize: 10.5,
+    fontSize: 10,
     fontFamily: "Inter_700Bold",
+    includeFontPadding: false,
     flexShrink: 1,
     textAlign: "right",
   },

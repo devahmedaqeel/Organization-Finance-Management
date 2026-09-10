@@ -943,7 +943,7 @@ export default function DashboardScreen() {
               {
                 backgroundColor: colors.card,
                 borderColor: colors.border,
-                width: Math.max(statCardW, 204),
+                width: Math.max(statCardW, 224),
               },
             ]}
             onPress={() => {
@@ -1007,7 +1007,7 @@ export default function DashboardScreen() {
               {
                 backgroundColor: colors.card,
                 borderColor: colors.border,
-                width: Math.max(statCardW, 204),
+                width: Math.max(statCardW, 224),
               },
             ]}
             onPress={() => {
@@ -1059,7 +1059,7 @@ export default function DashboardScreen() {
                   ]}
                   numberOfLines={1}
                   adjustsFontSizeToFit
-                  minimumFontScale={0.75}
+                  minimumFontScale={0.7}
                 >
                   {totalExpenses === 0
                     ? "No Outflows"
@@ -1094,11 +1094,12 @@ export default function DashboardScreen() {
                     : colors.foreground,
                 fontFamily: "Inter_600SemiBold",
                 marginTop: -2,
-                minHeight: 24,
+                minHeight: 26,
+                lineHeight: 13,
               }}
               numberOfLines={2}
               adjustsFontSizeToFit
-              minimumFontScale={0.8}
+              minimumFontScale={0.75}
             >
               {totalExpenses === 0
                 ? "0% Outflow"
@@ -1132,7 +1133,7 @@ export default function DashboardScreen() {
               {
                 backgroundColor: colors.card,
                 borderColor: colors.border,
-                width: Math.max(statCardW, 204),
+                width: Math.max(statCardW, 224),
               },
             ]}
             onPress={() => {
@@ -1266,7 +1267,7 @@ export default function DashboardScreen() {
               {
                 backgroundColor: colors.card,
                 borderColor: colors.border,
-                width: Math.max(statCardW, 204),
+                width: Math.max(statCardW, 224),
               },
             ]}
             onPress={() => {
@@ -1330,7 +1331,7 @@ export default function DashboardScreen() {
               {
                 backgroundColor: colors.card,
                 borderColor: colors.border,
-                width: Math.max(statCardW, 204),
+                width: Math.max(statCardW, 224),
               },
             ]}
             onPress={() => {
@@ -1537,9 +1538,9 @@ export default function DashboardScreen() {
               1-tap financial workflows
             </Text>
           </View>
-          <View style={[styles.actionSectionPill, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "30", flexShrink: 0, paddingHorizontal: 7 }]}>
+          <View style={[styles.actionSectionPill, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "30", flexShrink: 0, paddingHorizontal: 9, paddingVertical: 3.5 }]}>
             <Feather name="zap" size={12} color={colors.primary} />
-            <Text style={[styles.actionSectionPillText, { color: colors.primary }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+            <Text style={[styles.actionSectionPillText, { color: colors.primary, includeFontPadding: false }]} numberOfLines={1}>
               Active
             </Text>
           </View>
@@ -2401,6 +2402,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3.5,
     borderRadius: 8,
     flexShrink: 0,
+    minWidth: 68,
     alignItems: "center",
     justifyContent: "center",
   },
