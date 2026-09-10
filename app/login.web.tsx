@@ -127,18 +127,27 @@ export default function WebLoginScreen() {
   };
 
   const handleForgotPassword = async () => {
-    if (!forgotEmail.trim()) {
+    const clean = forgotEmail.trim();
+    if (!clean) {
       setForgotMsg({ type: "error", text: "Please enter your email address." });
       return;
     }
     setForgotLoading(true);
     setForgotMsg(null);
-    const result = await forgotPassword(forgotEmail.trim());
+    const result = await forgotPassword(clean);
     setForgotLoading(false);
     if (result.success) {
-      setForgotMsg({ type: "success", text: "Password reset instructions sent. Please check your inbox." });
+      setForgotMsg({
+        type: "success",
+        text:
+          result.message ||
+          "If an account exists with this email address, password reset instructions have been sent.",
+      });
     } else {
-      setForgotMsg({ type: "error", text: result.error || "Could not send reset email. Please verify address." });
+      setForgotMsg({
+        type: "error",
+        text: result.error || "Unable to send reset link. Please verify address.",
+      });
     }
   };
 
@@ -457,14 +466,14 @@ export default function WebLoginScreen() {
 
               <View style={{ padding: 20, gap: 14 }}>
                 <Text style={styles.modalSubtitle}>
-                  Enter your work email address to receive password reset instructions.
+                  Enter your registered email address and we will send you instructions to reset your password.
                 </Text>
 
                 <View style={styles.inputWrap}>
                   <SvgMail size={15} color="#94A3B8" />
                   <TextInput
                     style={styles.input}
-                    placeholder="Enter your email address"
+                    placeholder="name@organization.com"
                     placeholderTextColor="#64748B"
                     keyboardType="email-address"
                     autoCapitalize="none"
@@ -497,9 +506,12 @@ export default function WebLoginScreen() {
                   disabled={forgotLoading}
                 >
                   {forgotLoading ? (
-                    <ActivityIndicator color="#FFFFFF" size="small" />
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <ActivityIndicator color="#FFFFFF" size="small" />
+                      <Text style={styles.submitBtnText}>Sending...</Text>
+                    </View>
                   ) : (
-                    <Text style={styles.submitBtnText}>Send Recovery Link</Text>
+                    <Text style={styles.submitBtnText}>Send Reset Link</Text>
                   )}
                 </TouchableOpacity>
               </View>

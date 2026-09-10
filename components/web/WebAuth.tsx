@@ -191,12 +191,23 @@ export function WebAuth() {
     try {
       const res = await forgotPassword(clean);
       if (res.success) {
-        setForgotMsg({ type: "success", text: "Password reset instructions sent! Please check your inbox." });
+        setForgotMsg({
+          type: "success",
+          text:
+            res.message ||
+            "If an account exists with this email address, password reset instructions have been sent.",
+        });
       } else {
-        setForgotMsg({ type: "error", text: res.error || "Could not send password reset email." });
+        setForgotMsg({
+          type: "error",
+          text: res.error || "Unable to send reset link. Please verify address.",
+        });
       }
-    } catch (err: any) {
-      setForgotMsg({ type: "error", text: err?.message || "Password reset request failed." });
+    } catch {
+      setForgotMsg({
+        type: "success",
+        text: "If an account exists with this email address, password reset instructions have been sent.",
+      });
     } finally {
       setForgotLoading(false);
     }
@@ -492,8 +503,8 @@ export function WebAuth() {
                 <SvgX size={18} color={colors.foreground} />
               </TouchableOpacity>
             </View>
-            <Text style={{ fontSize: 12, color: colors.mutedForeground, marginTop: 4 }}>
-              Enter your registered work email to receive password reset instructions.
+            <Text style={{ fontSize: 12.5, color: colors.mutedForeground, marginTop: 4, lineHeight: 18 }}>
+              Enter your registered email address and we will send you instructions to reset your password.
             </Text>
 
             {forgotMsg && (
@@ -529,7 +540,14 @@ export function WebAuth() {
               onPress={handleForgotSubmit}
               disabled={forgotLoading}
             >
-              {forgotLoading ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.submitBtnText}>Send Reset Link</Text>}
+              {forgotLoading ? (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <ActivityIndicator color="#fff" size="small" />
+                  <Text style={styles.submitBtnText}>Sending...</Text>
+                </View>
+              ) : (
+                <Text style={styles.submitBtnText}>Send Reset Link</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>

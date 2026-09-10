@@ -10,6 +10,7 @@ dist/
 web-build/
 expo-env.d.ts
 .eas/
+functions/lib/
 
 # Native & Signing Keys (Secrets)
 ios/

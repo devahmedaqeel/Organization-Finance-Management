@@ -61,6 +61,11 @@ const testSuites = [
     cmd: "npx",
     args: ["-y", "tsx", "services/__tests__/newOrgCleanState.test.ts"],
   },
+  {
+    name: "11. Production-Grade Password Reset Engine Suite",
+    cmd: "npx",
+    args: ["-y", "tsx", "services/__tests__/PasswordResetEngine.test.ts"],
+  },
 ];
 
 console.log("\n=======================================================");

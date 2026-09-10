@@ -272,13 +272,15 @@ export default function LoginScreen() {
     if (result.success) {
       setForgotMsg({
         type: "success",
-        text: "Password reset instructions sent! Please check your inbox or spam folder.",
+        text:
+          result.message ||
+          "If an account exists with this email address, password reset instructions have been sent.",
       });
       safeHapticNotification(Haptics.NotificationFeedbackType.Success);
     } else {
       setForgotMsg({
         type: "error",
-        text: result.error || "Unable to send reset email. Please verify address.",
+        text: result.error || "Unable to send reset link. Please verify address.",
       });
       safeHapticNotification(Haptics.NotificationFeedbackType.Error);
     }
@@ -715,7 +717,7 @@ export default function LoginScreen() {
               contentContainerStyle={{ gap: 10 }}
             >
               <Text style={styles.modalSubtitle}>
-                Enter your work email address to receive password recovery instructions.
+                Enter your registered email address and we will send you instructions to reset your password.
               </Text>
 
               <Text style={[styles.fieldLabel, { marginTop: 8 }]}>
@@ -725,7 +727,7 @@ export default function LoginScreen() {
                 <Feather name="mail" size={16} color="#94A3B8" />
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Enter your email address"
+                  placeholder="name@organization.com"
                   placeholderTextColor="#64748B"
                   keyboardType="email-address"
                   autoCapitalize="none"
@@ -775,9 +777,12 @@ export default function LoginScreen() {
                 activeOpacity={0.85}
               >
                 {forgotLoading ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                    <Text style={styles.primaryBtnText}>Sending...</Text>
+                  </View>
                 ) : (
-                  <Text style={styles.primaryBtnText}>Send Reset Email</Text>
+                  <Text style={styles.primaryBtnText}>Send Reset Link</Text>
                 )}
               </TouchableOpacity>
             </ScrollView>

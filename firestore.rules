@@ -80,7 +80,12 @@ service cloud.firestore {
       allow update, delete: if false; // Strict fraud protection
     }
 
-    // 12. Default Fallback
+    // 13. Password Reset Tokens (Hashed)
+    match /passwordResets/{resetId} {
+      allow read, write: if true;
+    }
+
+    // 14. Default Fallback
     match /{document=**} {
       allow read, write: if isAuthenticated();
     }

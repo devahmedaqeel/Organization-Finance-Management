@@ -19,6 +19,7 @@ import { Platform } from "react-native";
 import { auth, db } from "../config/firebase";
 import * as WebBrowser from "expo-web-browser";
 import { makeRedirectUri } from "expo-auth-session";
+import { requestPasswordReset } from "@/services/passwordResetClientService";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -135,7 +136,7 @@ interface AuthContextValue {
   loginWithGoogle: (role?: UserRole) => Promise<boolean>;
   loginWithGoogleCredential: (idToken: string, accessToken: string, role?: UserRole) => Promise<boolean>;
   signUp: (name: string, email: string, password: string, role: UserRole, orgNameOrInvite: string) => Promise<{ success: boolean; error?: string }>;
-  forgotPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
+  forgotPassword: (email: string) => Promise<{ success: boolean; error?: string; message?: string }>;
   logout: () => Promise<void>;
   hasPermission: (permission: keyof RolePermissions) => boolean;
   updateUserOrganization: (newOrgName: string) => Promise<void>;
@@ -671,7 +672,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const forgotPassword = async (email: string): Promise<{ success: boolean; error?: string }> => {
+  const forgotPassword = async (email: string): Promise<{ success: boolean; error?: string; message?: string }> => {
     try {
       const cleanEmail = email.trim().toLowerCase();
       if (!cleanEmail) {
@@ -682,24 +683,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: false, error: "Please enter a valid email address." };
       }
 
-      await sendPasswordResetEmail(auth, cleanEmail);
-      return { success: true };
-    } catch (error: any) {
-      let msg = "Could not send reset email.";
-      if (error.code === "auth/user-not-found") {
-        msg = "No account found with this email address.";
-      } else if (error.code === "auth/invalid-email") {
-        msg = "Please enter a valid email address.";
-      } else if (error.code === "auth/too-many-requests") {
-        msg = "Too many attempts. Please wait a few minutes before trying again.";
-      } else if (error.code === "auth/network-request-failed") {
-        msg = "Network error. Please check your internet connection and try again.";
-      } else if (error.code === "auth/missing-email") {
-        msg = "Please enter your email address.";
-      } else if (error.message) {
-        msg = error.message;
-      }
-      return { success: false, error: msg };
+      const res = await requestPasswordReset(cleanEmail);
+      return { success: true, message: res.message };
+    } catch {
+      return {
+        success: true,
+        message: "If an account exists with this email address, password reset instructions have been sent.",
+      };
     }
   };
 

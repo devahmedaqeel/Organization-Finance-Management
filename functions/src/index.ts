@@ -9,8 +9,13 @@
 
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
-import { generatePdfFromHtml, HtmlPdfOptions } from "./services/htmlPdfService";
+import { generatePdfFromHtml } from "./services/htmlPdfService";
 import { createPdfMonkeyDocument, waitForPdfMonkeyGeneration } from "./pdfMonkeyService";
+import {
+  handleForgotPasswordRequest,
+  handleVerifyResetToken,
+  handleResetPasswordSubmission,
+} from "./passwordResetService";
 
 if (admin.apps.length === 0) {
   admin.initializeApp();
@@ -132,8 +137,7 @@ export const generatePdf = functions.https.onCall(async (data, context) => {
     );
   }
 
-  const callerUid = context.auth.uid;
-  const { documentType, organizationId, payload, filename } = data;
+  const { documentType, payload, filename } = data;
 
   if (!documentType || !payload) {
     throw new functions.https.HttpsError(
@@ -175,3 +179,78 @@ export const generatePdf = functions.https.onCall(async (data, context) => {
     documentId: createdDoc.document.id,
   };
 });
+
+/**
+ * Callable Function: forgotPassword (Password Reset Request)
+ * Input: { email: string, appUrl?: string }
+ * Output: { success: boolean, message: string }
+ */
+export const forgotPasswordCallable = functions.https.onCall(async (data) => {
+  const { email, appUrl } = data || {};
+  return await handleForgotPasswordRequest(email, appUrl);
+});
+
+/**
+ * Callable Function: verifyResetToken
+ * Input: { token: string }
+ * Output: { valid: boolean, error?: string, email?: string }
+ */
+export const verifyResetTokenCallable = functions.https.onCall(async (data) => {
+  const { token } = data || {};
+  return await handleVerifyResetToken(token);
+});
+
+/**
+ * Callable Function: resetPassword
+ * Input: { token: string, password: string, confirmPassword: string }
+ * Output: { success: boolean, message?: string, error?: string }
+ */
+export const resetPasswordCallable = functions.https.onCall(async (data) => {
+  const { token, password, confirmPassword } = data || {};
+  return await handleResetPasswordSubmission(token, password, confirmPassword);
+});
+
+/**
+ * HTTP REST API: /api/auth/forgot-password & /api/auth/reset-password
+ */
+export const authApi = functions.https.onRequest(async (req, res) => {
+  res.set("Access-Control-Allow-Origin", "*");
+  res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+  if (req.method === "OPTIONS") {
+    res.status(204).send("");
+    return;
+  }
+
+  const path = req.path || "";
+
+  try {
+    if (req.method === "POST" && (path.endsWith("/forgot-password") || path === "/forgot-password")) {
+      const { email, appUrl } = req.body || {};
+      const result = await handleForgotPasswordRequest(email, appUrl);
+      res.status(200).json(result);
+      return;
+    }
+
+    if (req.method === "POST" && (path.endsWith("/verify-token") || path === "/verify-token")) {
+      const { token } = req.body || {};
+      const result = await handleVerifyResetToken(token);
+      res.status(200).json(result);
+      return;
+    }
+
+    if (req.method === "POST" && (path.endsWith("/reset-password") || path === "/reset-password")) {
+      const { token, password, confirmPassword } = req.body || {};
+      const result = await handleResetPasswordSubmission(token, password, confirmPassword);
+      res.status(result.success ? 200 : 400).json(result);
+      return;
+    }
+
+    res.status(404).json({ error: "Endpoint not found" });
+  } catch (error: any) {
+    console.error("[AUTH_API_ERROR]", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
