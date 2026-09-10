@@ -18,6 +18,7 @@ import {
   NormalizedPeriod,
   aggregateTransactionsByGranularity,
   getPresetPeriod,
+  getPreviousPeriod,
   filterTransactionsByPeriod,
 } from "@/services/DatePeriodService";
 import {
@@ -86,6 +87,11 @@ export default function AIInsightsScreen() {
   const [selectedPoint, setSelectedPoint] = useState<any | null>(null);
   const [chartContainerWidth, setChartContainerWidth] = useState<number>(0);
 
+  // Derive previous period for verified historical comparisons
+  const previousPeriod = useMemo(() => {
+    return getPreviousPeriod(activePeriod);
+  }, [activePeriod]);
+
   // Intelligent active period auto-alignment: if default Last 6 Months has zero transactions but others exist, align to All Time
   useEffect(() => {
     if (transactions.length > 0 && activePeriod.presetId === "last_6m") {
@@ -111,8 +117,8 @@ export default function AIInsightsScreen() {
 
   // 1. Authoritative Financial Health Calculation
   const healthReport = useMemo(() => {
-    return calculateFinancialHealth(transactions, budgets, payroll, activePeriod);
-  }, [transactions, budgets, payroll, activePeriod]);
+    return calculateFinancialHealth(transactions, budgets, payroll, activePeriod, previousPeriod, departments);
+  }, [transactions, budgets, payroll, activePeriod, previousPeriod, departments]);
 
   const { hasData, healthScore, status: healthLabel, statusColor: healthColor, metrics: healthMetrics } = healthReport;
 
@@ -124,11 +130,11 @@ export default function AIInsightsScreen() {
       payroll,
       departments,
       activePeriod,
-      undefined,
+      previousPeriod,
       settings.currency || "PKR",
       user?.organizationId || "default_org"
     );
-  }, [transactions, budgets, payroll, departments, activePeriod, settings.currency, user?.organizationId]);
+  }, [transactions, budgets, payroll, departments, activePeriod, previousPeriod, settings.currency, user?.organizationId]);
 
   // Dispatch critical/warning AI insight alerts & recommendations to Notification Center
   useEffect(() => {
@@ -1225,7 +1231,7 @@ export default function AIInsightsScreen() {
           <Feather name={hasData ? "check-circle" : "info"} size={24} color={hasData ? "#10B981" : "#94A3B8"} />
           <Text style={[styles.disclaimerText, { color: colors.foreground, fontSize: 13, marginTop: 6 }]}>
             {!hasData
-              ? "No financial data available yet. Add income, expenses, or budgets to generate real-time AI financial intelligence."
+              ? "More financial data is required to generate meaningful insights. Add income, expenses, or budgets to activate real-time intelligence."
               : insightFilter === "critical" || insightFilter === "advisories"
               ? "No critical alerts or warnings found in this period."
               : insightFilter === "positive"
@@ -1256,14 +1262,30 @@ export default function AIInsightsScreen() {
               }}
               activeOpacity={insight.actionRoute ? 0.85 : 1}
             >
-              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
-                  <View style={[styles.insightIcon, { backgroundColor: conf.bg }]}>
+              <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+                <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 8, flex: 1 }}>
+                  <View style={[styles.insightIcon, { backgroundColor: conf.bg, marginTop: 1 }]}>
                     <Feather name={conf.icon} size={15} color={conf.color} />
                   </View>
-                  <Text style={[styles.insightTitle, { color: colors.foreground, flex: 1 }]}>{insight.title}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.insightTitle, { color: colors.foreground }]} numberOfLines={2}>
+                      {insight.title}
+                    </Text>
+                    {insight.metric ? (
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 3, flexWrap: "wrap" }}>
+                        <View style={{ backgroundColor: conf.color + "18", borderColor: conf.color + "44", borderWidth: 1, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
+                          <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: conf.color }}>
+                            {insight.metric}
+                          </Text>
+                        </View>
+                        <Text style={{ fontSize: 10.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
+                          {insight.sourceReference}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
                 </View>
-                <View style={[styles.typeBadge, { backgroundColor: conf.bg }]}>
+                <View style={[styles.typeBadge, { backgroundColor: conf.bg, flexShrink: 0 }]}>
                   <Text style={[styles.typeBadgeText, { color: conf.color }]}>{insight.severity}</Text>
                 </View>
               </View>
@@ -1285,8 +1307,8 @@ export default function AIInsightsScreen() {
 
               {/* ACTION */}
               {insight.isActionable && (
-                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 4 }}>
-                  <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: conf.color, flex: 1 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 4, flexWrap: "wrap", gap: 6 }}>
+                  <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: conf.color, flex: 1, minWidth: 160 }} numberOfLines={3}>
                     👉 {insight.recommendedAction}
                   </Text>
                   {insight.actionRoute && (
@@ -1298,7 +1320,7 @@ export default function AIInsightsScreen() {
                         paddingVertical: 4,
                         paddingHorizontal: 10,
                         borderRadius: 6,
-                        marginLeft: 10,
+                        flexShrink: 0,
                       }}
                     >
                       <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: colors.primary }}>

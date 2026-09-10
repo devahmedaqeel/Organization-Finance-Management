@@ -6,6 +6,13 @@
  * and payroll records into actionable, prioritized, mathematically verified insights.
  *
  * ZERO GENERIC/MOCK AI TEXT: All insights are derived strictly from authoritative financial data.
+ * Fully adapts dynamically to all 6 data availability scenarios:
+ * 1. Zero Data (clean empty state)
+ * 2. Income Only (inflow recognition without unsupported expense/budget claims)
+ * 3. Income + Expense (surplus, deficit, break-even balance)
+ * 4. Budget + Expense (overall institutional utilization and category/pool limits)
+ * 5. Department Data (spending concentration, budget adherence, unbudgeted expenditure)
+ * 6. Payroll Data (remuneration share of expenses and revenue alignment)
  */
 
 import { Transaction, Budget, PayrollEntry, Department } from "@/context/FinanceContext";
@@ -30,6 +37,7 @@ export type InsightCategory =
   | "revenue"
   | "expense"
   | "budget"
+  | "department"
   | "payroll"
   | "cashflow"
   | "health"
@@ -43,12 +51,12 @@ export interface ActionableInsight {
   type: string;
   severity: InsightSeverity;
   title: string;
-  summary: string;           // Short executive summary
+  summary: string;           // WHAT: Short executive summary
   details?: string;          // Extended financial explanation
-  whyItMatters: string;      // WHY this metric is significant
-  recommendedAction: string; // WHAT action the user should take
+  whyItMatters: string;      // WHY: Significance of the metric
+  recommendedAction: string; // ACTION: What action the user should take
   category: InsightCategory;
-  metric: string;
+  metric: string;            // DATA CONTEXT: Exact amount, percentage, or comparison
   currentValue?: number;
   previousValue?: number;
   changeAmount?: number;
@@ -64,11 +72,12 @@ export interface ActionableInsight {
 }
 
 /**
- * Generates prioritized, authoritative financial insights from verified ledger data.
+ * Generates prioritized, authoritative financial insights strictly from verified database records.
+ * Adapts dynamically to whatever real data is available.
  */
 export function generateFinancialInsights(
-  transactions: Transaction[],
-  budgets: Budget[],
+  transactions: Transaction[] = [],
+  budgets: Budget[] = [],
   payroll: PayrollEntry[] = [],
   departments: Department[] = [],
   currentPeriod: NormalizedPeriod,
@@ -76,16 +85,34 @@ export function generateFinancialInsights(
   currency: string = "PKR",
   orgId: string = "default_org"
 ): ActionableInsight[] {
-  // If no transactions or budgets exist, return empty (clean state for new users)
-  if ((!transactions || transactions.length === 0) && (!budgets || budgets.length === 0)) {
+  // Exclude deleted, void, or cancelled records
+  const validTxs = (transactions || []).filter((t) => {
+    if (!t) return false;
+    const status = (t as any).status;
+    return status !== "deleted" && status !== "void" && status !== "cancelled";
+  });
+  const validBudgets = (budgets || []).filter((b) => b && Number(b.allocated || 0) > 0);
+  const validDepts = (departments || []).filter((d) => d && (d.name || "").trim().length > 0);
+  const validDeptBudgets = validDepts.filter((d) => Number(d.budgetAllocated || 0) > 0);
+  const validPayroll = (payroll || []).filter((p) => p && Number(p.baseSalary || 0) > 0);
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // SCENARIO 1: ZERO FINANCIAL DATA (Clean State)
+  // ──────────────────────────────────────────────────────────────────────────
+  if (
+    validTxs.length === 0 &&
+    validBudgets.length === 0 &&
+    validDeptBudgets.length === 0 &&
+    validPayroll.length === 0
+  ) {
     return [];
   }
 
   const insights: ActionableInsight[] = [];
   const nowStr = new Date().toISOString();
 
-  const currentTxs = filterTransactionsByPeriod(transactions, currentPeriod);
-  const prevTxs = previousPeriod ? filterTransactionsByPeriod(transactions, previousPeriod) : [];
+  const currentTxs = filterTransactionsByPeriod(validTxs, currentPeriod);
+  const prevTxs = previousPeriod ? filterTransactionsByPeriod(validTxs, previousPeriod) : [];
 
   const income = calculateTotalIncome(currentTxs);
   const expense = calculateTotalExpenses(currentTxs);
@@ -94,31 +121,57 @@ export function generateFinancialInsights(
   const prevIncome = previousPeriod ? calculateTotalIncome(prevTxs) : 0;
   const prevExpense = previousPeriod ? calculateTotalExpenses(prevTxs) : 0;
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // 1. CASH FLOW & OPERATING RESULT INSIGHTS
-  // ──────────────────────────────────────────────────────────────────────────
-  const totalBudgeted = calculateBudgetAllocation(budgets, departments);
-  const totalBudgetSpent = calculateBudgetUsed(currentTxs, budgets, undefined, departments);
+  const totalBudgeted = calculateBudgetAllocation(validBudgets, validDepts);
+  const totalBudgetSpent = calculateBudgetUsed(currentTxs, validBudgets, undefined, validDepts);
   const netBudgetRemaining = calculateBudgetRemaining(totalBudgeted, totalBudgetSpent);
   const unallocatedFunds = Math.max(0, net - totalBudgeted);
 
-  if (net < 0 && expense > 0) {
+  // ──────────────────────────────────────────────────────────────────────────
+  // 1. CASH FLOW & OPERATING BALANCE INSIGHTS (Scenarios 2 & 3)
+  // ──────────────────────────────────────────────────────────────────────────
+  if (income > 0 && expense === 0) {
+    // SCENARIO 2: INCOME ONLY (Zero Outflows)
+    insights.push({
+      id: `cf-inflow-only-${currentPeriod.label}`,
+      organizationId: orgId,
+      type: "INFLOW_RECOGNITION",
+      title: "Recognized Inflow Surplus",
+      summary: `Recognized institutional inflows of ${currency} ${income.toLocaleString()} recorded during ${currentPeriod.label} with zero operational disbursements to date.`,
+      whyItMatters: `Operating with zero outflows preserves 100% of recognized capital (${currency} ${income.toLocaleString()} liquid cash), available for planned departmental or operational allocations.`,
+      recommendedAction: totalBudgeted > 0
+        ? "Review authorized department budget allocations before disbursing funds."
+        : "Configure department budget targets in Budgets to guide planned operational deployment.",
+      severity: "SUCCESS",
+      category: "cashflow",
+      metric: `+${currency} ${income.toLocaleString()} (0 Outflows)`,
+      currentValue: income,
+      changePercent: 100,
+      period: currentPeriod.label,
+      sourceReference: "Inflow Transactions Ledger",
+      actionRoute: totalBudgeted > 0 ? "/(tabs)/reports" : "/budget",
+      timestamp: nowStr,
+      isActionable: true,
+      confidence: 1.0,
+    });
+  } else if (net < 0 && expense > 0) {
+    // SCENARIO 3A: OPERATING DEFICIT (Outflows > Inflows)
     const isBudgetCovered = totalBudgeted > 0 && totalBudgetSpent <= totalBudgeted;
-    const burnRatio = income > 0 ? (expense / income) * 100 : 100;
     const excessOverRevenue = income > 0 ? ((expense - income) / income) * 100 : 100;
+    const burnRatio = income > 0 ? (expense / income) * 100 : 100;
+
     insights.push({
       id: `cf-deficit-${currentPeriod.label}`,
       organizationId: orgId,
       type: "OPERATING_DEFICIT",
       title: isBudgetCovered ? "Operating Deficit (Within Department Budget)" : "Operating Deficit Notice",
       summary: isBudgetCovered
-        ? `Disbursements exceed recognized inflows by ${currency} ${Math.abs(net).toLocaleString()} during ${currentPeriod.label}, but remain within approved department budget allocations (${currency} ${netBudgetRemaining.toLocaleString()} remaining).`
-        : `Disbursements exceed recognized institutional inflows by ${currency} ${Math.abs(net).toLocaleString()} during ${currentPeriod.label}.`,
+        ? `Disbursements exceed recognized inflows by ${currency} ${Math.abs(net).toLocaleString()} during ${currentPeriod.label}, but remain authorized within departmental budget allocations (${currency} ${netBudgetRemaining.toLocaleString()} remaining).`
+        : `Disbursements of ${currency} ${expense.toLocaleString()} exceed recognized institutional inflows (${currency} ${income.toLocaleString()}) by ${currency} ${Math.abs(net).toLocaleString()} during ${currentPeriod.label}.`,
       whyItMatters: isBudgetCovered
-        ? `Disbursements exceed incoming revenue by ${excessOverRevenue.toFixed(1)}%, but are authorized within departmental budget caps (${currency} ${netBudgetRemaining.toLocaleString()} remaining budget).`
+        ? `Disbursements exceed incoming revenue by ${excessOverRevenue.toFixed(1)}%, but are authorized within pre-allocated budget reserves (${currency} ${netBudgetRemaining.toLocaleString()} remaining).`
         : income > 0
-        ? `Disbursements exceed incoming revenue by ${excessOverRevenue.toFixed(1)}% (total spending is ${burnRatio.toFixed(1)}% of inflows), creating a deficit that degrades treasury reserves.`
-        : `Operating with zero incoming revenue (${currency} ${expense.toLocaleString()} disbursed), which depletes cash reserves.`,
+        ? `Disbursements exceed incoming revenue by ${excessOverRevenue.toFixed(1)}% (outflows are ${burnRatio.toFixed(1)}% of inflows), creating a deficit that degrades cash reserves.`
+        : `Operating with zero incoming revenue while disbursing ${currency} ${expense.toLocaleString()}, which directly depletes treasury reserves.`,
       recommendedAction: isBudgetCovered
         ? "Continue planned budget execution while tracking category disbursements against department caps."
         : "Review discretionary disbursements in Expenses and pause non-essential requisitions.",
@@ -135,27 +188,29 @@ export function generateFinancialInsights(
       isActionable: true,
       confidence: 1.0,
     });
-  } else if (net > 0 && income > 0) {
+  } else if (net > 0 && income > 0 && expense > 0) {
+    // SCENARIO 3B: OPERATING SURPLUS (Inflows > Outflows)
     const margin = (net / income) * 100;
     const isBudgetCovered = totalBudgeted > 0;
     const unallocatedPct = net > 0 ? (unallocatedFunds / net) * 100 : 0;
+
     insights.push({
       id: `cf-surplus-${currentPeriod.label}`,
       organizationId: orgId,
       type: "OPERATING_SURPLUS",
       title: isBudgetCovered ? "Positive Operating Cashflow & Budget Allocation" : "Positive Operating Surplus",
       summary: isBudgetCovered
-        ? `Net operating cashflow of ${currency} ${net.toLocaleString()} (+${margin.toFixed(1)}% margin) achieved. Department budgets allocated: ${currency} ${totalBudgeted.toLocaleString()} (${currency} ${unallocatedFunds.toLocaleString()} available to allocate).`
+        ? `Net operating cashflow of ${currency} ${net.toLocaleString()} (+${margin.toFixed(1)}% margin) achieved. Department budgets allocated: ${currency} ${totalBudgeted.toLocaleString()} (${currency} ${unallocatedFunds.toLocaleString()} unallocated reserve).`
         : `Net operating surplus of ${currency} ${net.toLocaleString()} achieved with a +${margin.toFixed(1)}% operating margin.`,
       whyItMatters: isBudgetCovered
-        ? `Operating with positive cashflow ensures liquidity while maintaining ${currency} ${unallocatedFunds.toLocaleString()} (${unallocatedPct.toFixed(0)}%) in unallocated reserve funds available to allocate.`
-        : "Healthy operating margins maintain liquid capital reserves for planned infrastructure.",
+        ? `Operating with positive cashflow preserves liquidity while retaining ${currency} ${unallocatedFunds.toLocaleString()} (${unallocatedPct.toFixed(0)}%) in unallocated reserve capital.`
+        : "Healthy operating margins maintain liquid capital reserves for planned institutional development.",
       recommendedAction: "Maintain current expenditure controls and review the consolidated statement for capital reserve allocations.",
       severity: "SUCCESS",
       category: "cashflow",
       metric: isBudgetCovered
         ? `+${currency} ${net.toLocaleString()} (${currency} ${unallocatedFunds.toLocaleString()} Available)`
-        : `+${currency} ${net.toLocaleString()} (${margin.toFixed(1)}% NOM)`,
+        : `+${currency} ${net.toLocaleString()} (+${margin.toFixed(1)}% NOM)`,
       currentValue: net,
       changePercent: margin,
       period: currentPeriod.label,
@@ -165,10 +220,52 @@ export function generateFinancialInsights(
       isActionable: true,
       confidence: 1.0,
     });
+  } else if (net === 0 && income > 0 && expense > 0) {
+    // SCENARIO 3C: BREAK-EVEN BALANCE (Inflows === Outflows)
+    insights.push({
+      id: `cf-breakeven-${currentPeriod.label}`,
+      organizationId: orgId,
+      type: "BALANCED_OPERATIONS",
+      title: "Break-Even Operating Balance",
+      summary: `Recognized inflows of ${currency} ${income.toLocaleString()} exactly match operational disbursements of ${currency} ${expense.toLocaleString()} during ${currentPeriod.label}.`,
+      whyItMatters: "Operating at exact break-even preserves existing cash reserves but provides 0.0% financial buffer against unforeseen operational obligations.",
+      recommendedAction: "Review discretionary disbursements in Expenses to generate an operating surplus margin.",
+      severity: "INFO",
+      category: "cashflow",
+      metric: `Balanced: ${currency} ${income.toLocaleString()} (0 Net)`,
+      currentValue: 0,
+      changePercent: 0,
+      period: currentPeriod.label,
+      sourceReference: "Operating Ledger Balance",
+      actionRoute: "/(tabs)/expenses",
+      timestamp: nowStr,
+      isActionable: true,
+      confidence: 1.0,
+    });
+  } else if (income === 0 && expense === 0 && currentTxs.length === 0 && validTxs.length > 0) {
+    // Current period has 0 records but other periods have records
+    insights.push({
+      id: `period-inactive-${currentPeriod.label}`,
+      organizationId: orgId,
+      type: "PERIOD_INACTIVE",
+      title: `No Recorded Activity in ${currentPeriod.label}`,
+      summary: `Zero revenue and zero disbursements recorded for ${currentPeriod.label}.`,
+      whyItMatters: "Financial monitoring requires continuous ledger recording to detect variance and preserve institutional runway.",
+      recommendedAction: "Record new inflows or expense receipts for this period, or switch timeline range to All Time.",
+      severity: "INFO",
+      category: "cashflow",
+      metric: "0 Transactions",
+      period: currentPeriod.label,
+      sourceReference: "Period Timeline Filter",
+      actionRoute: "/(tabs)/income",
+      timestamp: nowStr,
+      isActionable: true,
+      confidence: 1.0,
+    });
   }
 
   // ──────────────────────────────────────────────────────────────────────────
-  // 2. PERIOD-OVER-PERIOD INCOME & EXPENSE VELOCITY
+  // 2. PERIOD-OVER-PERIOD HISTORICAL TRENDS (STRICTLY GATED)
   // ──────────────────────────────────────────────────────────────────────────
   if (previousPeriod && prevIncome > 0 && income > 0) {
     const incChangePct = ((income - prevIncome) / prevIncome) * 100;
@@ -179,12 +276,12 @@ export function generateFinancialInsights(
         organizationId: orgId,
         type: "INCOME_GROWTH",
         title: "Revenue Expansion",
-        summary: `Inflows grew by +${incChangePct.toFixed(1)}% (${currency} ${diff.toLocaleString()}) compared to prior period.`,
+        summary: `Inflows grew by +${incChangePct.toFixed(1)}% (${currency} ${diff.toLocaleString()}) compared to ${previousPeriod.label} (${currency} ${prevIncome.toLocaleString()}).`,
         whyItMatters: "Higher institutional revenue strengthens operational stability and enables expanded department allocations.",
         recommendedAction: "Review high-performing revenue categories and verify timely receivable collections.",
         severity: "SUCCESS",
         category: "revenue",
-        metric: `+${incChangePct.toFixed(1)}% Inflows`,
+        metric: `+${incChangePct.toFixed(1)}% Inflows (+${currency} ${diff.toLocaleString()})`,
         currentValue: income,
         previousValue: prevIncome,
         changeAmount: diff,
@@ -202,12 +299,12 @@ export function generateFinancialInsights(
         organizationId: orgId,
         type: "INCOME_DECLINE",
         title: "Revenue Contraction Warning",
-        summary: `Inflows declined by ${Math.abs(incChangePct).toFixed(1)}% (${currency} ${Math.abs(diff).toLocaleString()}) compared to prior period.`,
-        whyItMatters: "Sustained revenue contraction requires proactive expense rationalization to avoid deficits.",
+        summary: `Inflows declined by ${Math.abs(incChangePct).toFixed(1)}% (${currency} ${Math.abs(diff).toLocaleString()}) compared to ${previousPeriod.label} (${currency} ${prevIncome.toLocaleString()}).`,
+        whyItMatters: "Sustained revenue contraction requires proactive expense rationalization to avoid operating deficits.",
         recommendedAction: "Audit outstanding client grants/invoices and review collection follow-ups.",
         severity: "WARNING",
         category: "revenue",
-        metric: `${incChangePct.toFixed(1)}% Inflow Contraction`,
+        metric: `${incChangePct.toFixed(1)}% Inflow Contraction (-${currency} ${Math.abs(diff).toLocaleString()})`,
         currentValue: income,
         previousValue: prevIncome,
         changeAmount: diff,
@@ -231,12 +328,12 @@ export function generateFinancialInsights(
         organizationId: orgId,
         type: "EXPENSE_SURGE",
         title: "Outflow Acceleration Alert",
-        summary: `Operational spending increased by +${expChangePct.toFixed(1)}% (${currency} ${diff.toLocaleString()}) vs prior period.`,
-        whyItMatters: "Rapid cost growth can quickly outpace revenue growth and deplete operating buffers.",
+        summary: `Operational spending increased by +${expChangePct.toFixed(1)}% (${currency} ${diff.toLocaleString()}) vs ${previousPeriod.label} (${currency} ${prevExpense.toLocaleString()}).`,
+        whyItMatters: "Rapid cost growth can quickly outpace revenue growth and deplete operating cash reserves.",
         recommendedAction: "Examine department-level expenditure variance and verify all large purchase orders.",
         severity: expChangePct >= 35 ? "CRITICAL" : "WARNING",
         category: "expense",
-        metric: `+${expChangePct.toFixed(1)}% Outflows`,
+        metric: `+${expChangePct.toFixed(1)}% Outflows (+${currency} ${diff.toLocaleString()})`,
         currentValue: expense,
         previousValue: prevExpense,
         changeAmount: diff,
@@ -254,12 +351,12 @@ export function generateFinancialInsights(
         organizationId: orgId,
         type: "EXPENSE_OPTIMIZATION",
         title: "Expenditure Reduction Achieved",
-        summary: `Operating costs decreased by ${Math.abs(expChangePct).toFixed(1)}% (${currency} ${Math.abs(diff).toLocaleString()}) compared to prior period.`,
+        summary: `Operating costs decreased by ${Math.abs(expChangePct).toFixed(1)}% (${currency} ${Math.abs(diff).toLocaleString()}) compared to ${previousPeriod.label} (${currency} ${prevExpense.toLocaleString()}).`,
         whyItMatters: "Prudent spending discipline expands available net operating margin.",
         recommendedAction: "Acknowledge cost-effective procurement practices across active departments.",
         severity: "SUCCESS",
         category: "expense",
-        metric: `${expChangePct.toFixed(1)}% Reduced Outflow`,
+        metric: `${expChangePct.toFixed(1)}% Reduced Outflow (-${currency} ${Math.abs(diff).toLocaleString()})`,
         currentValue: expense,
         previousValue: prevExpense,
         changeAmount: diff,
@@ -288,14 +385,14 @@ export function generateFinancialInsights(
     });
 
   const sortedCats = Object.entries(catTotals).sort((a, b) => b[1].amount - a[1].amount);
-  const totalPayroll = calculatePayrollCost(payroll);
+  const totalPayroll = calculatePayrollCost(validPayroll);
 
   if (sortedCats.length > 0 && expense > 0) {
     const [topCat, topData] = sortedCats[0];
     const topPct = (topData.amount / expense) * 100;
     const isPayrollCat = /salary|salaries|payroll|wage|compensation|stipend/i.test(topCat);
 
-    // If this category is payroll/salaries and payroll records exist, skip here to avoid duplicating Section 5
+    // If this category is payroll/salaries and payroll records exist, skip here to avoid duplicating Section 6
     if (topPct >= 35 && (!isPayrollCat || totalPayroll === 0)) {
       insights.push({
         id: `cat-concentration-${topCat}`,
@@ -311,7 +408,7 @@ export function generateFinancialInsights(
           : `Inspect individual vendor disbursements within ${topCat} to evaluate recurring service contracts.`,
         severity: net < 0 && topPct >= 55 ? "WARNING" : "INFO",
         category: isPayrollCat ? "payroll" : "expense",
-        metric: `${topPct.toFixed(1)}% of Total Outflows`,
+        metric: `${topPct.toFixed(1)}% of Outflows (${currency} ${topData.amount.toLocaleString()})`,
         currentValue: topData.amount,
         changePercent: topPct,
         period: currentPeriod.label,
@@ -325,10 +422,64 @@ export function generateFinancialInsights(
   }
 
   // ──────────────────────────────────────────────────────────────────────────
-  // 4. BUDGET LIMITS, UTILIZATION & VELOCITY FORECAST
+  // 4. OVERALL & CATEGORY BUDGET UTILIZATION (SCENARIO 4)
   // ──────────────────────────────────────────────────────────────────────────
+  // 4A. Overall Institutional Budget Utilization
+  if (totalBudgeted > 0 && expense > 0) {
+    const overallUtil = (totalBudgetSpent / totalBudgeted) * 100;
+    if (overallUtil > 100) {
+      const overallExcess = totalBudgetSpent - totalBudgeted;
+      insights.push({
+        id: `overall-budget-overrun-${currentPeriod.label}`,
+        organizationId: orgId,
+        type: "OVERALL_BUDGET_OVERRUN",
+        title: "Institutional Budget Limit Exceeded",
+        summary: `Total departmental spending of ${currency} ${totalBudgetSpent.toLocaleString()} has exceeded the institutional allocation of ${currency} ${totalBudgeted.toLocaleString()} by ${currency} ${overallExcess.toLocaleString()} (${overallUtil.toFixed(1)}% utilized).`,
+        whyItMatters: "Cumulative budget overruns compromise organizational solvency and drain capital reserves.",
+        recommendedAction: "Review active departmental disbursements in Budget and enforce spending freezes on depleted cost centers.",
+        severity: "CRITICAL",
+        category: "budget",
+        metric: `+${(overallUtil - 100).toFixed(1)}% Over Cap (${currency} ${overallExcess.toLocaleString()})`,
+        currentValue: totalBudgetSpent,
+        previousValue: totalBudgeted,
+        changeAmount: overallExcess,
+        changePercent: overallUtil,
+        period: currentPeriod.label,
+        sourceReference: "Institutional Budget Consolidation",
+        actionRoute: "/budget",
+        timestamp: nowStr,
+        isActionable: true,
+        confidence: 1.0,
+      });
+    } else if (overallUtil >= 85) {
+      insights.push({
+        id: `overall-budget-warning-${currentPeriod.label}`,
+        organizationId: orgId,
+        type: "OVERALL_BUDGET_WARNING",
+        title: "Institutional Budget Approaching Ceiling",
+        summary: `Total expenditure has reached ${overallUtil.toFixed(1)}% of the institutional budget ceiling (${currency} ${totalBudgetSpent.toLocaleString()} of ${currency} ${totalBudgeted.toLocaleString()}), leaving ${currency} ${netBudgetRemaining.toLocaleString()} remaining.`,
+        whyItMatters: "Overall budget buffer is constrained before concluding the active financial cycle.",
+        recommendedAction: "Audit upcoming requisitions across departments to avoid organizational budget exhaustion.",
+        severity: "WARNING",
+        category: "budget",
+        metric: `${overallUtil.toFixed(1)}% Utilized (${currency} ${netBudgetRemaining.toLocaleString()} Left)`,
+        currentValue: totalBudgetSpent,
+        previousValue: totalBudgeted,
+        changeAmount: netBudgetRemaining,
+        changePercent: overallUtil,
+        period: currentPeriod.label,
+        sourceReference: "Institutional Budget Consolidation",
+        actionRoute: "/budget",
+        timestamp: nowStr,
+        isActionable: true,
+        confidence: 0.95,
+      });
+    }
+  }
+
+  // 4B. Line-Item & Department Pool Budget Inspection
   const budgetInspectionList: { id: string; category: string; department?: string; allocated: number; isDepartmentPool?: boolean }[] = [];
-  budgets.forEach((b) => {
+  validBudgets.forEach((b) => {
     budgetInspectionList.push({
       id: b.id,
       category: b.category || "General",
@@ -338,7 +489,7 @@ export function generateFinancialInsights(
     });
   });
 
-  departments.forEach((d) => {
+  validDepts.forEach((d) => {
     const dName = (d.name || "").trim();
     const dAlloc = safeNumber(d.budgetAllocated, 0);
     if (dAlloc <= 0 || !dName) return;
@@ -372,7 +523,7 @@ export function generateFinancialInsights(
     if (b.isDepartmentPool) {
       const bDept = (b.department || "").trim().toLowerCase();
       spent = currentTxs
-        .filter((t) => t.type === "expense" && (t.department || "").trim().toLowerCase() === bDept && t.status !== "failed")
+        .filter((t) => t.type === "expense" && (t.department || "").trim().toLowerCase() === bDept)
         .reduce((s, t) => s + safeNumber(t.amount, 0), 0);
     } else {
       spent = calculateBudgetSpentForCategory(b as any, currentTxs, currentPeriod);
@@ -412,7 +563,7 @@ export function generateFinancialInsights(
           organizationId: orgId,
           type: "BUDGET_WARNING",
           title: `Budget Approaching Ceiling: ${b.category || b.department}`,
-          summary: `${b.category || b.department} is at ${util.toFixed(1)}% capacity with ${currency} ${remaining.toLocaleString()} remaining.`,
+          summary: `${b.category || b.department} has utilized ${util.toFixed(1)}% of its allocated budget (${currency} ${spent.toLocaleString()} of ${currency} ${allocated.toLocaleString()}), leaving ${currency} ${remaining.toLocaleString()} remaining.`,
           whyItMatters: "Cost center is close to exhaustion before period conclusion.",
           recommendedAction: "Review scheduled requisitions to avoid budget overrun.",
           severity: "WARNING",
@@ -436,8 +587,8 @@ export function generateFinancialInsights(
           type: "BUDGET_UNSPENT",
           title: `Approved Budget Reserves Intact: ${b.category || b.department}`,
           summary: `Approved budget allocation of ${currency} ${allocated.toLocaleString()} remains 100% intact with zero disbursements recorded.`,
-          whyItMatters: "Operations are presently self-funded from recognized revenue, preserving pre-allocated capital reserves for scheduled initiatives.",
-          recommendedAction: "Review departmental milestones in Budget Allocations to track project execution or deploy capital.",
+          whyItMatters: "Pre-allocated capital reserves are preserved for scheduled operational initiatives.",
+          recommendedAction: "Review departmental milestones in Budget Allocations to deploy planned capital.",
           severity: "INFO",
           category: "budget",
           metric: `0% Disbursed (${currency} ${allocated.toLocaleString()} Intact)`,
@@ -457,18 +608,91 @@ export function generateFinancialInsights(
   });
 
   // ──────────────────────────────────────────────────────────────────────────
-  // 5. PAYROLL DISBURSAL WEIGHT
+  // 5. DEPARTMENT SPENDING & COST CENTERS (SCENARIO 5)
   // ──────────────────────────────────────────────────────────────────────────
-  if (expense > 0 && totalPayroll > 0) {
+  const deptSpendingMap: Record<string, number> = {};
+  currentTxs
+    .filter((t) => t.type === "expense")
+    .forEach((t) => {
+      const deptName = (t.department || "General").trim();
+      deptSpendingMap[deptName] = (deptSpendingMap[deptName] || 0) + safeNumber(t.amount, 0);
+    });
+
+  const sortedDeptSpending = Object.entries(deptSpendingMap).sort((a, b) => b[1] - a[1]);
+
+  if (sortedDeptSpending.length > 0 && expense > 0) {
+    const [topDeptName, topDeptAmt] = sortedDeptSpending[0];
+    const topDeptPct = (topDeptAmt / expense) * 100;
+
+    // 5A. Top Department Spending Concentration
+    if (topDeptPct >= 40 && sortedDeptSpending.length >= 2) {
+      insights.push({
+        id: `dept-concentration-${topDeptName}`,
+        organizationId: orgId,
+        type: "DEPARTMENT_CONCENTRATION",
+        title: `Primary Cost Driver: ${topDeptName}`,
+        summary: `${topDeptName} represents ${topDeptPct.toFixed(1)}% of all organizational disbursements (${currency} ${topDeptAmt.toLocaleString()}) during ${currentPeriod.label}.`,
+        whyItMatters: "High expenditure concentration in a single department increases reliance on that unit's operational efficiency.",
+        recommendedAction: `Inspect line-item requisitions in ${topDeptName} to confirm expenditures match deliverable milestones.`,
+        severity: net < 0 && topDeptPct >= 55 ? "WARNING" : "INFO",
+        category: "department",
+        metric: `${topDeptPct.toFixed(1)}% of Outflows (${currency} ${topDeptAmt.toLocaleString()})`,
+        currentValue: topDeptAmt,
+        changePercent: topDeptPct,
+        period: currentPeriod.label,
+        sourceReference: `Cost Center / ${topDeptName}`,
+        actionRoute: "/departments",
+        timestamp: nowStr,
+        isActionable: true,
+        confidence: 0.9,
+      });
+    }
+
+    // 5B. Unbudgeted Department Spending Alert
+    sortedDeptSpending.forEach(([dName, dSpend]) => {
+      if (dSpend >= 1000) {
+        const dMatch = validDepts.find((d) => (d.name || "").trim().toLowerCase() === dName.toLowerCase());
+        const hasBudgetDoc = validBudgets.some((b) => (b.department || "").trim().toLowerCase() === dName.toLowerCase());
+        const dAlloc = dMatch ? safeNumber(dMatch.budgetAllocated, 0) : 0;
+
+        if (dAlloc <= 0 && !hasBudgetDoc) {
+          insights.push({
+            id: `dept-unbudgeted-${dName}`,
+            organizationId: orgId,
+            type: "UNBUDGETED_DEPARTMENT_SPEND",
+            title: `Unbudgeted Disbursements: ${dName}`,
+            summary: `${dName} has recorded ${currency} ${dSpend.toLocaleString()} in operational disbursements without an authorized budget allocation cap.`,
+            whyItMatters: "Uncapped departmental disbursements risk unauthorized capital drain.",
+            recommendedAction: `Navigate to Departments or Budget to establish an authorized allocation cap for ${dName}.`,
+            severity: "WARNING",
+            category: "department",
+            metric: `${currency} ${dSpend.toLocaleString()} Unbudgeted`,
+            currentValue: dSpend,
+            period: currentPeriod.label,
+            sourceReference: `Unbudgeted Cost Center / ${dName}`,
+            actionRoute: "/departments",
+            timestamp: nowStr,
+            isActionable: true,
+            confidence: 0.95,
+          });
+        }
+      }
+    });
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // 6. PAYROLL DISBURSAL WEIGHT (SCENARIO 6 - ONLY IF PAYROLL EXISTS)
+  // ──────────────────────────────────────────────────────────────────────────
+  if (expense > 0 && validPayroll.length > 0 && totalPayroll > 0) {
     const payrollPct = (totalPayroll / expense) * 100;
     const revPct = income > 0 ? (totalPayroll / income) * 100 : null;
-    if (payrollPct >= 45) {
+    if (payrollPct >= 35) {
       insights.push({
         id: `payroll-weight-${currentPeriod.label}`,
         organizationId: orgId,
         type: "PAYROLL_WEIGHT",
         title: "Staff Compensation Commitment",
-        summary: `Staff compensation represents ${payrollPct.toFixed(1)}% of total period disbursements (${currency} ${totalPayroll.toLocaleString()})${revPct !== null ? `, accounted at ${revPct.toFixed(1)}% of revenue` : ""}.`,
+        summary: `Staff compensation represents ${payrollPct.toFixed(1)}% of total period disbursements (${currency} ${totalPayroll.toLocaleString()} across ${validPayroll.length} staff)${revPct !== null ? `, accounting for ${revPct.toFixed(1)}% of revenue` : ""}.`,
         whyItMatters: revPct !== null && revPct <= 50
           ? `Remuneration commitments are well-calibrated against operating revenue (${revPct.toFixed(1)}% of inflows), ensuring stable liquidity.`
           : "Fixed remuneration obligations require stable recurring cash receipts to ensure timely disbursement.",
@@ -479,7 +703,7 @@ export function generateFinancialInsights(
         currentValue: totalPayroll,
         changePercent: payrollPct,
         period: currentPeriod.label,
-        sourceReference: `Payroll Disbursals (${payroll.length} Staff)`,
+        sourceReference: `Payroll Disbursals (${validPayroll.length} Staff)`,
         actionRoute: "/payroll",
         timestamp: nowStr,
         isActionable: true,
@@ -489,7 +713,7 @@ export function generateFinancialInsights(
   }
 
   // ──────────────────────────────────────────────────────────────────────────
-  // 6. ANOMALY DETECTION (STATISTICAL OUTLIER DETECTION)
+  // 7. STATISTICAL OUTLIER DETECTION (ANOMALY)
   // ──────────────────────────────────────────────────────────────────────────
   const expenseTxs = currentTxs.filter((t) => t.type === "expense");
   // Outlier detection requires sufficient sample size (>= 5 transactions) for statistical validity
@@ -522,7 +746,7 @@ export function generateFinancialInsights(
   }
 
   // ──────────────────────────────────────────────────────────────────────────
-  // 7. POTENTIAL DUPLICATE TRANSACTION DETECTION
+  // 8. POTENTIAL DUPLICATE TRANSACTION DETECTION
   // ──────────────────────────────────────────────────────────────────────────
   for (let i = 0; i < currentTxs.length; i++) {
     for (let j = i + 1; j < currentTxs.length; j++) {

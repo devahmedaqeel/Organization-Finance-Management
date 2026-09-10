@@ -202,11 +202,83 @@ assert(totalPool === 215000, "Test 18a: Total Funding Pool is strictly 215,000 (
 assert(netSurplus === 210000, "Test 18b: Net Surplus is strictly 210,000 (215k Pool - 5k Expense)");
 assert(Math.round((totalExp / totalBud) * 100 * 10) / 10 === 2.5, "Test 18c: Budget utilization is strictly 2.5% (NOT 0%)");
 
-// STEP 11: Actionable Recommendations Evaluation
-const testInsights = generateFinancialInsights(testOrgTxs, testOrgBudgets, [], [], currentPeriod, undefined, "PKR", "test_org");
-assert(testInsights !== null && Array.isArray(testInsights), "Test 19a: AI insights returns valid array");
-const hasActionableOrAlert = testInsights.some(i => i.isActionable || i.severity === "CRITICAL" || i.severity === "WARNING" || i.severity === "INFO");
-assert(hasActionableOrAlert, "Test 19b: AI insights generates actionable advisories or operational intelligence");
+// STEP 12: Scenario 2 - Income Only (Zero Outflows) Test
+const incomeOnlyTxs: Transaction[] = [
+  { id: "inc-only-1", type: "income", category: "Client Retainer", amount: 75000, date: "2026-08-05", department: "Growth", description: "Retainer" },
+];
+const incomeOnlyInsights = generateFinancialInsights(incomeOnlyTxs, [], [], [], currentPeriod);
+const inflowRec = incomeOnlyInsights.find((i) => i.type === "INFLOW_RECOGNITION");
+assert(!!inflowRec, "Test 20a: Income-only dataset triggers INFLOW_RECOGNITION insight");
+assert(inflowRec?.severity === "SUCCESS", "Test 20b: Inflow recognition severity is SUCCESS");
+assert(!incomeOnlyInsights.some((i) => i.type === "EXPENSE_SURGE" || i.type === "BUDGET_OVERRUN"), "Test 20c: Zero fake expense or budget alerts on income-only dataset");
+
+// STEP 13: Scenario 3c - Break-Even Operating Balance (Inflow === Outflow) Test
+const breakEvenTxs: Transaction[] = [
+  { id: "be-1", type: "income", category: "Grants", amount: 30000, date: "2026-08-05", department: "Admin", description: "Grant" },
+  { id: "be-2", type: "expense", category: "Operations", amount: 30000, date: "2026-08-10", department: "Admin", description: "Operations" },
+];
+const breakEvenInsights = generateFinancialInsights(breakEvenTxs, [], [], [], currentPeriod);
+const beInsight = breakEvenInsights.find((i) => i.type === "BALANCED_OPERATIONS");
+assert(!!beInsight, "Test 21a: Break-even (inflows === outflows) triggers BALANCED_OPERATIONS insight");
+assert(beInsight?.severity === "INFO", "Test 21b: Break-even severity is INFO");
+
+// STEP 14: Scenario 4 - Overall Institutional Budget Overrun & Warning
+const overBudgets: Budget[] = [
+  { id: "b-all", category: "General", department: "All", allocated: 100000, spent: 110000, period: "2026-08" },
+];
+const overTxs: Transaction[] = [
+  { id: "ot-1", type: "expense", category: "General", amount: 110000, date: "2026-08-12", department: "Operations", description: "Heavy Op" },
+];
+const overInsights = generateFinancialInsights(overTxs, overBudgets, [], [], currentPeriod);
+const overallOver = overInsights.find((i) => i.type === "OVERALL_BUDGET_OVERRUN");
+assert(!!overallOver, "Test 22a: Institutional expenditure > budget triggers OVERALL_BUDGET_OVERRUN");
+assert(overallOver?.severity === "CRITICAL", "Test 22b: Institutional budget overrun severity is CRITICAL");
+
+// STEP 15: Scenario 5 - Department Spending Concentration & Unbudgeted Department Spend
+const deptTxs: Transaction[] = [
+  { id: "dt-1", type: "expense", category: "Servers", amount: 40000, date: "2026-08-05", department: "Engineering", description: "Cloud" },
+  { id: "dt-2", type: "expense", category: "Marketing", amount: 5000, date: "2026-08-08", department: "Growth", description: "Ads" },
+];
+const deptList: Department[] = [
+  { id: "d-eng", name: "Engineering", headCount: 15, budgetAllocated: 50000 },
+  { id: "d-grw", name: "Growth", headCount: 5, budgetAllocated: 0 }, // Unbudgeted!
+];
+const deptInsights = generateFinancialInsights(deptTxs, [], [], deptList, currentPeriod);
+const deptConc = deptInsights.find((i) => i.type === "DEPARTMENT_CONCENTRATION");
+const unbudgetedDept = deptInsights.find((i) => i.type === "UNBUDGETED_DEPARTMENT_SPEND");
+assert(!!deptConc, "Test 23a: Top department spending (>40% of outflows) triggers DEPARTMENT_CONCENTRATION");
+assert(!!unbudgetedDept, "Test 23b: Unbudgeted department spending triggers UNBUDGETED_DEPARTMENT_SPEND");
+
+// STEP 16: Scenario 6 - Payroll Weight Only When Payroll Exists
+const payrollTxs: Transaction[] = [
+  { id: "ptx-1", type: "expense", category: "Salaries", amount: 20000, date: "2026-08-10", department: "Engineering", description: "Payroll" },
+  { id: "ptx-2", type: "expense", category: "Software", amount: 5000, date: "2026-08-12", department: "Engineering", description: "Tools" },
+];
+const payrollRecords: PayrollEntry[] = [
+  { id: "p-1", employeeName: "Zahid Ali", employeeId: "EMP01", department: "Engineering", baseSalary: 12000, bonus: 0, deductions: 0, month: "2026-08" },
+];
+const payrollInsights = generateFinancialInsights(payrollTxs, [], payrollRecords, [], currentPeriod);
+const payWeight = payrollInsights.find((i) => i.type === "PAYROLL_WEIGHT");
+assert(!!payWeight, "Test 24a: Payroll records present triggers PAYROLL_WEIGHT insight");
+const noPayrollInsights = generateFinancialInsights(payrollTxs, [], [], [], currentPeriod);
+assert(!noPayrollInsights.some((i) => i.type === "PAYROLL_WEIGHT"), "Test 24b: Zero payroll insights generated when no payroll records exist");
+
+// STEP 17: Historical Trend Gating (No Previous Period Data = No Unsupported Trend Claims)
+const singlePeriodTxs: Transaction[] = [
+  { id: "sp-1", type: "income", category: "Sales", amount: 50000, date: "2026-08-10", department: "Sales", description: "Sales" },
+];
+const noTrendInsights = generateFinancialInsights(singlePeriodTxs, [], [], [], currentPeriod, undefined);
+assert(!noTrendInsights.some((i) => i.type === "INCOME_GROWTH" || i.type === "INCOME_DECLINE"), "Test 25: No historical comparison period = ZERO unsupported trend claims");
+
+// STEP 18: Standardized 3-Part/4-Part Insight Format Completeness
+const sampleInsights = generateFinancialInsights(deficitTxs, budgets, [], [], currentPeriod);
+sampleInsights.forEach((insight) => {
+  assert(!!insight.title && insight.title.length > 0, `Test 26a: Insight ${insight.id} has title`);
+  assert(!!insight.summary && insight.summary.length > 0, `Test 26b: Insight ${insight.id} has summary (WHAT)`);
+  assert(!!insight.whyItMatters && insight.whyItMatters.length > 0, `Test 26c: Insight ${insight.id} has whyItMatters (WHY)`);
+  assert(!!insight.recommendedAction && insight.recommendedAction.length > 0, `Test 26d: Insight ${insight.id} has recommendedAction (ACTION)`);
+  assert(!!insight.metric && insight.metric.length > 0, `Test 26e: Insight ${insight.id} has metric (DATA CONTEXT)`);
+});
 
 console.log("\n=======================================================");
 console.log("ALL FINANCIAL INSIGHTS & HEALTH ENGINE TESTS PASSED 100% ✅");

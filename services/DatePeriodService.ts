@@ -275,6 +275,144 @@ export function createCustomDatePeriod(startDate: string, endDate: string, custo
   };
 }
 
+export function getPreviousPeriod(period?: NormalizedPeriod): NormalizedPeriod | undefined {
+  if (!period || !period.startDate || !period.endDate || period.presetId === "all_time") {
+    return undefined;
+  }
+
+  const key = (period.presetId || "").toLowerCase().trim();
+  const start = parseYMD(period.startDate);
+  const end = parseYMD(period.endDate);
+
+  if (key === "today") {
+    const prev = new Date(start);
+    prev.setDate(start.getDate() - 1);
+    const prevStr = formatYMD(prev);
+    return {
+      mode: "presets",
+      startDate: prevStr,
+      endDate: prevStr,
+      label: `Yesterday (${formatReadableDate(prevStr)})`,
+      granularity: "day",
+      presetId: "yesterday",
+    };
+  }
+
+  if (key === "1w" || key === "this_week" || key === "last_7d") {
+    const prevEnd = new Date(start);
+    prevEnd.setDate(start.getDate() - 1);
+    const prevStart = new Date(prevEnd);
+    prevStart.setDate(prevEnd.getDate() - 6);
+    return {
+      mode: "presets",
+      startDate: formatYMD(prevStart),
+      endDate: formatYMD(prevEnd),
+      label: "Prior 7 Days",
+      granularity: "day",
+      presetId: "prev_7d",
+    };
+  }
+
+  if (key === "2w" || key === "last_14d") {
+    const prevEnd = new Date(start);
+    prevEnd.setDate(start.getDate() - 1);
+    const prevStart = new Date(prevEnd);
+    prevStart.setDate(prevEnd.getDate() - 13);
+    return {
+      mode: "presets",
+      startDate: formatYMD(prevStart),
+      endDate: formatYMD(prevEnd),
+      label: "Prior 14 Days",
+      granularity: "day",
+      presetId: "prev_14d",
+    };
+  }
+
+  if (key === "1m" || key === "this_month") {
+    const prevStart = new Date(start.getFullYear(), start.getMonth() - 1, 1);
+    const prevEnd = new Date(start.getFullYear(), start.getMonth(), 0);
+    return {
+      mode: "presets",
+      startDate: formatYMD(prevStart),
+      endDate: formatYMD(prevEnd),
+      label: `Prior Month (${MONTH_NAMES_SHORT[prevStart.getMonth()]} ${prevStart.getFullYear()})`,
+      granularity: "week",
+      presetId: "prev_month",
+    };
+  }
+
+  if (key === "last_30d") {
+    const prevEnd = new Date(start);
+    prevEnd.setDate(start.getDate() - 1);
+    const prevStart = new Date(prevEnd);
+    prevStart.setDate(prevEnd.getDate() - 29);
+    return {
+      mode: "presets",
+      startDate: formatYMD(prevStart),
+      endDate: formatYMD(prevEnd),
+      label: "Prior 30 Days",
+      granularity: "week",
+      presetId: "prev_30d",
+    };
+  }
+
+  if (key === "3m" || key === "last_3m") {
+    const prevEnd = new Date(start.getFullYear(), start.getMonth(), 0);
+    const prevStart = new Date(prevEnd.getFullYear(), prevEnd.getMonth() - 2, 1);
+    return {
+      mode: "presets",
+      startDate: formatYMD(prevStart),
+      endDate: formatYMD(prevEnd),
+      label: "Prior 3 Months",
+      granularity: "month",
+      presetId: "prev_3m",
+    };
+  }
+
+  if (key === "6m" || key === "last_6m") {
+    const prevEnd = new Date(start.getFullYear(), start.getMonth(), 0);
+    const prevStart = new Date(prevEnd.getFullYear(), prevEnd.getMonth() - 5, 1);
+    return {
+      mode: "presets",
+      startDate: formatYMD(prevStart),
+      endDate: formatYMD(prevEnd),
+      label: "Prior 6 Months",
+      granularity: "month",
+      presetId: "prev_6m",
+    };
+  }
+
+  if (key === "1y" || key === "this_year") {
+    const py = start.getFullYear() - 1;
+    return {
+      mode: "presets",
+      startDate: `${py}-01-01`,
+      endDate: `${py}-12-31`,
+      label: `Prior Year ${py}`,
+      granularity: "month",
+      presetId: "prev_year",
+    };
+  }
+
+  // Custom / fallback date range: shift back by exact duration
+  const diffDays = Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+  const prevEnd = new Date(start);
+  prevEnd.setDate(start.getDate() - 1);
+  const prevStart = new Date(prevEnd);
+  prevStart.setDate(prevEnd.getDate() - diffDays + 1);
+  const sStr = formatYMD(prevStart);
+  const eStr = formatYMD(prevEnd);
+
+  return {
+    mode: period.mode || "days",
+    startDate: sStr,
+    endDate: eStr,
+    label: `Prior Period (${formatReadableDate(sStr)} → ${formatReadableDate(eStr)})`,
+    granularity: calculateIntelligentGranularity(sStr, eStr),
+    presetId: "custom_prior",
+  };
+}
+
 export function filterTransactionsByPeriod(
   transactions: Transaction[],
   period: NormalizedPeriod
