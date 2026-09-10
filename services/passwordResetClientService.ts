@@ -36,16 +36,18 @@ export async function requestPasswordReset(
     return { success: false, error: "Please enter a valid email address." };
   }
 
-  // 1. Immediate Dispatch: Firebase Auth Password Reset Email with ActionCodeSettings
+  // Single Authoritative Dispatch: Firebase Authentication
   try {
     const actionCodeSettings = {
-      url: `${API_BASE_URL}/reset-password`,
-      handleCodeInApp: true,
+      url: `${API_BASE_URL}/login`,
+      handleCodeInApp: false,
     };
     await sendPasswordResetEmail(auth, cleanEmail, actionCodeSettings);
-    console.log("[FIREBASE_RESET_SUCCESS] Sent reset email with action code to:", cleanEmail);
+    console.log("[FIREBASE_RESET_SUCCESS] Sent reset email to:", cleanEmail);
+    return { success: true, message: GENERIC_RESET_SUCCESS_MSG };
   } catch (fbErr: any) {
-    console.log("[FIREBASE_RESET_ACTION_CODE_CODE]", fbErr?.code, fbErr?.message);
+    console.log("[FIREBASE_RESET_ERROR]", fbErr?.code, fbErr?.message);
+
     if (fbErr?.code === "auth/invalid-email") {
       return { success: false, error: "Please enter a valid email address." };
     }
@@ -55,35 +57,27 @@ export async function requestPasswordReset(
     if (fbErr?.code === "auth/too-many-requests") {
       return { success: false, error: "Too many reset attempts. Please wait a few minutes and try again." };
     }
+    if (fbErr?.code === "auth/user-not-found") {
+      // Email enumeration privacy protection
+      return { success: true, message: GENERIC_RESET_SUCCESS_MSG };
+    }
 
-    // Fallback to standard sendPasswordResetEmail
-    try {
-      await sendPasswordResetEmail(auth, cleanEmail);
-      console.log("[FIREBASE_RESET_SUCCESS] Sent standard reset email to:", cleanEmail);
-    } catch (fallbackErr: any) {
-      console.log("[FIREBASE_RESET_STANDARD_FALLBACK]", fallbackErr?.code, fallbackErr?.message);
-      if (fallbackErr?.code === "auth/invalid-email") {
-        return { success: false, error: "Please enter a valid email address." };
-      }
-      if (fallbackErr?.code === "auth/network-request-failed") {
-        return { success: false, error: "Network error. Please check your internet connection and try again." };
-      }
-      if (fallbackErr?.code === "auth/too-many-requests") {
-        return { success: false, error: "Too many reset attempts. Please wait a few minutes and try again." };
+    // If continueUrl was not accepted by Firebase project settings, fallback ONCE to plain reset email
+    if (fbErr?.code === "auth/unauthorized-continue-uri" || fbErr?.code === "auth/invalid-continue-uri") {
+      try {
+        await sendPasswordResetEmail(auth, cleanEmail);
+        console.log("[FIREBASE_RESET_PLAIN_SUCCESS] Sent standard reset email to:", cleanEmail);
+        return { success: true, message: GENERIC_RESET_SUCCESS_MSG };
+      } catch (fallbackErr: any) {
+        if (fallbackErr?.code === "auth/too-many-requests") {
+          return { success: false, error: "Too many reset attempts. Please wait a few minutes and try again." };
+        }
+        return { success: false, error: fallbackErr?.message || "Unable to send reset email. Please try again." };
       }
     }
+
+    return { success: false, error: fbErr?.message || "Unable to send reset email. Please try again." };
   }
-
-  // 2. Also call backend Cloud Function in parallel if deployed
-  try {
-    const forgotFn = httpsCallable<{ email: string; appUrl?: string }, { success: boolean; message: string }>(
-      functions,
-      "forgotPasswordCallable"
-    );
-    forgotFn({ email: cleanEmail, appUrl: API_BASE_URL }).catch(() => {});
-  } catch {}
-
-  return { success: true, message: GENERIC_RESET_SUCCESS_MSG };
 }
 
 /**

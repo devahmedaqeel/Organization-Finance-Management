@@ -21,10 +21,26 @@ import {
 
 export default function ResetPasswordScreen() {
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams();
+  const params = useLocalSearchParams<{ oobCode?: string; token?: string }>();
+  const resolveToken = (): string => {
+    if (typeof window !== "undefined" && window.location) {
+      if (window.location.search) {
+        const searchParams = new URLSearchParams(window.location.search);
+        const code = searchParams.get("oobCode") || searchParams.get("token");
+        if (code) return code.trim();
+      }
+      if (window.location.hash && window.location.hash.includes("?")) {
+        const hashQuery = window.location.hash.split("?")[1];
+        const hashParams = new URLSearchParams(hashQuery);
+        const code = hashParams.get("oobCode") || hashParams.get("token");
+        if (code) return code.trim();
+      }
+    }
+    const rawTokenParam = params.oobCode || params.token || "";
+    return (Array.isArray(rawTokenParam) ? rawTokenParam[0] : rawTokenParam).trim();
+  };
 
-  const rawTokenParam = params.token || params.oobCode || "";
-  const token = Array.isArray(rawTokenParam) ? rawTokenParam[0] : rawTokenParam;
+  const token = resolveToken();
 
   const [verifying, setVerifying] = useState(true);
   const [tokenValid, setTokenValid] = useState(false);
