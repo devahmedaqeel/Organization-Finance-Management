@@ -29,11 +29,11 @@ const API_BASE_URL =
  */
 export async function requestPasswordReset(
   email: string
-): Promise<{ success: boolean; message: string }> {
+): Promise<{ success: boolean; message?: string; error?: string }> {
   const cleanEmail = (email || "").trim().toLowerCase();
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!cleanEmail || !emailRegex.test(cleanEmail)) {
-    return { success: true, message: GENERIC_RESET_SUCCESS_MSG };
+    return { success: false, error: "Please enter a valid email address." };
   }
 
   // 1. Immediate Dispatch: Firebase Auth Password Reset Email with ActionCodeSettings
@@ -46,12 +46,31 @@ export async function requestPasswordReset(
     console.log("[FIREBASE_RESET_SUCCESS] Sent reset email with action code to:", cleanEmail);
   } catch (fbErr: any) {
     console.log("[FIREBASE_RESET_ACTION_CODE_CODE]", fbErr?.code, fbErr?.message);
-    // If actionCodeSettings fails (e.g. domain validation), fallback to standard sendPasswordResetEmail
+    if (fbErr?.code === "auth/invalid-email") {
+      return { success: false, error: "Please enter a valid email address." };
+    }
+    if (fbErr?.code === "auth/network-request-failed") {
+      return { success: false, error: "Network error. Please check your internet connection and try again." };
+    }
+    if (fbErr?.code === "auth/too-many-requests") {
+      return { success: false, error: "Too many reset attempts. Please wait a few minutes and try again." };
+    }
+
+    // Fallback to standard sendPasswordResetEmail
     try {
       await sendPasswordResetEmail(auth, cleanEmail);
       console.log("[FIREBASE_RESET_SUCCESS] Sent standard reset email to:", cleanEmail);
     } catch (fallbackErr: any) {
-      console.log("[FIREBASE_RESET_STANDARD_FALLBACK]", fallbackErr?.code);
+      console.log("[FIREBASE_RESET_STANDARD_FALLBACK]", fallbackErr?.code, fallbackErr?.message);
+      if (fallbackErr?.code === "auth/invalid-email") {
+        return { success: false, error: "Please enter a valid email address." };
+      }
+      if (fallbackErr?.code === "auth/network-request-failed") {
+        return { success: false, error: "Network error. Please check your internet connection and try again." };
+      }
+      if (fallbackErr?.code === "auth/too-many-requests") {
+        return { success: false, error: "Too many reset attempts. Please wait a few minutes and try again." };
+      }
     }
   }
 

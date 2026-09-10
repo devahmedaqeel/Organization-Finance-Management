@@ -684,11 +684,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       const res = await requestPasswordReset(cleanEmail);
+      if (!res.success) {
+        return { success: false, error: res.error };
+      }
       return { success: true, message: res.message };
-    } catch {
+    } catch (err: any) {
       return {
-        success: true,
-        message: "If an account exists with this email address, password reset instructions have been sent.",
+        success: false,
+        error: err?.message || "Unable to send reset link. Please try again.",
       };
     }
   };
