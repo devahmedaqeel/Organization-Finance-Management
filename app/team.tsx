@@ -491,7 +491,12 @@ ${orgName}`;
           </TouchableOpacity>
           <View style={styles.headerTitleWrap}>
             <Text style={[styles.headerTitle, { color: colors.foreground }]}>Team Members</Text>
-            <Text style={[styles.headerSub, { color: colors.mutedForeground }]} numberOfLines={1}>
+            <Text
+              style={[styles.headerSub, { color: colors.mutedForeground }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+            >
               {settings.organizationName}
             </Text>
           </View>

@@ -821,7 +821,12 @@ export default function SettingsScreen() {
                 )}
               </View>
               <View style={{ flex: 1, gap: 2 }}>
-                <Text style={[styles.logoPreviewOrgName, { color: colors.foreground }]} numberOfLines={1}>
+                <Text
+                  style={[styles.logoPreviewOrgName, { color: colors.foreground }]}
+                  numberOfLines={2}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
+                >
                   {form.organizationName || "Your Organization"}
                 </Text>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 }}>
