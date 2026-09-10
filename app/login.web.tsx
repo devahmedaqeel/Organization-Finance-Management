@@ -141,7 +141,7 @@ export default function WebLoginScreen() {
         type: "success",
         text:
           result.message ||
-          "If an account exists with this email address, password reset instructions have been sent.",
+          "If an account exists with this email address, password reset instructions have been sent. Please check your Inbox and Spam / Junk folder. If you registered with Google, you can sign in directly using 'Sign in with Google'.",
       });
     } else {
       setForgotMsg({

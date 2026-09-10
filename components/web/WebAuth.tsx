@@ -206,7 +206,7 @@ export function WebAuth() {
     } catch {
       setForgotMsg({
         type: "success",
-        text: "If an account exists with this email address, password reset instructions have been sent.",
+        text: "If an account exists with this email address, password reset instructions have been sent. Please check your Inbox and Spam / Junk folder. If you registered with Google, you can sign in directly using 'Sign in with Google'.",
       });
     } finally {
       setForgotLoading(false);

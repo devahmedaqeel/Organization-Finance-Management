@@ -14,7 +14,7 @@ import { sendPasswordResetEmail, confirmPasswordReset, verifyPasswordResetCode }
 import { Platform } from "react-native";
 
 export const GENERIC_RESET_SUCCESS_MSG =
-  "If an account exists with this email address, password reset instructions have been sent.";
+  "If an account exists with this email address, password reset instructions have been sent. Please check your Inbox and Spam / Junk folder. If you registered with Google, you can sign in directly using 'Sign in with Google'.";
 
 const API_BASE_URL =
   process.env.EXPO_PUBLIC_APP_URL ||
@@ -24,7 +24,8 @@ const API_BASE_URL =
 
 /**
  * Request password reset email.
- * Never exposes whether the email exists.
+ * Dispatches real email immediately via Firebase Authentication.
+ * Never exposes whether the email exists to protect user privacy.
  */
 export async function requestPasswordReset(
   email: string
@@ -35,42 +36,33 @@ export async function requestPasswordReset(
     return { success: true, message: GENERIC_RESET_SUCCESS_MSG };
   }
 
-  // 1. Try Backend Cloud Function
+  // 1. Immediate Dispatch: Firebase Auth Password Reset Email with ActionCodeSettings
+  try {
+    const actionCodeSettings = {
+      url: `${API_BASE_URL}/reset-password`,
+      handleCodeInApp: true,
+    };
+    await sendPasswordResetEmail(auth, cleanEmail, actionCodeSettings);
+    console.log("[FIREBASE_RESET_SUCCESS] Sent reset email with action code to:", cleanEmail);
+  } catch (fbErr: any) {
+    console.log("[FIREBASE_RESET_ACTION_CODE_CODE]", fbErr?.code, fbErr?.message);
+    // If actionCodeSettings fails (e.g. domain validation), fallback to standard sendPasswordResetEmail
+    try {
+      await sendPasswordResetEmail(auth, cleanEmail);
+      console.log("[FIREBASE_RESET_SUCCESS] Sent standard reset email to:", cleanEmail);
+    } catch (fallbackErr: any) {
+      console.log("[FIREBASE_RESET_STANDARD_FALLBACK]", fallbackErr?.code);
+    }
+  }
+
+  // 2. Also call backend Cloud Function in parallel if deployed
   try {
     const forgotFn = httpsCallable<{ email: string; appUrl?: string }, { success: boolean; message: string }>(
       functions,
       "forgotPasswordCallable"
     );
-    const res = await forgotFn({ email: cleanEmail, appUrl: API_BASE_URL });
-    if (res.data && res.data.message) {
-      return { success: true, message: res.data.message };
-    }
-  } catch (callableErr: any) {
-    console.log("[FORGOT_PASSWORD_CALLABLE_FALLBACK]", callableErr?.message);
-  }
-
-  // 2. Try REST API endpoint
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: cleanEmail, appUrl: API_BASE_URL }),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      return { success: true, message: data.message || GENERIC_RESET_SUCCESS_MSG };
-    }
-  } catch (fetchErr: any) {
-    console.log("[FORGOT_PASSWORD_REST_FALLBACK]", fetchErr?.message);
-  }
-
-  // 3. Dual-Guarantee: Firebase Auth standard reset email
-  try {
-    await sendPasswordResetEmail(auth, cleanEmail);
-  } catch (fbErr: any) {
-    // Swallow user-not-found / enumeration errors
-    console.log("[FIREBASE_RESET_DISPATCH]", fbErr?.code || fbErr?.message);
-  }
+    forgotFn({ email: cleanEmail, appUrl: API_BASE_URL }).catch(() => {});
+  } catch {}
 
   return { success: true, message: GENERIC_RESET_SUCCESS_MSG };
 }
