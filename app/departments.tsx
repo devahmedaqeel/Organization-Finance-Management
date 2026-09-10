@@ -77,16 +77,11 @@ export default function DepartmentsScreen() {
   const webTop = Platform.OS === "web" ? 67 : 0;
 
   const fmt = (n: number) => {
-    if (Math.abs(n) >= 1000000) return `${settings.currency} ${(n / 1000000).toFixed(2)}M`;
-    if (Math.abs(n) >= 1000) return `${settings.currency} ${(n / 1000).toFixed(1)}K`;
     return `${settings.currency} ${Number(n || 0).toLocaleString()}`;
   };
 
   const fmtShort = (n: number) => {
-    const abs = Math.abs(n);
-    if (abs >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
-    if (abs >= 1000) return `${(n / 1000).toFixed(0)}K`;
-    return String(Math.round(n));
+    return Number(n || 0).toLocaleString();
   };
 
   // Compute metrics per department

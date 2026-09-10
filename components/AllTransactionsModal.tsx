@@ -49,9 +49,7 @@ export function AllTransactionsModal({
   }, [visible, initialFilter]);
 
   const fmt = (n: number) => {
-    if (n >= 1000000) return `${settings.currency} ${(n / 1000000).toFixed(2)}M`;
-    if (n >= 1000) return `${settings.currency} ${(n / 1000).toFixed(1)}K`;
-    return `${settings.currency} ${n.toLocaleString()}`;
+    return `${settings.currency} ${Number(n || 0).toLocaleString()}`;
   };
 
   const totalInflows = useMemo(

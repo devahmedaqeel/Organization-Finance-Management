@@ -83,9 +83,7 @@ function fmt(n: number): string {
 function fmtShort(n: number): string {
   const abs = Math.abs(n || 0);
   const prefix = n < 0 ? "-" : "";
-  if (abs >= 1000000) return `${prefix}${(abs / 1000000).toFixed(1)}M`;
-  if (abs >= 1000) return `${prefix}${(abs / 1000).toFixed(0)}K`;
-  return `${prefix}${String(Math.round(abs))}`;
+  return `${prefix}${abs.toLocaleString()}`;
 }
 
 function escapeCsv(val: any): string {

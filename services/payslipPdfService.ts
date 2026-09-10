@@ -54,9 +54,6 @@ export function formatCurrency(amount: number, currency: string = "PKR"): string
  * Standard compact currency formatter.
  */
 export function formatCurrencyShort(amount: number, currency: string = "PKR"): string {
-  const abs = Math.abs(amount || 0);
-  if (abs >= 1000000) return `${currency} ${(amount / 1000000).toFixed(2)}M`;
-  if (abs >= 1000) return `${currency} ${(amount / 1000).toFixed(1)}K`;
   return `${currency} ${Number(amount || 0).toLocaleString()}`;
 }
 

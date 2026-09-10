@@ -38,9 +38,6 @@ import { dispatchNotification } from "@/services/notificationService";
 const CAT_COLORS = ["#F43F5E", "#F59E0B", "#8B5CF6", "#0EA5E9", "#10B981", "#EC4899"];
 
 function fmt(n: number) {
-  const abs = Math.abs(n);
-  if (abs >= 1000000) return `${(n / 1000000).toFixed(2)}M`;
-  if (abs >= 1000) return `${(n / 1000).toFixed(1)}K`;
   return Number(n || 0).toLocaleString();
 }
 

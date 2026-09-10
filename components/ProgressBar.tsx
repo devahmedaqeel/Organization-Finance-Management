@@ -11,9 +11,7 @@ interface ProgressBarProps {
 }
 
 function fmt(v: number) {
-  if (v >= 1000000) return `${(v / 1000000).toFixed(1)}M`;
-  if (v >= 1000) return `${(v / 1000).toFixed(0)}K`;
-  return v.toString();
+  return Number(v || 0).toLocaleString();
 }
 
 export function ProgressBar({ label, value, max, color, formatValue = fmt }: ProgressBarProps) {

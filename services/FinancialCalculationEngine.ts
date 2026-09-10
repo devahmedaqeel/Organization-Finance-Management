@@ -192,12 +192,6 @@ export function formatCompactCurrency(amount: number, currency: string = "PKR"):
   const n = safeNumber(amount, 0);
   const abs = Math.abs(n);
   const prefix = n < 0 ? "-" : "";
-  if (abs >= 1000000) {
-    return `${prefix}${currency} ${(abs / 1000000).toFixed(2)}M`;
-  }
-  if (abs >= 1000) {
-    return `${prefix}${currency} ${(abs / 1000).toFixed(1)}K`;
-  }
   return `${prefix}${currency} ${abs.toLocaleString()}`;
 }
 

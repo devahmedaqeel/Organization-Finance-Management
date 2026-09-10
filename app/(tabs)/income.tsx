@@ -29,9 +29,7 @@ export default function IncomeScreen() {
   const { settings } = useSettings();
 
   const formatAmt = (n: number) => {
-    if (n >= 1000000) return `${settings.currency} ${(n / 1000000).toFixed(2)}M`;
-    if (n >= 1000) return `${settings.currency} ${(n / 1000).toFixed(0)}K`;
-    return `${settings.currency} ${n.toLocaleString()}`;
+    return `${settings.currency} ${Number(n || 0).toLocaleString()}`;
   };
 
   const [search, setSearch] = useState("");

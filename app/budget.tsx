@@ -60,9 +60,6 @@ const CATS = [
 const DEPT_COLORS = ["#3B82F6", "#10B981", "#F59E0B", "#8B5CF6", "#EC4899", "#06B6D4"];
 
 function fmtNum(n: number) {
-  const abs = Math.abs(n);
-  if (abs >= 1000000) return `${(n / 1000000).toFixed(2)}M`;
-  if (abs >= 1000) return `${(n / 1000).toFixed(1)}K`;
   return Number(n || 0).toLocaleString();
 }
 

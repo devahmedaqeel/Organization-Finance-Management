@@ -18,9 +18,7 @@ interface Props {
 }
 
 function defaultFmt(v: number) {
-  if (v >= 1000000) return `${(v / 1000000).toFixed(1)}M`;
-  if (v >= 1000) return `${(v / 1000).toFixed(1)}K`;
-  return v.toLocaleString();
+  return Number(v || 0).toLocaleString();
 }
 
 function AnimatedBarRow({

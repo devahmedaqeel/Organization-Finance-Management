@@ -488,7 +488,7 @@ export function AreaLineChart({
               adjustsFontSizeToFit
               minimumFontScale={0.78}
             >
-              Net: {isNetPositive ? "+" : "-"}{currency} {fmtAmount(Math.abs(netSurplus))}
+              Net: {isNetPositive ? "+" : "-"}{currency} {Number(Math.abs(netSurplus) || 0).toLocaleString()}
             </Text>
           </View>
         </View>
@@ -506,7 +506,7 @@ export function AreaLineChart({
               adjustsFontSizeToFit
               minimumFontScale={0.75}
             >
-              {currency} {fmtAmount(activePoint ? activePoint.income : 0)}
+              {currency} {Number(activePoint ? activePoint.income : 0).toLocaleString()}
             </Text>
           </View>
 
@@ -521,7 +521,7 @@ export function AreaLineChart({
               adjustsFontSizeToFit
               minimumFontScale={0.75}
             >
-              {currency} {fmtAmount(activePoint ? activePoint.expense : 0)}
+              {currency} {Number(activePoint ? activePoint.expense : 0).toLocaleString()}
             </Text>
           </View>
         </View>

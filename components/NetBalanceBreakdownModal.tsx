@@ -127,10 +127,7 @@ export function NetBalanceBreakdownModal({
   };
 
   const fmtShort = (n: number) => {
-    const abs = Math.abs(n);
-    if (abs >= 1000000) return `${(n / 1000000).toFixed(2)}M`;
-    if (abs >= 1000) return `${(n / 1000).toFixed(1)}K`;
-    return String(Math.round(n));
+    return Number(n || 0).toLocaleString();
   };
 
   // Month-over-Month (MoM) Financial Data Aggregation & Chart Points

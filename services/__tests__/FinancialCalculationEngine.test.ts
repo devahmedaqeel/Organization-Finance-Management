@@ -23,7 +23,7 @@ describe("FinancialCalculationEngine - Authoritative Test Suite", () => {
       expect(result.remainingAmount).toBe(50000);
       expect(result.excessAmount).toBe(0);
       expect(result.isOverBudget).toBe(false);
-      expect(result.remainingText).toContain("50.0K Remaining");
+      expect(result.remainingText).toContain("50,000 Remaining");
     });
 
     test("Scenario 2: Budget = 100,000, Expense = 100,000 => 100% (Near Limit)", () => {
@@ -48,7 +48,7 @@ describe("FinancialCalculationEngine - Authoritative Test Suite", () => {
       expect(result.isOverBudget).toBe(true);
       expect(result.remainingAmount).toBe(0);
       expect(result.excessAmount).toBe(25000);
-      expect(result.remainingText).toContain("25.0K Over Budget");
+      expect(result.remainingText).toContain("25,000 Over Budget");
     });
 
     test("Scenario 4: Budget = 0 => No Budget / N/A (Never NaN or Infinity)", () => {

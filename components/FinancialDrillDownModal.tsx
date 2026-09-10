@@ -42,9 +42,7 @@ interface Props {
 }
 
 function fmt(n: number) {
-  if (Math.abs(n) >= 1000000) return `${(n / 1000000).toFixed(2)}M`;
-  if (Math.abs(n) >= 1000) return `${(n / 1000).toFixed(1)}K`;
-  return n.toLocaleString();
+  return Number(n || 0).toLocaleString();
 }
 
 export function FinancialDrillDownModal({

@@ -148,9 +148,6 @@ export default function PayrollScreen() {
   const isOverBudget = currentNet > deptRemainingBudget && !isZeroBudget;
 
   const fmt = (n: number) => {
-    const abs = Math.abs(n);
-    if (abs >= 1000000) return `${settings.currency} ${(n / 1000000).toFixed(2)}M`;
-    if (abs >= 1000) return `${settings.currency} ${(n / 1000).toFixed(1)}K`;
     return `${settings.currency} ${Number(n || 0).toLocaleString()}`;
   };
 
