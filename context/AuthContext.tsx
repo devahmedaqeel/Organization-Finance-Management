@@ -673,12 +673,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const forgotPassword = async (email: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      await sendPasswordResetEmail(auth, email.trim().toLowerCase());
+      const cleanEmail = email.trim().toLowerCase();
+      if (!cleanEmail) {
+        return { success: false, error: "Please enter your email address." };
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(cleanEmail)) {
+        return { success: false, error: "Please enter a valid email address." };
+      }
+
+      await sendPasswordResetEmail(auth, cleanEmail);
       return { success: true };
     } catch (error: any) {
       let msg = "Could not send reset email.";
-      if (error.code === "auth/user-not-found") msg = "No account found with this email.";
-      else if (error.code === "auth/invalid-email") msg = "Invalid email address.";
+      if (error.code === "auth/user-not-found") {
+        msg = "No account found with this email address.";
+      } else if (error.code === "auth/invalid-email") {
+        msg = "Please enter a valid email address.";
+      } else if (error.code === "auth/too-many-requests") {
+        msg = "Too many attempts. Please wait a few minutes before trying again.";
+      } else if (error.code === "auth/network-request-failed") {
+        msg = "Network error. Please check your internet connection and try again.";
+      } else if (error.code === "auth/missing-email") {
+        msg = "Please enter your email address.";
+      } else if (error.message) {
+        msg = error.message;
+      }
       return { success: false, error: msg };
     }
   };

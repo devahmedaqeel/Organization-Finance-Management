@@ -14,6 +14,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -32,6 +33,7 @@ const SIGNUP_ROLES: { id: UserRole; label: string; desc: string; icon: string }[
 ];
 
 export default function LoginScreen() {
+  const { height: windowHeight } = useWindowDimensions();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { login, loginWithGoogle, loginWithGoogleCredential, signUp, forgotPassword } = useAuth();
@@ -211,7 +213,7 @@ export default function LoginScreen() {
 
   const handleSignUp = async () => {
     const cleanName = name.trim();
-    const cleanOrg = orgNameOrInvite.trim() || "Devorbit Tech";
+    const cleanOrg = orgNameOrInvite.trim() || (selectedRole === "admin" ? `${cleanName}'s Organization` : "My Organization");
     const cleanEmail = email.trim();
 
     if (!cleanName) { setError("Please enter your full name."); return; }
@@ -252,19 +254,32 @@ export default function LoginScreen() {
   };
 
   const handleForgotPassword = async () => {
-    if (!forgotEmail.trim()) {
+    const clean = forgotEmail.trim();
+    if (!clean) {
       setForgotMsg({ type: "error", text: "Please enter your email address." });
       return;
     }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(clean)) {
+      setForgotMsg({ type: "error", text: "Please enter a valid email address." });
+      return;
+    }
+    Keyboard.dismiss();
     setForgotLoading(true);
     setForgotMsg(null);
-    const result = await forgotPassword(forgotEmail.trim());
+    const result = await forgotPassword(clean);
     setForgotLoading(false);
     if (result.success) {
-      setForgotMsg({ type: "success", text: "Password reset instructions sent. Please check your inbox." });
+      setForgotMsg({
+        type: "success",
+        text: "Password reset instructions sent! Please check your inbox or spam folder.",
+      });
       safeHapticNotification(Haptics.NotificationFeedbackType.Success);
     } else {
-      setForgotMsg({ type: "error", text: result.error || "Unable to send reset email. Please verify address." });
+      setForgotMsg({
+        type: "error",
+        text: result.error || "Unable to send reset email. Please verify address.",
+      });
       safeHapticNotification(Haptics.NotificationFeedbackType.Error);
     }
   };
@@ -426,12 +441,14 @@ export default function LoginScreen() {
             </View>
           )}
 
-          {/* 1-Tap Quick Demo Cloud Access (Devorbit Tech) */}
+          {/* 1-Tap Quick Demo Access */}
           {mode === "signin" && (
             <View style={{ gap: 8, marginBottom: 12 }}>
               <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                 <Text style={styles.fieldLabel}>INSTANT DEMO ACCESS</Text>
-                <Text style={{ fontSize: 10, color: "#38BDF8", fontFamily: "Inter_600SemiBold" }}>Devorbit Tech</Text>
+                <View style={{ backgroundColor: "rgba(59, 130, 246, 0.12)", paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 6 }}>
+                  <Text style={{ fontSize: 9.5, color: "#60A5FA", fontFamily: "Inter_600SemiBold", letterSpacing: 0.3 }}>1-TAP LOGIN</Text>
+                </View>
               </View>
               <View style={{ flexDirection: "row", gap: 6 }}>
                 {[
@@ -628,29 +645,80 @@ export default function LoginScreen() {
       <Modal
         visible={forgotModal}
         transparent
-        animationType="slide"
-        onRequestClose={() => setForgotModal(false)}
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => {
+          Keyboard.dismiss();
+          setForgotModal(false);
+          setForgotMsg(null);
+        }}
       >
-        <View style={styles.modalOverlay}>
-          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
-            <View style={styles.modalSheet}>
-              <View style={styles.handle} />
-              <View style={styles.modalHeader}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                  <View style={styles.iconPill}>
-                    <Feather name="lock" size={16} color="#3B82F6" />
-                  </View>
-                  <Text style={styles.modalTitle}>Reset Password</Text>
+        <KeyboardAvoidingView
+          style={[
+            styles.modalOverlay,
+            Platform.OS === "android" && keyboardHeight > 0
+              ? { paddingBottom: keyboardHeight }
+              : null,
+          ]}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
+        >
+          {/* Backdrop dismiss touchable */}
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => {
+              Keyboard.dismiss();
+              setForgotModal(false);
+              setForgotMsg(null);
+            }}
+          />
+
+          <View
+            style={[
+              styles.modalSheet,
+              { maxHeight: Math.min(540, windowHeight * 0.85) },
+              Platform.OS === "android" && keyboardHeight > 0
+                ? {
+                    paddingBottom: 20,
+                    borderBottomLeftRadius: 20,
+                    borderBottomRightRadius: 20,
+                    borderBottomWidth: 1,
+                  }
+                : null,
+            ]}
+          >
+            <View style={styles.handle} />
+            <View style={styles.modalHeader}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <View style={styles.iconPill}>
+                  <Feather name="lock" size={16} color="#3B82F6" />
                 </View>
-                <TouchableOpacity onPress={() => { setForgotModal(false); setForgotMsg(null); }} hitSlop={8}>
-                  <Feather name="x" size={18} color="#94A3B8" />
-                </TouchableOpacity>
+                <Text style={styles.modalTitle}>Reset Password</Text>
               </View>
+              <TouchableOpacity
+                onPress={() => {
+                  Keyboard.dismiss();
+                  setForgotModal(false);
+                  setForgotMsg(null);
+                }}
+                hitSlop={8}
+              >
+                <Feather name="x" size={18} color="#94A3B8" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              bounces={false}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ gap: 10 }}
+            >
               <Text style={styles.modalSubtitle}>
                 Enter your work email address to receive password recovery instructions.
               </Text>
-              
-              <Text style={[styles.fieldLabel, { marginTop: 14 }]}>
+
+              <Text style={[styles.fieldLabel, { marginTop: 8 }]}>
                 EMAIL ADDRESS
               </Text>
               <View style={styles.inputBox}>
@@ -661,9 +729,14 @@ export default function LoginScreen() {
                   placeholderTextColor="#64748B"
                   keyboardType="email-address"
                   autoCapitalize="none"
+                  autoCorrect={false}
                   value={forgotEmail}
-                  onChangeText={(v) => { setForgotEmail(v); setForgotMsg(null); }}
-                  autoFocus
+                  onChangeText={(v) => {
+                    setForgotEmail(v);
+                    setForgotMsg(null);
+                  }}
+                  returnKeyType="send"
+                  onSubmitEditing={handleForgotPassword}
                 />
               </View>
 
@@ -672,16 +745,22 @@ export default function LoginScreen() {
                   style={[
                     styles.msgBanner,
                     {
-                      backgroundColor: forgotMsg.type === "success" ? "rgba(34, 197, 94, 0.15)" : "rgba(239, 68, 68, 0.15)",
-                      borderColor: forgotMsg.type === "success" ? "#22C55E" : "#EF4444",
+                      backgroundColor:
+                        forgotMsg.type === "success"
+                          ? "rgba(34, 197, 94, 0.15)"
+                          : "rgba(239, 68, 68, 0.15)",
+                      borderColor:
+                        forgotMsg.type === "success" ? "#22C55E" : "#EF4444",
                     },
                   ]}
                 >
                   <Text
                     style={{
-                      color: forgotMsg.type === "success" ? "#22C55E" : "#EF4444",
+                      color:
+                        forgotMsg.type === "success" ? "#22C55E" : "#EF4444",
                       fontSize: 12.5,
                       fontFamily: "Inter_500Medium",
+                      lineHeight: 18,
                     }}
                   >
                     {forgotMsg.text}
@@ -701,9 +780,9 @@ export default function LoginScreen() {
                   <Text style={styles.primaryBtnText}>Send Reset Email</Text>
                 )}
               </TouchableOpacity>
-            </View>
-          </KeyboardAvoidingView>
-        </View>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </KeyboardAvoidingView>
   );
