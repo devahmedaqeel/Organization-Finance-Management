@@ -98,35 +98,7 @@ export async function verifyResetToken(
 
   const cleanToken = token.trim();
 
-  // 1. Try Backend Cloud Function
-  try {
-    const verifyFn = httpsCallable<{ token: string }, { valid: boolean; error?: string; email?: string }>(
-      functions,
-      "verifyResetTokenCallable"
-    );
-    const res = await verifyFn({ token: cleanToken });
-    if (res.data) {
-      return res.data;
-    }
-  } catch (err: any) {
-    console.log("[VERIFY_TOKEN_CALLABLE_FALLBACK]", err?.message);
-  }
-
-  // 2. Try REST API endpoint
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/auth/verify-token`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token: cleanToken }),
-    });
-    if (res.ok) {
-      return await res.json();
-    }
-  } catch (fetchErr: any) {
-    console.log("[VERIFY_TOKEN_REST_FALLBACK]", fetchErr?.message);
-  }
-
-  // 3. Check if token is a standard Firebase Auth oobCode
+  // 1. Direct Firebase Auth oobCode Verification (Authoritative Primary)
   try {
     const email = await verifyPasswordResetCode(auth, cleanToken);
     return { valid: true, email };
@@ -138,9 +110,34 @@ export async function verifyResetToken(
       };
     }
     if (fbErr.code === "auth/invalid-action-code") {
-      return { valid: false, error: "This password reset link is invalid." };
+      // Check if custom backend token fallback is available
+    } else {
+      console.log("[FIREBASE_VERIFY_CODE_ERROR]", fbErr?.code, fbErr?.message);
     }
   }
+
+  // 2. Custom Token Fallback (Cloud Function / REST API if deployed)
+  try {
+    const verifyFn = httpsCallable<{ token: string }, { valid: boolean; error?: string; email?: string }>(
+      functions,
+      "verifyResetTokenCallable"
+    );
+    const res = await verifyFn({ token: cleanToken });
+    if (res.data && res.data.valid) {
+      return res.data;
+    }
+  } catch {}
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/auth/verify-token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: cleanToken }),
+    });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch {}
 
   return { valid: false, error: "This password reset link is invalid." };
 }
@@ -169,7 +166,33 @@ export async function submitPasswordReset(
 
   const cleanToken = token.trim();
 
-  // 1. Try Backend Cloud Function
+  // 1. Direct Firebase Auth confirmPasswordReset (Authoritative Primary)
+  try {
+    await confirmPasswordReset(auth, cleanToken, password);
+    return {
+      success: true,
+      message: "Your password has been successfully reset. You can now sign in with your new password.",
+    };
+  } catch (fbErr: any) {
+    if (fbErr.code === "auth/expired-action-code") {
+      return {
+        success: false,
+        error: "This password reset link has expired. Please request a new password reset link.",
+      };
+    }
+    if (fbErr.code === "auth/invalid-action-code") {
+      // Check if custom backend token fallback is available
+    } else if (fbErr.code === "auth/weak-password") {
+      return {
+        success: false,
+        error: "Password is too weak. Please use a stronger password.",
+      };
+    } else {
+      console.log("[FIREBASE_CONFIRM_CODE_ERROR]", fbErr?.code, fbErr?.message);
+    }
+  }
+
+  // 2. Custom Token Fallback (Cloud Function / REST API if deployed)
   try {
     const resetFn = httpsCallable<
       { token: string; password: string; confirmPassword: string },
@@ -186,11 +209,8 @@ export async function submitPasswordReset(
     if (res.data && res.data.error) {
       return res.data;
     }
-  } catch (err: any) {
-    console.log("[SUBMIT_RESET_CALLABLE_FALLBACK]", err?.message);
-  }
+  } catch {}
 
-  // 2. Try REST API endpoint
   try {
     const res = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
       method: "POST",
@@ -208,33 +228,10 @@ export async function submitPasswordReset(
     if (data && data.error) {
       return data;
     }
-  } catch (fetchErr: any) {
-    console.log("[SUBMIT_RESET_REST_FALLBACK]", fetchErr?.message);
-  }
+  } catch {}
 
-  // 3. Fallback to Firebase confirmPasswordReset if code is standard Firebase oobCode
-  try {
-    await confirmPasswordReset(auth, cleanToken, password);
-    return {
-      success: true,
-      message: "Your password has been successfully reset. You can now sign in with your new password.",
-    };
-  } catch (fbErr: any) {
-    if (fbErr.code === "auth/expired-action-code") {
-      return {
-        success: false,
-        error: "This password reset link has expired. Please request a new password reset link.",
-      };
-    }
-    if (fbErr.code === "auth/invalid-action-code") {
-      return {
-        success: false,
-        error: "This password reset link is invalid.",
-      };
-    }
-    return {
-      success: false,
-      error: fbErr.message || "Unable to reset password. Please try again.",
-    };
-  }
+  return {
+    success: false,
+    error: "This password reset link is invalid or has expired. Please request a new link.",
+  };
 }
