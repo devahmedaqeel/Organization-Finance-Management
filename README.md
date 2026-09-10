@@ -22,10 +22,14 @@ It delivers real-time double-entry ledger accounting, department budget allocati
 - **Double-Entry General Ledger**: Record Revenue Inflows and Operational Expense Outflows with voucher references, category tagging, and receipt verification.
 - **Department Cost Centers**: Allocate fiscal expenditure ceilings, track department burn rates, and receive real-time budget overrun warnings.
 - **Staff Payroll & Payslip Engine**: Automated calculation of base salaries, allowances, bonuses, and statutory deductions with 1-click official PDF & High-Res Image exports.
-- **Executive Financial Dossiers**: Real-time Net Operating Balance, Operating Surplus, Retention Margin, Savings Velocity, and Runway estimation.
+- **Deterministic AI Insights & Alerts**: 100% data-driven, read-only intelligence covering all 6 data availability scenarios, strict historical trend gating, statistical anomaly detection, duplicate transaction recognition, and anti-spam notification idempotency.
+- **Multi-Page Vector PDF Reporting Suite**: User-controlled financial statement exports with print-optimized CSS, multi-page vector layout, native mobile downloads via `expo-print`, and direct sharing via `expo-sharing`.
+- **Exact Numeric Formatting**: All financial figures across Web and Mobile are formatted as exact, unrounded values (`PKR 7,750`, `PKR 7,100`), eliminating lossy `K` abbreviation distortion.
+- **Mobile Text Visibility Guarantee**: Responsive minimum widths and flexible containers prevent text clipping (`Inflo...`, `Expen...`) across all common mobile screen sizes (360px–428px).
 - **Two-Way Real-Time Synchronization**: Central Cloud Firestore serves as the single source of truth; any change created, edited, or deleted on Web immediately updates Mobile, and vice-versa.
 - **Permanent Deletion Guarantee**: Successfully deleted records are purged from the database and registered in persistent tombstones, ensuring deleted records never resurrect after logout, login, refresh, or restart.
-- **Multi-Role Security (RBAC)**: Distinct permissions for Super Administrator, Accountant, Manager, and Employee.
+- **Multi-Role Security (RBAC)**: Distinct permissions for Super Administrator, Accountant, Manager, and Employee with strict tenant isolation.
+- **Session & Refresh Resilience**: Web refresh preserves authenticated user and active organization without falling back to demo accounts.
 - **Institutional Branding & Customization**: Support for 150+ international currencies (with default PKR formatting), custom organization logo upload, and dark/light adaptive themes.
 - **0ms Instant Startup**: Ultra-lightweight root redirector prevents bundle stalls on native startup.
 

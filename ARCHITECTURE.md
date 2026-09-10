@@ -225,3 +225,70 @@ User (Web or Mobile) ──> Edit Modal ──> Validation ──> Firebase SDK 
 ```
 User (Web or Mobile) ──> Confirm Delete ──> deleteDoc() ──> Remote Firestore Deletion ──> Add to Local Tombstones ──> Filter from In-Memory State ──> Permanent Removal Across Restarts
 ```
+
+---
+
+## Authoritative Financial Calculation Engine
+
+OFM relies on a single shared mathematical calculation core (`services/FinancialCalculationEngine.ts`) used identically across Web, Mobile, and PDF reporting:
+
+* **Income**: Sum of all valid, non-voided, non-deleted income ledger entries.
+* **Expenses**: Sum of all valid operational expense ledger entries plus processed payroll disbursements (strictly single-counted).
+* **Net Operating Balance**: $\text{Revenue} - \text{Expenses}$.
+* **Budget Allocations**: Department and category ceilings strictly separated from operating income (budgets are expenditure ceilings, never added to liquid income).
+* **Budget Utilization**: $\frac{\text{Actual Spending}}{\text{Approved Budget}} \times 100$.
+* **Department Spending Share**: $\frac{\text{Department Disbursements}}{\text{Total Expenses}} \times 100$.
+* **Exact Numeric Formatting**: All monetary values are rendered as exact, unrounded amounts via `toLocaleString()` (e.g., `PKR 7,750`, `PKR 7,100`), eliminating lossy `K` abbreviation distortion.
+
+---
+
+## Deterministic AI Insights & Recommendation Engine
+
+The AI Intelligence layer (`services/financialInsightsService.ts`) provides 100% data-driven, read-only financial diagnostics:
+
+### 1. Six Real-World Data Scenarios
+1. **Zero Data State**: Returns a clean, professional empty state (`"More financial data is required to generate meaningful insights."`) with zero fake alerts or synthetic trends.
+2. **Income Only**: Triggers `INFLOW_RECOGNITION`, highlighting 100% available liquid capital and recommending budget target configuration prior to disbursements.
+3. **Income + Expenses**: 
+   - **Operating Surplus (`net > 0`)**: Reports exact net operating margin and unallocated reserve capital.
+   - **Operating Deficit (`net < 0`)**: `CRITICAL` alert reporting exact deficit amount, burn percentage, and top contributing cost centers.
+   - **Break-Even (`net === 0`)**: `INFO` alert noting zero financial buffer.
+4. **Budget + Expenses**:
+   - **Overall Institutional Overrun (`util > 100%`)**: `CRITICAL` alert with exact excess.
+   - **Approaching Ceiling (`util >= 85%`)**: `WARNING` alert with exact remaining buffer.
+   - **Unspent Allocations**: `INFO` alert for intact capital reserves.
+5. **Department Insights**:
+   - **Cost Driver Concentration (`>= 40%`)**: Identifies primary departmental cost driver.
+   - **Unbudgeted Spending Alert (`>= PKR 1,000`)**: `WARNING` alert when a department records expenses without an authorized allocation ceiling.
+6. **Payroll Disbursal Weight**: Evaluates remuneration commitments as a proportion of total outflows and revenue only when active payroll entries exist.
+
+### 2. Strict Historical Trend Gating
+- Trends (`INCOME_GROWTH`, `EXPENSE_SURGE`, `INCOME_DECLINE`, `EXPENSE_OPTIMIZATION`) are only evaluated if the comparative previous period contains verified records (`prevIncome > 0` or `prevExpense > 0`).
+- If comparative data does not exist, zero speculative trends are generated.
+
+### 3. Anti-Spam Notification Idempotency
+- Insights dispatch notifications to the in-app Notification Center using a deterministic key: `ai_insight_${orgId}_${insight.id}`.
+- Web refreshes, screen switches, and mobile restarts will not create duplicate notifications.
+
+---
+
+## Complete PDF Reporting System
+
+The enterprise reporting system (`services/ReportExportService.ts` & `services/pdfDownloadService.ts`) supports comprehensive, user-controlled dossier compilation:
+
+* **Report Types**: Full Consolidated Financial Statement, Income Ledger, Expense Ledger, Department Allocation Performance, Payroll Summary, and Individual Payslips.
+* **Date Range Filtering**: Strictly respects the active period (`Today`, `Week`, `Month`, `Quarter`, `Year`, `All Time`, `Custom Range`).
+* **Multi-Page Vector Layout**: Print-optimized CSS rules (`@page`, `page-break-inside: avoid`, `table { page-break-inside: auto }`) guarantee no overlapping text, clipped tables, or broken columns.
+* **Mobile PDF Download Flow**:
+  - Native generation via `expo-print` producing standard A4 documents saved directly to `FileSystem.documentDirectory`.
+  - Seamless native sharing via `expo-sharing` (`sharePdfFile`).
+  - Web platform opens a print preview window or triggers direct binary download (`application/pdf`).
+
+---
+
+## Mobile Text Visibility & Responsive Design
+
+To eliminate text clipping and incomplete words (`Inflo...`, `Expen...`, `Depart...`):
+* Minimum card widths ($178\text{dp}$) and flexible containers (`flex: 1`, `flexWrap: "wrap"`).
+* Text scaling safeguards: `adjustsFontSizeToFit` with `minimumFontScale={0.85}`.
+* Verified responsive rendering across common viewports: $360\text{px}$, $375\text{px}$, $390\text{px}$, $412\text{px}$, and $428\text{px}$.
