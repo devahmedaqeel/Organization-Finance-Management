@@ -24,40 +24,6 @@ const ROLE_CONFIG: Record<UserRole, { color: string; bg: string; border: string;
   employee: { color: "#34D399", bg: "#10B98120", border: "#10B98140", label: "EMPLOYEE" },
 };
 
-const DEFAULT_TEAM_MEMBERS: User[] = [
-  {
-    id: "u1",
-    name: "Ahmed Aqeel",
-    email: "admin@ofm.com",
-    role: "admin",
-    organization: "Organization Finance Management",
-    organizationId: "demo-org",
-  },
-  {
-    id: "u2",
-    name: "Maryam Naz",
-    email: "accountant@ofm.com",
-    role: "accountant",
-    organization: "Organization Finance Management",
-    organizationId: "demo-org",
-  },
-  {
-    id: "u3",
-    name: "Dr. Sundas Iftikhar",
-    email: "manager@ofm.com",
-    role: "manager",
-    organization: "Organization Finance Management",
-    organizationId: "demo-org",
-  },
-  {
-    id: "u4",
-    name: "Ali Hassan",
-    email: "employee@ofm.com",
-    role: "employee",
-    organization: "Organization Finance Management",
-    organizationId: "demo-org",
-  },
-];
 
 export function WebTeam() {
   const colors = useColors();
@@ -80,21 +46,8 @@ export function WebTeam() {
 
   useEffect(() => {
     if (!user) return;
-    const isDemo = user.organizationId === "demo-org" || user.organizationId === "org-9icgv4ijp" || user.email === "admin@ofm.com";
-    const orgName = user.organization || settings.organizationName || "Organization Finance Management";
     const orgId = user.organizationId || "default-org";
-
-    const q = isDemo
-      ? query(
-          collection(db, "users"),
-          where("organization", "in", [
-            orgName,
-            "Organization Finance Management",
-            "OFM — Organization Finance Management",
-            "OFM — Organization Finance Manager",
-          ])
-        )
-      : query(collection(db, "users"), where("organizationId", "==", orgId));
+    const q = query(collection(db, "users"), where("organizationId", "==", orgId));
 
     const unsub = onSnapshot(
       q,
@@ -117,7 +70,7 @@ export function WebTeam() {
           });
           setMembers(list);
         } else {
-          setMembers(isDemo ? DEFAULT_TEAM_MEMBERS.map((m) => ({ ...m, organization: orgName })) : (user ? [user] : []));
+          setMembers(user ? [user] : []);
         }
         setLoading(false);
       },

@@ -385,10 +385,10 @@ export function FinancialStatementViewerModal({
               <View style={styles.formalTable}>
                 {/* Table Header */}
                 <View style={styles.formalTableHeader}>
-                  <Text style={[styles.fth, { flex: 2.5, textAlign: "left" }]} numberOfLines={1}>ACCOUNTING HEAD</Text>
+                  <Text style={[styles.fth, { flex: 2.2, textAlign: "left" }]} numberOfLines={2}>ACCOUNTING HEAD</Text>
                   <Text style={[styles.fth, { flex: 0.8, textAlign: "center" }]} numberOfLines={1}>RECS</Text>
-                  <Text style={[styles.fth, { flex: 1.5, textAlign: "right" }]} numberOfLines={1}>INFLOW (+)</Text>
-                  <Text style={[styles.fth, { flex: 1.5, textAlign: "right" }]} numberOfLines={1}>OUTFLOW (-)</Text>
+                  <Text style={[styles.fth, { flex: 1.5, textAlign: "right" }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8}>INFLOW (+)</Text>
+                  <Text style={[styles.fth, { flex: 1.5, textAlign: "right" }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8}>OUTFLOW (-)</Text>
                 </View>
 
                 {/* Sub-header: Revenue Streams */}
@@ -473,10 +473,10 @@ export function FinancialStatementViewerModal({
 
                 <View style={styles.formalTable}>
                   <View style={styles.formalTableHeader}>
-                    <Text style={[styles.fth, { flex: 2.2, textAlign: "left" }]} numberOfLines={1}>DEPARTMENT</Text>
+                    <Text style={[styles.fth, { flex: 2.2, textAlign: "left" }]} numberOfLines={2}>DEPARTMENT</Text>
                     <Text style={[styles.fth, { flex: 0.7, textAlign: "center" }]} numberOfLines={1}>STAFF</Text>
-                    <Text style={[styles.fth, { flex: 1.3, textAlign: "right" }]} numberOfLines={1}>BUDGET</Text>
-                    <Text style={[styles.fth, { flex: 1.3, textAlign: "right" }]} numberOfLines={1}>SPENT</Text>
+                    <Text style={[styles.fth, { flex: 1.3, textAlign: "right" }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8}>BUDGET</Text>
+                    <Text style={[styles.fth, { flex: 1.3, textAlign: "right" }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8}>SPENT</Text>
                     <Text style={[styles.fth, { flex: 0.9, textAlign: "center" }]} numberOfLines={1}>UTIL %</Text>
                   </View>
 
@@ -660,7 +660,7 @@ export function FinancialStatementViewerModal({
 
                 <View style={styles.formalTable}>
                   <View style={styles.formalTableHeader}>
-                    <Text style={[styles.fth, { flex: 2.6, textAlign: "left" }]} numberOfLines={1}>AUDIT VERIFICATION ITEM</Text>
+                    <Text style={[styles.fth, { flex: 2.6, textAlign: "left" }]} numberOfLines={2}>AUDIT VERIFICATION ITEM</Text>
                     <Text style={[styles.fth, { flex: 1.7, textAlign: "right" }]} numberOfLines={1}>VALUE</Text>
                     <Text style={[styles.fth, { flex: 1.3, textAlign: "center" }]} numberOfLines={1}>STATUS</Text>
                   </View>
@@ -733,7 +733,7 @@ export function FinancialStatementViewerModal({
 
               <View style={styles.sealColumn}>
                 <View style={styles.circularSeal}>
-                  <Text style={styles.sealOrgName} numberOfLines={1}>{organizationName.substring(0, 14).toUpperCase()}</Text>
+                  <Text style={styles.sealOrgName} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>{organizationName.toUpperCase()}</Text>
                   <Feather name="award" size={13} color="#0F172A" style={{ marginVertical: 1 }} />
                   <Text style={styles.sealStampText}>AUDITED & SEALED</Text>
                   <Text style={styles.sealYear}>{fiscalYear}</Text>

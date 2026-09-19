@@ -276,15 +276,37 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     departments: false,
   });
 
-  const activeOrgId = (user?.organizationId === "demo-org" ? "org-9icgv4ijp" : user?.organizationId) || "org-9icgv4ijp";
+  const activeOrgId = user?.organizationId || "";
+  const currentUserId = user ? user.id : "";
+  const currentOrgId = user ? user.organizationId : "";
   const cachePrefix = `ofm_cache:${activeOrgId}:`;
+
+  // Reset state when user logs out or org is cleared
+  useEffect(() => {
+    if (!user || !activeOrgId) {
+      setTransactions([]);
+      setBudgets([]);
+      setPayroll([]);
+      setDepartments([]);
+      setNotifications([]);
+      setLoaded(true);
+      currentLoadedOrgIdRef.current = "";
+      deletedIdsRef.current.clear();
+      hasLiveSnapshotRef.current = {
+        transactions: false,
+        budgets: false,
+        payroll: false,
+        departments: false,
+      };
+    }
+  }, [currentUserId, activeOrgId]);
 
   // Push Token Registration
   useEffect(() => {
     if (user?.id && user?.organizationId) {
       registerForPushNotificationsAsync(user.id, activeOrgId).catch(() => {});
     }
-  }, [user?.id, user?.organizationId, activeOrgId]);
+  }, [currentUserId, currentOrgId, activeOrgId]);
 
   // Real-time Notification Subscription
   useEffect(() => {
@@ -377,7 +399,15 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           }
         } catch {}
       }
-      targetOrgId = (targetOrgId === "demo-org" ? "org-9icgv4ijp" : targetOrgId) || activeOrgId;
+      targetOrgId = targetOrgId || activeOrgId;
+      if (!targetOrgId) {
+        setTransactions([]);
+        setBudgets([]);
+        setPayroll([]);
+        setDepartments([]);
+        setLoaded(true);
+        return;
+      }
 
       // Only reset snapshot flags if switching to a genuinely DIFFERENT organization
       if (currentLoadedOrgIdRef.current && currentLoadedOrgIdRef.current !== targetOrgId) {
@@ -507,7 +537,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     return () => {
       active = false;
     };
-  }, [activeOrgId, user?.id]);
+  }, [activeOrgId, currentUserId]);
 
   // 2. Real-time Firebase Synchronization (Web <-> Mobile)
   useEffect(() => {
@@ -515,7 +545,10 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const canonicalOrgId = (user.organizationId === "demo-org" ? "org-9icgv4ijp" : user.organizationId) || "org-9icgv4ijp";
+    const canonicalOrgId = user.organizationId;
+    if (!canonicalOrgId) {
+      return;
+    }
 
     // Real-time listener for Transactions
     const qTransactions = query(
@@ -998,9 +1031,6 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     const aliasId = `tx_${id}_${orgKey}`;
     const mirrorId = id.startsWith("sync_") ? rawTxId : `sync_${id}`;
     const targetIds = [id, aliasId];
-    if (activeOrgId === "demo-org" || activeOrgId === "org-9icgv4ijp") {
-      targetIds.push(mirrorId, `sync_tx_pay_${rawTxId}`, `tx_pay_${rawTxId}`);
-    }
 
     // If deleting a salary transaction, also clean up linked payroll record
     const targetTx = transactions.find((t) => t.id === id || t.id === rawTxId);
@@ -1260,9 +1290,6 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     const aliasId = `budget_${rawBudgetId}_${orgKey}`;
     const mirrorId = id.startsWith("sync_") ? rawBudgetId : `sync_${id}`;
     const targetIds = [id, aliasId];
-    if (activeOrgId === "demo-org" || activeOrgId === "org-9icgv4ijp") {
-      targetIds.push(mirrorId, `sync_${rawBudgetId}`);
-    }
 
     let deleteSucceeded = false;
     let failureReason: any = null;
@@ -1465,18 +1492,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
       saveDocREST("payroll", id, cleanPayroll).catch(() => {});
       saveDocREST("transactions", txId, cleanSalaryTx).catch(() => {});
-      if (orgId === "demo-org" || orgId === "org-9icgv4ijp") {
-        const counterpartOrgId = orgId === "demo-org" ? "org-9icgv4ijp" : "demo-org";
-        const rawId = id.replace(/^sync_/, "");
-        const mirrorPayrollId = id.startsWith("sync_") ? rawId : `sync_${id}`;
-        const mirrorTxId = `sync_tx_pay_${rawId}`;
-        const mirroredPayroll: PayrollEntry = sanitizeForFirestore({ ...newPayroll, id: mirrorPayrollId, organizationId: counterpartOrgId, expenseId: mirrorTxId });
-        const mirroredTx: Transaction = sanitizeForFirestore({ ...salaryTx, id: mirrorTxId, organizationId: counterpartOrgId, payrollId: mirrorPayrollId, budgetId: null });
-        safeSetDoc(doc(db, "payroll", mirrorPayrollId), mirroredPayroll).catch(() => {});
-        saveDocREST("payroll", mirrorPayrollId, mirroredPayroll).catch(() => {});
-        safeSetDoc(doc(db, "transactions", mirrorTxId), mirroredTx).catch(() => {});
-        saveDocREST("transactions", mirrorTxId, mirroredTx).catch(() => {});
-      }
+      // Direct tenant isolation; no dual-org mirroring
       recordAuditLog({
         organizationId: orgId,
         actorUid: user?.id || "anonymous",
@@ -1669,15 +1685,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
       saveDocREST("payroll", id, cleanPayrollUpdates).catch(() => {});
       saveDocREST("transactions", txId, cleanTxUpdates).catch(() => {});
-      if (activeOrgId === "demo-org" || activeOrgId === "org-9icgv4ijp") {
-        const rawId = id.replace(/^sync_/, "");
-        const mirrorPayrollId = id.startsWith("sync_") ? rawId : `sync_${id}`;
-        const mirrorTxId = `sync_tx_pay_${rawId}`;
-        safeSetDoc(doc(db, "payroll", mirrorPayrollId), cleanPayrollUpdates, { merge: true }).catch(() => {});
-        saveDocREST("payroll", mirrorPayrollId, cleanPayrollUpdates).catch(() => {});
-        safeSetDoc(doc(db, "transactions", mirrorTxId), cleanTxUpdates, { merge: true }).catch(() => {});
-        saveDocREST("transactions", mirrorTxId, cleanTxUpdates).catch(() => {});
-      }
+      // Direct tenant isolation; no dual-org mirroring
       recordAuditLog({
         organizationId: activeOrgId,
         actorUid: user?.id || "anonymous",
@@ -1866,13 +1874,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     try {
       await safeSetDoc(doc(db, "departments", id), cleanDept);
       saveDocREST("departments", id, cleanDept).catch(() => {});
-      if (orgId === "demo-org" || orgId === "org-9icgv4ijp") {
-        const counterpartOrgId = orgId === "demo-org" ? "org-9icgv4ijp" : "demo-org";
-        const mirrorId = id.startsWith("sync_") ? id.replace("sync_", "") : `sync_${id}`;
-        const mirroredDept = sanitizeForFirestore({ ...cleanDept, id: mirrorId, organizationId: counterpartOrgId });
-        safeSetDoc(doc(db, "departments", mirrorId), mirroredDept).catch(() => {});
-        saveDocREST("departments", mirrorId, mirroredDept).catch(() => {});
-      }
+      // Direct tenant isolation; no dual-org mirroring
       recordAuditLog({
         organizationId: orgId,
         actorUid: user?.id || "anonymous",
@@ -1937,11 +1939,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     try {
       await safeSetDoc(doc(db, "departments", id), cleanUpdates, { merge: true });
       saveDocREST("departments", id, cleanUpdates).catch(() => {});
-      if (activeOrgId === "demo-org" || activeOrgId === "org-9icgv4ijp") {
-        const mirrorId = id.startsWith("sync_") ? id.replace("sync_", "") : `sync_${id}`;
-        safeSetDoc(doc(db, "departments", mirrorId), cleanUpdates, { merge: true }).catch(() => {});
-        saveDocREST("departments", mirrorId, cleanUpdates).catch(() => {});
-      }
+      // Direct tenant isolation; no dual-org mirroring
       recordAuditLog({
         organizationId: activeOrgId,
         actorUid: user?.id || "anonymous",
@@ -1968,9 +1966,6 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     const aliasId = `dept_${rawDeptId}_${orgKey}`;
     const mirrorId = id.startsWith("sync_") ? rawDeptId : `sync_${id}`;
     const targetIds = [id, aliasId];
-    if (activeOrgId === "demo-org" || activeOrgId === "org-9icgv4ijp") {
-      targetIds.push(mirrorId, `sync_${rawDeptId}`);
-    }
 
     let deleteSucceeded = false;
     let failureReason: any = null;
@@ -2223,19 +2218,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           getDocs(query(collection(db, "departments"), where("organizationId", "==", activeOrgId))).catch(() => null),
           getDocs(query(collection(db, "payroll"), where("organizationId", "==", activeOrgId))).catch(() => null),
         ]);
-        let effectiveTxDocs = qTxSnap?.docs || [];
-        if (effectiveTxDocs.length === 0 && (activeOrgId === "demo-org" || activeOrgId === "org-9icgv4ijp")) {
-          const altOrg = activeOrgId === "demo-org" ? "org-9icgv4ijp" : "demo-org";
-          const altSnap = await getDocs(query(collection(db, "transactions"), where("organizationId", "==", altOrg))).catch(() => null);
-          if (altSnap && !altSnap.empty) effectiveTxDocs = altSnap.docs;
-        }
-
-        let effectiveDeptDocs = qDSnap?.docs || [];
-        if (effectiveDeptDocs.length === 0 && (activeOrgId === "demo-org" || activeOrgId === "org-9icgv4ijp")) {
-          const altOrg = activeOrgId === "demo-org" ? "org-9icgv4ijp" : "demo-org";
-          const altSnap = await getDocs(query(collection(db, "departments"), where("organizationId", "==", altOrg))).catch(() => null);
-          if (altSnap && !altSnap.empty) effectiveDeptDocs = altSnap.docs;
-        }
+        const effectiveTxDocs = qTxSnap?.docs || [];
+        const effectiveDeptDocs = qDSnap?.docs || [];
 
         if (effectiveTxDocs.length > 0) {
           const rawSdkTxs = effectiveTxDocs.map((d) => ({ id: d.id, ...d.data() } as Transaction));

@@ -165,7 +165,7 @@ function AnimatedQuickAction({
           )}
         </View>
         <View style={{ gap: 2 }}>
-          <Text style={[styles.actionTitleText, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+          <Text style={[styles.actionTitleText, { color: colors.foreground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8}>
             {label}
           </Text>
           <Text style={[styles.actionSubText, { color: colors.mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
@@ -1535,7 +1535,7 @@ export default function DashboardScreen() {
               Quick Actions
             </Text>
             <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-              1-tap financial workflows
+              Instant financial shortcuts
             </Text>
           </View>
           <View style={[styles.actionSectionPill, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "30", flexShrink: 0, paddingHorizontal: 9, paddingVertical: 3.5 }]}>
@@ -2398,11 +2398,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   kpiTag: {
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
     paddingVertical: 3.5,
     borderRadius: 8,
-    flexShrink: 1,
-    minWidth: 54,
+    flexShrink: 0,
     alignItems: "center",
     justifyContent: "center",
   },

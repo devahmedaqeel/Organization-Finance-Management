@@ -12,7 +12,7 @@ import {
 } from "../services/settingsHelper";
 export { AppTheme, Settings, getCleanDefaultSettings };
 
-const DEFAULT_SETTINGS: Settings = getCleanDefaultSettings("DevOrbit Tech Kotli", true);
+const DEFAULT_SETTINGS: Settings = getCleanDefaultSettings();
 
 interface SettingsContextValue {
   settings: Settings;
@@ -32,14 +32,19 @@ const SettingsContext = createContext<SettingsContextValue>({
 
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const { user, updateUserOrganization } = useAuth();
-  const isDemoAdmin = user?.organizationId === "org-9icgv4ijp" || user?.organizationId === "demo-org" || user?.email === "admin@ofm.com";
   const orgKey = user?.organizationId || "default";
   const settingsStorageKey = `ofm_settings:${orgKey}`;
   const durableSettingsKey = `ofm_data:${orgKey}:settings`;
-  const baseDefaults = useMemo(
-    () => getCleanDefaultSettings(user?.organization, isDemoAdmin),
-    [user?.organization, isDemoAdmin]
-  );
+  const baseDefaults = useMemo(() => {
+    if (user?.organizationId === "org-9icgv4ijp" || user?.email === "engrahmedaqeel14@gmail.com") {
+      return {
+        ...getCleanDefaultSettings("DevOrbit Tech Kotli"),
+        organizationAddress: "Kotli, Azad Kashmir",
+        organizationPhone: "+92-586-444111",
+      };
+    }
+    return getCleanDefaultSettings(user?.organization);
+  }, [user?.organization, user?.organizationId, user?.email]);
 
   const [settings, setSettings] = useState<Settings>(baseDefaults);
   const [isLoading, setIsLoading] = useState(true);

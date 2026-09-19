@@ -60,12 +60,6 @@ const ROLE_OPTIONS: { role: UserRole; title: string; desc: string; badge: string
   },
 ];
 
-const ROLE_ACCOUNTS = [
-  { role: "admin" as UserRole, email: "admin@ofm.com", label: "Organization Admin", pass: "Admin123", color: "#6366F1" },
-  { role: "accountant" as UserRole, email: "accountant@ofm.com", label: "Financial Accountant", pass: "Account123", color: "#F59E0B" },
-  { role: "manager" as UserRole, email: "manager@ofm.com", label: "Department Manager", pass: "Manager123", color: "#8B5CF6" },
-  { role: "employee" as UserRole, email: "employee@ofm.com", label: "Staff Member", pass: "Employee123", color: "#10B981" },
-];
 
 export function WebAuth() {
   const colors = useColors();
@@ -279,30 +273,6 @@ export function WebAuth() {
             </View>
           ) : null}
 
-          {/* Institutional Role Portal Switcher (Available on Sign In) */}
-          {mode === "login" && (
-            <View style={styles.demoSection}>
-              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>INSTITUTIONAL ROLE PORTAL (QUICK ACCESS)</Text>
-              <View style={styles.demoGrid}>
-                {ROLE_ACCOUNTS.map((d) => (
-                  <TouchableOpacity
-                    key={d.role}
-                    style={[styles.demoPill, { backgroundColor: d.color + "12", borderColor: d.color + "40" }]}
-                    onPress={() => {
-                      setEmail(d.email);
-                      setPassword(d.pass);
-                      setSelectedRole(d.role);
-                      handleLogin(d.email, d.pass, d.role);
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <View style={[styles.demoDot, { backgroundColor: d.color }]} />
-                    <Text style={[styles.demoPillText, { color: colors.foreground }]}>{d.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          )}
 
           {/* Role Selection for Sign Up */}
           {mode === "signup" && (
@@ -573,11 +543,6 @@ const styles = StyleSheet.create({
   alertBanner: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: 12, borderWidth: 1 },
   alertText: { fontSize: 12.5, fontFamily: "Inter_500Medium", flex: 1 },
   fieldLabel: { fontSize: 10.5, fontFamily: "Inter_700Bold", letterSpacing: 0.6 },
-  demoSection: { gap: 8 },
-  demoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  demoPill: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, borderWidth: 1 },
-  demoDot: { width: 7.5, height: 7.5, borderRadius: 4 },
-  demoPillText: { fontSize: 11.5, fontFamily: "Inter_600SemiBold" },
   roleGrid: { gap: 8 },
   roleCard: { padding: 12, borderRadius: 14, borderWidth: 1.2, gap: 4 },
   roleCardTitle: { fontSize: 13.5, fontFamily: "Inter_700Bold" },

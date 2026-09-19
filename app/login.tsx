@@ -443,51 +443,6 @@ export default function LoginScreen() {
             </View>
           )}
 
-          {/* 1-Tap Quick Demo Access */}
-          {mode === "signin" && (
-            <View style={{ gap: 8, marginBottom: 12 }}>
-              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                <Text style={styles.fieldLabel}>INSTANT DEMO ACCESS</Text>
-                <View style={{ backgroundColor: "rgba(59, 130, 246, 0.12)", paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 6 }}>
-                  <Text style={{ fontSize: 9.5, color: "#60A5FA", fontFamily: "Inter_600SemiBold", letterSpacing: 0.3 }}>1-TAP LOGIN</Text>
-                </View>
-              </View>
-              <View style={{ flexDirection: "row", gap: 6 }}>
-                {[
-                  { role: "admin", label: "Admin", email: "admin@ofm.com", pass: "Admin123", color: "#3B82F6", icon: "shield" },
-                  { role: "accountant", label: "Accountant", email: "accountant@ofm.com", pass: "Account123", color: "#10B981", icon: "dollar-sign" },
-                  { role: "manager", label: "Manager", email: "manager@ofm.com", pass: "Manager123", color: "#8B5CF6", icon: "bar-chart-2" },
-                  { role: "employee", label: "Staff", email: "employee@ofm.com", pass: "Employee123", color: "#F59E0B", icon: "user" },
-                ].map((item) => (
-                  <TouchableOpacity
-                    key={item.role}
-                    style={{
-                      flex: 1,
-                      paddingVertical: 8,
-                      paddingHorizontal: 4,
-                      borderRadius: 10,
-                      backgroundColor: email === item.email ? "rgba(59, 130, 246, 0.20)" : "rgba(255, 255, 255, 0.05)",
-                      borderWidth: 1,
-                      borderColor: email === item.email ? item.color : "rgba(255, 255, 255, 0.12)",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 4,
-                    }}
-                    onPress={() => {
-                      setEmail(item.email);
-                      setPassword(item.pass);
-                      setError("");
-                      handleLogin(item.email, item.pass);
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <Feather name={item.icon as any} size={14} color={item.color} />
-                    <Text style={{ color: "#F8FAFC", fontSize: 10.5, fontFamily: "Inter_700Bold" }}>{item.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          )}
 
           {/* Email Field */}
           <View

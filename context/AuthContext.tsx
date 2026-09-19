@@ -142,52 +142,6 @@ interface AuthContextValue {
   updateUserOrganization: (newOrgName: string) => Promise<void>;
 }
 
-const DEMO_USERS: Record<string, { password: string; user: User }> = {
-  "admin@ofm.com": {
-    password: "Admin123",
-    user: {
-      id: "u1",
-      name: "Ahmed Aqeel",
-      email: "admin@ofm.com",
-      role: "admin",
-      organization: "Devorbit Tech",
-      organizationId: "org-9icgv4ijp",
-    },
-  },
-  "accountant@ofm.com": {
-    password: "Account123",
-    user: {
-      id: "u2",
-      name: "Maryam Naz",
-      email: "accountant@ofm.com",
-      role: "accountant",
-      organization: "Devorbit Tech",
-      organizationId: "org-9icgv4ijp",
-    },
-  },
-  "manager@ofm.com": {
-    password: "Manager123",
-    user: {
-      id: "u3",
-      name: "Dr. Sundas Iftikhar",
-      email: "manager@ofm.com",
-      role: "manager",
-      organization: "Devorbit Tech",
-      organizationId: "org-9icgv4ijp",
-    },
-  },
-  "employee@ofm.com": {
-    password: "Employee123",
-    user: {
-      id: "u4",
-      name: "Tariq Mahmood",
-      email: "employee@ofm.com",
-      role: "employee",
-      organization: "Devorbit Tech",
-      organizationId: "org-9icgv4ijp",
-    },
-  },
-};
 
 const AuthContext = createContext<AuthContextValue>({
   user: null,
@@ -270,10 +224,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let orgId = existingData.organizationId || "";
     const userRole = existingData.role || defaultRole;
 
-    // Canonical organization mapping: primary accounts and demo-org aliases map to org-9icgv4ijp
-    if (!orgId || orgId === "demo-org" || formattedEmail === "admin@ofm.com" || formattedEmail === "engrahmedaqeel14@gmail.com") {
+    // Canonical organization mapping: preserve user org or initialize clean tenant
+    if (formattedEmail === "engrahmedaqeel14@gmail.com") {
       org = org || "Devorbit Tech";
-      orgId = "org-9icgv4ijp";
+      orgId = orgId || "org-9icgv4ijp";
+    } else if (!orgId) {
+      org = org || "My Organization";
+      orgId = `org_${firebaseUser.uid.slice(0, 8)}`;
     }
 
     const resolvedUser: User = {
@@ -281,8 +238,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       name: existingData.name || firebaseUser.displayName || formattedEmail.split("@")[0] || "User",
       email: formattedEmail,
       role: userRole,
-      organization: org || "Devorbit Tech",
-      organizationId: orgId || "org-9icgv4ijp",
+      organization: org,
+      organizationId: orgId,
     };
 
     setDoc(doc(db, "users", firebaseUser.uid), resolvedUser, { merge: true }).catch(() => {});
@@ -317,21 +274,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [resolveCanonicalUserProfile, persistUserSession]);
 
-  // Helper to ensure authenticated Firebase session ONLY for demo accounts that need Firestore transport
-  const ensureActiveSession = useCallback(async (preferredEmail?: string) => {
-    if (auth.currentUser) return;
-    if (!preferredEmail) return;
-    try {
-      const emailToUse = preferredEmail.toLowerCase().trim();
-      const demo = DEMO_USERS[emailToUse];
-      // Only sign in if this is explicitly a configured demo user account!
-      if (demo) {
-        await signInWithEmailAndPassword(auth, demo.user.email, demo.password).catch(() => {});
-      }
-      // If it's a real user account, NEVER sign in as admin@ofm.com.
-      // Firebase Auth will restore the real user session from local persistence (IndexedDB/AsyncStorage).
-    } catch (e) {}
-  }, []);
 
   // 1. Instant Local Cache Restore on Mount (takes ~5ms, zero network latency)
   useEffect(() => {
@@ -353,17 +295,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           try {
             const parsed = JSON.parse(cachedData);
             if (parsed && (parsed.email || parsed.id)) {
-              if (parsed.email === "admin@ofm.com" || parsed.organizationId === "demo-org") {
-                parsed.organization = parsed.organization || "Devorbit Tech";
-                parsed.organizationId = "org-9icgv4ijp";
-              }
               setUser(parsed);
               setIsLoading(false);
               persistUserSession(parsed).catch(() => {});
-              // If this is a demo user, ensure Firebase Auth session is connected
-              if (DEMO_USERS[parsed.email?.toLowerCase()?.trim()]) {
-                ensureActiveSession(parsed.email);
-              }
               return;
             }
           } catch (e) {}
@@ -384,7 +318,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       active = false;
     };
-  }, [ensureActiveSession, persistUserSession]);
+  }, [persistUserSession]);
 
   // 2. Real-time Firebase Auth state sync with background timeout
   useEffect(() => {
@@ -435,9 +369,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (localData) {
             const parsed = JSON.parse(localData);
             if (parsed && (parsed.email || parsed.id)) {
-              if (parsed.email === "admin@ofm.com" || parsed.email === "engrahmedaqeel14@gmail.com" || parsed.organizationId === "demo-org") {
+              if (parsed.email === "engrahmedaqeel14@gmail.com") {
                 parsed.organization = parsed.organization || "Devorbit Tech";
-                parsed.organizationId = "org-9icgv4ijp";
+                parsed.organizationId = parsed.organizationId || "org-9icgv4ijp";
               }
               setUser(parsed);
             }
@@ -481,22 +415,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, password: string, role?: UserRole): Promise<boolean> => {
     const formattedEmail = email.toLowerCase().trim();
-    const demoRecord = DEMO_USERS[formattedEmail];
-
-    if (demoRecord && demoRecord.password === password && (!role || demoRecord.user.role === role)) {
-      // Connect to Firebase Auth so Firestore security rules allow full cloud sync
-      try {
-        if (!auth.currentUser) {
-          await signInWithEmailAndPassword(auth, formattedEmail, password).catch(async () => {
-            await ensureActiveSession(formattedEmail);
-          });
-        }
-      } catch (e) {}
-
-      await persistUserSession(demoRecord.user);
-      setUser(demoRecord.user);
-      return true;
-    }
 
     try {
       const userCredential = await signInWithEmailAndPassword(auth, formattedEmail, password);
@@ -567,17 +485,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const normalizedEmail = email.trim().toLowerCase();
       const adminEmail = orgNameOrInvite.trim().toLowerCase();
 
-      // Demo admin check (instant, 0ms)
-      const demoAdminEntry = Object.values(DEMO_USERS).find(
-        (entry) => entry.user.email.toLowerCase() === adminEmail && entry.user.role === "admin"
-      );
-
       if (role === "admin") {
         organization = orgNameOrInvite.trim() || "My Organization";
         organizationId = "org-" + Math.random().toString(36).substring(2, 11);
-      } else if (demoAdminEntry) {
-        organization = demoAdminEntry.user.organization;
-        organizationId = demoAdminEntry.user.organizationId;
       } else if (adminEmail) {
         // Fast invite check with 2.5s timeout
         try {

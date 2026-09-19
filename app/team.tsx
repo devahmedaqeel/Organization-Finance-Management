@@ -57,7 +57,6 @@ export default function TeamScreen() {
   const { settings } = useSettings();
   const keyboardHeight = useKeyboardHeight();
   const webTop = Platform.OS === "web" ? 67 : 0;
-  const isDemo = !user || (user.email && user.email.endsWith("@ofm.com"));
   const canInvite = user?.role === "admin";
 
   // State Management
@@ -173,23 +172,10 @@ export default function TeamScreen() {
       return;
     }
 
-    const isDemo = user.organizationId === "demo-org" || user.organizationId === "org-9icgv4ijp" || user.email === "admin@ofm.com";
-    const orgName = user.organization || settings.organizationName || "Organization Finance Management";
     const orgId = user.organizationId || "default-org";
 
     const { onSnapshot } = require("firebase/firestore");
-    const q = isDemo
-      ? query(
-          collection(db, "users"),
-          where("organization", "in", [
-            orgName,
-            "Devorbit Tech",
-            "Organization Finance Management",
-            "OFM — Organization Finance Management",
-            "OFM — Organization Finance Manager",
-          ])
-        )
-      : query(collection(db, "users"), where("organizationId", "==", orgId));
+    const q = query(collection(db, "users"), where("organizationId", "==", orgId));
 
     const unsubscribe = onSnapshot(
       q,
@@ -215,16 +201,7 @@ export default function TeamScreen() {
 
           setMembers(fetched);
         } else {
-          setMembers(
-            isDemo
-              ? [
-                  { id: "u1", name: "Ahmed Aqeel", email: "admin@ofm.com", role: "admin", organization: orgName, organizationId: "org-9icgv4ijp" },
-                  { id: "u2", name: "Maryam Naz", email: "accountant@ofm.com", role: "accountant", organization: orgName, organizationId: "org-9icgv4ijp" },
-                  { id: "u3", name: "Dr. Sundas Iftikhar", email: "manager@ofm.com", role: "manager", organization: orgName, organizationId: "org-9icgv4ijp" },
-                  { id: "u4", name: "Ali Hassan", email: "employee@ofm.com", role: "employee", organization: orgName, organizationId: "org-9icgv4ijp" },
-                ]
-              : [user]
-          );
+          setMembers(user ? [user] : []);
         }
         setLoading(false);
         setRefreshing(false);
