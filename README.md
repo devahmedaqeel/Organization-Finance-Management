@@ -17,23 +17,25 @@ It delivers real-time double-entry ledger accounting, department budget allocati
 
 ---
 
-## Features
-
+- **Offline-First Resilience**: Full CRUD functionality without an active network connection. Records persist locally, immediately participate in calculations, and synchronize upon reconnection.
+- **Durable Crash-Safe Outbox**: Offline creations, updates, and deletions enter an idempotent background synchronization outbox with automatic exponential backoff retry.
+- **Cold Start 0ms Hydration**: Instant data availability upon launching the application offline with zero blank screen flicker or empty cache overwrites.
+- **Permanent Deletion & Tombstone Guarantee**: Deleted records are purged centrally and registered in local persistent tombstones, preventing zombie resurrection from stale server snapshots.
+- **Adaptive Web Responsiveness for All Devices**:
+  - **Desktop ($\ge 1080\text{px}$)**: Dual-pane enterprise layout with collapsible sidebar, real-time KPI matrix, and wide data tables.
+  - **Tablet ($768\text{px} - 1079\text{px}$)**: Fluid grid layout with compact icon sidebar and swipeable filters.
+  - **Mobile Web ($< 768\text{px}$)**: Native-feeling mobile app experience with slide-out drawer, floating bottom navigation bar (`Home`, `Ledger`, `Reports`, `More`), and edge swipe back navigation.
+- **Two-Way Real-Time Synchronization**: Central Cloud Firestore serves as the authoritative single source of truth; updates from Web propagate to Mobile, and offline mobile mutations propagate seamlessly to Web.
+- **Multi-Role Security (RBAC)**: Distinct permissions for Super Administrator, Accountant, Manager, and Employee with strict multi-tenant isolation.
 - **Double-Entry General Ledger**: Record Revenue Inflows and Operational Expense Outflows with voucher references, category tagging, and receipt verification.
 - **Department Cost Centers**: Allocate fiscal expenditure ceilings, track department burn rates, and receive real-time budget overrun warnings.
 - **Staff Payroll & Payslip Engine**: Automated calculation of base salaries, allowances, bonuses, and statutory deductions with 1-click official PDF & High-Res Image exports.
 - **Deterministic AI Insights & Alerts**: 100% data-driven, read-only intelligence covering all 6 data availability scenarios, strict historical trend gating, statistical anomaly detection, duplicate transaction recognition, and anti-spam notification idempotency.
 - **Multi-Page Vector PDF Reporting Suite**: User-controlled financial statement exports with print-optimized CSS, multi-page vector layout, native mobile downloads via `expo-print`, and direct sharing via `expo-sharing`.
-- **Exact Numeric Formatting**: All financial figures across Web and Mobile are formatted as exact, unrounded values (`PKR 7,750`, `PKR 7,100`), eliminating lossy `K` abbreviation distortion.
-- **Mobile Text Visibility Guarantee**: Responsive minimum widths and flexible containers prevent text clipping (`Inflo...`, `Expen...`) across all common mobile screen sizes (360px–428px).
-- **Two-Way Real-Time Synchronization**: Central Cloud Firestore serves as the single source of truth; any change created, edited, or deleted on Web immediately updates Mobile, and vice-versa.
-- **Permanent Deletion Guarantee**: Successfully deleted records are purged from the database and registered in persistent tombstones, ensuring deleted records never resurrect after logout, login, refresh, or restart.
-- **Multi-Role Security (RBAC)**: Distinct permissions for Super Administrator, Accountant, Manager, and Employee with strict tenant isolation.
+- **Exact Numeric Formatting**: All financial figures across Web and Mobile are formatted as exact, unrounded values (`PKR 7,750`, `PKR 7,100`), eliminating lossy abbreviation distortion.
+- **Mobile Text Visibility Guarantee**: Responsive minimum widths and flexible containers prevent text clipping (`Inflows`, `Total Expenses`, `Department Budget`) across all screen sizes (320px–430px+).
 - **Session & Refresh Resilience**: Web refresh preserves authenticated user and active organization without falling back to demo accounts.
-- **Institutional Branding & Customization**: Support for 150+ international currencies (with default PKR formatting), custom organization logo upload, and dark/light adaptive themes.
-- **0ms Instant Startup**: Ultra-lightweight root redirector prevents bundle stalls on native startup.
-
----
+- **Live Production Hosting**: Deployed on Google Firebase Hosting worldwide CDN: [https://ofmapp-main.web.app](https://ofmapp-main.web.app).
 
 ## Technology Stack
 
@@ -174,7 +176,7 @@ The following scripts are defined in `package.json`:
 | `npm run build:web` | `expo export -p web` | Exports the static production web bundle into `dist/` |
 | `npm run deploy:hosting`| `expo export -p web && firebase deploy --only hosting` | Exports web bundle and deploys to Firebase Hosting |
 | `npm run typecheck` | `tsc -p tsconfig.json --noEmit` | Runs full TypeScript static type checking |
-| `npm test` | `npx -y tsx services/__tests__/runAllTests.ts` | Runs the comprehensive 10-suite automated test suite |
+| `npm test` | `npx -y tsx services/__tests__/runAllTests.ts` | Runs the comprehensive 13-suite automated test matrix (100% passing) |
 
 ---
 
@@ -199,28 +201,33 @@ This initiates a cloud build using the `preview` profile configured in `eas.json
 OFM uses a **Single Unified Backend Architecture** where Google Cloud Firestore is the authoritative central source of truth for all clients:
 
 ```
-┌────────────────────────────────────────────────────────┐
-│               CENTRAL CLOUD FIRESTORE                  │
-│             (Single Authoritative SSOT)                │
-└───────────────────────────┬────────────────────────────┘
-                            │
-              WebSocket Real-Time Sync (onSnapshot)
-                            │
-         ┌──────────────────┴──────────────────┐
-         ▼                                     ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                        CENTRAL CLOUD FIRESTORE                         │
+│                      (Single Authoritative SSOT)                       │
+└──────────────────────────────────┬─────────────────────────────────────┘
+                                   │
+                     WebSocket Real-Time Sync (onSnapshot)
+                     + Durable Idempotent Outbox Push
+                                   │
+                ┌──────────────────┴──────────────────┐
+                ▼                                     ▼
 ┌──────────────────────────────┐     ┌──────────────────────────────┐
 │       WEB APPLICATION        │     │      MOBILE APPLICATION      │
 │  (Desktop / Tablet / PWA)    │     │    (Android APK / iOS)       │
 │                              │     │                              │
 │ • WebShell Enterprise Layout │     │ • Expo Router Tab Navigator  │
-│ • High-Density Data Tables   │     │ • Touch-Optimized Cards      │
-│ • IndexedDB Persistence      │     │ • AsyncStorage Persistence   │
-│ • Direct Firestore SDK       │     │ • Direct Firestore SDK       │
+│ • Desktop / Tablet / Mobile  │     │ • Touch-Optimized Cards      │
+│ • IndexedDB & LocalStorage   │     │ • AsyncStorage Persistence   │
+│ • Durable Offline Outbox     │     │ • Durable Offline Outbox     │
+│ • Tombstone Register         │     │ • Tombstone Register         │
+│ • Direct Firestore SDK       │     │ • Cold-Start 0ms Hydration   │
 └──────────────────────────────┘     └──────────────────────────────┘
 ```
 
 Both clients share:
-1. **Central Collections**: `transactions`, `budgets`, `departments`, `payroll`, `settings`.
-2. **Organization Isolation**: Scoped by `organizationId` across all reads and writes.
-3. **Deterministic Math Engine**: All financial computations are calculated through `services/FinancialCalculationEngine.ts`.
-4. **Persistent Tombstones**: Deleted records are purged centrally and indexed locally to guarantee they never resurface.
+1. **Central Collections**: `transactions`, `budgets`, `departments`, `payroll`, `settings`, `notifications`.
+2. **Organization Isolation**: Scoped strictly by `organizationId` across all reads, writes, and cache keys (`ofm_data:${orgId}:*`).
+3. **Deterministic Math Engine**: All financial calculations are executed through `services/FinancialCalculationEngine.ts`.
+4. **Persistent Tombstones**: Deleted records are purged centrally and registered in local persistent tombstones, preventing zombie resurrection.
+5. **Crash-Safe Outbox**: Offline operations are serialized with unique operation IDs, ensuring zero duplicates upon network restoration.
+

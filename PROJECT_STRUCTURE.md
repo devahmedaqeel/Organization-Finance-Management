@@ -1,4 +1,4 @@
-\ OFM — Project Structure & Folder Hierarchy
+# OFM — Project Structure & Folder Hierarchy
 
 This document provides a comprehensive, verified overview of the actual directory layout and file responsibilities in the **Organization Finance Management (OFM)** project.
 

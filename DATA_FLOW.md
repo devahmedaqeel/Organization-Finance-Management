@@ -207,3 +207,52 @@ Because both platforms connect to the same central Firestore collections with re
 2. **Query Filtering**: All live listeners attach explicit constraints: `where("organizationId", "==", activeOrgId)`.
 3. **Clean Initialization**: When a new organization is registered, it begins with an entirely clean ledger ($0$ transactions, $0$ budgets, $0$ departments).
 4. **Session Teardown**: Upon logout, local in-memory states and listener subscriptions are cleanly destroyed, preventing cross-tenant data contamination.
+
+---
+
+## 5. Offline-First & Durable Outbox Data Flow
+
+When the device has no network connection:
+
+```
+[OFFLINE WORKFLOW]
+User creates, edits, or deletes an entity (Transaction, Budget, Department, Payroll)
+                      │
+                      ▼
+Immediate Local UI Update:
+- In-memory state updated instantly (0ms latency)
+- Dependent calculations (Net Operating Balance, Budget Utilization) recomputed immediately
+                      │
+                      ▼
+Local Durable Storage Commit:
+- Committed to disk under tenant-scoped key `ofm_data:${orgId}:${entityType}`
+- Deletions registered in persistent Tombstone registers (`ofm_tombstones:${orgId}:${entityType}`)
+                      │
+                      ▼
+Durable Outbox Enqueueing:
+- Operation packaged with unique `operationId`, `organizationId`, `entityType`, `opType`, `payload`, `timestamp`
+- Appended to persistent crash-safe queue `ofm_outbox:${orgId}`
+                      │
+                      ▼
+[SURVIVES APP CLOSE & RESTART]
+Data remains fully visible and editable across device reboots while offline.
+                      │
+                      ▼
+[AUTOMATIC RECONNECTION FLOW]
+Network connectivity restored (`networkService` detects online event)
+                      │
+                      ▼
+`flushOutbox()` validates active session & tenant identity
+                      │
+                      ▼
+Outbox operations executed sequentially against Cloud Firestore via batch/atomic operations:
+- Creates use deterministic paths (`doc(db, col, entityId)`)
+- Updates update server fields and timestamps
+- Deletes permanently remove remote documents
+                      │
+                      ▼
+Only successfully committed operations are cleared from the outbox
+                      │
+                      ▼
+Remote clients (Web & other authorized Mobile devices) receive Firestore snapshot updates.
+```

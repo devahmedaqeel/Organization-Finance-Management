@@ -277,7 +277,7 @@ export function WebDashboard({
           <Text style={[styles.welcomeTitle, { color: colors.foreground, fontSize: isMobile ? 18 : 22 }]}>
             Executive Financial Overview
           </Text>
-          <Text style={[styles.welcomeSubtitle, { color: colors.mutedForeground, fontSize: isMobile ? 11.5 : 13, marginTop: 2 }]} numberOfLines={1}>
+          <Text style={[styles.welcomeSubtitle, { color: colors.mutedForeground, fontSize: isMobile ? 11.5 : 13, marginTop: 2 }]} numberOfLines={2}>
             {settings.organizationName || user?.organization || "Organization Finance Management"} · Real-Time Institutional Ledger
           </Text>
         </View>

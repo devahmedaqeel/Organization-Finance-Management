@@ -288,7 +288,31 @@ The enterprise reporting system (`services/ReportExportService.ts` & `services/p
 
 ## Mobile Text Visibility & Responsive Design
 
-To eliminate text clipping and incomplete words (`Inflo...`, `Expen...`, `Depart...`):
+To eliminate text clipping and incomplete words (`Inflows`, `Total Expenses`, `Department Budget`):
 * Minimum card widths ($178\text{dp}$) and flexible containers (`flex: 1`, `flexWrap: "wrap"`).
-* Text scaling safeguards: `adjustsFontSizeToFit` with `minimumFontScale={0.85}`.
-* Verified responsive rendering across common viewports: $360\text{px}$, $375\text{px}$, $390\text{px}$, $412\text{px}$, and $428\text{px}$.
+* Text scaling safeguards: `adjustsFontSizeToFit` with `minimumFontScale={0.65}` and `numberOfLines={2}`.
+* Verified responsive rendering across common viewports: $320\text{px}$, $360\text{px}$, $375\text{px}$, $390\text{px}$, $412\text{px}$, and $428\text{px}$.
+
+---
+
+## Offline-First Synchronization Architecture
+
+The OFM application features a production-grade, crash-resilient **Offline-First & Reconciliation Engine** (`services/offlineSyncService.ts`, `services/networkService.ts`):
+
+1. **Local Persistent Cache Layer**:
+   - Authorized organization data is stored locally under tenant-partitioned keys: `ofm_data:${organizationId}:${entityType}`.
+   - On application launch, data pre-hydrates immediately (0ms) from local disk storage, eliminating loading spinners and empty screens.
+   - Guarded persistence protects valid local storage against being overwritten by transient empty offline snapshot responses.
+
+2. **Durable Crash-Safe Outbox**:
+   - Mutations performed while disconnected (creates, updates, deletes) are encapsulated as operational units with stable identities (`operationId`, `organizationId`, `entityType`, `opType`, `payload`, `timestamp`).
+   - Outbox is persisted in disk storage (`ofm_outbox:${organizationId}`) and survives app restarts, power cycles, and crashes.
+
+3. **Deterministic State Reconciliation**:
+   - Upon network restoration, `flushOutbox()` authenticates tenant identity and executes mutations sequentially.
+   - Pending local mutations take precedence over stale server snapshots.
+   - Successful operations are atomically removed from the queue; failed operations remain queued with exponential backoff.
+
+4. **Tombstone Deletion Protection (Zero Zombie Resurrection)**:
+   - When a record is deleted locally or remotely, its ID is written to a persistent tombstone register (`ofm_tombstones:${organizationId}:${entityType}`).
+   - Incoming Firestore snapshots filter out tombstoned IDs, preventing deleted items from re-appearing after reconnect, logout, or app restart.
