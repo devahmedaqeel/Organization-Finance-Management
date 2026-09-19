@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../config/firebase";
 import { useAuth } from "./AuthContext";
+import { enqueueOperation } from "@/services/offlineSyncService";
 
 import {
   AppTheme,
@@ -34,6 +35,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const isDemoAdmin = user?.organizationId === "org-9icgv4ijp" || user?.organizationId === "demo-org" || user?.email === "admin@ofm.com";
   const orgKey = user?.organizationId || "default";
   const settingsStorageKey = `ofm_settings:${orgKey}`;
+  const durableSettingsKey = `ofm_data:${orgKey}:settings`;
   const baseDefaults = useMemo(
     () => getCleanDefaultSettings(user?.organization, isDemoAdmin),
     [user?.organization, isDemoAdmin]
@@ -44,7 +46,11 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
 
   // Load from AsyncStorage scoped to active organization on mount or org switch
   useEffect(() => {
-    AsyncStorage.getItem(settingsStorageKey).then((data) => {
+    Promise.all([
+      AsyncStorage.getItem(durableSettingsKey),
+      AsyncStorage.getItem(settingsStorageKey),
+    ]).then(([durableData, legacyData]) => {
+      const data = durableData || legacyData;
       if (data) {
         try {
           setSettings({ ...baseDefaults, ...JSON.parse(data) });
@@ -56,7 +62,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
       }
       setIsLoading(false);
     });
-  }, [settingsStorageKey, baseDefaults]);
+  }, [settingsStorageKey, durableSettingsKey, baseDefaults]);
 
   // Real-time 2-way sync across Web and Mobile via Firestore
   useEffect(() => {
@@ -74,6 +80,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
               merged.organizationLogo = firebaseSettings.organizationLogo ?? "";
             }
             AsyncStorage.setItem(settingsStorageKey, JSON.stringify(merged));
+            AsyncStorage.setItem(durableSettingsKey, JSON.stringify(merged));
             return merged;
           });
 
@@ -95,17 +102,28 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     );
 
     return () => unsub();
-  }, [user?.id, user?.organizationId, user?.organization, baseDefaults, settingsStorageKey]);
+  }, [user?.id, user?.organizationId, user?.organization, baseDefaults, settingsStorageKey, durableSettingsKey]);
 
   const updateSettings = useCallback(async (patch: Partial<Settings>) => {
     let nextSettings: Settings = baseDefaults;
     setSettings((prev) => {
       nextSettings = { ...prev, ...patch };
-      AsyncStorage.setItem(settingsStorageKey, JSON.stringify(nextSettings));
+      AsyncStorage.setItem(settingsStorageKey, JSON.stringify(nextSettings)).catch(() => {});
+      AsyncStorage.setItem(durableSettingsKey, JSON.stringify(nextSettings)).catch(() => {});
       return nextSettings;
     });
 
     const docId = user?.organizationId || (user?.organization ? user.organization.replace(/\s+/g, "_") : "default_org");
+    
+    await enqueueOperation({
+      entityType: "setting",
+      entityId: docId,
+      operationType: "UPDATE",
+      organizationId: user?.organizationId || "demo-org",
+      userId: user?.id || "anonymous",
+      payload: nextSettings,
+    }).catch(() => {});
+
     try {
       await setDoc(doc(db, "orgSettings", docId), nextSettings, { merge: true });
     } catch (err) {
@@ -115,7 +133,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     if (patch.organizationName && updateUserOrganization) {
       updateUserOrganization(patch.organizationName).catch(() => {});
     }
-  }, [user?.organizationId, user?.organization, updateUserOrganization, baseDefaults, settingsStorageKey]);
+  }, [user?.organizationId, user?.organization, updateUserOrganization, baseDefaults, settingsStorageKey, durableSettingsKey]);
 
   const addCustomCategory = useCallback(async (type: "income" | "expense", category: string) => {
     const cleanCat = category.trim();

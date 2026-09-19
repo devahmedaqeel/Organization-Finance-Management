@@ -1,4 +1,4 @@
-# OFM — Project Structure & Folder Hierarchy
+\ OFM — Project Structure & Folder Hierarchy
 
 This document provides a comprehensive, verified overview of the actual directory layout and file responsibilities in the **Organization Finance Management (OFM)** project.
 
@@ -69,6 +69,8 @@ project-root/
 │   └── NotificationHelper.ts            # Local notification triggers
 │
 ├── services/                            # Core business logic & authoritative engines
+│   ├── networkService.ts                # Universal online/offline detector & network telemetry
+│   ├── offlineSyncService.ts            # Durable persistence, crash-safe outbox, tombstones & state reconciliation
 │   ├── FinancialCalculationEngine.ts    # Single authoritative financial calculation engine
 │   ├── DatePeriodService.ts             # Fiscal period filtering & date range calculations
 │   ├── ReportExportService.ts           # PDF dossier generator & compiler
@@ -88,7 +90,7 @@ project-root/
 │   ├── mobileWebPdfRedirectService.ts   # Mobile-to-web PDF redirect handler
 │   ├── firestoreRestService.ts          # REST fallback for Firestore queries
 │   ├── settingsHelper.ts                # Organization settings helper
-│   └── __tests__/                       # Automated test suites (10 comprehensive suites)
+│   └── __tests__/                       # Automated test suites (13 comprehensive test suites)
 │
 ├── stubs/                               # Web compatibility stubs
 │   └── react-native-keyboard-controller.web.js # Prevents web bundler crashes

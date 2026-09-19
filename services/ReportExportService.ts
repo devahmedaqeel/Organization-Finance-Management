@@ -1400,8 +1400,8 @@ export function generateFinancialHtmlReport(input: ReportOptions | EnterpriseRep
  */
 export function buildFinancialPdfBinary(input: ReportOptions | EnterpriseReportData): string {
   const data = normalizeToEnterpriseData(input);
-  const { metadata, executiveSummary, generalLedger, departmentFinancials, payrollSection, monthlyTrends } = data;
-  const currency = metadata.currency;
+  const { metadata, filters, executiveSummary, generalLedger, departmentFinancials, payrollSection, monthlyTrends } = data;
+  const currency = metadata.currency || "PKR";
   const totalIncome = executiveSummary.totalRevenue;
   const totalExpenses = executiveSummary.totalExpenses;
   const netBalance = executiveSummary.netOperatingBalance;
@@ -1413,466 +1413,580 @@ export function buildFinancialPdfBinary(input: ReportOptions | EnterpriseReportD
   const netCapitalSurplus = netBalance;
   const isSurplusPositive = isNetPositive;
   const retainedPct = totalIncome > 0 ? (Math.max(0, netBalance) / totalIncome) * 100 : 0;
-  const orgName = metadata.organizationName;
-  const generatedBy = metadata.generatedBy;
+  const orgName = metadata.organizationName || "Organization Finance Management";
+  const generatedBy = metadata.generatedBy || "Chief Financial Officer";
   const dateStr = metadata.generatedDate;
   const timeStr = metadata.generatedTime;
   const certId = metadata.reportRefId;
 
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const maxBarVal = Math.max(totalIncome, totalExpenses, 1);
+  const contactParts: string[] = [];
+  if (metadata.organizationAddress && !metadata.organizationAddress.includes("Kotli, Azad Kashmir")) {
+    contactParts.push(metadata.organizationAddress);
+  } else if (metadata.organizationAddress) {
+    contactParts.push(metadata.organizationAddress);
+  }
+  if (metadata.organizationEmail && !metadata.organizationEmail.includes("devorbit.tech") && !metadata.organizationEmail.includes("ofm-cloud.com")) {
+    contactParts.push(metadata.organizationEmail);
+  }
+  if (metadata.organizationPhone && !metadata.organizationPhone.includes("555-0199") && !metadata.organizationPhone.includes("444111")) {
+    contactParts.push(metadata.organizationPhone);
+  }
+  const fullContact = contactParts.length > 0 ? contactParts.join(" · ") : "Official Institutional Audited Financial Statement";
 
-  const fullContact = [
-    metadata.organizationAddress || "Kotli, Azad Kashmir",
-    metadata.organizationEmail || "finance@devorbit.tech",
-    metadata.organizationPhone || "+92-586-444111",
-  ].filter(Boolean).join(" · ");
+  const fmtEx = (n: number) => Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtInt = (n: number) => Number(n || 0).toLocaleString();
 
-  const streamLines: string[] = [
-    "q",
-    // 1. Top Header Banner
-    "0.06 0.09 0.16 rg",
-    "40 735 515.28 75 re f",
-    "0.22 0.74 0.97 rg",
-    "40 735 6 75 re f",
-    "BT",
-    "/F2 15 Tf 1 1 1 rg",
-    `56 788 Td (${escapePdfText(orgName)}) Tj`,
-    "/F1 8.5 Tf 0.78 0.82 0.95 rg",
-    "56 772 Td (Organization Finance Management · Official Audited Statement) Tj",
-    "/F1 7.5 Tf 0.22 0.74 0.97 rg",
-    `56 756 Td (${escapePdfText(fullContact)}) Tj`,
-    "ET",
+  // Multi-Page state
+  const pages: string[][] = [];
+  let curPage: string[] = [];
+  let currentY = 800;
 
-    // Header Right Badge
-    "0.15 0.23 0.40 rg",
-    "405 760 140 22 re f",
-    "BT",
-    "/F2 8 Tf 0.22 0.74 0.97 rg",
-    `415 768 Td (REF: ${escapePdfText(certId.slice(0, 16))}) Tj`,
-    "ET",
+  const pushCurrentPage = () => {
+    if (curPage.length > 0) {
+      pages.push(curPage);
+      curPage = [];
+    }
+  };
 
-    // 2. Executive Summary Cards (3 Columns)
-    // Card 1: Revenue
-    "0.96 0.97 0.99 rg",
-    "40 660 165 65 re f",
-    "0.06 0.72 0.50 rg",
-    "40 722 165 3 re f",
-    "BT",
-    "/F2 7.5 Tf 0.40 0.45 0.55 rg",
-    "50 708 Td (TOTAL REVENUE / INFLOWS) Tj",
-    "ET",
-    "BT",
-    "/F2 12 Tf 0.06 0.72 0.50 rg",
-    `50 690 Td (+${escapePdfText(currency)} ${escapePdfText(totalIncome.toLocaleString(undefined, { minimumFractionDigits: 2 }))}) Tj`,
-    "ET",
-    "BT",
-    "/F1 7 Tf 0.45 0.50 0.60 rg",
-    "50 674 Td (Institutional Inflows & Grants) Tj",
-    "ET",
+  const startNewPage = (isFirst = false) => {
+    pushCurrentPage();
+    curPage = ["q"];
 
-    // Card 2: Expenditures
-    "0.96 0.97 0.99 rg",
-    "215 660 165 65 re f",
-    "0.94 0.25 0.37 rg",
-    "215 722 165 3 re f",
-    "BT",
-    "/F2 7.5 Tf 0.40 0.45 0.55 rg",
-    "225 708 Td (TOTAL EXPENDITURES) Tj",
-    "ET",
-    "BT",
-    "/F2 12 Tf 0.94 0.25 0.37 rg",
-    `225 690 Td (-${escapePdfText(currency)} ${escapePdfText(totalExpenses.toLocaleString(undefined, { minimumFractionDigits: 2 }))}) Tj`,
-    "ET",
-    "BT",
-    "/F1 7 Tf 0.45 0.50 0.60 rg",
-    hasBudget
-      ? `225 674 Td (Budget Cap: ${escapePdfText(currency)} ${escapePdfText(fmtShort(executiveSummary.budgetTotal))}) Tj`
-      : "225 674 Td (Operating Outflows & Payroll) Tj",
-    "ET",
-
-    // Card 3: Net Operating Balance / Net Capital Surplus
-    "0.96 0.97 0.99 rg",
-    "390 660 165 65 re f",
-    (hasBudget ? isSurplusPositive : isNetPositive) ? "0.06 0.72 0.50 rg" : "0.94 0.25 0.37 rg",
-    "390 722 165 3 re f",
-    "BT",
-    "/F2 7.5 Tf 0.40 0.45 0.55 rg",
-    `400 708 Td (${hasBudget ? "NET CAPITAL SURPLUS" : "NET OPERATING BALANCE"}) Tj`,
-    "ET",
-    "BT",
-    `/F2 12 Tf ${(hasBudget ? isSurplusPositive : isNetPositive) ? "0.06 0.72 0.50" : "0.94 0.25 0.37"} rg`,
-    hasBudget
-      ? `400 690 Td (${isSurplusPositive ? "+" : "-"}${escapePdfText(currency)} ${escapePdfText(Math.abs(netCapitalSurplus).toLocaleString(undefined, { minimumFractionDigits: 2 }))}) Tj`
-      : `400 690 Td (${isNetPositive ? "+" : "-"}${escapePdfText(currency)} ${escapePdfText(Math.abs(netBalance).toLocaleString(undefined, { minimumFractionDigits: 2 }))}) Tj`,
-    "ET",
-    "BT",
-    "/F1 7 Tf 0.45 0.50 0.60 rg",
-    hasBudget
-      ? `400 674 Td (${retainedPct.toFixed(0)}% Retained · +${escapePdfText(currency)} ${escapePdfText(fmtShort(netBalance))} Cash) Tj`
-      : `400 674 Td (${isNetPositive ? "Operating Surplus Retained" : "Operating Deficit Alert"}) Tj`,
-    "ET",
-
-    // ─── 3. FINANCIAL TREND & CASHFLOW VISUAL GRAPH ───
-    "0.98 0.98 1.0 rg",
-    "40 550 515.28 98 re f",
-    "0.88 0.90 0.95 rg",
-    "40 550 515.28 98 re S",
-
-    // Graph Title & Legend
-    "BT",
-    "/F2 8.5 Tf 0.10 0.15 0.30 rg",
-    "50 632 Td (MONTHLY CASH FLOW & REVENUE TRAJECTORY (VECTOR AUDIT)) Tj",
-    "ET",
-
-    // Legend items
-    "0.06 0.72 0.50 rg",
-    "360 634 8 8 re f",
-    "BT",
-    "/F1 7 Tf 0.30 0.35 0.45 rg",
-    "372 635 Td (Realized Inflows) Tj",
-    "ET",
-
-    "0.94 0.25 0.37 rg",
-    "445 634 8 8 re f",
-    "BT",
-    "/F1 7 Tf 0.30 0.35 0.45 rg",
-    "457 635 Td (Operational Outflows) Tj",
-    "ET",
-
-    // Baseline axis
-    "0.75 0.80 0.88 rg",
-    "50 570 495 1 re f",
-
-    // Render Dynamic Comparison Bars from Real Database Points
-    ...(monthlyTrends?.chartPoints && monthlyTrends.chartPoints.length > 0
-      ? monthlyTrends.chartPoints.slice(-6).map((cp: any) => ({
-          m: cp.label || cp.monthLabel || "",
-          inc: cp.income || cp.revenue || 0,
-          exp: cp.expense || cp.expenses || 0,
-        }))
-      : [
-          { m: "Current", inc: totalIncome, exp: totalExpenses },
-        ]
-    ).flatMap((pt: any, idx: number, arr: any[]) => {
-      const stepW = 460 / Math.max(arr.length, 1);
-      const x = 65 + idx * stepW;
-      const incH = Math.max(2, Math.min(48, ((pt.inc || 0) / maxBarVal) * 48));
-      const expH = Math.max(2, Math.min(48, ((pt.exp || 0) / maxBarVal) * 48));
-      return [
-        // Inflow Bar (Green)
-        "0.06 0.72 0.50 rg",
-        `${x} 570 14 ${incH} re f`,
-        // Outflow Bar (Rose)
-        "0.94 0.25 0.37 rg",
-        `${x + 16} 570 14 ${expH} re f`,
-        // Month label
+    if (isFirst) {
+      // ─── 1. TOP HEADER BANNER (Page 1) ───
+      curPage.push(
+        "0.06 0.09 0.16 rg",
+        "40 735 515.28 75 re f",
+        "0.22 0.74 0.97 rg",
+        "40 735 6 75 re f",
         "BT",
-        "/F1 7 Tf 0.40 0.45 0.55 rg",
-        `${x + 4} 558 Td (${escapePdfText(pt.m.slice(0, 6))}) Tj`,
+        "/F2 14 Tf 1 1 1 rg",
+        `56 788 Td (${escapePdfText(orgName.slice(0, 42))}) Tj`,
+        "/F1 8 Tf 0.78 0.82 0.95 rg",
+        "56 772 Td (Organization Finance Management · Official Certified Statement) Tj",
+        "/F1 7.5 Tf 0.22 0.74 0.97 rg",
+        `56 756 Td (${escapePdfText(fullContact.slice(0, 75))}) Tj`,
         "ET",
-      ];
-    }),
+        // Header Right Badge
+        "0.15 0.23 0.40 rg",
+        "405 760 140 22 re f",
+        "BT",
+        "/F2 7.5 Tf 0.22 0.74 0.97 rg",
+        `415 768 Td (REF: ${escapePdfText(certId.slice(0, 18))}) Tj`,
+        "ET",
+        // Applied Scope Bar
+        "0.94 0.95 0.98 rg",
+        "40 710 515.28 18 re f",
+        "0.85 0.88 0.94 rg",
+        "40 710 515.28 18 re S",
+        "BT",
+        "/F2 7.5 Tf 0.15 0.20 0.35 rg",
+        `48 716 Td (AUDIT SCOPE: ${escapePdfText(filters.periodLabel)}  |  RANGE: ${escapePdfText(filters.startDate)} to ${escapePdfText(filters.endDate)}  |  RECORDS: ${generalLedger.transactions.length}) Tj`,
+        "ET",
+        // ─── 2. EXECUTIVE SUMMARY CARDS (3 Columns) ───
+        // Card 1: Revenue
+        "0.96 0.97 0.99 rg",
+        "40 640 165 62 re f",
+        "0.06 0.72 0.50 rg",
+        "40 700 165 2.5 re f",
+        "BT",
+        "/F2 7.5 Tf 0.40 0.45 0.55 rg",
+        "50 688 Td (TOTAL REVENUE / INFLOWS) Tj",
+        "ET",
+        "BT",
+        "/F2 11 Tf 0.06 0.72 0.50 rg",
+        `50 670 Td (+${escapePdfText(currency)} ${escapePdfText(fmtEx(totalIncome))}) Tj`,
+        "ET",
+        "BT",
+        "/F1 7 Tf 0.45 0.50 0.60 rg",
+        `50 654 Td (${generalLedger.transactions.filter(t => t.type === "income").length} Realized Inflows) Tj`,
+        "ET",
+        // Card 2: Expenditures
+        "0.96 0.97 0.99 rg",
+        "215 640 165 62 re f",
+        "0.94 0.25 0.37 rg",
+        "215 700 165 2.5 re f",
+        "BT",
+        "/F2 7.5 Tf 0.40 0.45 0.55 rg",
+        "225 688 Td (TOTAL EXPENDITURES) Tj",
+        "ET",
+        "BT",
+        "/F2 11 Tf 0.94 0.25 0.37 rg",
+        `225 670 Td (-${escapePdfText(currency)} ${escapePdfText(fmtEx(totalExpenses))}) Tj`,
+        "ET",
+        "BT",
+        "/F1 7 Tf 0.45 0.50 0.60 rg",
+        hasBudget
+          ? `225 654 Td (Budget Cap: ${escapePdfText(currency)} ${escapePdfText(fmtInt(executiveSummary.budgetTotal))}) Tj`
+          : `225 654 Td (${generalLedger.transactions.filter(t => t.type === "expense").length} Outflow Vouchers) Tj`,
+        "ET",
+        // Card 3: Net Operating Balance
+        "0.96 0.97 0.99 rg",
+        "390 640 165 62 re f",
+        (hasBudget ? isSurplusPositive : isNetPositive) ? "0.06 0.72 0.50 rg" : "0.94 0.25 0.37 rg",
+        "390 700 165 2.5 re f",
+        "BT",
+        "/F2 7.5 Tf 0.40 0.45 0.55 rg",
+        `400 688 Td (${hasBudget ? "NET CAPITAL SURPLUS" : "NET OPERATING BALANCE"}) Tj`,
+        "ET",
+        "BT",
+        `/F2 11 Tf ${(hasBudget ? isSurplusPositive : isNetPositive) ? "0.06 0.72 0.50" : "0.94 0.25 0.37"} rg`,
+        hasBudget
+          ? `400 670 Td (${isSurplusPositive ? "+" : "-"}${escapePdfText(currency)} ${escapePdfText(fmtEx(Math.abs(netCapitalSurplus)))}) Tj`
+          : `400 670 Td (${isNetPositive ? "+" : "-"}${escapePdfText(currency)} ${escapePdfText(fmtEx(Math.abs(netBalance)))}) Tj`,
+        "ET",
+        "BT",
+        "/F1 7 Tf 0.45 0.50 0.60 rg",
+        hasBudget
+          ? `400 654 Td (${retainedPct.toFixed(0)}% Retained · ${isNetPositive ? "+" : "-"}${escapePdfText(currency)} ${escapePdfText(fmtInt(Math.abs(netBalance)))} Cash) Tj`
+          : `400 654 Td (${isNetPositive ? "Operating Surplus Retained" : "Operating Deficit Alert"}) Tj`,
+        "ET"
+      );
 
-    // ─── 4. DEPARTMENT ALLOCATION MATRIX & PROGRESS BARS ───
-    "0.06 0.09 0.16 rg",
-    "40 518 515.28 18 re f",
-    "BT",
-    "/F2 8.5 Tf 1 1 1 rg",
-    "48 523 Td (DEPARTMENTAL COST CENTER ALLOCATIONS & UTILIZATION) Tj",
-    "ET",
+      // ─── 3. FINANCIAL TREND GRAPH (Page 1) ───
+      const chartY = 525;
+      const chartH = 102;
+      curPage.push(
+        "0.98 0.98 1.0 rg",
+        `40 ${chartY} 515.28 ${chartH} re f`,
+        "0.88 0.90 0.95 rg",
+        `40 ${chartY} 515.28 ${chartH} re S`,
+        "BT",
+        "/F2 8 Tf 0.10 0.15 0.30 rg",
+        `50 ${chartY + 86} Td (FINANCIAL CASH FLOW & REVENUE TRAJECTORY (VECTOR AUDIT)) Tj`,
+        "ET",
+        "0.06 0.72 0.50 rg",
+        `355 ${chartY + 88} 7 7 re f`,
+        "BT",
+        "/F1 6.5 Tf 0.30 0.35 0.45 rg",
+        `366 ${chartY + 89} Td (Realized Inflows) Tj`,
+        "ET",
+        "0.94 0.25 0.37 rg",
+        `440 ${chartY + 88} 7 7 re f`,
+        "BT",
+        "/F1 6.5 Tf 0.30 0.35 0.45 rg",
+        `451 ${chartY + 89} Td (Operational Outflows) Tj`,
+        "ET",
+        "0.75 0.80 0.88 rg",
+        `50 ${chartY + 22} 495 0.8 re f`
+      );
 
-    // Dept Table Header
-    "0.92 0.94 0.98 rg",
-    "40 500 515.28 16 re f",
-    "BT",
-    "/F2 7.5 Tf 0.20 0.25 0.35 rg",
-    "48 505 Td (COST CENTER) Tj",
-    "ET",
-    "BT",
-    "/F2 7.5 Tf 0.20 0.25 0.35 rg",
-    "180 505 Td (HEADCOUNT) Tj",
-    "ET",
-    "BT",
-    "/F2 7.5 Tf 0.20 0.25 0.35 rg",
-    "260 505 Td (ALLOCATED) Tj",
-    "ET",
-    "BT",
-    "/F2 7.5 Tf 0.20 0.25 0.35 rg",
-    "360 505 Td (ACTUAL SPENT) Tj",
-    "ET",
-    "BT",
-    "/F2 7.5 Tf 0.20 0.25 0.35 rg",
-    "460 505 Td (CAPACITY UTILIZATION) Tj",
-    "ET",
+      const pts = monthlyTrends?.chartPoints || [];
+      if (pts.length > 0 && (totalIncome > 0 || totalExpenses > 0)) {
+        const maxBar = Math.max(...pts.map((p) => Math.max(p.income || 0, p.expense || 0)), totalIncome, totalExpenses, 1);
+        const visiblePts = pts.slice(0, 14);
+        const stepW = 460 / Math.max(visiblePts.length, 1);
+        const barW = Math.max(4, Math.min(15, stepW * 0.36));
 
-    // Department Rows (Up to 4 Departments)
-    ...((departmentFinancials.departments && departmentFinancials.departments.length > 0)
-      ? departmentFinancials.departments.slice(0, 4)
-      : []
-    ).flatMap((d, idx) => {
-      const y = 482 - idx * 19;
+        visiblePts.forEach((pt, idx) => {
+          const x = 58 + idx * stepW;
+          const incH = Math.max(1, Math.min(52, ((pt.income || 0) / maxBar) * 52));
+          const expH = Math.max(1, Math.min(52, ((pt.expense || 0) / maxBar) * 52));
+          curPage.push(
+            "0.06 0.72 0.50 rg",
+            `${x} ${chartY + 22} ${barW} ${incH} re f`,
+            "0.94 0.25 0.37 rg",
+            `${x + barW + 2} ${chartY + 22} ${barW} ${expH} re f`,
+            "BT",
+            "/F1 6.5 Tf 0.40 0.45 0.55 rg",
+            `${x} ${chartY + 11} Td (${escapePdfText((pt.label || "").slice(0, 7))}) Tj`,
+            "ET"
+          );
+        });
+      } else {
+        curPage.push(
+          "BT",
+          "/F1 8 Tf 0.45 0.50 0.60 rg",
+          `160 ${chartY + 46} Td (No financial activity recorded for the selected audit period) Tj`,
+          "ET"
+        );
+      }
+
+      currentY = 508;
+    } else {
+      // Running header on Page 2+
+      curPage.push(
+        "BT",
+        "/F2 8 Tf 0.10 0.15 0.30 rg",
+        `40 812 Td (${escapePdfText(orgName.slice(0, 35))} · Official Financial Statement) Tj`,
+        "ET",
+        "BT",
+        "/F1 7.5 Tf 0.45 0.50 0.60 rg",
+        `390 812 Td (REF: ${escapePdfText(certId.slice(0, 16))} · ${escapePdfText(filters.periodLabel.slice(0, 22))}) Tj`,
+        "ET",
+        "0.85 0.88 0.94 rg",
+        "40 804 515.28 0.8 re f"
+      );
+      currentY = 785;
+    }
+  };
+
+  const ensureSpace = (needed: number, onNewPageHeader?: () => void) => {
+    if (currentY - needed < 70) {
+      startNewPage(false);
+      if (onNewPageHeader) {
+        onNewPageHeader();
+      }
+    }
+  };
+
+  // Start Page 1
+  startNewPage(true);
+
+  // ─── 4. DEPARTMENT ALLOCATIONS (Full List) ───
+  if (departmentFinancials?.departments && departmentFinancials.departments.length > 0) {
+    const renderDeptHeader = () => {
+      curPage.push(
+        "0.06 0.09 0.16 rg",
+        `40 ${currentY - 16} 515.28 16 re f`,
+        "BT",
+        "/F2 8 Tf 1 1 1 rg",
+        `48 ${currentY - 12} Td (DEPARTMENTAL COST CENTER ALLOCATIONS & UTILIZATION) Tj`,
+        "ET",
+        "0.92 0.94 0.98 rg",
+        `40 ${currentY - 32} 515.28 15 re f`,
+        "BT",
+        "/F2 7 Tf 0.20 0.25 0.35 rg",
+        `48 ${currentY - 28} Td (COST CENTER) Tj`,
+        `180 ${currentY - 28} Td (HEADCOUNT) Tj`,
+        `250 ${currentY - 28} Td (ALLOCATED (${escapePdfText(currency)})) Tj`,
+        `350 ${currentY - 28} Td (ACTUAL SPENT (${escapePdfText(currency)})) Tj`,
+        `460 ${currentY - 28} Td (CAPACITY UTILIZATION) Tj`,
+        "ET"
+      );
+      currentY -= 33;
+    };
+
+    ensureSpace(50, renderDeptHeader);
+    renderDeptHeader();
+
+    departmentFinancials.departments.forEach((d, idx) => {
+      ensureSpace(18, renderDeptHeader);
+      const y = currentY;
       const utilPct = Math.min(100, Math.round(d.utilizationPct || 0));
-      const barW = Math.max(2, Math.min(60, (utilPct / 100) * 60));
+      const barW = Math.max(2, Math.min(50, (utilPct / 100) * 50));
       const isOver = utilPct > 90;
-      return [
-        idx % 2 === 1 ? `0.98 0.98 0.99 rg\n40 ${y - 3} 515.28 18 re f` : "",
+
+      if (idx % 2 === 1) {
+        curPage.push("0.98 0.98 0.99 rg", `40 ${y - 14} 515.28 16 re f`);
+      }
+      curPage.push(
         "0.90 0.92 0.95 rg",
-        `40 ${y - 3} 515.28 0.5 re f`,
+        `40 ${y - 14} 515.28 0.5 re f`,
         "BT",
         "/F2 7.5 Tf 0.10 0.15 0.25 rg",
-        `48 ${y + 2} Td (${escapePdfText(d.name.slice(0, 20))}) Tj`,
+        `48 ${y - 10} Td (${escapePdfText(d.name.slice(0, 22))}) Tj`,
         "ET",
         "BT",
         "/F1 7.5 Tf 0.35 0.40 0.50 rg",
-        `190 ${y + 2} Td (${d.headcount} Staff) Tj`,
+        `185 ${y - 10} Td (${d.headcount} Staff) Tj`,
         "ET",
         "BT",
         "/F1 7.5 Tf 0.35 0.40 0.50 rg",
-        `260 ${y + 2} Td (${currency} ${fmtShort(d.allocatedBudget)}) Tj`,
+        `250 ${y - 10} Td (${currency} ${escapePdfText(fmtInt(d.allocatedBudget))}) Tj`,
         "ET",
         "BT",
         "/F2 7.5 Tf 0.94 0.25 0.37 rg",
-        `360 ${y + 2} Td (${currency} ${fmtShort(d.actualSpent)}) Tj`,
+        `350 ${y - 10} Td (${currency} ${escapePdfText(fmtInt(d.actualSpent))}) Tj`,
         "ET",
-        // Progress bar background
+        // Progress bar track
         "0.88 0.90 0.95 rg",
-        `460 ${y + 2} 60 6 re f`,
+        `460 ${y - 10} 50 6 re f`,
         // Progress bar fill
         isOver ? "0.94 0.25 0.37 rg" : "0.22 0.74 0.97 rg",
-        `460 ${y + 2} ${barW} 6 re f`,
+        `460 ${y - 10} ${barW} 6 re f`,
         "BT",
         "/F2 7 Tf 0.15 0.20 0.30 rg",
-        `524 ${y + 2} Td (${utilPct}%) Tj`,
+        `515 ${y - 10} Td (${utilPct}%) Tj`,
+        "ET"
+      );
+      currentY -= 17;
+    });
+    currentY -= 6;
+  }
+
+  // ─── 5. STAFF PAYROLL & REMUNERATION AUDIT (Full List) ───
+  if (payrollSection?.employees && payrollSection.employees.length > 0 && payrollSection.canViewDetails) {
+    const renderPayrollHeader = () => {
+      curPage.push(
+        "0.06 0.09 0.16 rg",
+        `40 ${currentY - 16} 515.28 16 re f`,
+        "BT",
+        "/F2 8 Tf 1 1 1 rg",
+        `48 ${currentY - 12} Td (STAFF PAYROLL & REMUNERATION AUDIT DOSSIER) Tj`,
         "ET",
-      ].filter(Boolean);
-    }),
+        "0.92 0.94 0.98 rg",
+        `40 ${currentY - 32} 515.28 15 re f`,
+        "BT",
+        "/F2 7 Tf 0.20 0.25 0.35 rg",
+        `48 ${currentY - 28} Td (EMPLOYEE NAME) Tj`,
+        `170 ${currentY - 28} Td (EMP ID) Tj`,
+        `230 ${currentY - 28} Td (DEPARTMENT) Tj`,
+        `345 ${currentY - 28} Td (BASE SALARY (${escapePdfText(currency)})) Tj`,
+        `455 ${currentY - 28} Td (NET DISBURSED (${escapePdfText(currency)})) Tj`,
+        "ET"
+      );
+      currentY -= 33;
+    };
 
-    // ─── 4.5. STAFF PAYROLL & REMUNERATION AUDIT DOSSIER ───
-    "0.06 0.09 0.16 rg",
-    "40 405 515.28 18 re f",
-    "BT",
-    "/F2 8.5 Tf 1 1 1 rg",
-    "48 410 Td (STAFF PAYROLL & REMUNERATION AUDIT DOSSIER) Tj",
-    "ET",
+    ensureSpace(50, renderPayrollHeader);
+    renderPayrollHeader();
 
-    // Payroll Table Header
-    "0.92 0.94 0.98 rg",
-    "40 387 515.28 16 re f",
-    "BT",
-    "/F2 7.5 Tf 0.20 0.25 0.35 rg",
-    "48 392 Td (EMPLOYEE NAME) Tj",
-    "ET",
-    "BT",
-    "/F2 7.5 Tf 0.20 0.25 0.35 rg",
-    "170 392 Td (EMP ID) Tj",
-    "ET",
-    "BT",
-    "/F2 7.5 Tf 0.20 0.25 0.35 rg",
-    "230 392 Td (DEPARTMENT) Tj",
-    "ET",
-    "BT",
-    "/F2 7.5 Tf 0.20 0.25 0.35 rg",
-    "350 392 Td (BASE SALARY) Tj",
-    "ET",
-    "BT",
-    "/F2 7.5 Tf 0.20 0.25 0.35 rg",
-    "450 392 Td (NET PAYOUT) Tj",
-    "ET",
+    payrollSection.employees.forEach((p, idx) => {
+      ensureSpace(17, renderPayrollHeader);
+      const y = currentY;
 
-    // Payroll Rows (Up to 5 Employees)
-    ...((payrollSection?.employees && payrollSection.employees.length > 0)
-      ? payrollSection.employees.slice(0, 5)
-      : []
-    ).flatMap((p, idx) => {
-      const y = 369 - idx * 18;
-      return [
-        idx % 2 === 1 ? `0.98 0.98 0.99 rg\n40 ${y - 3} 515.28 18 re f` : "",
+      if (idx % 2 === 1) {
+        curPage.push("0.98 0.98 0.99 rg", `40 ${y - 13} 515.28 15 re f`);
+      }
+      curPage.push(
         "0.90 0.92 0.95 rg",
-        `40 ${y - 3} 515.28 0.5 re f`,
+        `40 ${y - 13} 515.28 0.5 re f`,
         "BT",
         "/F2 7.5 Tf 0.10 0.15 0.25 rg",
-        `48 ${y + 2} Td (${escapePdfText((p.employeeName || "").slice(0, 20))}) Tj`,
+        `48 ${y - 10} Td (${escapePdfText((p.employeeName || "").slice(0, 20))}) Tj`,
         "ET",
         "BT",
         "/F1 7 Tf 0.35 0.40 0.50 rg",
-        `170 ${y + 2} Td (${escapePdfText((p.employeeId || "-").slice(0, 10))}) Tj`,
+        `170 ${y - 10} Td (${escapePdfText((p.employeeId || "-").slice(0, 10))}) Tj`,
         "ET",
         "BT",
         "/F1 7.5 Tf 0.35 0.40 0.50 rg",
-        `230 ${y + 2} Td (${escapePdfText((p.department || "").slice(0, 16))}) Tj`,
+        `230 ${y - 10} Td (${escapePdfText((p.department || "").slice(0, 16))}) Tj`,
         "ET",
         "BT",
         "/F1 7.5 Tf 0.20 0.25 0.35 rg",
-        `350 ${y + 2} Td (${currency} ${Number(p.baseSalary || 0).toLocaleString()}) Tj`,
+        `345 ${y - 10} Td (${currency} ${escapePdfText(fmtEx(p.baseSalary))}) Tj`,
         "ET",
         "BT",
         "/F2 7.5 Tf 0.06 0.72 0.50 rg",
-        `450 ${y + 2} Td (${currency} ${Number(p.netSalary || p.baseSalary || 0).toLocaleString()}) Tj`,
+        `455 ${y - 10} Td (${currency} ${escapePdfText(fmtEx(p.netSalary || p.baseSalary))}) Tj`,
+        "ET"
+      );
+      currentY -= 16;
+    });
+    currentY -= 6;
+  }
+
+  // ─── 6. AUDITED GENERAL LEDGER (Full Dynamically Paginated List) ───
+  if (generalLedger?.transactions && generalLedger.transactions.length > 0) {
+    const renderLedgerHeader = () => {
+      curPage.push(
+        "0.06 0.09 0.16 rg",
+        `40 ${currentY - 16} 515.28 16 re f`,
+        "BT",
+        "/F2 8 Tf 1 1 1 rg",
+        `48 ${currentY - 12} Td (AUDITED GENERAL LEDGER & TRANSACTION TRAIL (${generalLedger.transactions.length} RECORDS)) Tj`,
         "ET",
-      ].filter(Boolean);
-    }),
+        "0.92 0.94 0.98 rg",
+        `40 ${currentY - 32} 515.28 15 re f`,
+        "BT",
+        "/F2 7 Tf 0.20 0.25 0.35 rg",
+        `48 ${currentY - 28} Td (DATE) Tj`,
+        `115 ${currentY - 28} Td (TYPE) Tj`,
+        `170 ${currentY - 28} Td (CATEGORY) Tj`,
+        `270 ${currentY - 28} Td (DEPARTMENT / DESCRIPTION) Tj`,
+        `450 ${currentY - 28} Td (AMOUNT (${escapePdfText(currency)})) Tj`,
+        "ET"
+      );
+      currentY -= 33;
+    };
 
-    // ─── 5. AUDITED GENERAL LEDGER TRANSACTIONS ───
-    "0.06 0.09 0.16 rg",
-    "40 275 515.28 18 re f",
-    "BT",
-    "/F2 8.5 Tf 1 1 1 rg",
-    "48 280 Td (AUDITED GENERAL LEDGER & ALLOCATION VOUCHERS) Tj",
-    "ET",
+    ensureSpace(50, renderLedgerHeader);
+    renderLedgerHeader();
 
-    // Table Header
-    "0.92 0.94 0.98 rg",
-    "40 257 515.28 16 re f",
-    "BT",
-    "/F2 7.5 Tf 0.20 0.25 0.35 rg",
-    "48 262 Td (DATE) Tj",
-    "ET",
-    "BT",
-    "/F2 7.5 Tf 0.20 0.25 0.35 rg",
-    "110 262 Td (TYPE) Tj",
-    "ET",
-    "BT",
-    "/F2 7.5 Tf 0.20 0.25 0.35 rg",
-    "165 262 Td (CATEGORY) Tj",
-    "ET",
-    "BT",
-    "/F2 7.5 Tf 0.20 0.25 0.35 rg",
-    "275 262 Td (DEPARTMENT / DESCRIPTION) Tj",
-    "ET",
-    "BT",
-    "/F2 7.5 Tf 0.20 0.25 0.35 rg",
-    "460 262 Td (AMOUNT) Tj",
-    "ET",
-
-    // Transaction rows (Up to 5 rows positioned cleanly between y=257 and y=152)
-    ...((generalLedger.transactions && generalLedger.transactions.length > 0) ? generalLedger.transactions.slice(0, 5) : []).flatMap((t, idx) => {
-      const y = 239 - idx * 17;
+    generalLedger.transactions.forEach((t, idx) => {
+      ensureSpace(16, renderLedgerHeader);
+      const y = currentY;
       const isIncome = t.type === "income";
-      const amtStr = `${isIncome ? "+" : "-"}${currency} ${Number(t.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}`;
-      return [
-        idx % 2 === 1 ? `0.98 0.98 0.99 rg\n40 ${y - 3} 515.28 16 re f` : "",
+      const amtStr = `${isIncome ? "+" : "-"}${currency} ${fmtEx(t.amount)}`;
+
+      if (idx % 2 === 1) {
+        curPage.push("0.98 0.98 0.99 rg", `40 ${y - 13} 515.28 15 re f`);
+      }
+      curPage.push(
         "0.90 0.92 0.95 rg",
-        `40 ${y - 3} 515.28 0.5 re f`,
+        `40 ${y - 13} 515.28 0.5 re f`,
         "BT",
         "/F1 7.5 Tf 0.15 0.20 0.30 rg",
-        `48 ${y + 2} Td (${escapePdfText(t.date || "")}) Tj`,
+        `48 ${y - 10} Td (${escapePdfText((t.date || "").slice(0, 10))}) Tj`,
         "ET",
         "BT",
-        `/F2 7.5 Tf ${isIncome ? "0.06 0.72 0.50" : "0.94 0.25 0.37"} rg`,
-        `110 ${y + 2} Td (${t.type.toUpperCase()}) Tj`,
+        `/F2 7 Tf ${isIncome ? "0.06 0.72 0.50" : "0.94 0.25 0.37"} rg`,
+        `115 ${y - 10} Td (${isIncome ? "INFLOW" : "OUTFLOW"}) Tj`,
         "ET",
         "BT",
         "/F2 7.5 Tf 0.10 0.15 0.25 rg",
-        `165 ${y + 2} Td (${escapePdfText((t.category || "").slice(0, 15))}) Tj`,
+        `170 ${y - 10} Td (${escapePdfText((t.category || "").slice(0, 16))}) Tj`,
         "ET",
         "BT",
         "/F1 7 Tf 0.35 0.40 0.50 rg",
-        `275 ${y + 2} Td (${escapePdfText(`${t.department || ""} ${t.description ? "— " + t.description : ""}`.slice(0, 28))}) Tj`,
+        `270 ${y - 10} Td (${escapePdfText(`${t.department || ""} ${t.description ? "— " + t.description : ""}`.slice(0, 50))}) Tj`,
         "ET",
         "BT",
         `/F2 7.5 Tf ${isIncome ? "0.06 0.72 0.50" : "0.94 0.25 0.37"} rg`,
-        `460 ${y + 2} Td (${escapePdfText(amtStr)}) Tj`,
-        "ET",
-      ].filter(Boolean);
-    }),
+        `450 ${y - 10} Td (${escapePdfText(amtStr)}) Tj`,
+        "ET"
+      );
+      currentY -= 15.5;
+    });
+    currentY -= 6;
+  } else {
+    // Empty data state banner
+    ensureSpace(48);
+    curPage.push(
+      "0.98 0.98 0.99 rg",
+      `40 ${currentY - 36} 515.28 36 re f`,
+      "0.88 0.90 0.95 rg",
+      `40 ${currentY - 36} 515.28 36 re S`,
+      "BT",
+      "/F2 8.5 Tf 0.35 0.40 0.50 rg",
+      `140 ${currentY - 18} Td (No financial records were found for the selected period.) Tj`,
+      "ET",
+      "BT",
+      "/F1 7.5 Tf 0.55 0.60 0.70 rg",
+      `175 ${currentY - 30} Td (All accounts and cost centers report zero transactions.) Tj`,
+      "ET"
+    );
+    currentY -= 48;
+  }
 
-    // Verification Signatures Box (Safe Bottom Alignment at y=80)
+  // ─── 7. VERIFICATION SIGNATURES (Guaranteed Safe Placement) ───
+  ensureSpace(85);
+  const sigY = currentY - 72;
+  curPage.push(
     "0.96 0.97 0.99 rg",
-    "40 76 515.28 72 re f",
+    `40 ${sigY} 515.28 68 re f`,
     "0.80 0.85 0.92 rg",
-    "40 76 515.28 72 re S",
-
+    `40 ${sigY} 515.28 68 re S`,
     // Signature 1
     "0.40 0.45 0.55 rg",
-    "60 110 130 0.8 re f",
+    `60 ${sigY + 30} 130 0.8 re f`,
     "BT",
-    "/F2 8 Tf 0.10 0.15 0.30 rg",
-    `60 98 Td (${escapePdfText(generatedBy)}) Tj`,
+    "/F2 7.5 Tf 0.10 0.15 0.30 rg",
+    `60 ${sigY + 18} Td (${escapePdfText(generatedBy.slice(0, 22))}) Tj`,
     "ET",
     "BT",
-    "/F1 7 Tf 0.45 0.50 0.60 rg",
-    "60 86 Td (Financial Controller / Auditor) Tj",
+    "/F1 6.5 Tf 0.45 0.50 0.60 rg",
+    `60 ${sigY + 8} Td (Financial Controller / Auditor) Tj`,
     "ET",
-
     // Signature 2
     "0.40 0.45 0.55 rg",
-    "230 110 130 0.8 re f",
+    `230 ${sigY + 30} 130 0.8 re f`,
     "BT",
-    "/F2 8 Tf 0.10 0.15 0.30 rg",
-    "230 98 Td (Head of Finance) Tj",
+    "/F2 7.5 Tf 0.10 0.15 0.30 rg",
+    `230 ${sigY + 18} Td (Executive Management) Tj`,
     "ET",
     "BT",
-    "/F1 7 Tf 0.45 0.50 0.60 rg",
-    "230 86 Td (Executive Authorization) Tj",
+    "/F1 6.5 Tf 0.45 0.50 0.60 rg",
+    `230 ${sigY + 8} Td (Financial Operations Authorization) Tj`,
     "ET",
-
     // Signature 3
     "0.40 0.45 0.55 rg",
-    "400 110 130 0.8 re f",
+    `400 ${sigY + 30} 130 0.8 re f`,
     "BT",
-    "/F2 8 Tf 0.10 0.15 0.30 rg",
-    "400 98 Td (Internal Audit Board) Tj",
+    "/F2 7.5 Tf 0.10 0.15 0.30 rg",
+    `400 ${sigY + 18} Td (Compliance & Audit Board) Tj`,
     "ET",
     "BT",
-    "/F1 7 Tf 0.45 0.50 0.60 rg",
-    "400 86 Td (Compliance Verification) Tj",
-    "ET",
+    "/F1 6.5 Tf 0.45 0.50 0.60 rg",
+    `400 ${sigY + 8} Td (Institutional Verification) Tj`,
+    "ET"
+  );
+  currentY = sigY - 10;
 
-    // Digital Security Audit Bar
-    "0.06 0.09 0.16 rg",
-    "40 25 515.28 42 re f",
-    "BT",
-    "/F1 7.5 Tf 0.65 0.70 0.88 rg",
-    `50 48 Td (${escapePdfText(orgName)} · Organization Finance Management · Ref: ${certId}) Tj`,
-    "ET",
-    "BT",
-    "/F2 7.5 Tf 0.22 0.74 0.97 rg",
-    `50 34 Td (Generated on ${dateStr} at ${timeStr} · Standard GAAP/IFRS Certified) Tj`,
-    "ET",
+  pushCurrentPage();
 
-    "Q",
-  ];
+  // ─── 8. RUNNING FOOTERS & GRAPHICS STATE RESTORATION ───
+  const totalPages = Math.max(pages.length, 1);
+  for (let pIdx = 0; pIdx < totalPages; pIdx++) {
+    const pLines = pages[pIdx];
+    pLines.push(
+      // Running footer line
+      "0.85 0.88 0.94 rg",
+      "40 45 515.28 0.8 re f",
+      "BT",
+      "/F1 7 Tf 0.40 0.45 0.55 rg",
+      `48 32 Td (${escapePdfText(orgName.slice(0, 32))} · Ref: ${escapePdfText(certId.slice(0, 16))} · Page ${pIdx + 1} of ${totalPages} · Generated ${escapePdfText(dateStr)} ${escapePdfText(timeStr)}) Tj`,
+      "ET",
+      "BT",
+      "/F2 7 Tf 0.22 0.74 0.97 rg",
+      `460 32 Td (GAAP / IFRS Certified) Tj`,
+      "ET",
+      "Q"
+    );
+  }
 
-  const streamContent = streamLines.join("\n");
-  const streamLength = typeof TextEncoder !== "undefined" ? new TextEncoder().encode(streamContent).length : streamContent.length;
-
-  const obj1 = `1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n`;
-  const obj2 = `2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n`;
-  const obj3 = `3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>\nendobj\n`;
-  const obj4 = `4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>\nendobj\n`;
-  const obj5 = `5 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>\nendobj\n`;
-  const obj6 = `6 0 obj\n<< /Length ${streamLength} >>\nstream\n${streamContent}\nendstream\nendobj\n`;
-
+  // ─── 9. PDF 1.4 STANDARD SERIALIZATION ───
   const header = `%PDF-1.4\n%\xE2\xE3\xCF\xD3\n`;
 
-  const offset1 = header.length;
-  const offset2 = offset1 + obj1.length;
-  const offset3 = offset2 + obj2.length;
-  const offset4 = offset3 + obj3.length;
-  const offset5 = offset4 + obj4.length;
-  const offset6 = offset5 + obj5.length;
-  const xrefOffset = offset6 + obj6.length;
+  // Object indices:
+  // 1 0 obj: Catalog
+  // 2 0 obj: Pages
+  // 3 0 obj: Font F1 (Helvetica)
+  // 4 0 obj: Font F2 (Helvetica-Bold)
+  // For each page p:
+  //   Page obj: 5 + p * 2
+  //   Content obj: 6 + p * 2
 
-  const xref =
-    `xref\n` +
-    `0 7\n` +
-    `0000000000 65535 f \n` +
-    `${String(offset1).padStart(10, "0")} 00000 n \n` +
-    `${String(offset2).padStart(10, "0")} 00000 n \n` +
-    `${String(offset3).padStart(10, "0")} 00000 n \n` +
-    `${String(offset4).padStart(10, "0")} 00000 n \n` +
-    `${String(offset5).padStart(10, "0")} 00000 n \n` +
-    `${String(offset6).padStart(10, "0")} 00000 n \n`;
+  const pageKids = Array.from({ length: totalPages }, (_, i) => `${5 + i * 2} 0 R`).join(" ");
+  const obj1 = `1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n`;
+  const obj2 = `2 0 obj\n<< /Type /Pages /Kids [${pageKids}] /Count ${totalPages} >>\nendobj\n`;
+  const obj3 = `3 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>\nendobj\n`;
+  const obj4 = `4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>\nendobj\n`;
+
+  const pageObjects: string[] = [];
+  for (let p = 0; p < totalPages; p++) {
+    const streamContent = pages[p].join("\n");
+    const streamLength = typeof TextEncoder !== "undefined"
+      ? new TextEncoder().encode(streamContent).length
+      : Buffer.byteLength(streamContent, "utf8");
+
+    const pageObjNum = 5 + p * 2;
+    const streamObjNum = 6 + p * 2;
+
+    const pageObj = `${pageObjNum} 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595.28 841.89] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${streamObjNum} 0 R >>\nendobj\n`;
+    const streamObj = `${streamObjNum} 0 obj\n<< /Length ${streamLength} >>\nstream\n${streamContent}\nendstream\nendobj\n`;
+    pageObjects.push(pageObj, streamObj);
+  }
+
+  // Calculate byte offsets for XREF table
+  const offsets: number[] = [0]; // dummy 0 for object 0
+  let runningOffset = header.length;
+
+  offsets.push(runningOffset); // obj 1
+  runningOffset += obj1.length;
+
+  offsets.push(runningOffset); // obj 2
+  runningOffset += obj2.length;
+
+  offsets.push(runningOffset); // obj 3
+  runningOffset += obj3.length;
+
+  offsets.push(runningOffset); // obj 4
+  runningOffset += obj4.length;
+
+  for (const objStr of pageObjects) {
+    offsets.push(runningOffset);
+    runningOffset += objStr.length;
+  }
+
+  const xrefOffset = runningOffset;
+  const totalObjCount = 4 + totalPages * 2;
+
+  let xref = `xref\n0 ${totalObjCount + 1}\n0000000000 65535 f \n`;
+  for (let i = 1; i <= totalObjCount; i++) {
+    xref += `${String(offsets[i]).padStart(10, "0")} 00000 n \n`;
+  }
 
   const trailer =
     `trailer\n` +
-    `<< /Size 7 /Root 1 0 R >>\n` +
+    `<< /Size ${totalObjCount + 1} /Root 1 0 R >>\n` +
     `startxref\n` +
     `${xrefOffset}\n` +
     `%%EOF\n`;
 
-  return header + obj1 + obj2 + obj3 + obj4 + obj5 + obj6 + xref + trailer;
+  return header + obj1 + obj2 + obj3 + obj4 + pageObjects.join("") + xref + trailer;
 }
 
 /**

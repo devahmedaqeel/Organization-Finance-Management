@@ -957,7 +957,7 @@ export default function DashboardScreen() {
                 <Feather name="arrow-up-circle" size={17} color={colors.income} />
               </View>
               <View style={[styles.kpiTag, { backgroundColor: colors.income + "18" }]}>
-                <Text style={[styles.kpiTagText, { color: colors.income }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                <Text style={[styles.kpiTagText, { color: colors.income }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>
                   Inflows
                 </Text>
               </View>
@@ -1203,7 +1203,7 @@ export default function DashboardScreen() {
                   ]}
                   numberOfLines={1}
                   adjustsFontSizeToFit
-                  minimumFontScale={0.75}
+                  minimumFontScale={0.65}
                 >
                   {totalAllocatedBudget === 0 ? "No Budget" : budgetUsedPct > 100 ? "Over Limit" : `${budgetUsedPct}% Used`}
                 </Text>
@@ -2398,11 +2398,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   kpiTag: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 6,
     paddingVertical: 3.5,
     borderRadius: 8,
-    flexShrink: 0,
-    minWidth: 68,
+    flexShrink: 1,
+    minWidth: 54,
     alignItems: "center",
     justifyContent: "center",
   },

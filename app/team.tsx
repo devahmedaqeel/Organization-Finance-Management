@@ -28,6 +28,7 @@ import { useSettings } from "@/context/SettingsContext";
 import { useColors } from "@/hooks/useColors";
 import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
 import { showFloatingToast } from "./_layout";
+import { enqueueOperation } from "@/services/offlineSyncService";
 
 // Color maps for dynamic visual badges across all 4 system roles
 const ROLE_BADGES: Record<UserRole, { color: string; label: string }> = {
@@ -98,7 +99,17 @@ export default function TeamScreen() {
       setSelectedMember({ ...selectedMember, role: newRole });
     }
 
+    const userOrgId = user?.organizationId || "demo-org";
     if (targetUser.id) {
+      await enqueueOperation({
+        entityType: "user",
+        entityId: targetUser.id,
+        operationType: "UPDATE",
+        organizationId: userOrgId,
+        userId: user?.id || "anonymous",
+        payload: { ...targetUser, role: newRole, updatedAt: new Date().toISOString() },
+      }).catch(() => {});
+
       try {
         const { doc, setDoc } = require("firebase/firestore");
         await setDoc(
@@ -131,6 +142,15 @@ export default function TeamScreen() {
             setMembers((prev) => prev.filter((m) => m.id !== targetUser.id));
             setMemberModalVisible(false);
             if (targetUser.id) {
+              const userOrgId = user?.organizationId || "demo-org";
+              await enqueueOperation({
+                entityType: "user",
+                entityId: targetUser.id,
+                operationType: "DELETE",
+                organizationId: userOrgId,
+                userId: user?.id || "anonymous",
+              }).catch(() => {});
+
               try {
                 const { doc, deleteDoc } = require("firebase/firestore");
                 await deleteDoc(doc(db, "users", targetUser.id));

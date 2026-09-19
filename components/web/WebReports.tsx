@@ -49,9 +49,11 @@ interface WebReportsProps {
 }
 
 const REPORT_PERIOD_PRESETS = [
+  { id: "today", label: "Today" },
+  { id: "yesterday", label: "Yesterday" },
   { id: "last_7d", label: "1W" },
-  { id: "last_14d", label: "2W" },
   { id: "this_month", label: "1M" },
+  { id: "prev_month", label: "Prev Month" },
   { id: "last_3m", label: "3M" },
   { id: "last_6m", label: "6M" },
   { id: "this_year", label: "1Y" },
@@ -243,15 +245,15 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
       {
         organizationName: settings.organizationName || user?.organization || "Organization Finance Management",
         organizationAddress: settings.organizationAddress || "Enterprise Financial Center",
-        organizationEmail: settings.organizationEmail || user?.email || "finance@ofm-cloud.com",
-        organizationPhone: settings.organizationPhone || "+92-586-444111",
+        organizationEmail: settings.organizationEmail || user?.email || "",
+        organizationPhone: settings.organizationPhone || "",
         organizationLogo: settings.organizationLogo || "",
         currency: settings.currency || "PKR",
         fiscalYear: settings.fiscalYear || "2025-2026",
       },
       {
         name: user?.name || user?.email || "Chief Financial Officer",
-        email: user?.email || "cfo@ofm.org",
+        email: user?.email || "",
         role: user?.role || "Admin",
         organization: settings.organizationName || user?.organization,
       }
@@ -299,15 +301,15 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
             {
               organizationName: settings.organizationName || user?.organization || "Organization Finance Management",
               organizationAddress: settings.organizationAddress || "Enterprise Financial Center",
-              organizationEmail: settings.organizationEmail || user?.email || "finance@ofm-cloud.com",
-              organizationPhone: settings.organizationPhone || "+92-586-444111",
+              organizationEmail: settings.organizationEmail || user?.email || "",
+              organizationPhone: settings.organizationPhone || "",
               organizationLogo: settings.organizationLogo || "",
               currency: settings.currency || "PKR",
               fiscalYear: settings.fiscalYear || "2025-2026",
             },
             {
               name: user?.name || user?.email || "Chief Financial Officer",
-              email: user?.email || "cfo@ofm.org",
+              email: user?.email || "",
               role: user?.role || "Admin",
               organization: settings.organizationName || user?.organization,
             }
@@ -1125,7 +1127,7 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
                     {activeEnterpriseData?.reportTitle || "Official Financial Dossier"}
                   </Text>
                   <Text style={{ fontSize: 11.5, color: "#94A3B8" }} numberOfLines={1}>
-                    {settings.organizationName || "DevOrbit Tech Kotli"} · Certified Statement · {activePeriod.label}
+                    {settings.organizationName || user?.organization || "Organization Finance Management"} · Certified Statement · {activePeriod.label}
                   </Text>
                 </View>
               </View>

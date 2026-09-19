@@ -212,10 +212,10 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
         selectedCharts: charts,
       },
       {
-        organizationName: settings.organizationName || user?.organization || "DevOrbit Tech Kotli",
-        organizationAddress: settings.organizationAddress || "Kotli, Azad Kashmir",
+        organizationName: settings.organizationName || user?.organization || "Organization Finance Management",
+        organizationAddress: settings.organizationAddress || "Enterprise Financial Center",
         organizationEmail: (settings.organizationEmail && !settings.organizationEmail.includes("ofm-cloud.com")) ? settings.organizationEmail : (user?.email && !user.email.includes("ofm-cloud.com")) ? user.email : "",
-        organizationPhone: (settings.organizationPhone && !settings.organizationPhone.includes("555-0199")) ? settings.organizationPhone : "+92-586-444111",
+        organizationPhone: (settings.organizationPhone && !settings.organizationPhone.includes("555-0199")) ? settings.organizationPhone : "",
         organizationLogo: settings.organizationLogo || "",
         currency: settings.currency || "PKR",
         fiscalYear: settings.fiscalYear || "2025-2026",
@@ -224,17 +224,17 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
         name: user?.name || user?.email || "Chief Financial Officer",
         email: (user?.email && !user.email.includes("ofm.org")) ? user.email : "",
         role: user?.role || "Admin",
-        organization: settings.organizationName || user?.organization || "DevOrbit Tech Kotli",
+        organization: settings.organizationName || user?.organization || "Organization Finance Management",
       }
     );
   }, [transactions, budgets, payroll, departments, effectivePeriod, scope, selectedDept, selectedCategory, selectedTypeFilter, selectedType, customTitle, customNotes, sections, charts, settings, user]);
 
   const reportOptsForViewer: ReportOptions = useMemo(() => {
     return {
-      organizationName: settings.organizationName || user?.organization || "DevOrbit Tech Kotli",
-      organizationAddress: settings.organizationAddress || "Kotli, Azad Kashmir",
+      organizationName: settings.organizationName || user?.organization || "Organization Finance Management",
+      organizationAddress: settings.organizationAddress || "Enterprise Financial Center",
       organizationEmail: (settings.organizationEmail && !settings.organizationEmail.includes("ofm-cloud.com")) ? settings.organizationEmail : (user?.email && !user.email.includes("ofm-cloud.com")) ? user.email : "",
-      organizationPhone: settings.organizationPhone || "+92-586-444111",
+      organizationPhone: settings.organizationPhone || "",
       organizationLogo: settings.organizationLogo || "",
       currency: settings.currency || "PKR",
       fiscalYear: settings.fiscalYear || "2025-2026",

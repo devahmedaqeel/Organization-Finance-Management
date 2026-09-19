@@ -66,6 +66,16 @@ const testSuites = [
     cmd: "npx",
     args: ["-y", "tsx", "services/__tests__/PasswordResetEngine.test.ts"],
   },
+  {
+    name: "12. Web Reports & PDF Reporting System Audit Suite",
+    cmd: "npx",
+    args: ["-y", "tsx", "-r", "./services/__tests__/mockReactNative.js", "services/__tests__/reportSystemAudit.test.ts"],
+  },
+  {
+    name: "13. Offline-First Data & Reliable Web/Mobile Sync Suite",
+    cmd: "npx",
+    args: ["-y", "tsx", "-r", "./services/__tests__/mockReactNative.js", "services/__tests__/offlineFirstSync.test.ts"],
+  },
 ];
 
 console.log("\n=======================================================");

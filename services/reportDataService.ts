@@ -305,8 +305,8 @@ export function buildEnterpriseReportData(
   const currency = settings.currency || "PKR";
   const orgName = settings.organizationName || user.organization || "Organization Finance Management";
   const orgAddress = settings.organizationAddress || "Enterprise Financial Center";
-  const orgEmail = settings.organizationEmail || user.email || "finance@ofm-cloud.com";
-  const orgPhone = settings.organizationPhone || "+92-586-444111";
+  const orgEmail = settings.organizationEmail || user.email || "";
+  const orgPhone = settings.organizationPhone || "";
   const fiscalYear = settings.fiscalYear || "2025-2026";
   const reportType = filters.reportType || "consolidated_statement";
   const userRole = (user.role || "admin").toLowerCase();
@@ -322,8 +322,10 @@ export function buildEnterpriseReportData(
     (!filters.period && !filters.startDate && !filters.endDate) ||
     filters.period?.presetId === "all_time";
   const allTimePeriod = getPresetPeriod("all_time", allTransactions);
-  const startDate = filters.startDate || (isAllTime ? allTimePeriod.startDate : filters.period?.startDate || allTimePeriod.startDate);
-  const endDate = filters.endDate || (isAllTime ? allTimePeriod.endDate : filters.period?.endDate || allTimePeriod.endDate);
+  const rawStart = filters.startDate || (isAllTime ? allTimePeriod.startDate : filters.period?.startDate || allTimePeriod.startDate);
+  const rawEnd = filters.endDate || (isAllTime ? allTimePeriod.endDate : filters.period?.endDate || allTimePeriod.endDate);
+  const startDate = (rawStart || "").trim().slice(0, 10).replace(/\//g, "-");
+  const endDate = (rawEnd || "").trim().slice(0, 10).replace(/\//g, "-");
   const periodLabel = isAllTime ? "All-Time Financial Archive" : (filters.period?.label || `${startDate} to ${endDate}`);
 
   const deptFilter = filters.departmentFilter || filters.department;
@@ -337,7 +339,7 @@ export function buildEnterpriseReportData(
     if (status === "failed" || status === "deleted" || status === "void" || status === "cancelled") return false;
 
     // Date range filter
-    const txDate = t.date.slice(0, 10).replace(/\//g, "-");
+    const txDate = (t.date || "").trim().slice(0, 10).replace(/\//g, "-");
     if (!isAllTime) {
       if (txDate < startDate || txDate > endDate) return false;
     }
@@ -803,7 +805,7 @@ export function buildEnterpriseReportData(
       currency,
       fiscalYear,
       generatedBy: user.name || user.email || "Chief Financial Officer",
-      generatedByEmail: user.email || "cfo@ofm.org",
+      generatedByEmail: user.email || "",
       userRole: (user.role || "Admin").toUpperCase(),
       generatedDate: printDate,
       generatedTime: printTime,

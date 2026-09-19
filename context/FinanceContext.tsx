@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Platform } from "react-native";
 import React, { createContext, useContext, useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, where, getDocs, writeBatch } from "firebase/firestore";
 import { db } from "../config/firebase";
@@ -6,6 +7,18 @@ import { useAuth } from "./AuthContext";
 import { useSettings } from "./SettingsContext";
 import { showFloatingToast } from "@/utils/toast";
 import { triggerLocalNotification } from "../hooks/NotificationHelper";
+import {
+  loadLocalEntities,
+  saveLocalEntities,
+  loadTombstones,
+  recordTombstones,
+  loadOutbox,
+  enqueueOperation,
+  reconcileEntities,
+  flushOutbox,
+  subscribeSyncState,
+} from "@/services/offlineSyncService";
+import { networkService } from "@/services/networkService";
 
 import {
   fetchCollectionREST,
@@ -171,73 +184,11 @@ function generateSafeId(collectionName: string = "transactions"): string {
 }
 
 async function loadPersistedTombstones(orgId: string): Promise<Set<string>> {
-  const result = new Set<string>();
-  try {
-    const raw = await AsyncStorage.getItem(`ofm_tombstones:${orgId}`);
-    if (raw) {
-      const arr = JSON.parse(raw);
-      if (Array.isArray(arr)) arr.forEach((id) => result.add(id));
-    }
-  } catch {}
-
-  if (typeof localStorage !== "undefined") {
-    try {
-      const webRaw = localStorage.getItem(`ofm_tombstones:${orgId}`);
-      if (webRaw) {
-        const arr = JSON.parse(webRaw);
-        if (Array.isArray(arr)) arr.forEach((id) => result.add(id));
-      }
-    } catch {}
-  }
-
-  // Also query Firestore tombstones collection for this organization for zero-resurrection guarantee
-  try {
-    const fetchTombstonesPromise = getDocs(
-      query(collection(db, "tombstones"), where("organizationId", "==", orgId))
-    );
-    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500));
-    const snap: any = await Promise.race([fetchTombstonesPromise, timeoutPromise]);
-
-    if (snap && typeof snap.forEach === "function") {
-      snap.forEach((docSnap: any) => {
-        result.add(docSnap.id);
-      });
-      const arr = Array.from(result).slice(-500);
-      AsyncStorage.setItem(`ofm_tombstones:${orgId}`, JSON.stringify(arr)).catch(() => {});
-      if (typeof localStorage !== "undefined") {
-        try { localStorage.setItem(`ofm_tombstones:${orgId}`, JSON.stringify(arr)); } catch {}
-      }
-    }
-  } catch {}
-
-  return result;
+  return loadTombstones(orgId);
 }
 
 async function recordPersistedTombstones(orgId: string, ids: string[]): Promise<void> {
-  try {
-    const existing = await loadPersistedTombstones(orgId);
-    ids.forEach((id) => existing.add(id));
-    const arr = Array.from(existing).slice(-500);
-    await AsyncStorage.setItem(`ofm_tombstones:${orgId}`, JSON.stringify(arr));
-    if (typeof localStorage !== "undefined") {
-      try { localStorage.setItem(`ofm_tombstones:${orgId}`, JSON.stringify(arr)); } catch {}
-    }
-  } catch {}
-
-  // Also persist to Firestore cloud tombstones collection with both SDK and REST
-  try {
-    await Promise.all(
-      ids.map((id) => {
-        const payload = {
-          id,
-          organizationId: orgId,
-          deletedAt: new Date().toISOString(),
-        };
-        saveDocREST("tombstones", id, payload).catch(() => {});
-        return safeSetDoc(doc(db, "tombstones", id), payload).catch(() => {});
-      })
-    );
-  } catch {}
+  return recordTombstones(orgId, ids);
 }
 
 /**
@@ -364,171 +315,209 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     }
   }, [loaded, activeOrgId, transactions.length, budgets.length, payroll.length, departments.length, settings.currency, user?.id]);
 
-  // 1. Organization-Scoped Initial Local Cache Load + Instant REST Cloud Sync
+  // Network and Sync State Subscriptions
   useEffect(() => {
-    // Immediately clear in-memory state so previous organization's data never leaks
-    setTransactions([]);
-    setBudgets([]);
-    setPayroll([]);
-    setDepartments([]);
-    setLoaded(false);
-    currentLoadedOrgIdRef.current = "";
+    const unsubNet = networkService.subscribe((status) => {
+      if (status === "online") {
+        loadOutbox(activeOrgId).then((queue) => {
+          if (queue.length > 0) {
+            setSyncStatus("syncing");
+            flushOutbox(activeOrgId).then((res) => {
+              setSyncStatus(res.success ? "synced" : "offline_pending");
+            });
+          } else {
+            setSyncStatus("synced");
+          }
+        });
+      } else {
+        loadOutbox(activeOrgId).then((queue) => {
+          if (queue.length > 0) {
+            setSyncStatus("offline_pending");
+          }
+        });
+      }
+    });
 
-    deletedIdsRef.current.clear();
-    hasLiveSnapshotRef.current = {
-      transactions: false,
-      budgets: false,
-      payroll: false,
-      departments: false,
+    const unsubSync = subscribeSyncState((orgId, count) => {
+      if (orgId === activeOrgId) {
+        if (count > 0) {
+          setSyncStatus(networkService.isOnline() ? "syncing" : "offline_pending");
+        } else {
+          setSyncStatus("synced");
+        }
+      }
+    });
+
+    return () => {
+      unsubNet();
+      unsubSync();
+    };
+  }, [activeOrgId]);
+
+  // 1. Organization-Scoped Initial Local Cache Load + Cloud Sync
+  useEffect(() => {
+    let active = true;
+
+    const initData = async () => {
+      // Determine target org ID: use activeOrgId if user is present,
+      // or check cached ofm_user from AsyncStorage/localStorage if user is still hydrating
+      let targetOrgId = user?.organizationId;
+      if (!targetOrgId) {
+        try {
+          let cachedUserStr: string | null = null;
+          if (Platform.OS === "web" && typeof localStorage !== "undefined") {
+            try { cachedUserStr = localStorage.getItem("ofm_user"); } catch {}
+          }
+          if (!cachedUserStr) {
+            cachedUserStr = await AsyncStorage.getItem("ofm_user");
+          }
+          if (cachedUserStr) {
+            const parsed = JSON.parse(cachedUserStr);
+            targetOrgId = parsed?.organizationId;
+          }
+        } catch {}
+      }
+      targetOrgId = (targetOrgId === "demo-org" ? "org-9icgv4ijp" : targetOrgId) || activeOrgId;
+
+      // Only reset snapshot flags if switching to a genuinely DIFFERENT organization
+      if (currentLoadedOrgIdRef.current && currentLoadedOrgIdRef.current !== targetOrgId) {
+        deletedIdsRef.current.clear();
+        hasLiveSnapshotRef.current = {
+          transactions: false,
+          budgets: false,
+          payroll: false,
+          departments: false,
+        };
+      }
+
+      // Load local entities, tombstones, and outbox immediately
+      try {
+        const [tombstones, localTxs, localBudgets, localPayroll, localDepts, outboxOps] = await Promise.all([
+          loadTombstones(targetOrgId),
+          loadLocalEntities<Transaction>(targetOrgId, "transactions"),
+          loadLocalEntities<Budget>(targetOrgId, "budgets"),
+          loadLocalEntities<PayrollEntry>(targetOrgId, "payroll"),
+          loadLocalEntities<Department>(targetOrgId, "departments"),
+          loadOutbox(targetOrgId),
+        ]);
+
+        if (!active) return;
+
+        tombstones.forEach((id) => deletedIdsRef.current.add(id));
+
+        const reconciledTxs = reconcileEntities(
+          [],
+          localTxs,
+          outboxOps.filter((o) => o.entityType === "transaction"),
+          tombstones
+        );
+        const reconciledBudgets = reconcileEntities(
+          [],
+          localBudgets,
+          outboxOps.filter((o) => o.entityType === "budget"),
+          tombstones
+        );
+        const reconciledPayroll = reconcileEntities(
+          [],
+          localPayroll,
+          outboxOps.filter((o) => o.entityType === "payroll"),
+          tombstones
+        );
+        const reconciledDepts = reconcileEntities(
+          [],
+          localDepts,
+          outboxOps.filter((o) => o.entityType === "department"),
+          tombstones
+        );
+
+        setTransactions(reconciledTxs);
+        setBudgets(reconciledBudgets);
+        setPayroll(reconciledPayroll);
+        setDepartments(reconciledDepts);
+
+        currentLoadedOrgIdRef.current = targetOrgId;
+        setLoaded(true);
+
+        if (outboxOps.length > 0) {
+          setSyncStatus(networkService.isOnline() ? "syncing" : "offline_pending");
+          if (networkService.isOnline()) {
+            flushOutbox(targetOrgId).then((res) => {
+              setSyncStatus(res.success ? "synced" : "offline_pending");
+            });
+          }
+        } else {
+          setSyncStatus(networkService.isOnline() ? "synced" : "offline_pending");
+        }
+      } catch (err) {
+        if (!active) return;
+        currentLoadedOrgIdRef.current = targetOrgId;
+        setLoaded(true);
+      }
+
+      // Cloud fetch if online
+      if (networkService.isOnline()) {
+        Promise.all([
+          fetchCollectionREST<Transaction>("transactions", targetOrgId),
+          fetchCollectionREST<Budget>("budgets", targetOrgId),
+          fetchCollectionREST<Department>("departments", targetOrgId),
+          fetchCollectionREST<PayrollEntry>("payroll", targetOrgId),
+        ])
+          .then(async ([restTxs, restBudgets, restDepts, restPayroll]) => {
+            if (!active) return;
+            const [tombstones, outboxOps] = await Promise.all([
+              loadTombstones(targetOrgId),
+              loadOutbox(targetOrgId),
+            ]);
+
+            if (restTxs !== null && !hasLiveSnapshotRef.current.transactions) {
+              setTransactions((prev) => {
+                const rec = reconcileEntities(restTxs, prev, outboxOps.filter((o) => o.entityType === "transaction"), tombstones);
+                saveLocalEntities(targetOrgId, "transactions", rec);
+                return rec;
+              });
+            }
+            if (restBudgets !== null && !hasLiveSnapshotRef.current.budgets) {
+              setBudgets((prev) => {
+                const rec = reconcileEntities(restBudgets, prev, outboxOps.filter((o) => o.entityType === "budget"), tombstones);
+                saveLocalEntities(targetOrgId, "budgets", rec);
+                return rec;
+              });
+            }
+            if (restDepts !== null && !hasLiveSnapshotRef.current.departments) {
+              setDepartments((prev) => {
+                const rec = reconcileEntities(restDepts, prev, outboxOps.filter((o) => o.entityType === "department"), tombstones);
+                saveLocalEntities(targetOrgId, "departments", rec);
+                return rec;
+              });
+            }
+            if (restPayroll !== null && !hasLiveSnapshotRef.current.payroll) {
+              setPayroll((prev) => {
+                const rec = reconcileEntities(restPayroll, prev, outboxOps.filter((o) => o.entityType === "payroll"), tombstones);
+                saveLocalEntities(targetOrgId, "payroll", rec);
+                return rec;
+              });
+            }
+          })
+          .catch(() => {});
+      }
     };
 
-    if (!user) {
-      setTransactions([]);
-      setBudgets([]);
-      setPayroll([]);
-      setDepartments([]);
-      setLoaded(true);
-      return;
-    }
+    initData();
 
-    loadPersistedTombstones(activeOrgId)
-      .then((tombstones) => {
-        tombstones.forEach((id) => deletedIdsRef.current.add(id));
-        return Promise.all([
-          AsyncStorage.getItem(`${cachePrefix}transactions`),
-          AsyncStorage.getItem(`${cachePrefix}budgets`),
-          AsyncStorage.getItem(`${cachePrefix}payroll`),
-          AsyncStorage.getItem(`${cachePrefix}departments`),
-        ]);
-      })
-      .then(([t, b, p, d]) => {
-        if (t) {
-          const parsed: Transaction[] = JSON.parse(t);
-          setTransactions(parsed.filter((item) => !deletedIdsRef.current.has(item.id)));
-        } else {
-          setTransactions([]);
-        }
-        if (b) {
-          const parsed: Budget[] = JSON.parse(b);
-          setBudgets(parsed.filter((item) => !deletedIdsRef.current.has(item.id)));
-        } else {
-          setBudgets([]);
-        }
-        if (p) {
-          const parsed: PayrollEntry[] = JSON.parse(p);
-          setPayroll(parsed.filter((item) => !deletedIdsRef.current.has(item.id)));
-        } else {
-          setPayroll([]);
-        }
-        if (d) {
-          const parsed: Department[] = JSON.parse(d);
-          setDepartments(parsed.filter((item) => !deletedIdsRef.current.has(item.id)));
-        } else {
-          setDepartments([]);
-        }
-        currentLoadedOrgIdRef.current = activeOrgId;
-        setLoaded(true);
-      })
-      .catch(() => {
-        currentLoadedOrgIdRef.current = activeOrgId;
-        setLoaded(true);
-      });
-
-    // Instant direct REST sync with Firebase Cloud (scoped to activeOrgId) with direct Firestore SDK fallback
-    Promise.all([
-      fetchCollectionREST<Transaction>("transactions", activeOrgId),
-      fetchCollectionREST<Budget>("budgets", activeOrgId),
-      fetchCollectionREST<Department>("departments", activeOrgId),
-      fetchCollectionREST<PayrollEntry>("payroll", activeOrgId),
-    ]).then(([restTxs, restBudgets, restDepts, restPayroll]) => {
-      if (activeOrgId !== (user?.organizationId || "demo-org")) return;
-      if (restTxs !== null && !hasLiveSnapshotRef.current.transactions) {
-        const validTxs = restTxs.filter((t) => !deletedIdsRef.current.has(t.id));
-        validTxs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        setTransactions(validTxs);
-        AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(validTxs)).catch(() => {});
-      } else if ((restTxs === null || restTxs.length === 0) && !hasLiveSnapshotRef.current.transactions) {
-        getDocs(query(collection(db, "transactions"), where("organizationId", "==", activeOrgId)))
-          .then((snap) => {
-            if (!hasLiveSnapshotRef.current.transactions && !snap.empty) {
-              const list: Transaction[] = [];
-              snap.forEach((d) => {
-                if (!deletedIdsRef.current.has(d.id)) list.push({ id: d.id, ...d.data() } as Transaction);
-              });
-              list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-              setTransactions(list);
-              AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(list)).catch(() => {});
-            }
-          })
-          .catch(() => {});
-      }
-
-      if (restBudgets !== null && !hasLiveSnapshotRef.current.budgets) {
-        const validBudgets = restBudgets.filter((b) => !deletedIdsRef.current.has(b.id));
-        setBudgets(validBudgets);
-        AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(validBudgets)).catch(() => {});
-      }
-
-      if (restDepts !== null && !hasLiveSnapshotRef.current.departments) {
-        const validDepts = restDepts.filter((d) => !deletedIdsRef.current.has(d.id));
-        setDepartments(validDepts);
-        AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(validDepts)).catch(() => {});
-      } else if ((restDepts === null || restDepts.length === 0) && !hasLiveSnapshotRef.current.departments) {
-        getDocs(query(collection(db, "departments"), where("organizationId", "==", activeOrgId)))
-          .then((snap) => {
-            if (!hasLiveSnapshotRef.current.departments && !snap.empty) {
-              const list: Department[] = [];
-              snap.forEach((d) => {
-                if (!deletedIdsRef.current.has(d.id)) list.push({ id: d.id, ...d.data() } as Department);
-              });
-              setDepartments(list);
-              AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(list)).catch(() => {});
-            }
-          })
-          .catch(() => {});
-      }
-
-      if (restPayroll !== null && !hasLiveSnapshotRef.current.payroll) {
-        const validPayroll = restPayroll.filter((p) => !deletedIdsRef.current.has(p.id));
-        setPayroll(validPayroll);
-        AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(validPayroll)).catch(() => {});
-      } else if ((restPayroll === null || restPayroll.length === 0) && !hasLiveSnapshotRef.current.payroll) {
-        getDocs(query(collection(db, "payroll"), where("organizationId", "==", activeOrgId)))
-          .then((snap) => {
-            if (!hasLiveSnapshotRef.current.payroll && !snap.empty) {
-              const list: PayrollEntry[] = [];
-              snap.forEach((d) => {
-                if (!deletedIdsRef.current.has(d.id)) list.push({ id: d.id, ...d.data() } as PayrollEntry);
-              });
-              setPayroll(list);
-              AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(list)).catch(() => {});
-            }
-          })
-          .catch(() => {});
-      }
-
-      if (restTxs !== null || restBudgets !== null || restDepts !== null || restPayroll !== null) {
-        setSyncStatus("synced");
-      }
-    }).catch(() => {});
+    return () => {
+      active = false;
+    };
   }, [activeOrgId, user?.id]);
 
   // 2. Real-time Firebase Synchronization (Web <-> Mobile)
   useEffect(() => {
     if (!loaded || !user) {
-      if (!user) {
-        setTransactions([]);
-        setBudgets([]);
-        setPayroll([]);
-        setDepartments([]);
-      }
       return;
     }
 
-    setSyncStatus("synced");
     const canonicalOrgId = (user.organizationId === "demo-org" ? "org-9icgv4ijp" : user.organizationId) || "org-9icgv4ijp";
 
-    // Real-time listener for Transactions strictly scoped to organization
+    // Real-time listener for Transactions
     const qTransactions = query(
       collection(db, "transactions"),
       where("organizationId", "==", canonicalOrgId)
@@ -536,32 +525,57 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
     const unsubTransactions = onSnapshot(
       qTransactions,
-      (snapshot) => {
+      async (snapshot) => {
+        // Ignore empty cache snapshot on native when offline to avoid wiping persistent storage
+        if (snapshot.metadata.fromCache && snapshot.empty && !networkService.isOnline()) {
+          return;
+        }
+
         hasLiveSnapshotRef.current.transactions = true;
-        setSyncStatus("synced");
-        const remoteMap = new Map<string, Transaction>();
+        const [tombstones, outboxOps] = await Promise.all([
+          loadTombstones(canonicalOrgId),
+          loadOutbox(canonicalOrgId),
+        ]);
+
+        const remoteList: Transaction[] = [];
         snapshot.forEach((d) => {
-          if (!deletedIdsRef.current.has(d.id)) {
-            remoteMap.set(d.id, { id: d.id, ...d.data() } as Transaction);
+          if (!tombstones.has(d.id)) {
+            remoteList.push({ id: d.id, ...d.data() } as Transaction);
           } else {
             deleteDoc(doc(db, "transactions", d.id)).catch(() => {});
           }
         });
 
-        const remoteItems = Array.from(remoteMap.values());
-        remoteItems.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        setTransactions(remoteItems);
-        prevTransactionsRef.current = remoteItems;
-        AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(remoteItems)).catch(() => {});
+        const fallbackLocal = prevTransactionsRef.current.length > 0
+          ? prevTransactionsRef.current
+          : await loadLocalEntities<Transaction>(canonicalOrgId, "transactions");
+
+        setTransactions((prev) => {
+          const effectiveBase = prev.length > 0 ? prev : fallbackLocal;
+          const reconciled = reconcileEntities(
+            remoteList,
+            effectiveBase,
+            outboxOps.filter((o) => o.entityType === "transaction"),
+            tombstones
+          );
+          prevTransactionsRef.current = reconciled;
+          saveLocalEntities(canonicalOrgId, "transactions", reconciled);
+          return reconciled;
+        });
+
+        if (outboxOps.length === 0) {
+          setSyncStatus("synced");
+        }
       },
       (err) => {
         if (err.code !== "permission-denied") {
           console.log("Transactions live sync notice:", err.message);
+          networkService.reportNetworkFailure();
         }
       }
     );
 
-    // Real-time listener for Budgets strictly scoped to organization
+    // Real-time listener for Budgets
     const qBudgets = query(
       collection(db, "budgets"),
       where("organizationId", "==", canonicalOrgId)
@@ -569,29 +583,53 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
     const unsubBudgets = onSnapshot(
       qBudgets,
-      (snapshot) => {
+      async (snapshot) => {
+        if (snapshot.metadata.fromCache && snapshot.empty && !networkService.isOnline()) {
+          return;
+        }
+
         hasLiveSnapshotRef.current.budgets = true;
-        const remoteMap = new Map<string, Budget>();
+        const [tombstones, outboxOps] = await Promise.all([
+          loadTombstones(canonicalOrgId),
+          loadOutbox(canonicalOrgId),
+        ]);
+
+        const remoteList: Budget[] = [];
         snapshot.forEach((d) => {
-          if (!deletedIdsRef.current.has(d.id)) {
-            remoteMap.set(d.id, { id: d.id, ...d.data() } as Budget);
+          if (!tombstones.has(d.id)) {
+            remoteList.push({ id: d.id, ...d.data() } as Budget);
           } else {
             deleteDoc(doc(db, "budgets", d.id)).catch(() => {});
           }
         });
 
-        const remoteItems = Array.from(remoteMap.values());
-        setBudgets(remoteItems);
-        AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(remoteItems)).catch(() => {});
+        const fallbackBudgets = await loadLocalEntities<Budget>(canonicalOrgId, "budgets");
+
+        setBudgets((prev) => {
+          const effectiveBase = prev.length > 0 ? prev : fallbackBudgets;
+          const reconciled = reconcileEntities(
+            remoteList,
+            effectiveBase,
+            outboxOps.filter((o) => o.entityType === "budget"),
+            tombstones
+          );
+          saveLocalEntities(canonicalOrgId, "budgets", reconciled);
+          return reconciled;
+        });
+
+        if (outboxOps.length === 0) {
+          setSyncStatus("synced");
+        }
       },
       (err) => {
         if (err.code !== "permission-denied") {
           console.log("Budgets live sync notice:", err.message);
+          networkService.reportNetworkFailure();
         }
       }
     );
 
-    // Real-time listener for Payroll strictly scoped to organization
+    // Real-time listener for Payroll
     const qPayroll = query(
       collection(db, "payroll"),
       where("organizationId", "==", canonicalOrgId)
@@ -599,29 +637,53 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
     const unsubPayroll = onSnapshot(
       qPayroll,
-      (snapshot) => {
+      async (snapshot) => {
+        if (snapshot.metadata.fromCache && snapshot.empty && !networkService.isOnline()) {
+          return;
+        }
+
         hasLiveSnapshotRef.current.payroll = true;
-        const remoteMap = new Map<string, PayrollEntry>();
+        const [tombstones, outboxOps] = await Promise.all([
+          loadTombstones(canonicalOrgId),
+          loadOutbox(canonicalOrgId),
+        ]);
+
+        const remoteList: PayrollEntry[] = [];
         snapshot.forEach((d) => {
-          if (!deletedIdsRef.current.has(d.id)) {
-            remoteMap.set(d.id, { id: d.id, ...d.data() } as PayrollEntry);
+          if (!tombstones.has(d.id)) {
+            remoteList.push({ id: d.id, ...d.data() } as PayrollEntry);
           } else {
             deleteDoc(doc(db, "payroll", d.id)).catch(() => {});
           }
         });
 
-        const remoteItems = Array.from(remoteMap.values());
-        setPayroll(remoteItems);
-        AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(remoteItems)).catch(() => {});
+        const fallbackPayroll = await loadLocalEntities<PayrollEntry>(canonicalOrgId, "payroll");
+
+        setPayroll((prev) => {
+          const effectiveBase = prev.length > 0 ? prev : fallbackPayroll;
+          const reconciled = reconcileEntities(
+            remoteList,
+            effectiveBase,
+            outboxOps.filter((o) => o.entityType === "payroll"),
+            tombstones
+          );
+          saveLocalEntities(canonicalOrgId, "payroll", reconciled);
+          return reconciled;
+        });
+
+        if (outboxOps.length === 0) {
+          setSyncStatus("synced");
+        }
       },
       (err) => {
         if (err.code !== "permission-denied") {
           console.log("Payroll live sync notice:", err.message);
+          networkService.reportNetworkFailure();
         }
       }
     );
 
-    // Real-time listener for Departments strictly scoped to organization
+    // Real-time listener for Departments
     const qDepartments = query(
       collection(db, "departments"),
       where("organizationId", "==", canonicalOrgId)
@@ -629,27 +691,52 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
     const unsubDepartments = onSnapshot(
       qDepartments,
-      (snapshot) => {
+      async (snapshot) => {
+        if (snapshot.metadata.fromCache && snapshot.empty && !networkService.isOnline()) {
+          return;
+        }
+
         hasLiveSnapshotRef.current.departments = true;
-        const remoteMap = new Map<string, Department>();
+        const [tombstones, outboxOps] = await Promise.all([
+          loadTombstones(canonicalOrgId),
+          loadOutbox(canonicalOrgId),
+        ]);
+
+        const remoteList: Department[] = [];
         snapshot.forEach((d) => {
-          if (!deletedIdsRef.current.has(d.id)) {
-            remoteMap.set(d.id, { id: d.id, ...d.data() } as Department);
+          if (!tombstones.has(d.id)) {
+            remoteList.push({ id: d.id, ...d.data() } as Department);
           } else {
             deleteDoc(doc(db, "departments", d.id)).catch(() => {});
           }
         });
 
-        const remoteItems = Array.from(remoteMap.values());
-        setDepartments(remoteItems);
-        AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(remoteItems)).catch(() => {});
+        const fallbackDepts = await loadLocalEntities<Department>(canonicalOrgId, "departments");
+
+        setDepartments((prev) => {
+          const effectiveBase = prev.length > 0 ? prev : fallbackDepts;
+          const reconciled = reconcileEntities(
+            remoteList,
+            effectiveBase,
+            outboxOps.filter((o) => o.entityType === "department"),
+            tombstones
+          );
+          saveLocalEntities(canonicalOrgId, "departments", reconciled);
+          return reconciled;
+        });
+
+        if (outboxOps.length === 0) {
+          setSyncStatus("synced");
+        }
       },
       (err) => {
         if (err.code !== "permission-denied") {
           console.log("Departments live sync notice:", err.message);
+          networkService.reportNetworkFailure();
         }
       }
     );
+
 
     return () => {
       unsubTransactions();
@@ -659,30 +746,30 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     };
   }, [loaded, user?.id, user?.organizationId, activeOrgId]);
 
-  // 3. Organization-Scoped Local Cache Write (guarantees deleted records are cleared from cache)
+  // 3. Organization-Scoped Local Cache Write
   useEffect(() => {
     if (loaded && user && currentLoadedOrgIdRef.current === activeOrgId) {
-      AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(transactions)).catch(() => {});
+      saveLocalEntities(activeOrgId, "transactions", transactions);
     }
-  }, [transactions, loaded, cachePrefix, user, activeOrgId]);
+  }, [transactions, loaded, user, activeOrgId]);
 
   useEffect(() => {
     if (loaded && user && currentLoadedOrgIdRef.current === activeOrgId) {
-      AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(budgets)).catch(() => {});
+      saveLocalEntities(activeOrgId, "budgets", budgets);
     }
-  }, [budgets, loaded, cachePrefix, user, activeOrgId]);
+  }, [budgets, loaded, user, activeOrgId]);
 
   useEffect(() => {
     if (loaded && user && currentLoadedOrgIdRef.current === activeOrgId) {
-      AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(payroll)).catch(() => {});
+      saveLocalEntities(activeOrgId, "payroll", payroll);
     }
-  }, [payroll, loaded, cachePrefix, user, activeOrgId]);
+  }, [payroll, loaded, user, activeOrgId]);
 
   useEffect(() => {
     if (loaded && user && currentLoadedOrgIdRef.current === activeOrgId) {
-      AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(departments)).catch(() => {});
+      saveLocalEntities(activeOrgId, "departments", departments);
     }
-  }, [departments, loaded, cachePrefix, user, activeOrgId]);
+  }, [departments, loaded, user, activeOrgId]);
 
   // --- CRUD Operations ---
 
@@ -746,41 +833,33 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
     setTransactions((prev) => {
       const updated = [newTx, ...prev.filter((item) => item.id !== id)];
+      saveLocalEntities(orgId, "transactions", updated);
       AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(updated)).catch(() => {});
       return updated;
     });
 
     const cleanNewTx = sanitizeForFirestore(newTx);
 
-    try {
-      await safeSetDoc(doc(db, "transactions", id), cleanNewTx);
-      setSyncStatus("synced");
-      recordAuditLog({
-        organizationId: orgId,
-        actorUid: user?.id || "anonymous",
-        actorName: user?.name || user?.email || "Finance Officer",
-        actorRole: user?.role || "admin",
-        action: "create",
-        entity: "transaction",
-        entityId: id,
-        metadata: { type: newTx.type, amount: newTx.amount, category: newTx.category, department: newTx.department },
-      }).catch(() => {});
-    } catch (err) {
-      setSyncStatus("offline_pending");
-      console.log("Transaction saved to offline local queue:", err);
-    }
+    // Enqueue into durable outbox queue (triggers immediate flush if online)
+    await enqueueOperation({
+      entityType: "transaction",
+      entityId: id,
+      operationType: "CREATE",
+      organizationId: orgId,
+      userId: user?.id || "anonymous",
+      payload: cleanNewTx,
+    });
 
-    // Direct background REST write for instant cloud sync across mobile & web
-    saveDocREST("transactions", id, cleanNewTx).then(() => setSyncStatus("synced")).catch(() => {});
-
-    // Cross-tenant mirror between demo-org and org-9icgv4ijp so both stay 100% in sync
-    if (orgId === "demo-org" || orgId === "org-9icgv4ijp") {
-      const counterpartOrgId = orgId === "demo-org" ? "org-9icgv4ijp" : "demo-org";
-      const mirrorId = id.startsWith("sync_") ? id.replace("sync_", "") : `sync_${id}`;
-      const mirroredTx = sanitizeForFirestore({ ...cleanNewTx, id: mirrorId, organizationId: counterpartOrgId });
-      safeSetDoc(doc(db, "transactions", mirrorId), mirroredTx).catch(() => {});
-      saveDocREST("transactions", mirrorId, mirroredTx).catch(() => {});
-    }
+    recordAuditLog({
+      organizationId: orgId,
+      actorUid: user?.id || "anonymous",
+      actorName: user?.name || user?.email || "Finance Officer",
+      actorRole: user?.role || "admin",
+      action: "create",
+      entity: "transaction",
+      entityId: id,
+      metadata: { type: newTx.type, amount: newTx.amount, category: newTx.category, department: newTx.department },
+    }).catch(() => {});
 
     // Budget overrun real-time validation & automated notification evaluation
     if (newTx.type === "expense") {
@@ -882,30 +961,30 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
     setTransactions((prev) => {
       const updated = prev.map((t) => (t.id === id ? { ...t, ...enrichedUpdates } : t));
+      saveLocalEntities(activeOrgId, "transactions", updated);
       AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(updated)).catch(() => {});
       return updated;
     });
-    try {
-      await safeSetDoc(doc(db, "transactions", id), cleanUpdates, { merge: true });
-      saveDocREST("transactions", id, cleanUpdates).catch(() => {});
-      if (activeOrgId === "demo-org" || activeOrgId === "org-9icgv4ijp") {
-        const mirrorId = id.startsWith("sync_") ? id.replace("sync_", "") : `sync_${id}`;
-        safeSetDoc(doc(db, "transactions", mirrorId), cleanUpdates, { merge: true }).catch(() => {});
-        saveDocREST("transactions", mirrorId, cleanUpdates).catch(() => {});
-      }
-      recordAuditLog({
-        organizationId: activeOrgId,
-        actorUid: user?.id || "anonymous",
-        actorName: user?.name || user?.email || "Finance Officer",
-        actorRole: user?.role || "admin",
-        action: "update",
-        entity: "transaction",
-        entityId: id,
-        metadata: updates,
-      }).catch(() => {});
-    } catch (err) {
-      console.log("Transaction update queued offline:", err);
-    }
+
+    await enqueueOperation({
+      entityType: "transaction",
+      entityId: id,
+      operationType: "UPDATE",
+      organizationId: activeOrgId,
+      userId: user?.id || "anonymous",
+      payload: cleanUpdates,
+    });
+
+    recordAuditLog({
+      organizationId: activeOrgId,
+      actorUid: user?.id || "anonymous",
+      actorName: user?.name || user?.email || "Finance Officer",
+      actorRole: user?.role || "admin",
+      action: "update",
+      entity: "transaction",
+      entityId: id,
+      metadata: updates,
+    }).catch(() => {});
   };
 
   const deleteTransaction = async (id: string) => {
@@ -939,56 +1018,71 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       deleteDocREST("payroll", mirrorPayrollId).catch(() => {});
       setPayroll((prev) => {
         const remaining = prev.filter((p) => !targetIds.includes(p.id));
+        saveLocalEntities(activeOrgId, "payroll", remaining);
         AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(remaining)).catch(() => {});
         return remaining;
       });
     }
 
-    // 1. Authoritative Firestore and REST deletion with verified success
+    // 1. Authoritative Firestore and REST deletion with verified success (when online)
     let deleteSucceeded = false;
     let failureReason: any = null;
 
-    try {
-      const deleteResults = await Promise.all(
-        targetIds.map(async (tid) => {
-          try {
-            await deleteDoc(doc(db, "transactions", tid));
-            return true;
-          } catch (err: any) {
-            failureReason = err;
-            return false;
-          }
-        })
-      );
-      if (deleteResults.some(Boolean)) {
-        deleteSucceeded = true;
+    if (networkService.isOnline()) {
+      try {
+        const deleteResults = await Promise.all(
+          targetIds.map(async (tid) => {
+            try {
+              await deleteDoc(doc(db, "transactions", tid));
+              return true;
+            } catch (err: any) {
+              failureReason = err;
+              return false;
+            }
+          })
+        );
+        if (deleteResults.some(Boolean)) {
+          deleteSucceeded = true;
+        }
+      } catch (err: any) {
+        failureReason = err;
       }
-    } catch (err: any) {
-      failureReason = err;
+
+      // Direct REST deletion fallback with auth
+      const restSuccessResults = await Promise.all(targetIds.map((tid) => deleteDocREST("transactions", tid).catch(() => false)));
+      if (restSuccessResults.some(Boolean)) deleteSucceeded = true;
+
+      // Strict safety check: if Firestore threw permission denied, do not delete from UI
+      if (!deleteSucceeded && failureReason?.code === "permission-denied") {
+        showFloatingToast("Permission Denied", "Database rejected delete: insufficient permissions.");
+        throw new Error("Database rejected delete: insufficient permissions");
+      }
     }
 
-    // Direct REST deletion fallback with auth
-    const restSuccessResults = await Promise.all(targetIds.map((tid) => deleteDocREST("transactions", tid).catch(() => false)));
-    if (restSuccessResults.some(Boolean)) deleteSucceeded = true;
-
-    // Strict safety check: if Firestore threw permission denied, do not delete from UI
-    if (!deleteSucceeded && failureReason?.code === "permission-denied") {
-      showFloatingToast("Permission Denied", "Database rejected delete: insufficient permissions.");
-      throw new Error("Database rejected delete: insufficient permissions");
-    }
-
-    // 2. Mark tombstones in memory and persist in AsyncStorage
+    // 2. Mark tombstones in memory and persist in AsyncStorage + cloud
     targetIds.forEach((tid) => deletedIdsRef.current.add(tid));
-    recordPersistedTombstones(activeOrgId, targetIds).catch(() => {});
+    await recordTombstones(activeOrgId, targetIds);
 
     // 3. Immediately update state and persistent storage with filtered records
     setTransactions((prev) => {
       const remaining = prev.filter((t) => !targetIds.includes(t.id));
+      saveLocalEntities(activeOrgId, "transactions", remaining);
       AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(remaining)).catch(() => {});
       return remaining;
     });
 
-    // 4. Audit trail
+    // 4. Enqueue into durable outbox queue
+    for (const tid of targetIds) {
+      await enqueueOperation({
+        entityType: "transaction",
+        entityId: tid,
+        operationType: "DELETE",
+        organizationId: activeOrgId,
+        userId: user?.id || "anonymous",
+      });
+    }
+
+    // 5. Audit trail
     recordAuditLog({
       organizationId: activeOrgId,
       actorUid: user?.id || "anonymous",
@@ -1045,44 +1139,42 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
     setBudgets((prev) => {
       const updated = [{ ...newBudget, spent: 0 }, ...prev.filter((item) => item.id !== id)];
+      saveLocalEntities(orgId, "budgets", updated);
       AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(updated)).catch(() => {});
       return updated;
     });
-    try {
-      await safeSetDoc(doc(db, "budgets", id), cleanBudget);
-      saveDocREST("budgets", id, cleanBudget).catch(() => {});
-      if (orgId === "demo-org" || orgId === "org-9icgv4ijp") {
-        const counterpartOrgId = orgId === "demo-org" ? "org-9icgv4ijp" : "demo-org";
-        const mirrorId = id.startsWith("sync_") ? id.replace("sync_", "") : `sync_${id}`;
-        const mirroredBudget: Budget = sanitizeForFirestore({ ...cleanBudget, id: mirrorId, organizationId: counterpartOrgId });
-        safeSetDoc(doc(db, "budgets", mirrorId), mirroredBudget).catch(() => {});
-        saveDocREST("budgets", mirrorId, mirroredBudget).catch(() => {});
-      }
-      recordAuditLog({
-        organizationId: orgId,
-        actorUid: user?.id || "anonymous",
-        actorName: user?.name || user?.email || "Finance Officer",
-        actorRole: user?.role || "admin",
-        action: "create",
-        entity: "budget",
-        entityId: id,
-        metadata: { category: newBudget.category, department: newBudget.department, allocated: newBudget.allocated },
-      }).catch(() => {});
 
-      // Synchronize department ceiling if department document has lower or 0 allocation
-      const deptNameClean = (newBudget.department || "").trim().toLowerCase();
-      const matchedDept = departments.find((d) => (d.name || "").trim().toLowerCase() === deptNameClean);
-      if (matchedDept) {
-        const allDeptsBudgets = [{ ...newBudget }, ...budgets.filter((item) => item.id !== id)];
-        const deptTotalBudget = allDeptsBudgets
-          .filter((item) => (item.department || "").trim().toLowerCase() === deptNameClean)
-          .reduce((sum, item) => sum + safeNumber(item.allocated, 0), 0);
-        if (deptTotalBudget > safeNumber(matchedDept.budgetAllocated, 0)) {
-          updateDepartment(matchedDept.id, { budgetAllocated: deptTotalBudget }).catch(() => {});
-        }
+    await enqueueOperation({
+      entityType: "budget",
+      entityId: id,
+      operationType: "CREATE",
+      organizationId: orgId,
+      userId: user?.id || "anonymous",
+      payload: cleanBudget,
+    });
+
+    recordAuditLog({
+      organizationId: orgId,
+      actorUid: user?.id || "anonymous",
+      actorName: user?.name || user?.email || "Finance Officer",
+      actorRole: user?.role || "admin",
+      action: "create",
+      entity: "budget",
+      entityId: id,
+      metadata: { category: newBudget.category, department: newBudget.department, allocated: newBudget.allocated },
+    }).catch(() => {});
+
+    // Synchronize department ceiling if department document has lower or 0 allocation
+    const deptNameClean = (newBudget.department || "").trim().toLowerCase();
+    const matchedDept = departments.find((d) => (d.name || "").trim().toLowerCase() === deptNameClean);
+    if (matchedDept) {
+      const allDeptsBudgets = [{ ...newBudget }, ...budgets.filter((item) => item.id !== id)];
+      const deptTotalBudget = allDeptsBudgets
+        .filter((item) => (item.department || "").trim().toLowerCase() === deptNameClean)
+        .reduce((sum, item) => sum + safeNumber(item.allocated, 0), 0);
+      if (deptTotalBudget > safeNumber(matchedDept.budgetAllocated, 0)) {
+        updateDepartment(matchedDept.id, { budgetAllocated: deptTotalBudget }).catch(() => {});
       }
-    } catch (err) {
-      console.log("Budget saved offline:", err);
     }
   };
 
@@ -1118,42 +1210,42 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     const cleanUpdates = sanitizeForFirestore(enrichedUpdates);
     setBudgets((prev) => {
       const updated = prev.map((b) => (b.id === id ? { ...b, ...enrichedUpdates } : b));
+      saveLocalEntities(activeOrgId, "budgets", updated);
       AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(updated)).catch(() => {});
       return updated;
     });
-    try {
-      await safeSetDoc(doc(db, "budgets", id), cleanUpdates, { merge: true });
-      saveDocREST("budgets", id, cleanUpdates).catch(() => {});
-      if (activeOrgId === "demo-org" || activeOrgId === "org-9icgv4ijp") {
-        const mirrorId = id.startsWith("sync_") ? id.replace("sync_", "") : `sync_${id}`;
-        safeSetDoc(doc(db, "budgets", mirrorId), cleanUpdates, { merge: true }).catch(() => {});
-        saveDocREST("budgets", mirrorId, cleanUpdates).catch(() => {});
-      }
-      recordAuditLog({
-        organizationId: activeOrgId,
-        actorUid: user?.id || "anonymous",
-        actorName: user?.name || user?.email || "Finance Officer",
-        actorRole: user?.role || "admin",
-        action: "update",
-        entity: "budget",
-        entityId: id,
-        metadata: updates,
-      }).catch(() => {});
 
-      // Synchronize department ceiling if department document has lower or 0 allocation
-      const targetDept = (updates.department || budgets.find((b) => b.id === id)?.department || "").trim().toLowerCase();
-      const matchedDept = departments.find((d) => (d.name || "").trim().toLowerCase() === targetDept);
-      if (matchedDept && targetDept) {
-        const allDeptsBudgets = budgets.map((b) => (b.id === id ? { ...b, ...enrichedUpdates } : b));
-        const deptTotalBudget = allDeptsBudgets
-          .filter((item) => (item.department || "").trim().toLowerCase() === targetDept)
-          .reduce((sum, item) => sum + safeNumber(item.allocated, 0), 0);
-        if (deptTotalBudget > safeNumber(matchedDept.budgetAllocated, 0)) {
-          updateDepartment(matchedDept.id, { budgetAllocated: deptTotalBudget }).catch(() => {});
-        }
+    await enqueueOperation({
+      entityType: "budget",
+      entityId: id,
+      operationType: "UPDATE",
+      organizationId: activeOrgId,
+      userId: user?.id || "anonymous",
+      payload: cleanUpdates,
+    });
+
+    recordAuditLog({
+      organizationId: activeOrgId,
+      actorUid: user?.id || "anonymous",
+      actorName: user?.name || user?.email || "Finance Officer",
+      actorRole: user?.role || "admin",
+      action: "update",
+      entity: "budget",
+      entityId: id,
+      metadata: updates,
+    }).catch(() => {});
+
+    // Synchronize department ceiling if department document has lower or 0 allocation
+    const targetDept = (updates.department || budgets.find((b) => b.id === id)?.department || "").trim().toLowerCase();
+    const matchedDept = departments.find((d) => (d.name || "").trim().toLowerCase() === targetDept);
+    if (matchedDept && targetDept) {
+      const allDeptsBudgets = budgets.map((b) => (b.id === id ? { ...b, ...enrichedUpdates } : b));
+      const deptTotalBudget = allDeptsBudgets
+        .filter((item) => (item.department || "").trim().toLowerCase() === targetDept)
+        .reduce((sum, item) => sum + safeNumber(item.allocated, 0), 0);
+      if (deptTotalBudget > safeNumber(matchedDept.budgetAllocated, 0)) {
+        updateDepartment(matchedDept.id, { budgetAllocated: deptTotalBudget }).catch(() => {});
       }
-    } catch (err) {
-      console.log("Budget update queued offline:", err);
     }
   };
 
@@ -1175,41 +1267,54 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     let deleteSucceeded = false;
     let failureReason: any = null;
 
-    try {
-      const deleteResults = await Promise.all(
-        targetIds.map(async (tid) => {
-          try {
-            await deleteDoc(doc(db, "budgets", tid));
-            return true;
-          } catch (err: any) {
-            failureReason = err;
-            return false;
-          }
-        })
-      );
-      if (deleteResults.some(Boolean)) {
-        deleteSucceeded = true;
+    if (networkService.isOnline()) {
+      try {
+        const deleteResults = await Promise.all(
+          targetIds.map(async (tid) => {
+            try {
+              await deleteDoc(doc(db, "budgets", tid));
+              return true;
+            } catch (err: any) {
+              failureReason = err;
+              return false;
+            }
+          })
+        );
+        if (deleteResults.some(Boolean)) {
+          deleteSucceeded = true;
+        }
+      } catch (err: any) {
+        failureReason = err;
       }
-    } catch (err: any) {
-      failureReason = err;
-    }
 
-    const restSuccessResults = await Promise.all(targetIds.map((tid) => deleteDocREST("budgets", tid).catch(() => false)));
-    if (restSuccessResults.some(Boolean)) deleteSucceeded = true;
+      const restSuccessResults = await Promise.all(targetIds.map((tid) => deleteDocREST("budgets", tid).catch(() => false)));
+      if (restSuccessResults.some(Boolean)) deleteSucceeded = true;
 
-    if (!deleteSucceeded && failureReason?.code === "permission-denied") {
-      showFloatingToast("Permission Denied", "Database rejected delete: insufficient permissions.");
-      throw new Error("Database rejected delete: insufficient permissions");
+      if (!deleteSucceeded && failureReason?.code === "permission-denied") {
+        showFloatingToast("Permission Denied", "Database rejected delete: insufficient permissions.");
+        throw new Error("Database rejected delete: insufficient permissions");
+      }
     }
 
     targetIds.forEach((tid) => deletedIdsRef.current.add(tid));
-    recordPersistedTombstones(activeOrgId, targetIds).catch(() => {});
+    await recordTombstones(activeOrgId, targetIds);
 
     setBudgets((prev) => {
       const remaining = prev.filter((b) => !targetIds.includes(b.id));
+      saveLocalEntities(activeOrgId, "budgets", remaining);
       AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(remaining)).catch(() => {});
       return remaining;
     });
+
+    for (const tid of targetIds) {
+      await enqueueOperation({
+        entityType: "budget",
+        entityId: tid,
+        operationType: "DELETE",
+        organizationId: activeOrgId,
+        userId: user?.id || "anonymous",
+      });
+    }
 
     recordAuditLog({
       organizationId: activeOrgId,
@@ -1310,12 +1415,14 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
     setPayroll((prev) => {
       const updated = [newPayroll, ...prev.filter((item) => item.id !== id)];
+      saveLocalEntities(orgId, "payroll", updated);
       AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(updated)).catch(() => {});
       return updated;
     });
 
     setTransactions((prev) => {
       const updated = [salaryTx, ...prev.filter((t) => t.id !== txId)];
+      saveLocalEntities(orgId, "transactions", updated);
       AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(updated)).catch(() => {});
       return updated;
     });
@@ -1324,6 +1431,24 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     const cleanSalaryTx = sanitizeForFirestore({
       ...salaryTx,
       budgetId: null,
+    });
+
+    await enqueueOperation({
+      entityType: "payroll",
+      entityId: id,
+      operationType: "CREATE",
+      payload: cleanPayroll,
+      organizationId: orgId,
+      userId: user?.id || "anonymous",
+    });
+
+    await enqueueOperation({
+      entityType: "transaction",
+      entityId: txId,
+      operationType: "CREATE",
+      payload: cleanSalaryTx,
+      organizationId: orgId,
+      userId: user?.id || "anonymous",
     });
 
     try {
@@ -1440,14 +1565,16 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         }
         return p;
       });
+      saveLocalEntities(activeOrgId, "payroll", updated);
       AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(updated)).catch(() => {});
       return updated;
     });
 
     setTransactions((prev) => {
       const exists = prev.some((t) => t.id === txId);
+      let updated: Transaction[];
       if (exists) {
-        const updated = prev.map((t) => {
+        updated = prev.map((t) => {
           if (t.id === txId) {
             return {
               ...t,
@@ -1465,8 +1592,6 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           }
           return t;
         });
-        AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(updated)).catch(() => {});
-        return updated;
       } else {
         const salaryTx: Transaction = {
           id: txId,
@@ -1490,29 +1615,48 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           employeeName,
           referenceNumber: `PAY-${id.substring(0, 8).toUpperCase()}`,
         };
-        const updated = [salaryTx, ...prev];
-        AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(updated)).catch(() => {});
-        return updated;
+        updated = [salaryTx, ...prev];
       }
+      saveLocalEntities(activeOrgId, "transactions", updated);
+      AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(updated)).catch(() => {});
+      return updated;
+    });
+
+    const txUpdates = {
+      amount: updatedNetSalary,
+      category: "Salary / Payroll",
+      department: targetDeptName,
+      title: salaryTitle,
+      description: salaryDesc,
+      employeeName,
+      employeeId,
+      expenseSource: "payroll",
+      payrollId: id,
+      updatedAt: new Date().toISOString(),
+    };
+
+    const cleanPayrollUpdates = sanitizeForFirestore(enrichedUpdates);
+    const cleanTxUpdates = sanitizeForFirestore(txUpdates);
+
+    await enqueueOperation({
+      entityType: "payroll",
+      entityId: id,
+      operationType: "UPDATE",
+      payload: cleanPayrollUpdates,
+      organizationId: activeOrgId,
+      userId: user?.id || "anonymous",
+    });
+
+    await enqueueOperation({
+      entityType: "transaction",
+      entityId: txId,
+      operationType: "UPDATE",
+      payload: cleanTxUpdates,
+      organizationId: activeOrgId,
+      userId: user?.id || "anonymous",
     });
 
     try {
-      const txUpdates = {
-        amount: updatedNetSalary,
-        category: "Salary / Payroll",
-        department: targetDeptName,
-        title: salaryTitle,
-        description: salaryDesc,
-        employeeName,
-        employeeId,
-        expenseSource: "payroll",
-        payrollId: id,
-        updatedAt: new Date().toISOString(),
-      };
-
-      const cleanPayrollUpdates = sanitizeForFirestore(enrichedUpdates);
-      const cleanTxUpdates = sanitizeForFirestore(txUpdates);
-
       const batch = writeBatch(db);
       batch.set(doc(db, "payroll", id), cleanPayrollUpdates, { merge: true });
       batch.set(doc(db, "transactions", txId), cleanTxUpdates, { merge: true });
@@ -1579,52 +1723,76 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     let deleteSucceeded = false;
     let failureReason: any = null;
 
-    try {
-      const deleteResults = await Promise.all([
-        ...targetPayrollIds.map(async (pid) => {
-          try {
-            await deleteDoc(doc(db, "payroll", pid));
-            return true;
-          } catch (e: any) {
-            failureReason = e;
-            return false;
-          }
-        }),
-        ...targetTxIds.map(async (tid) => {
-          try {
-            await deleteDoc(doc(db, "transactions", tid));
-            return true;
-          } catch (e) {
-            return false;
-          }
-        }),
-      ]);
-      if (deleteResults.some(Boolean)) deleteSucceeded = true;
-    } catch (e2) {}
+    if (networkService.isOnline()) {
+      try {
+        const deleteResults = await Promise.all([
+          ...targetPayrollIds.map(async (pid) => {
+            try {
+              await deleteDoc(doc(db, "payroll", pid));
+              return true;
+            } catch (e: any) {
+              failureReason = e;
+              return false;
+            }
+          }),
+          ...targetTxIds.map(async (tid) => {
+            try {
+              await deleteDoc(doc(db, "transactions", tid));
+              return true;
+            } catch (e) {
+              return false;
+            }
+          }),
+        ]);
+        if (deleteResults.some(Boolean)) deleteSucceeded = true;
+      } catch (e2) {}
 
-    const restPayrollResults = await Promise.all(targetPayrollIds.map((pid) => deleteDocREST("payroll", pid).catch(() => false)));
-    await Promise.all(targetTxIds.map((tid) => deleteDocREST("transactions", tid).catch(() => false)));
-    if (restPayrollResults.some(Boolean)) deleteSucceeded = true;
+      const restPayrollResults = await Promise.all(targetPayrollIds.map((pid) => deleteDocREST("payroll", pid).catch(() => false)));
+      await Promise.all(targetTxIds.map((tid) => deleteDocREST("transactions", tid).catch(() => false)));
+      if (restPayrollResults.some(Boolean)) deleteSucceeded = true;
 
-    if (!deleteSucceeded && failureReason?.code === "permission-denied") {
-      showFloatingToast("Permission Denied", "Database rejected delete: insufficient permissions.");
-      throw new Error("Database rejected delete: insufficient permissions");
+      if (!deleteSucceeded && failureReason?.code === "permission-denied") {
+        showFloatingToast("Permission Denied", "Database rejected delete: insufficient permissions.");
+        throw new Error("Database rejected delete: insufficient permissions");
+      }
     }
 
     allTargetIds.forEach((tid: string) => deletedIdsRef.current.add(tid));
-    recordPersistedTombstones(activeOrgId, allTargetIds).catch(() => {});
+    await recordTombstones(activeOrgId, allTargetIds);
 
     setPayroll((prev) => {
       const remaining = prev.filter((p) => !allTargetIds.includes(p.id));
+      saveLocalEntities(activeOrgId, "payroll", remaining);
       AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(remaining)).catch(() => {});
       return remaining;
     });
 
     setTransactions((prev) => {
       const remaining = prev.filter((t) => !allTargetIds.includes(t.id));
+      saveLocalEntities(activeOrgId, "transactions", remaining);
       AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(remaining)).catch(() => {});
       return remaining;
     });
+
+    for (const pid of targetPayrollIds) {
+      await enqueueOperation({
+        entityType: "payroll",
+        entityId: pid,
+        operationType: "DELETE",
+        organizationId: activeOrgId,
+        userId: user?.id || "anonymous",
+      });
+    }
+
+    for (const tid of targetTxIds) {
+      await enqueueOperation({
+        entityType: "transaction",
+        entityId: tid,
+        operationType: "DELETE",
+        organizationId: activeOrgId,
+        userId: user?.id || "anonymous",
+      });
+    }
 
     recordAuditLog({
       organizationId: activeOrgId,
@@ -1680,10 +1848,21 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
     setDepartments((prev) => {
       const updated = [...prev.filter((item) => item.id !== id), newDept];
+      saveLocalEntities(orgId, "departments", updated);
       AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(updated)).catch(() => {});
       return updated;
     });
     const cleanDept = sanitizeForFirestore(newDept);
+
+    await enqueueOperation({
+      entityType: "department",
+      entityId: id,
+      operationType: "CREATE",
+      payload: cleanDept,
+      organizationId: orgId,
+      userId: user?.id || "anonymous",
+    });
+
     try {
       await safeSetDoc(doc(db, "departments", id), cleanDept);
       saveDocREST("departments", id, cleanDept).catch(() => {});
@@ -1738,12 +1917,23 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     }
 
     const enrichedUpdates = { ...updates, updatedAt: new Date().toISOString() };
+    const cleanUpdates = sanitizeForFirestore(enrichedUpdates);
     setDepartments((prev) => {
       const updated = prev.map((d) => (d.id === id ? { ...d, ...enrichedUpdates } : d));
+      saveLocalEntities(activeOrgId, "departments", updated);
       AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(updated)).catch(() => {});
       return updated;
     });
-    const cleanUpdates = sanitizeForFirestore(enrichedUpdates);
+
+    await enqueueOperation({
+      entityType: "department",
+      entityId: id,
+      operationType: "UPDATE",
+      payload: cleanUpdates,
+      organizationId: activeOrgId,
+      userId: user?.id || "anonymous",
+    });
+
     try {
       await safeSetDoc(doc(db, "departments", id), cleanUpdates, { merge: true });
       saveDocREST("departments", id, cleanUpdates).catch(() => {});
@@ -1785,40 +1975,53 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     let deleteSucceeded = false;
     let failureReason: any = null;
 
-    try {
-      const deleteResults = await Promise.all(
-        targetIds.map(async (tid) => {
-          try {
-            await deleteDoc(doc(db, "departments", tid));
-            return true;
-          } catch (err: any) {
-            failureReason = err;
-            return false;
-          }
-        })
-      );
-      if (deleteResults.some(Boolean)) deleteSucceeded = true;
-    } catch (err: any) {
-      failureReason = err;
-    }
+    if (networkService.isOnline()) {
+      try {
+        const deleteResults = await Promise.all(
+          targetIds.map(async (tid) => {
+            try {
+              await deleteDoc(doc(db, "departments", tid));
+              return true;
+            } catch (err: any) {
+              failureReason = err;
+              return false;
+            }
+          })
+        );
+        if (deleteResults.some(Boolean)) deleteSucceeded = true;
+      } catch (err: any) {
+        failureReason = err;
+      }
 
-    const restSuccess = await deleteDocREST("departments", id).catch(() => false);
-    await Promise.all(targetIds.map((tid) => deleteDocREST("departments", tid).catch(() => false)));
-    if (restSuccess) deleteSucceeded = true;
+      const restSuccess = await deleteDocREST("departments", id).catch(() => false);
+      await Promise.all(targetIds.map((tid) => deleteDocREST("departments", tid).catch(() => false)));
+      if (restSuccess) deleteSucceeded = true;
 
-    if (!deleteSucceeded && failureReason?.code === "permission-denied") {
-      showFloatingToast("Permission Denied", "Database rejected delete: insufficient permissions.");
-      throw new Error("Database rejected delete: insufficient permissions");
+      if (!deleteSucceeded && failureReason?.code === "permission-denied") {
+        showFloatingToast("Permission Denied", "Database rejected delete: insufficient permissions.");
+        throw new Error("Database rejected delete: insufficient permissions");
+      }
     }
 
     targetIds.forEach((tid) => deletedIdsRef.current.add(tid));
-    recordPersistedTombstones(activeOrgId, targetIds).catch(() => {});
+    await recordTombstones(activeOrgId, targetIds);
 
     setDepartments((prev) => {
       const remaining = prev.filter((d) => !targetIds.includes(d.id));
+      saveLocalEntities(activeOrgId, "departments", remaining);
       AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(remaining)).catch(() => {});
       return remaining;
     });
+
+    for (const tid of targetIds) {
+      await enqueueOperation({
+        entityType: "department",
+        entityId: tid,
+        operationType: "DELETE",
+        organizationId: activeOrgId,
+        userId: user?.id || "anonymous",
+      });
+    }
 
     recordAuditLog({
       organizationId: activeOrgId,
@@ -1956,6 +2159,15 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const refreshData = useCallback(async () => {
     setSyncStatus("syncing");
     try {
+      if (networkService.isOnline()) {
+        await flushOutbox(activeOrgId).catch(() => {});
+      }
+
+      const [outboxOps, tombstones] = await Promise.all([
+        loadOutbox(activeOrgId),
+        loadTombstones(activeOrgId),
+      ]);
+
       const fetchPromise = Promise.all([
         fetchCollectionREST<Transaction>("transactions", activeOrgId),
         fetchCollectionREST<Budget>("budgets", activeOrgId),
@@ -1971,28 +2183,36 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       ]);
 
       if (restTxs !== null) {
-        const validTxs = restTxs.filter((t: Transaction) => !deletedIdsRef.current.has(t.id));
-        validTxs.sort((a: Transaction, b: Transaction) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        setTransactions(validTxs);
-        AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(validTxs)).catch(() => {});
+        const localTxs = await loadLocalEntities<Transaction>(activeOrgId, "transactions");
+        const reconciledTxs = reconcileEntities<Transaction>(restTxs, localTxs, outboxOps, tombstones);
+        reconciledTxs.sort((a: Transaction, b: Transaction) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        setTransactions(reconciledTxs);
+        saveLocalEntities(activeOrgId, "transactions", reconciledTxs);
+        AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(reconciledTxs)).catch(() => {});
       }
 
       if (restBudgets !== null) {
-        const validBudgets = restBudgets.filter((b: Budget) => !deletedIdsRef.current.has(b.id));
-        setBudgets(validBudgets);
-        AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(validBudgets)).catch(() => {});
+        const localBudgets = await loadLocalEntities<Budget>(activeOrgId, "budgets");
+        const reconciledBudgets = reconcileEntities<Budget>(restBudgets, localBudgets, outboxOps, tombstones);
+        setBudgets(reconciledBudgets);
+        saveLocalEntities(activeOrgId, "budgets", reconciledBudgets);
+        AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(reconciledBudgets)).catch(() => {});
       }
 
       if (restDepts !== null) {
-        const validDepts = restDepts.filter((d: Department) => !deletedIdsRef.current.has(d.id));
-        setDepartments(validDepts);
-        AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(validDepts)).catch(() => {});
+        const localDepts = await loadLocalEntities<Department>(activeOrgId, "departments");
+        const reconciledDepts = reconcileEntities<Department>(restDepts, localDepts, outboxOps, tombstones);
+        setDepartments(reconciledDepts);
+        saveLocalEntities(activeOrgId, "departments", reconciledDepts);
+        AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(reconciledDepts)).catch(() => {});
       }
 
       if (restPayroll !== null) {
-        const validPayroll = restPayroll.filter((p: PayrollEntry) => !deletedIdsRef.current.has(p.id));
-        setPayroll(validPayroll);
-        AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(validPayroll)).catch(() => {});
+        const localPayroll = await loadLocalEntities<PayrollEntry>(activeOrgId, "payroll");
+        const reconciledPayroll = reconcileEntities<PayrollEntry>(restPayroll, localPayroll, outboxOps, tombstones);
+        setPayroll(reconciledPayroll);
+        saveLocalEntities(activeOrgId, "payroll", reconciledPayroll);
+        AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(reconciledPayroll)).catch(() => {});
       }
 
       // If REST sync was unavailable (e.g. mobile ISP), query Firestore Central Database directly via SDK
@@ -2018,42 +2238,48 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (effectiveTxDocs.length > 0) {
-          const list: Transaction[] = [];
-          effectiveTxDocs.forEach((d) => {
-            if (!deletedIdsRef.current.has(d.id)) list.push({ id: d.id, ...d.data() } as Transaction);
-          });
-          list.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-          setTransactions(list);
-          AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(list)).catch(() => {});
+          const rawSdkTxs = effectiveTxDocs.map((d) => ({ id: d.id, ...d.data() } as Transaction));
+          const localTxs = await loadLocalEntities<Transaction>(activeOrgId, "transactions");
+          const reconciled = reconcileEntities<Transaction>(rawSdkTxs, localTxs, outboxOps, tombstones);
+          reconciled.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          setTransactions(reconciled);
+          saveLocalEntities(activeOrgId, "transactions", reconciled);
+          AsyncStorage.setItem(`${cachePrefix}transactions`, JSON.stringify(reconciled)).catch(() => {});
         }
         if (qBSnap) {
-          const list: Budget[] = [];
-          qBSnap.forEach((d) => {
-            if (!deletedIdsRef.current.has(d.id)) list.push({ id: d.id, ...d.data() } as Budget);
-          });
-          setBudgets(list);
-          AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(list)).catch(() => {});
+          const rawSdkBudgets = qBSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Budget));
+          const localBudgets = await loadLocalEntities<Budget>(activeOrgId, "budgets");
+          const reconciled = reconcileEntities<Budget>(rawSdkBudgets, localBudgets, outboxOps, tombstones);
+          setBudgets(reconciled);
+          saveLocalEntities(activeOrgId, "budgets", reconciled);
+          AsyncStorage.setItem(`${cachePrefix}budgets`, JSON.stringify(reconciled)).catch(() => {});
         }
         if (effectiveDeptDocs.length > 0) {
-          const list: Department[] = [];
-          effectiveDeptDocs.forEach((d) => {
-            if (!deletedIdsRef.current.has(d.id)) list.push({ id: d.id, ...d.data() } as Department);
-          });
-          setDepartments(list);
-          AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(list)).catch(() => {});
+          const rawSdkDepts = effectiveDeptDocs.map((d) => ({ id: d.id, ...d.data() } as Department));
+          const localDepts = await loadLocalEntities<Department>(activeOrgId, "departments");
+          const reconciled = reconcileEntities<Department>(rawSdkDepts, localDepts, outboxOps, tombstones);
+          setDepartments(reconciled);
+          saveLocalEntities(activeOrgId, "departments", reconciled);
+          AsyncStorage.setItem(`${cachePrefix}departments`, JSON.stringify(reconciled)).catch(() => {});
         }
         if (qPSnap) {
-          const list: PayrollEntry[] = [];
-          qPSnap.forEach((d) => {
-            if (!deletedIdsRef.current.has(d.id)) list.push({ id: d.id, ...d.data() } as PayrollEntry);
-          });
-          setPayroll(list);
-          AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(list)).catch(() => {});
+          const rawSdkPayroll = qPSnap.docs.map((d) => ({ id: d.id, ...d.data() } as PayrollEntry));
+          const localPayroll = await loadLocalEntities<PayrollEntry>(activeOrgId, "payroll");
+          const reconciled = reconcileEntities<PayrollEntry>(rawSdkPayroll, localPayroll, outboxOps, tombstones);
+          setPayroll(reconciled);
+          saveLocalEntities(activeOrgId, "payroll", reconciled);
+          AsyncStorage.setItem(`${cachePrefix}payroll`, JSON.stringify(reconciled)).catch(() => {});
         }
       }
     } catch (e) {
+      console.warn("refreshData error:", e);
     } finally {
-      setSyncStatus("synced");
+      const remainingOutbox = await loadOutbox(activeOrgId);
+      if (!networkService.isOnline() || remainingOutbox.length > 0) {
+        setSyncStatus("offline_pending");
+      } else {
+        setSyncStatus("synced");
+      }
     }
   }, [cachePrefix, activeOrgId]);
 

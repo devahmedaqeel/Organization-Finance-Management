@@ -158,6 +158,15 @@ export function getPresetPeriod(presetId: string, transactions?: Transaction[]):
       label = `Today (${formatReadableDate(todayStr)})`;
       break;
     }
+    case "yesterday": {
+      const y = new Date(now);
+      y.setDate(now.getDate() - 1);
+      const yStr = formatYMD(y);
+      startDate = yStr;
+      endDate = yStr;
+      label = `Yesterday (${formatReadableDate(yStr)})`;
+      break;
+    }
     case "1w":
     case "this_week":
     case "last_7d": {
@@ -184,6 +193,16 @@ export function getPresetPeriod(presetId: string, transactions?: Transaction[]):
       startDate = formatYMD(s);
       endDate = formatYMD(e);
       label = `This Month (${MONTH_NAMES_SHORT[now.getMonth()]} ${now.getFullYear()})`;
+      break;
+    }
+    case "prev_month":
+    case "previous_month":
+    case "last_month": {
+      const s = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const e = new Date(now.getFullYear(), now.getMonth(), 0);
+      startDate = formatYMD(s);
+      endDate = formatYMD(e);
+      label = `Previous Month (${MONTH_NAMES_SHORT[s.getMonth()]} ${s.getFullYear()})`;
       break;
     }
     case "last_30d": {
@@ -230,17 +249,22 @@ export function getPresetPeriod(presetId: string, transactions?: Transaction[]):
     case "all_time":
     default: {
       let minDate = "2024-01-01";
+      let maxDate = todayStr;
       if (transactions && transactions.length > 0) {
         const validDates = transactions
-          .map((t) => (t.date || "").trim().slice(0, 10))
+          .map((t) => (t.date || "").trim().slice(0, 10).replace(/\//g, "-"))
           .filter((d) => d.length === 10 && d >= "2000-01-01")
           .sort();
         if (validDates.length > 0) {
           minDate = `${validDates[0].slice(0, 7)}-01`;
+          const latestTxDate = validDates[validDates.length - 1];
+          if (latestTxDate > maxDate) {
+            maxDate = latestTxDate;
+          }
         }
       }
       startDate = minDate;
-      endDate = formatYMD(now);
+      endDate = maxDate;
       label = "All Time";
       break;
     }
@@ -820,27 +844,11 @@ export function aggregateTransactionsByGranularity(
   }
 
   // ─── 4. YEAR VIEW (Accurate yearly sum of real transactions) ───
-  let startYear = start.getFullYear();
-  let endYear = end.getFullYear();
-
-  if (endYear - startYear < 3) {
-    startYear = Math.max(2023, endYear - 3);
-    endYear = Math.max(endYear, new Date().getFullYear());
-  }
-
-  const txSource =
-    endYear - start.getFullYear() < 3
-      ? transactions.filter((t) => {
-          if (!t || !t.date) return false;
-          const status = (t as any).status;
-          if (status === "deleted" || status === "void" || status === "cancelled") return false;
-          const yr = Number((t.date || "").trim().substring(0, 4));
-          return !isNaN(yr) && yr >= startYear && yr <= endYear;
-        })
-      : filtered;
+  const startYear = start.getFullYear();
+  const endYear = end.getFullYear();
 
   const yearMap: Record<string, { inc: number; exp: number; count: number }> = {};
-  txSource.forEach((t) => {
+  filtered.forEach((t) => {
     const yr = (t.date || "").trim().substring(0, 4);
     const amt = Number(t.amount || 0);
     if (isNaN(amt) || amt <= 0) return;

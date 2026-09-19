@@ -14,7 +14,7 @@ import {
   getRedirectResult,
   signInAnonymously,
 } from "firebase/auth";
-import { doc, getDoc, setDoc, collection, query, where, getDocs, Timestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, query, where, getDocs, Timestamp, onSnapshot } from "firebase/firestore";
 import { Platform } from "react-native";
 import { auth, db } from "../config/firebase";
 import * as WebBrowser from "expo-web-browser";
@@ -440,21 +440,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 parsed.organizationId = "org-9icgv4ijp";
               }
               setUser(parsed);
-            } else {
-              setUser(null);
             }
-          } else {
-            setUser(null);
           }
-        } catch (e) {
-          setUser(null);
-        }
+          // Do not overwrite user with null if already restored from storage and offline
+        } catch (e) {}
       }
       setIsLoading(false);
     });
 
     return () => unsubscribe();
   }, [resolveCanonicalUserProfile, persistUserSession]);
+
+  // 3. Real-time Live Role and Permission Synchronization
+  // Updates user role immediately if online when changed in Firestore; retains cached role if offline.
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const unsub = onSnapshot(
+      doc(db, "users", user.id),
+      (snap) => {
+        if (snap.exists()) {
+          const cloudData = snap.data() as Partial<User>;
+          if (cloudData.role && cloudData.role !== user.role) {
+            setUser((prev) => {
+              if (!prev) return prev;
+              const updated = { ...prev, role: cloudData.role as UserRole };
+              persistUserSession(updated).catch(() => {});
+              return updated;
+            });
+          }
+        }
+      },
+      () => {
+        // Suppress network/offline errors so local cached role is smoothly retained
+      }
+    );
+
+    return () => unsub();
+  }, [user?.id, user?.role, persistUserSession]);
 
   const login = async (email: string, password: string, role?: UserRole): Promise<boolean> => {
     const formattedEmail = email.toLowerCase().trim();
@@ -817,42 +840,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (e) {}
     }
 
-    // Purge all organization-scoped caches from AsyncStorage (Preserve tombstones so deleted items NEVER resurrect)
-    try {
-      const allKeys = await AsyncStorage.getAllKeys();
-      const cacheKeys = allKeys.filter(
-        (k) =>
-          k.startsWith("ofm_cache:") ||
-          k.includes("transactions") ||
-          k.includes("budgets") ||
-          k.includes("payroll") ||
-          k.includes("departments")
-      );
-      if (cacheKeys.length > 0) {
-        await AsyncStorage.multiRemove(cacheKeys);
-      }
-    } catch (e) {}
-
-    // Purge all web local/session caches (Preserve tombstones so deleted items NEVER resurrect)
-    if (typeof window !== "undefined") {
-      try {
-        sessionStorage.clear();
-        for (let i = localStorage.length - 1; i >= 0; i--) {
-          const k = localStorage.key(i);
-          if (
-            k &&
-            !k.startsWith("ofm_tombstones:") &&
-            (k.startsWith("ofm_cache:") ||
-             k.includes("transactions") ||
-             k.includes("budgets") ||
-             k.includes("payroll") ||
-             k.includes("departments"))
-          ) {
-            localStorage.removeItem(k);
-          }
-        }
-      } catch (e) {}
-    }
+    // Clear user session token
     setUser(null);
   };
 

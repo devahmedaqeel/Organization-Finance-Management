@@ -54,5 +54,6 @@ firebase-adminsdk*.json
 .firebase/
 powershell.cmd
 powershell.bat
+scratch/
 
 
