@@ -957,8 +957,8 @@ export default function DashboardScreen() {
                 <Feather name="arrow-up-circle" size={17} color={colors.income} />
               </View>
               <View style={[styles.kpiTag, { backgroundColor: colors.income + "18" }]}>
-                <Text style={[styles.kpiTagText, { color: colors.income }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>
-                  Inflows
+                <Text style={[styles.kpiTagText, { color: colors.income }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                  Inflow
                 </Text>
               </View>
             </View>
@@ -1059,17 +1059,17 @@ export default function DashboardScreen() {
                   ]}
                   numberOfLines={1}
                   adjustsFontSizeToFit
-                  minimumFontScale={0.7}
+                  minimumFontScale={0.75}
                 >
                   {totalExpenses === 0
-                    ? "No Outflows"
+                    ? "No Outflow"
                     : totalAllocatedBudget > 0
                     ? totalBudgetSpent > totalAllocatedBudget
                       ? "Over Budget"
                       : "Within Budget"
                     : isDeficit
                     ? "Over Inflow"
-                    : "Outflows"}
+                    : "Outflow"}
                 </Text>
               </View>
             </View>
@@ -2398,15 +2398,16 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   kpiTag: {
-    paddingHorizontal: 8,
-    paddingVertical: 3.5,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
     borderRadius: 8,
     flexShrink: 0,
+    minWidth: 52,
     alignItems: "center",
     justifyContent: "center",
   },
   kpiTagText: {
-    fontSize: 9.5,
+    fontSize: 10,
     fontFamily: "Inter_700Bold",
     includeFontPadding: false,
     textAlign: "center",

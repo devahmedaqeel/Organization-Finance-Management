@@ -15,7 +15,6 @@
       },
       "env": {
         "EAS_SKIP_AUTO_FINGERPRINT": "1",
-        "NODE_ENV": "production",
         "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyDPpbHAUApFuyq-u1L891fvl95C5mHeSKY",
         "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "ofmapp-main.firebaseapp.com",
         "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "ofmapp-main",

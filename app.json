@@ -4,7 +4,7 @@
     "description": "OFM — Organization Finance Management is an enterprise financial management platform for institutional budgets, ledger transactions, department cost centers, and real-time collaboration.",
     "slug": "ofm-app",
     "owner": "ahmedaqeeldev",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "ofm-app",
@@ -17,14 +17,12 @@
         "applinks:ofmapp-main.firebaseapp.com"
       ],
       "infoPlist": {
-        "NSSpeechRecognitionUsageDescription": "OFM uses speech for voice-guided onboarding.",
-        "NSMicrophoneUsageDescription": "OFM uses the microphone for voice assistance features.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "com.organization.financemanager",
-      "versionCode": 6,
+      "versionCode": 7,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#ffffff"
@@ -57,8 +55,6 @@
       "permissions": [
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE",
-        "RECORD_AUDIO",
-        "MODIFY_AUDIO_SETTINGS",
         "INTERNET",
         "ACCESS_NETWORK_STATE"
       ]
