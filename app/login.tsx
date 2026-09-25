@@ -18,8 +18,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { UserRole, useAuth, ROLE_PERMISSIONS } from "@/context/AuthContext";
-import { useColors } from "@/hooks/useColors";
+import { UserRole, useAuth } from "@/context/AuthContext";
 import { OFMBrandLogo } from "@/components/OFMBrandLogo";
 import { GoogleIcon } from "@/components/GoogleIcon";
 
@@ -29,12 +28,11 @@ const SIGNUP_ROLES: { id: UserRole; label: string; desc: string; icon: string }[
   { id: "admin", label: "Admin", desc: "Create Org", icon: "shield" },
   { id: "accountant", label: "Accountant", desc: "Ledgers & Cash", icon: "dollar-sign" },
   { id: "manager", label: "Manager", desc: "Reports & Approvals", icon: "bar-chart-2" },
-  { id: "employee", label: "Employee", desc: "Expense Claims", icon: "user" },
+  { id: "employee", label: "Staff", desc: "Expense Claims", icon: "user" },
 ];
 
 export default function LoginScreen() {
   const { height: windowHeight } = useWindowDimensions();
-  const colors = useColors();
   const insets = useSafeAreaInsets();
   const { login, loginWithGoogle, loginWithGoogleCredential, signUp, forgotPassword } = useAuth();
 
@@ -49,6 +47,7 @@ export default function LoginScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
   // Keyboard avoidance, layout measurement, and auto-scroll handling
   const scrollViewRef = useRef<ScrollView>(null);
@@ -62,7 +61,6 @@ export default function LoginScreen() {
     const field = targetField || activeFieldRef.current;
     if (!field || !scrollViewRef.current) return;
 
-    // Fallback Y coordinate estimates relative to ScrollView if onLayout hasn't fired yet
     const fallbackY: Record<string, number> =
       mode === "signup"
         ? { name: 320, org: 400, email: 480, password: 560, confirm: 640 }
@@ -72,7 +70,6 @@ export default function LoginScreen() {
     const fieldAbsoluteY =
       measuredY !== undefined ? cardY.current + measuredY : (fallbackY[field] ?? 320);
 
-    // Scroll so the active field sits comfortably in the upper-middle visible area (leaving 60px breathing room above)
     const targetOffset = Math.max(0, fieldAbsoluteY - 60);
     scrollViewRef.current.scrollTo({ y: targetOffset, animated: true });
   };
@@ -84,7 +81,6 @@ export default function LoginScreen() {
     const showSub = Keyboard.addListener(showEvent, (e) => {
       const h = e.endCoordinates.height;
       setKeyboardHeight(h);
-      // Auto-scroll the active field above the newly opened keyboard across frames
       scrollToActiveField();
       setTimeout(() => scrollToActiveField(), 60);
       setTimeout(() => scrollToActiveField(), 180);
@@ -103,6 +99,7 @@ export default function LoginScreen() {
 
   const handleInputFocus = (field: "name" | "org" | "email" | "password" | "confirm") => {
     activeFieldRef.current = field;
+    setFocusedField(field);
     if (Platform.OS === "web") return;
     scrollToActiveField(field);
     setTimeout(() => scrollToActiveField(field), 60);
@@ -114,6 +111,7 @@ export default function LoginScreen() {
     if (activeFieldRef.current === field) {
       activeFieldRef.current = null;
     }
+    setFocusedField((prev) => (prev === field ? null : prev));
   };
 
   // Forgot Password Modal
@@ -184,6 +182,7 @@ export default function LoginScreen() {
     setEmail("");
     setPassword("");
     setConfirmPassword("");
+    setFocusedField(null);
     activeFieldRef.current = null;
     fieldPositions.current = {};
     safeHapticSelection();
@@ -199,14 +198,19 @@ export default function LoginScreen() {
     }
     setLoading(true);
     setError("");
-    // Role is authoritative on backend; login verifies credentials and loads assigned Firestore permissions
-    const success = await login(cleanEmail, cleanPass);
-    setLoading(false);
-    if (success) {
-      safeHapticNotification(Haptics.NotificationFeedbackType.Success);
-      router.replace("/(tabs)");
-    } else {
-      setError("Incorrect email or password. Please try again.");
+    try {
+      const success = await login(cleanEmail, cleanPass);
+      setLoading(false);
+      if (success) {
+        safeHapticNotification(Haptics.NotificationFeedbackType.Success);
+        router.replace("/(tabs)");
+      } else {
+        setError("Incorrect email or password. Please try again.");
+        safeHapticNotification(Haptics.NotificationFeedbackType.Error);
+      }
+    } catch (err: any) {
+      setLoading(false);
+      setError(err?.message || "Incorrect email or password. Please try again.");
       safeHapticNotification(Haptics.NotificationFeedbackType.Error);
     }
   };
@@ -225,13 +229,19 @@ export default function LoginScreen() {
 
     setLoading(true);
     setError("");
-    const result = await signUp(cleanName, cleanEmail, password, selectedRole, cleanOrg);
-    setLoading(false);
-    if (result.success) {
-      safeHapticNotification(Haptics.NotificationFeedbackType.Success);
-      router.replace("/(tabs)");
-    } else {
-      setError(result.error || "Unable to create account. Please try again.");
+    try {
+      const result = await signUp(cleanName, cleanEmail, password, selectedRole, cleanOrg);
+      setLoading(false);
+      if (result.success) {
+        safeHapticNotification(Haptics.NotificationFeedbackType.Success);
+        router.replace("/(tabs)");
+      } else {
+        setError(result.error || "Unable to create account. Please try again.");
+        safeHapticNotification(Haptics.NotificationFeedbackType.Error);
+      }
+    } catch (err: any) {
+      setLoading(false);
+      setError(err?.message || "Unable to create account. Please try again.");
       safeHapticNotification(Haptics.NotificationFeedbackType.Error);
     }
   };
@@ -267,20 +277,29 @@ export default function LoginScreen() {
     Keyboard.dismiss();
     setForgotLoading(true);
     setForgotMsg(null);
-    const result = await forgotPassword(clean);
-    setForgotLoading(false);
-    if (result.success) {
-      setForgotMsg({
-        type: "success",
-        text:
-          result.message ||
-          "If an account exists with this email address, password reset instructions have been sent. Please check your Inbox and Spam / Junk folder. If you registered with Google, you can sign in directly using 'Sign in with Google'.",
-      });
-      safeHapticNotification(Haptics.NotificationFeedbackType.Success);
-    } else {
+    try {
+      const result = await forgotPassword(clean);
+      setForgotLoading(false);
+      if (result.success) {
+        setForgotMsg({
+          type: "success",
+          text:
+            result.message ||
+            "If an account exists with this email address, password reset instructions have been sent. Please check your Inbox and Spam / Junk folder. If you registered with Google, you can sign in directly using 'Continue with Google'.",
+        });
+        safeHapticNotification(Haptics.NotificationFeedbackType.Success);
+      } else {
+        setForgotMsg({
+          type: "error",
+          text: result.error || "Unable to send reset link. Please verify address.",
+        });
+        safeHapticNotification(Haptics.NotificationFeedbackType.Error);
+      }
+    } catch (err: any) {
+      setForgotLoading(false);
       setForgotMsg({
         type: "error",
-        text: result.error || "Unable to send reset link. Please verify address.",
+        text: err?.message || "Unable to send reset link. Please verify address.",
       });
       safeHapticNotification(Haptics.NotificationFeedbackType.Error);
     }
@@ -312,7 +331,7 @@ export default function LoginScreen() {
             paddingTop: Math.max(insets.top, 20) + 16,
             paddingBottom:
               Math.max(insets.bottom, 16) +
-              30 +
+              32 +
               (keyboardHeight > 0
                 ? Platform.OS === "android"
                   ? keyboardHeight + 80
@@ -326,9 +345,20 @@ export default function LoginScreen() {
       >
         {/* ─── Header & Enterprise Branding ─── */}
         <View style={styles.headerBox}>
-          <OFMBrandLogo size={64} />
-          <Text style={styles.appName}>Organization Finance Management</Text>
-          <Text style={styles.subtitle}>Secure financial management for your organization</Text>
+          <View style={styles.logoBadgeContainer}>
+            <OFMBrandLogo size={66} />
+          </View>
+          <Text
+            style={styles.appName}
+            adjustsFontSizeToFit
+            numberOfLines={1}
+            minimumFontScale={0.85}
+          >
+            Organization Finance Management
+          </Text>
+          <Text style={styles.subtitle}>
+            Secure financial management for your organization
+          </Text>
         </View>
 
         {/* ─── Authentication Card ─── */}
@@ -344,6 +374,9 @@ export default function LoginScreen() {
               style={[styles.modeBtn, mode === "signin" && styles.modeBtnActive]}
               onPress={() => switchMode("signin")}
               activeOpacity={0.85}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: mode === "signin" }}
+              accessibilityLabel="Sign In"
             >
               <Text style={[styles.modeBtnText, mode === "signin" ? styles.textActive : styles.textInactive]}>
                 Sign In
@@ -354,6 +387,9 @@ export default function LoginScreen() {
               style={[styles.modeBtn, mode === "signup" && styles.modeBtnActive]}
               onPress={() => switchMode("signup")}
               activeOpacity={0.85}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: mode === "signup" }}
+              accessibilityLabel="Create Account"
             >
               <Text style={[styles.modeBtnText, mode === "signup" ? styles.textActive : styles.textInactive]}>
                 Create Account
@@ -378,6 +414,9 @@ export default function LoginScreen() {
                       ]}
                       onPress={() => { setSelectedRole(r.id); safeHapticSelection(); }}
                       activeOpacity={0.75}
+                      accessibilityRole="radio"
+                      accessibilityState={{ checked: isSelected }}
+                      accessibilityLabel={`${r.label} role`}
                     >
                       <Feather name={r.icon} size={15} color={activeColor} />
                       <Text style={[styles.roleLabel, { color: isSelected ? "#3B82F6" : "#F8FAFC" }]}>
@@ -400,8 +439,17 @@ export default function LoginScreen() {
               }}
             >
               <Text style={styles.fieldLabel}>FULL NAME</Text>
-              <View style={styles.inputBox}>
-                <Feather name="user" size={16} color="#94A3B8" />
+              <View
+                style={[
+                  styles.inputBox,
+                  focusedField === "name" && styles.inputBoxFocused,
+                ]}
+              >
+                <Feather
+                  name="user"
+                  size={17}
+                  color={focusedField === "name" ? "#60A5FA" : "#94A3B8"}
+                />
                 <TextInput
                   style={styles.textInput}
                   placeholder="Enter your full name"
@@ -411,6 +459,7 @@ export default function LoginScreen() {
                   onFocus={() => handleInputFocus("name")}
                   onBlur={() => handleInputBlur("name")}
                   autoCapitalize="words"
+                  returnKeyType="next"
                 />
               </View>
             </View>
@@ -427,8 +476,17 @@ export default function LoginScreen() {
               <Text style={styles.fieldLabel}>
                 {selectedRole === "admin" ? "ORGANIZATION NAME" : "INVITE CODE (ADMIN'S EMAIL)"}
               </Text>
-              <View style={styles.inputBox}>
-                <Feather name="briefcase" size={16} color="#94A3B8" />
+              <View
+                style={[
+                  styles.inputBox,
+                  focusedField === "org" && styles.inputBoxFocused,
+                ]}
+              >
+                <Feather
+                  name="briefcase"
+                  size={17}
+                  color={focusedField === "org" ? "#60A5FA" : "#94A3B8"}
+                />
                 <TextInput
                   style={styles.textInput}
                   placeholder={selectedRole === "admin" ? "Enter your organization name" : "admin@organization.com"}
@@ -438,22 +496,33 @@ export default function LoginScreen() {
                   onFocus={() => handleInputFocus("org")}
                   onBlur={() => handleInputBlur("org")}
                   autoCapitalize={selectedRole === "admin" ? "words" : "none"}
+                  returnKeyType="next"
                 />
               </View>
             </View>
           )}
 
-
-          {/* Email Field */}
+          {/* Email Address Field */}
           <View
             style={styles.fieldGroup}
             onLayout={(e) => {
               fieldPositions.current["email"] = e.nativeEvent.layout.y;
             }}
           >
-            <Text style={styles.fieldLabel}>{mode === "signup" ? "WORK EMAIL" : "EMAIL ADDRESS"}</Text>
-            <View style={styles.inputBox}>
-              <Feather name="mail" size={16} color="#94A3B8" />
+            <Text style={styles.fieldLabel}>
+              {mode === "signup" ? "WORK EMAIL" : "EMAIL ADDRESS"}
+            </Text>
+            <View
+              style={[
+                styles.inputBox,
+                focusedField === "email" && styles.inputBoxFocused,
+              ]}
+            >
+              <Feather
+                name="mail"
+                size={17}
+                color={focusedField === "email" ? "#60A5FA" : "#94A3B8"}
+              />
               <TextInput
                 style={styles.textInput}
                 placeholder="Enter your email address"
@@ -465,6 +534,7 @@ export default function LoginScreen() {
                 onChangeText={(v) => { setEmail(v); setError(""); }}
                 onFocus={() => handleInputFocus("email")}
                 onBlur={() => handleInputBlur("email")}
+                returnKeyType="next"
               />
             </View>
           </View>
@@ -480,15 +550,32 @@ export default function LoginScreen() {
               <Text style={styles.fieldLabel}>PASSWORD</Text>
               {mode === "signin" && (
                 <TouchableOpacity
-                  onPress={() => { setForgotEmail(email); setForgotMsg(null); setForgotModal(true); }}
-                  hitSlop={8}
+                  style={styles.forgotBtn}
+                  onPress={() => {
+                    setForgotEmail(email);
+                    setForgotMsg(null);
+                    setForgotModal(true);
+                  }}
+                  hitSlop={{ top: 12, bottom: 12, left: 14, right: 14 }}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel="Forgot Password?"
                 >
-                  <Text style={styles.forgotLink}>Forgot password?</Text>
+                  <Text style={styles.forgotLink}>Forgot Password?</Text>
                 </TouchableOpacity>
               )}
             </View>
-            <View style={styles.inputBox}>
-              <Feather name="lock" size={16} color="#94A3B8" />
+            <View
+              style={[
+                styles.inputBox,
+                focusedField === "password" && styles.inputBoxFocused,
+              ]}
+            >
+              <Feather
+                name="lock"
+                size={17}
+                color={focusedField === "password" ? "#60A5FA" : "#94A3B8"}
+              />
               <TextInput
                 style={styles.textInput}
                 placeholder="Enter your password"
@@ -498,9 +585,22 @@ export default function LoginScreen() {
                 onChangeText={(v) => { setPassword(v); setError(""); }}
                 onFocus={() => handleInputFocus("password")}
                 onBlur={() => handleInputBlur("password")}
+                returnKeyType={mode === "signin" ? "done" : "next"}
+                onSubmitEditing={mode === "signin" ? () => handleLogin() : undefined}
               />
-              <TouchableOpacity onPress={() => setShowPassword((p) => !p)} hitSlop={8}>
-                <Feather name={showPassword ? "eye-off" : "eye"} size={17} color="#94A3B8" />
+              <TouchableOpacity
+                style={styles.eyeBtn}
+                onPress={() => setShowPassword((p) => !p)}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={showPassword ? "Hide password" : "Show password"}
+              >
+                <Feather
+                  name={showPassword ? "eye-off" : "eye"}
+                  size={18}
+                  color={showPassword ? "#60A5FA" : "#94A3B8"}
+                />
               </TouchableOpacity>
             </View>
           </View>
@@ -514,8 +614,17 @@ export default function LoginScreen() {
               }}
             >
               <Text style={styles.fieldLabel}>CONFIRM PASSWORD</Text>
-              <View style={styles.inputBox}>
-                <Feather name="lock" size={16} color="#94A3B8" />
+              <View
+                style={[
+                  styles.inputBox,
+                  focusedField === "confirm" && styles.inputBoxFocused,
+                ]}
+              >
+                <Feather
+                  name="lock"
+                  size={17}
+                  color={focusedField === "confirm" ? "#60A5FA" : "#94A3B8"}
+                />
                 <TextInput
                   style={styles.textInput}
                   placeholder="Confirm your password"
@@ -525,9 +634,22 @@ export default function LoginScreen() {
                   onChangeText={(v) => { setConfirmPassword(v); setError(""); }}
                   onFocus={() => handleInputFocus("confirm")}
                   onBlur={() => handleInputBlur("confirm")}
+                  returnKeyType="done"
+                  onSubmitEditing={handleSignUp}
                 />
-                <TouchableOpacity onPress={() => setShowConfirmPassword((p) => !p)} hitSlop={8}>
-                  <Feather name={showConfirmPassword ? "eye-off" : "eye"} size={17} color="#94A3B8" />
+                <TouchableOpacity
+                  style={styles.eyeBtn}
+                  onPress={() => setShowConfirmPassword((p) => !p)}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={showConfirmPassword ? "Hide password" : "Show password"}
+                >
+                  <Feather
+                    name={showConfirmPassword ? "eye-off" : "eye"}
+                    size={18}
+                    color={showConfirmPassword ? "#60A5FA" : "#94A3B8"}
+                  />
                 </TouchableOpacity>
               </View>
             </View>
@@ -536,20 +658,27 @@ export default function LoginScreen() {
           {/* Error Banner */}
           {error ? (
             <View style={styles.errorCard}>
-              <Feather name="alert-circle" size={15} color="#EF4444" />
+              <Feather name="alert-circle" size={16} color="#EF4444" />
               <Text style={styles.errorText}>{error}</Text>
             </View>
           ) : null}
 
           {/* Primary Action CTA */}
           <TouchableOpacity
-            style={[styles.primaryBtn, loading && { opacity: 0.75 }]}
+            style={[styles.primaryBtn, loading && styles.btnDisabled]}
             onPress={mode === "signin" ? () => handleLogin() : handleSignUp}
             disabled={loading}
             activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={mode === "signin" ? "Sign In" : "Create Account"}
           >
             {loading ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
+              <View style={styles.btnLoadingRow}>
+                <ActivityIndicator color="#FFFFFF" size="small" />
+                <Text style={styles.primaryBtnText}>
+                  {mode === "signin" ? "Signing In..." : "Creating Account..."}
+                </Text>
+              </View>
             ) : (
               <Text style={styles.primaryBtnText}>
                 {mode === "signin" ? "Sign In" : "Create Account"}
@@ -566,10 +695,12 @@ export default function LoginScreen() {
 
           {/* Google Sign-In Button */}
           <TouchableOpacity
-            style={styles.googleBtn}
+            style={[styles.googleBtn, loading && styles.btnDisabled]}
             onPress={handleGoogleLogin}
             disabled={loading}
             activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Continue with Google"
           >
             <GoogleIcon size={19} />
             <Text style={styles.googleBtnText}>Continue with Google</Text>
@@ -578,7 +709,7 @@ export default function LoginScreen() {
 
         {/* ─── Security Footer Indicator ─── */}
         <View style={styles.securityIndicator}>
-          <Feather name="shield" size={13} color="#64748B" />
+          <Feather name="shield" size={13.5} color="#60A5FA" style={{ marginTop: 1.5 }} />
           <Text style={styles.securityText}>
             Secure authentication · Role-based access · Protected organization data
           </Text>
@@ -588,13 +719,16 @@ export default function LoginScreen() {
         <TouchableOpacity
           style={styles.webPortalBtn}
           onPress={handleOpenWebPortal}
-          activeOpacity={0.75}
+          hitSlop={{ top: 10, bottom: 10, left: 12, right: 12 }}
+          activeOpacity={0.7}
+          accessibilityRole="link"
+          accessibilityLabel="Open Web Cloud Portal"
         >
-          <Feather name="globe" size={13} color="#64748B" />
+          <Feather name="globe" size={13.5} color="#60A5FA" />
           <Text style={styles.webPortalText}>
             Open Web Cloud Portal (ofmapp-main.web.app)
           </Text>
-          <Feather name="arrow-up-right" size={12} color="#64748B" />
+          <Feather name="arrow-up-right" size={12.5} color="#60A5FA" />
         </TouchableOpacity>
       </ScrollView>
 
@@ -647,19 +781,22 @@ export default function LoginScreen() {
           >
             <View style={styles.handle} />
             <View style={styles.modalHeader}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
                 <View style={styles.iconPill}>
                   <Feather name="lock" size={16} color="#3B82F6" />
                 </View>
                 <Text style={styles.modalTitle}>Reset Password</Text>
               </View>
               <TouchableOpacity
+                style={styles.modalCloseBtn}
                 onPress={() => {
                   Keyboard.dismiss();
                   setForgotModal(false);
                   setForgotMsg(null);
                 }}
-                hitSlop={8}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                accessibilityRole="button"
+                accessibilityLabel="Close reset password dialog"
               >
                 <Feather name="x" size={18} color="#94A3B8" />
               </TouchableOpacity>
@@ -669,32 +806,34 @@ export default function LoginScreen() {
               bounces={false}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ gap: 10 }}
+              contentContainerStyle={{ gap: 12 }}
             >
               <Text style={styles.modalSubtitle}>
                 Enter your registered email address and we will send you instructions to reset your password.
               </Text>
 
-              <Text style={[styles.fieldLabel, { marginTop: 8 }]}>
-                EMAIL ADDRESS
-              </Text>
-              <View style={styles.inputBox}>
-                <Feather name="mail" size={16} color="#94A3B8" />
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="name@organization.com"
-                  placeholderTextColor="#64748B"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  value={forgotEmail}
-                  onChangeText={(v) => {
-                    setForgotEmail(v);
-                    setForgotMsg(null);
-                  }}
-                  returnKeyType="send"
-                  onSubmitEditing={handleForgotPassword}
-                />
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>EMAIL ADDRESS</Text>
+                <View style={[styles.inputBox, focusedField === "forgot" && styles.inputBoxFocused]}>
+                  <Feather name="mail" size={17} color={focusedField === "forgot" ? "#60A5FA" : "#94A3B8"} />
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="name@organization.com"
+                    placeholderTextColor="#64748B"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    value={forgotEmail}
+                    onChangeText={(v) => {
+                      setForgotEmail(v);
+                      setForgotMsg(null);
+                    }}
+                    onFocus={() => setFocusedField("forgot")}
+                    onBlur={() => setFocusedField(null)}
+                    returnKeyType="send"
+                    onSubmitEditing={handleForgotPassword}
+                  />
+                </View>
               </View>
 
               {forgotMsg && (
@@ -715,9 +854,9 @@ export default function LoginScreen() {
                     style={{
                       color:
                         forgotMsg.type === "success" ? "#22C55E" : "#EF4444",
-                      fontSize: 12.5,
+                      fontSize: 13,
                       fontFamily: "Inter_500Medium",
-                      lineHeight: 18,
+                      lineHeight: 19,
                     }}
                   >
                     {forgotMsg.text}
@@ -726,13 +865,15 @@ export default function LoginScreen() {
               )}
 
               <TouchableOpacity
-                style={[styles.primaryBtn, { marginTop: 8 }]}
+                style={[styles.primaryBtn, { marginTop: 6 }, forgotLoading && styles.btnDisabled]}
                 onPress={handleForgotPassword}
                 disabled={forgotLoading}
                 activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel="Send Reset Link"
               >
                 {forgotLoading ? (
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <View style={styles.btnLoadingRow}>
                     <ActivityIndicator color="#FFFFFF" size="small" />
                     <Text style={styles.primaryBtnText}>Sending...</Text>
                   </View>
@@ -751,64 +892,86 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: {
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
     alignItems: "center",
   },
   headerBox: {
     alignItems: "center",
-    marginBottom: 18,
-    gap: 4,
+    marginBottom: 20,
+    gap: 6,
+    width: "100%",
+    maxWidth: 420,
+  },
+  logoBadgeContainer: {
+    padding: 3,
+    borderRadius: 22,
+    backgroundColor: "rgba(59, 130, 246, 0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(59, 130, 246, 0.22)",
+    shadowColor: "#2563EB",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 6,
   },
   appName: {
-    fontSize: 20,
+    fontSize: 21,
     fontFamily: "Inter_800ExtraBold",
     color: "#F8FAFC",
     letterSpacing: -0.3,
     textAlign: "center",
-    marginTop: 8,
+    marginTop: 6,
   },
   subtitle: {
-    fontSize: 13,
+    fontSize: 13.5,
     fontFamily: "Inter_400Regular",
     color: "#94A3B8",
     textAlign: "center",
+    lineHeight: 19,
+    maxWidth: 320,
+    alignSelf: "center",
   },
   card: {
     width: "100%",
     maxWidth: 420,
     backgroundColor: "#111C2E",
-    borderRadius: 18,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: "#233653",
-    padding: 20,
-    gap: 13,
+    padding: 22,
+    gap: 16,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 20,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.4,
+    shadowRadius: 24,
+    elevation: 6,
   },
   modeToggle: {
     flexDirection: "row",
     backgroundColor: "#07101F",
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#233653",
-    padding: 3,
-    gap: 3,
+    borderColor: "#1E2F4D",
+    padding: 4,
+    gap: 4,
   },
   modeBtn: {
     flex: 1,
-    paddingVertical: 8,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 7,
+    borderRadius: 9,
   },
   modeBtnActive: {
     backgroundColor: "#3B82F6",
+    shadowColor: "#3B82F6",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 2,
   },
   modeBtnText: {
-    fontSize: 13,
+    fontSize: 13.5,
     fontFamily: "Inter_700Bold",
   },
   textActive: {
@@ -818,20 +981,20 @@ const styles = StyleSheet.create({
     color: "#94A3B8",
   },
   fieldGroup: {
-    gap: 5,
+    gap: 7,
   },
   roleGrid: {
     flexDirection: "row",
-    gap: 5,
+    gap: 6,
   },
   roleCard: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    gap: 2,
-    paddingVertical: 7,
-    paddingHorizontal: 2,
-    borderRadius: 8,
+    gap: 3,
+    paddingVertical: 8,
+    paddingHorizontal: 3,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: "#233653",
     backgroundColor: "#152238",
@@ -851,83 +1014,113 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   fieldLabel: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontFamily: "Inter_700Bold",
     color: "#94A3B8",
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
+  },
+  forgotBtn: {
+    paddingVertical: 2,
+    paddingHorizontal: 2,
+  },
+  forgotLink: {
+    fontSize: 12.5,
+    fontFamily: "Inter_600SemiBold",
+    color: "#60A5FA",
   },
   inputBox: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#152238",
-    borderWidth: 1,
+    borderWidth: 1.2,
     borderColor: "#233653",
     borderRadius: 12,
     paddingHorizontal: 14,
     height: 52,
-    gap: 10,
+    gap: 11,
+  },
+  inputBoxFocused: {
+    borderColor: "#3B82F6",
+    backgroundColor: "#15243C",
+    shadowColor: "#3B82F6",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 2,
   },
   textInput: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 14.5,
     fontFamily: "Inter_500Medium",
     color: "#F8FAFC",
+    paddingVertical: 0,
   },
-  forgotLink: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
-    color: "#3B82F6",
+  eyeBtn: {
+    minWidth: 40,
+    minHeight: 44,
+    alignItems: "center",
+    justifyContent: "center",
   },
   errorCard: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: 10,
     backgroundColor: "rgba(239, 68, 68, 0.12)",
     borderColor: "rgba(239, 68, 68, 0.35)",
     borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
+    borderRadius: 11,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
   errorText: {
-    fontSize: 12.5,
+    fontSize: 13,
     fontFamily: "Inter_500Medium",
     color: "#EF4444",
     flex: 1,
+    lineHeight: 18,
   },
   primaryBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#3B82F6",
-    height: 50,
+    backgroundColor: "#2563EB",
+    height: 52,
     borderRadius: 12,
-    shadowColor: "#3B82F6",
+    shadowColor: "#2563EB",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 4,
   },
   primaryBtnText: {
     color: "#FFFFFF",
-    fontSize: 14.5,
+    fontSize: 15,
     fontFamily: "Inter_700Bold",
+  },
+  btnDisabled: {
+    opacity: 0.75,
+  },
+  btnLoadingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
   dividerRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    marginVertical: 2,
+    gap: 12,
+    marginVertical: 1,
   },
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: "#233653",
+    backgroundColor: "#1E2F4D",
   },
   dividerText: {
     fontSize: 11,
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: "Inter_700Bold",
     color: "#64748B",
+    letterSpacing: 1,
   },
   googleBtn: {
     flexDirection: "row",
@@ -937,65 +1130,71 @@ const styles = StyleSheet.create({
     backgroundColor: "#152238",
     borderColor: "#233653",
     borderWidth: 1,
-    height: 50,
+    height: 52,
     borderRadius: 12,
   },
   googleBtnText: {
-    fontSize: 14,
+    fontSize: 14.5,
     fontFamily: "Inter_700Bold",
     color: "#F8FAFC",
   },
   securityIndicator: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "center",
-    gap: 6,
-    marginTop: 20,
-    paddingHorizontal: 12,
+    gap: 7,
+    marginTop: 22,
+    paddingHorizontal: 16,
+    maxWidth: 390,
+    alignSelf: "center",
   },
   securityText: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontFamily: "Inter_400Regular",
     color: "#64748B",
     textAlign: "center",
+    lineHeight: 17,
+    flexShrink: 1,
   },
   webPortalBtn: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    marginTop: 10,
+    marginTop: 8,
     paddingVertical: 6,
+    paddingHorizontal: 12,
+    alignSelf: "center",
   },
   webPortalText: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: "Inter_500Medium",
     color: "#64748B",
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.75)",
+    backgroundColor: "rgba(0, 0, 0, 0.78)",
     justifyContent: "flex-end",
   },
   modalSheet: {
     backgroundColor: "#111C2E",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     borderTopWidth: 1,
     borderLeftWidth: 1,
     borderRightWidth: 1,
     borderColor: "#233653",
-    padding: 20,
+    padding: 22,
     paddingBottom: 36,
-    gap: 10,
+    gap: 12,
   },
   handle: {
-    width: 36,
+    width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    backgroundColor: "rgba(255, 255, 255, 0.25)",
     alignSelf: "center",
-    marginBottom: 4,
+    marginBottom: 6,
   },
   modalHeader: {
     flexDirection: "row",
@@ -1003,28 +1202,36 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   iconPill: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: "rgba(59, 130, 246, 0.15)",
     alignItems: "center",
     justifyContent: "center",
   },
   modalTitle: {
-    fontSize: 16,
+    fontSize: 17,
     fontFamily: "Inter_700Bold",
     color: "#F8FAFC",
   },
+  modalCloseBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   modalSubtitle: {
-    fontSize: 12.5,
+    fontSize: 13,
     fontFamily: "Inter_400Regular",
     color: "#94A3B8",
-    lineHeight: 18,
+    lineHeight: 19,
   },
   msgBanner: {
-    padding: 10,
-    borderRadius: 8,
+    padding: 12,
+    borderRadius: 10,
     borderWidth: 1,
-    marginTop: 4,
+    marginTop: 6,
   },
 });
