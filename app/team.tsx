@@ -1,4 +1,5 @@
 import { Feather } from "@/components/UniversalIcon";
+import { screenTopPadding } from "@/utils/layout";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
@@ -26,17 +27,19 @@ import { db } from "@/config/firebase";
 import { useAuth, User, UserRole } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
 import { useColors } from "@/hooks/useColors";
-import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
-import { showFloatingToast } from "./_layout";
+import { useRequirePermission } from "@/hooks/useRequirePermission";
+import { useBottomSheetLayout } from "@/hooks/useBottomSheetLayout";
+import { showFloatingToast } from "@/utils/toast";
 import { enqueueOperation } from "@/services/offlineSyncService";
 
-// Color maps for dynamic visual badges across all 4 system roles
-const ROLE_BADGES: Record<UserRole, { color: string; label: string }> = {
-  admin: { color: "#6366F1", label: "ADMIN" },
-  accountant: { color: "#10B981", label: "ACCOUNTANT" },
-  manager: { color: "#8B5CF6", label: "MANAGER" },
-  employee: { color: "#0EA5E9", label: "EMPLOYEE" },
+// Role presentation: colour, icon, short title and what the role can do
+const ROLE_INFO: Record<UserRole, { color: string; label: string; title: string; icon: string; description: string }> = {
+  admin: { color: "#6366F1", label: "ADMIN", title: "Admin", icon: "shield", description: "Full control: finances, team, settings & reports" },
+  accountant: { color: "#10B981", label: "ACCOUNTANT", title: "Accountant", icon: "edit-3", description: "Records transactions, payroll and receipts" },
+  manager: { color: "#8B5CF6", label: "MANAGER", title: "Manager", icon: "briefcase", description: "Allocates budgets, approves expenses, views reports" },
+  employee: { color: "#0EA5E9", label: "EMPLOYEE", title: "Employee", icon: "user", description: "Own payslips, claims and staff portal only" },
 };
+const ROLE_ORDER: UserRole[] = ["admin", "accountant", "manager", "employee"];
 
 const AVATAR_PALETTE = ["#F43F5E", "#3B82F6", "#10B981", "#8B5CF6", "#F59E0B", "#0EA5E9", "#EC4899"];
 
@@ -52,10 +55,12 @@ function getAvatarColor(name: string) {
 
 export default function TeamScreen() {
   const colors = useColors();
+  // Role guard: leave if this role can't use this screen (e.g. opened via deep link)
+  useRequirePermission("manage_team");
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { settings } = useSettings();
-  const keyboardHeight = useKeyboardHeight();
+  const { maxHeight: sheetMaxHeight, keyboardHeight, scrollRef: sheetScrollRef, onTouchEnd: sheetOnTouchEnd, sheetBottomInset } = useBottomSheetLayout();
   const webTop = Platform.OS === "web" ? 67 : 0;
   const canInvite = user?.role === "admin";
 
@@ -88,6 +93,11 @@ export default function TeamScreen() {
 
   const handleUpdateRole = async (targetUser: User, newRole: UserRole) => {
     if (targetUser.role === newRole) return;
+    // An admin changing their own role could leave the organization with no admin at all
+    if ((targetUser.email || "").toLowerCase() === (user?.email || "").toLowerCase() || targetUser.id === user?.id) {
+      showFloatingToast("Not allowed", "You can't change your own role. Ask another admin to do it.");
+      return;
+    }
     safeHaptic(Haptics.ImpactFeedbackStyle.Medium);
 
     // Optimistically update local state
@@ -116,6 +126,16 @@ export default function TeamScreen() {
           { ...targetUser, role: newRole, updatedAt: new Date().toISOString() },
           { merge: true }
         );
+        // Keep a pending invitation in sync: sign-up takes the role from the invitation
+        const inviteEmail = (targetUser.email || "").toLowerCase().trim();
+        if (inviteEmail) {
+          const inviteRef = doc(db, "invitations", inviteEmail);
+          const { getDoc } = require("firebase/firestore");
+          const inviteSnap = await getDoc(inviteRef).catch(() => null);
+          if (inviteSnap?.exists()) {
+            await setDoc(inviteRef, { role: newRole, updatedAt: new Date().toISOString() }, { merge: true });
+          }
+        }
       } catch (err) {
         console.warn("Firebase role update notice:", err);
       }
@@ -181,16 +201,20 @@ export default function TeamScreen() {
       q,
       (querySnapshot: any) => {
         if (!querySnapshot.empty) {
-          const seen = new Set<string>();
-          const fetched: User[] = [];
+          // One entry per email. Invites create a placeholder record ("u_<email>"); once the person
+          // signs up their real account must win, so role changes reach the account they log in with.
+          const byEmail = new Map<string, User>();
           querySnapshot.forEach((docSnap: any) => {
             const m = { id: docSnap.id, ...docSnap.data() } as User;
             const emailKey = (m.email || "").toLowerCase().trim();
-            if (emailKey && !seen.has(emailKey)) {
-              seen.add(emailKey);
-              fetched.push(m);
+            if (!emailKey) return;
+            const current = byEmail.get(emailKey);
+            const isPlaceholder = (id: string) => id.startsWith("u_");
+            if (!current || (isPlaceholder(current.id) && !isPlaceholder(m.id))) {
+              byEmail.set(emailKey, m);
             }
           });
+          const fetched: User[] = Array.from(byEmail.values());
 
           // Sort members: Admins first, then alphabetically by name
           fetched.sort((a, b) => {
@@ -267,12 +291,6 @@ export default function TeamScreen() {
       employees: members.filter((m) => m.role === "employee").length,
     };
   }, [members]);
-
-  // Helper for generating dynamic avatar background colors consistently
-  const getAvatarColor = (name: string) => {
-    const charCode = (name || "U").charCodeAt(0) || 0;
-    return AVATAR_PALETTE[charCode % AVATAR_PALETTE.length];
-  };
 
   // Invitation sender launcher with universal Multi-Channel Share & Mail fallback
   const openMailtoLink = async (mailtoUrl: string, rawShareMessage: string, invitedEmail: string, assignedRole: string) => {
@@ -472,203 +490,245 @@ ${orgName}`;
     }
   };
 
+  // ─── Presentation helpers (no data logic) ───
+  const isSelf = (m: User) =>
+    (m.email || "").toLowerCase() === (user?.email || "").toLowerCase() || (!!user?.id && m.id === user.id);
+  // Invites create a placeholder record ("u_<email>") until the person signs up with that email
+  const isPendingInvite = (m: User) => (m.id || "").startsWith("u_");
+  const initialsOf = (m: User) => {
+    const parts = (m.name || m.email || "U").trim().split(/[\s@._-]+/).filter(Boolean);
+    return ((parts[0]?.[0] || "U") + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
+  };
+  const pendingCount = members.filter(isPendingInvite).length;
+  const emailLooksValid = /^\S+@\S+\.\S+$/.test(inviteEmail.trim());
+  const roleFilters = [
+    { id: "all", label: "All", count: stats.total, color: colors.primary },
+    { id: "admin", label: "Admins", count: stats.admins, color: ROLE_INFO.admin.color },
+    { id: "accountant", label: "Accountants", count: stats.accountants, color: ROLE_INFO.accountant.color },
+    { id: "manager", label: "Managers", count: stats.managers, color: ROLE_INFO.manager.color },
+    { id: "employee", label: "Employees", count: stats.employees, color: ROLE_INFO.employee.color },
+  ];
+  const tint = (c: string) => c + (colors.isDark ? "26" : "14");
+
+  // Passed as an element (not a function) so the search box keeps focus while typing
+  const listHeader = (
+    <View style={styles.listHeader}>
+      {/* Team summary */}
+      <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={[styles.summaryIcon, { backgroundColor: tint(colors.primary) }]}>
+          <Feather name="users" size={20} color={colors.primary} />
+        </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={[styles.summaryValue, { color: colors.foreground }]}>
+            {stats.total} {stats.total === 1 ? "member" : "members"}
+          </Text>
+          <Text style={[styles.summarySub, { color: colors.mutedForeground }]} numberOfLines={2}>
+            {stats.admins} admin{stats.admins === 1 ? "" : "s"} · {stats.accountants} accountant{stats.accountants === 1 ? "" : "s"} · {stats.managers} manager{stats.managers === 1 ? "" : "s"} · {stats.employees} employee{stats.employees === 1 ? "" : "s"}
+          </Text>
+        </View>
+        {pendingCount > 0 ? (
+          <View style={[styles.pendingPill, { backgroundColor: tint(colors.warning) }]}>
+            <Feather name="clock" size={12} color={colors.warning} />
+            <Text style={[styles.pendingPillText, { color: colors.warning }]}>{pendingCount} invited</Text>
+          </View>
+        ) : null}
+      </View>
+
+      {/* Search */}
+      <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Feather name="search" size={16} color={colors.mutedForeground} />
+        <TextInput
+          style={[styles.searchInput, { color: colors.foreground }]}
+          placeholder="Search by name or email"
+          placeholderTextColor={colors.mutedForeground}
+          value={search}
+          onChangeText={setSearch}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="search"
+        />
+        {search ? (
+          <TouchableOpacity onPress={() => setSearch("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} accessibilityLabel="Clear search">
+            <Feather name="x-circle" size={16} color={colors.mutedForeground} />
+          </TouchableOpacity>
+        ) : null}
+      </View>
+
+      {/* Role filters (one control, with counts) */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow} keyboardShouldPersistTaps="handled">
+        {roleFilters.map((f) => {
+          const isActive = selectedRole === f.id;
+          return (
+            <TouchableOpacity
+              key={f.id}
+              style={[styles.filterChip, { backgroundColor: isActive ? f.color : colors.card, borderColor: isActive ? f.color : colors.border }]}
+              onPress={() => {
+                safeHaptic(Haptics.ImpactFeedbackStyle.Light);
+                setSelectedRole(f.id);
+              }}
+              activeOpacity={0.8}
+              accessibilityState={{ selected: isActive }}
+            >
+              <Text style={[styles.filterChipText, { color: isActive ? "#FFFFFF" : colors.foreground }]}>{f.label}</Text>
+              <View style={[styles.filterCount, { backgroundColor: isActive ? "rgba(255,255,255,0.25)" : tint(f.color) }]}>
+                <Text style={[styles.filterCountText, { color: isActive ? "#FFFFFF" : f.color }]}>{f.count}</Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
+      <Text style={[styles.resultCount, { color: colors.mutedForeground }]}>
+        {loading
+          ? "Loading members…"
+          : search || selectedRole !== "all"
+          ? `${filteredMembers.length} of ${members.length} shown`
+          : "Tap a member to see details or change their role"}
+      </Text>
+    </View>
+  );
+
   return (
     <KeyboardAvoidingView
       style={[styles.flex, { backgroundColor: colors.background }]}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      {/* Premium Header */}
-      <View style={[styles.header, { paddingTop: webTop + insets.top + (Platform.OS === "android" ? 20 : 12), backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: webTop + screenTopPadding(insets.top), backgroundColor: colors.background, borderBottomColor: colors.border }]}>
         <View style={styles.headerRow}>
           <TouchableOpacity
-            style={[styles.backBtn, { borderColor: colors.border }]}
+            style={[styles.backBtn, { borderColor: colors.border, backgroundColor: colors.card }]}
             onPress={handleGoBack}
+            accessibilityLabel="Go back"
           >
             <Feather name="arrow-left" size={18} color={colors.foreground} />
           </TouchableOpacity>
           <View style={styles.headerTitleWrap}>
             <Text style={[styles.headerTitle, { color: colors.foreground }]}>Team Members</Text>
-            <Text
-              style={[styles.headerSub, { color: colors.mutedForeground }]}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.8}
-            >
+            <Text style={[styles.headerSub, { color: colors.mutedForeground }]} numberOfLines={1}>
               {settings.organizationName}
             </Text>
           </View>
-          <View style={{ width: 38 }} />
+          {canInvite ? (
+            <TouchableOpacity
+              style={[styles.headerInviteBtn, { backgroundColor: tint(colors.primary) }]}
+              onPress={() => {
+                safeHaptic(Haptics.ImpactFeedbackStyle.Light);
+                setInviteModal(true);
+              }}
+              accessibilityLabel="Invite member"
+            >
+              <Feather name="user-plus" size={18} color={colors.primary} />
+            </TouchableOpacity>
+          ) : (
+            <View style={{ width: 40 }} />
+          )}
         </View>
       </View>
 
       <FlatList
         data={filteredMembers}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={[styles.scrollArea, { paddingBottom: Math.max(insets.bottom, 16) + 90 }]}
+        contentContainerStyle={[styles.scrollArea, { paddingBottom: Math.max(insets.bottom, 16) + (canInvite ? 96 : 24) }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={[colors.primary]} tintColor={colors.primary} />}
         showsVerticalScrollIndicator={false}
-        ListHeaderComponent={() => (
-          <>
-            {/* Executive Bento Statistics Grid (Interactive Filters) */}
-            <View style={styles.statsRow}>
-              {[
-                { label: "Total Members", sub: "All Staff", value: stats.total, color: colors.primary, icon: "users" as const, filterKey: "all" },
-                { label: "Admins", sub: "Full Control", value: stats.admins, color: "#6366F1", icon: "shield" as const, filterKey: "admin" },
-                { label: "Accountants", sub: "Ledgers", value: stats.accountants, color: "#10B981", icon: "edit-3" as const, filterKey: "accountant" },
-                { label: "Managers", sub: "Budgets", value: stats.managers, color: "#8B5CF6", icon: "briefcase" as const, filterKey: "manager" },
-                { label: "Employees", sub: "Portal", value: stats.employees, color: "#0EA5E9", icon: "user" as const, filterKey: "employee" },
-              ].map((stat) => {
-                const isSelected = selectedRole === stat.filterKey;
-                return (
-                  <TouchableOpacity
-                    key={stat.label}
-                    style={[
-                      styles.statBox,
-                      {
-                        backgroundColor: colors.card,
-                        borderColor: isSelected ? stat.color : colors.border,
-                        borderWidth: isSelected ? 1.5 : 1,
-                      },
-                    ]}
-                    onPress={() => {
-                      safeHaptic(Haptics.ImpactFeedbackStyle.Light);
-                      setSelectedRole(stat.filterKey);
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <View style={styles.statTopRow}>
-                      <View style={[styles.statIconWrap, { backgroundColor: stat.color + "16" }]}>
-                        <Feather name={stat.icon} size={15} color={stat.color} />
-                      </View>
-                      <Text style={[styles.statVal, { color: stat.color }]}>{stat.value}</Text>
-                    </View>
-                    <View style={styles.statBottomWrap}>
-                      <Text style={[styles.statLabel, { color: colors.foreground }]}>{stat.label}</Text>
-                      <Text style={[styles.statSub, { color: colors.mutedForeground }]}>{stat.sub}</Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            {/* Live Search Controls */}
-            <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Feather name="search" size={15} color={colors.mutedForeground} />
-              <TextInput
-                style={[styles.searchInput, { color: colors.foreground }]}
-                placeholder="Search member by name or email..."
-                placeholderTextColor={colors.mutedForeground}
-                value={search}
-                onChangeText={setSearch}
-              />
-              {search ? (
-                <TouchableOpacity onPress={() => setSearch("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Feather name="x" size={15} color={colors.mutedForeground} />
-                </TouchableOpacity>
-              ) : null}
-            </View>
-
-            {/* Filter Tags across all 4 roles */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-              {[
-                { id: "all", label: "ALL MEMBERS" },
-                { id: "admin", label: "ADMINS" },
-                { id: "accountant", label: "ACCOUNTANTS" },
-                { id: "manager", label: "MANAGERS" },
-                { id: "employee", label: "EMPLOYEES" },
-              ].map((filter) => {
-                const isActive = selectedRole === filter.id;
-                return (
-                  <TouchableOpacity
-                    key={filter.id}
-                    style={[
-                      styles.filterChip,
-                      {
-                        backgroundColor: isActive ? colors.primary : colors.card,
-                        borderColor: isActive ? colors.primary : colors.border,
-                      },
-                    ]}
-                    onPress={() => { safeHaptic(Haptics.ImpactFeedbackStyle.Light); setSelectedRole(filter.id); }}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={[styles.filterChipText, { color: isActive ? "#fff" : colors.mutedForeground }]}>
-                      {filter.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </>
-        )}
-        ListEmptyComponent={() => (
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={
           <View style={styles.emptyState}>
             {loading ? (
               <ActivityIndicator size="large" color={colors.primary} />
             ) : (
               <>
                 <View style={[styles.emptyIconWrap, { backgroundColor: colors.muted }]}>
-                  <Feather name="users" size={32} color={colors.mutedForeground} />
+                  <Feather name={search ? "search" : "users"} size={28} color={colors.mutedForeground} />
                 </View>
-                <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No Members Found</Text>
-                <Text style={[styles.emptySub, { color: colors.mutedForeground }]}>
-                  No users matched your search criteria. Pull to refresh or invite someone!
+                <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
+                  {search || selectedRole !== "all" ? "No matching members" : "No members yet"}
                 </Text>
+                <Text style={[styles.emptySub, { color: colors.mutedForeground }]}>
+                  {search || selectedRole !== "all"
+                    ? "Try another name or email, or switch the role filter to All."
+                    : canInvite
+                    ? "Invite your first team member to start working together."
+                    : "Pull down to refresh."}
+                </Text>
+                {(search || selectedRole !== "all") ? (
+                  <TouchableOpacity
+                    style={[styles.emptyBtn, { borderColor: colors.border, backgroundColor: colors.card }]}
+                    onPress={() => {
+                      setSearch("");
+                      setSelectedRole("all");
+                    }}
+                  >
+                    <Text style={[styles.emptyBtnText, { color: colors.primary }]}>Clear filters</Text>
+                  </TouchableOpacity>
+                ) : null}
               </>
             )}
           </View>
-        )}
+        }
         renderItem={({ item }) => {
-          const badge = ROLE_BADGES[item.role] || { color: colors.mutedForeground, label: item.role.toUpperCase() };
-          const isCurrentUser = item.email === user?.email;
+          const info = ROLE_INFO[item.role] || { color: colors.mutedForeground, label: String(item.role || "").toUpperCase(), icon: "user", title: String(item.role || ""), description: "" };
+          const self = isSelf(item);
+          const pending = isPendingInvite(item);
           return (
             <TouchableOpacity
-              style={[styles.memberCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+              style={[styles.memberCard, { backgroundColor: colors.card, borderColor: self ? colors.primary + "55" : colors.border }]}
               activeOpacity={0.85}
               onPress={() => {
                 safeHaptic(Haptics.ImpactFeedbackStyle.Light);
                 setSelectedMember(item);
                 setMemberModalVisible(true);
               }}
+              accessibilityLabel={`${item.name || item.email}, ${info.title}${pending ? ", invitation pending" : ""}`}
             >
-              {/* Dynamic colored avatar bubble */}
               <View style={[styles.avatar, { backgroundColor: getAvatarColor(item.name || item.email || "U") }]}>
-                <Text style={styles.avatarText}>{(item.name || item.email || "U").charAt(0).toUpperCase()}</Text>
+                <Text style={styles.avatarText}>{initialsOf(item)}</Text>
               </View>
 
-              {/* Information */}
-              <View style={[styles.memberInfo, { flex: 1, minWidth: 0, marginRight: 8 }]}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                  <Text style={[styles.memberName, { color: colors.foreground, flexShrink: 1 }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
-                    {item.name}
+              <View style={styles.memberInfo}>
+                <View style={styles.memberNameRow}>
+                  <Text style={[styles.memberName, { color: colors.foreground }]} numberOfLines={1}>
+                    {item.name || item.email}
                   </Text>
-                  {isCurrentUser && (
-                    <View style={styles.selfPill}>
-                      <Text style={styles.selfText}>YOU</Text>
+                  {self ? (
+                    <View style={[styles.miniPill, { backgroundColor: tint(colors.primary) }]}>
+                      <Text style={[styles.miniPillText, { color: colors.primary }]}>You</Text>
                     </View>
-                  )}
+                  ) : null}
                 </View>
-                <Text style={[styles.memberEmail, { color: colors.mutedForeground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
+                <Text style={[styles.memberEmail, { color: colors.mutedForeground }]} numberOfLines={1}>
                   {item.email}
                 </Text>
+                <View style={styles.memberMetaRow}>
+                  <View style={[styles.roleBadge, { backgroundColor: tint(info.color) }]}>
+                    <Feather name={info.icon as any} size={11} color={info.color} />
+                    <Text style={[styles.roleBadgeText, { color: info.color }]}>{info.title}</Text>
+                  </View>
+                  {pending ? (
+                    <View style={[styles.roleBadge, { backgroundColor: tint(colors.warning) }]}>
+                      <Feather name="clock" size={11} color={colors.warning} />
+                      <Text style={[styles.roleBadgeText, { color: colors.warning }]}>Invite pending</Text>
+                    </View>
+                  ) : null}
+                </View>
               </View>
 
-              {/* Role badge */}
-              <View style={[styles.roleBadge, { backgroundColor: badge.color + "14", borderColor: badge.color + "30", flexShrink: 0 }]}>
-                <View style={[styles.roleDot, { backgroundColor: badge.color }]} />
-                <Text style={[styles.roleBadgeText, { color: badge.color }]}>{badge.label}</Text>
-              </View>
+              <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
             </TouchableOpacity>
           );
         }}
       />
 
-      {/* Floating Invite Button (Admin Only, placed safely above system navigation bar) */}
+      {/* Invite button (admins), kept above the system navigation bar */}
       {canInvite && (
         <TouchableOpacity
           style={[
             styles.floatingAddBtn,
             {
-              bottom: Math.max(insets.bottom, 16) + (Platform.OS === "android" ? 28 : 18),
+              bottom: Math.max(insets.bottom, 16) + (Platform.OS === "android" ? 20 : 12),
               backgroundColor: colors.primary,
               shadowColor: colors.primary,
             },
@@ -679,241 +739,263 @@ ${orgName}`;
           }}
           activeOpacity={0.85}
         >
-          <Feather name="user-plus" size={17} color="#fff" />
-          <Text style={styles.floatingAddBtnText}>Invite Member</Text>
+          <Feather name="user-plus" size={18} color="#fff" />
+          <Text style={styles.floatingAddBtnText}>Invite member</Text>
         </TouchableOpacity>
       )}
 
-      {/* Slide Drawer Invite Modal */}
+      {/* Invite sheet */}
       <Modal visible={inviteModal} animationType="slide" transparent onRequestClose={() => setInviteModal(false)}>
         <KeyboardAvoidingView
           style={[styles.modalBg, { paddingBottom: Platform.OS === "android" ? keyboardHeight : 0 }]}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
         >
-          <View style={[styles.modalCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
+          <View style={[styles.modalCard, { backgroundColor: colors.background, borderColor: colors.border, maxHeight: sheetMaxHeight }]}>
+            <View style={styles.sheetHandle} />
             <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <View style={[styles.modalHeaderIconWrap, { backgroundColor: colors.primary + "18" }]}>
+              <View style={styles.modalHeaderLeft}>
+                <View style={[styles.modalHeaderIconWrap, { backgroundColor: tint(colors.primary) }]}>
                   <Feather name="user-plus" size={18} color={colors.primary} />
                 </View>
-                <View>
-                  <Text style={[styles.modalTitle, { color: colors.foreground }]}>Invite Team Member</Text>
-                  <Text style={[styles.modalSub, { color: colors.mutedForeground }]}>Send Gmail invitation with organization code</Text>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={[styles.modalTitle, { color: colors.foreground }]}>Invite a team member</Text>
+                  <Text style={[styles.modalSub, { color: colors.mutedForeground }]}>They join {settings.organizationName || "your organization"} with the role you pick</Text>
                 </View>
               </View>
               <TouchableOpacity
                 style={[styles.modalCloseBtn, { backgroundColor: colors.muted }]}
                 onPress={() => { setInviteModal(false); setInviteName(""); setInviteEmail(""); }}
+                accessibilityLabel="Close"
               >
                 <Feather name="x" size={18} color={colors.foreground} />
               </TouchableOpacity>
             </View>
 
-            <ScrollView contentContainerStyle={[styles.modalContent, { paddingBottom: 80 }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-              <Text style={[styles.modalDescription, { color: colors.mutedForeground }]}>
-                Add your colleague's information below. An official email invitation will be dispatched with your organization's invite code.
-              </Text>
-
-              {/* Name field */}
-              <Text style={[styles.miniLabel, { color: colors.mutedForeground }]}>MEMBER'S FULL NAME (OPTIONAL)</Text>
-              <TextInput
-                style={[styles.miniInput, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground }]}
-                placeholder="e.g. Ali Raza"
-                placeholderTextColor={colors.mutedForeground}
-                value={inviteName}
-                onChangeText={setInviteName}
-              />
-
-              {/* Email field */}
-              <Text style={[styles.miniLabel, { color: colors.mutedForeground, marginTop: 14 }]}>EMAIL ADDRESS</Text>
-              <TextInput
-                style={[styles.miniInput, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground }]}
-                placeholder="employee@organization.com"
-                placeholderTextColor={colors.mutedForeground}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                value={inviteEmail}
-                onChangeText={setInviteEmail}
-              />
-
-              {/* Role Chip Options - All 4 System Roles */}
-              <Text style={[styles.miniLabel, { color: colors.mutedForeground, marginTop: 14 }]}>ASSIGN SYSTEM ROLE</Text>
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
-                {([
-                  { id: "admin", label: "ADMIN", color: "#6366F1" },
-                  { id: "accountant", label: "ACCOUNTANT", color: "#10B981" },
-                  { id: "manager", label: "MANAGER", color: "#8B5CF6" },
-                  { id: "employee", label: "EMPLOYEE", color: "#0EA5E9" },
-                ] as const).map((r) => {
-                  const isSelected = inviteRole === r.id;
-                  return (
-                    <TouchableOpacity
-                      key={r.id}
-                      style={[
-                        styles.roleChip,
-                        {
-                          backgroundColor: isSelected ? r.color : colors.card,
-                          borderColor: isSelected ? r.color : colors.border,
-                          borderWidth: 1.2,
-                        },
-                      ]}
-                      onPress={() => setInviteRole(r.id as UserRole)}
-                    >
-                      <Text style={[styles.roleChipText, { color: isSelected ? "#fff" : colors.foreground }]}>
-                        {r.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
+            <ScrollView ref={sheetScrollRef} onTouchEnd={sheetOnTouchEnd} contentContainerStyle={[styles.modalContent, { paddingBottom: 40 + sheetBottomInset }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+              <View style={styles.field}>
+                <Text style={[styles.fieldLabel, { color: colors.foreground }]}>
+                  Full name <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular" }}>(optional)</Text>
+                </Text>
+                <TextInput
+                  style={[styles.fieldInput, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground }]}
+                  placeholder="e.g. Ali Raza"
+                  placeholderTextColor={colors.mutedForeground}
+                  value={inviteName}
+                  onChangeText={setInviteName}
+                  returnKeyType="next"
+                />
               </View>
 
-              <View style={[styles.infoBanner, { backgroundColor: colors.primary + "12", borderColor: colors.primary + "35", marginTop: 16 }]}>
-                <Feather name="send" size={14} color={colors.primary} />
+              <View style={styles.field}>
+                <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Email address</Text>
+                <TextInput
+                  style={[
+                    styles.fieldInput,
+                    {
+                      backgroundColor: colors.input,
+                      color: colors.foreground,
+                      borderColor: inviteEmail.trim() && !emailLooksValid ? colors.expense : colors.border,
+                    },
+                  ]}
+                  placeholder="name@organization.com"
+                  placeholderTextColor={colors.mutedForeground}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  value={inviteEmail}
+                  onChangeText={setInviteEmail}
+                />
+                {inviteEmail.trim() && !emailLooksValid ? (
+                  <Text style={[styles.fieldError, { color: colors.expense }]}>Enter a valid email, e.g. name@company.com</Text>
+                ) : null}
+              </View>
+
+              <View style={styles.field}>
+                <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Role</Text>
+                <View style={styles.roleGrid}>
+                  {ROLE_ORDER.map((r) => {
+                    const info = ROLE_INFO[r];
+                    const isSelected = inviteRole === r;
+                    return (
+                      <TouchableOpacity
+                        key={r}
+                        style={[styles.roleOption, { backgroundColor: isSelected ? tint(info.color) : colors.card, borderColor: isSelected ? info.color : colors.border }]}
+                        onPress={() => {
+                          safeHaptic(Haptics.ImpactFeedbackStyle.Light);
+                          setInviteRole(r);
+                        }}
+                        activeOpacity={0.85}
+                        accessibilityState={{ selected: isSelected }}
+                      >
+                        <View style={styles.roleOptionTop}>
+                          <Feather name={info.icon as any} size={15} color={info.color} />
+                          <Text style={[styles.roleOptionTitle, { color: colors.foreground }]}>{info.title}</Text>
+                          {isSelected ? <Feather name="check-circle" size={15} color={info.color} /> : null}
+                        </View>
+                        <Text style={[styles.roleOptionDesc, { color: colors.mutedForeground }]}>{info.description}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              <View style={[styles.infoBanner, { backgroundColor: tint(colors.primary), borderColor: colors.primary + "35" }]}>
+                <Feather name="info" size={14} color={colors.primary} />
                 <Text style={[styles.infoBannerText, { color: colors.foreground }]}>
-                  Member will be instantly added to your organization database. You can deliver invite via Gmail, WhatsApp, or any app.
+                  They're added right away. Then send the invite by email, WhatsApp or any app — they sign up with this email to join.
                 </Text>
               </View>
 
-              {/* Send Invitation Action */}
               <TouchableOpacity
-                style={[styles.modalInviteBtn, { backgroundColor: colors.primary }]}
+                style={[styles.modalInviteBtn, { backgroundColor: colors.primary, opacity: emailLooksValid ? 1 : 0.55 }]}
                 onPress={handleSendInvite}
                 activeOpacity={0.85}
               >
-                <Feather name="send" size={15} color="#fff" />
-                <Text style={styles.modalInviteBtnText}>Send & Share Invitation</Text>
+                <Feather name="send" size={16} color="#fff" />
+                <Text style={styles.modalInviteBtnText}>Send invitation</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Member Details & Role Management Modal */}
+      {/* Member details & role sheet */}
       <Modal visible={memberModalVisible} animationType="slide" transparent onRequestClose={() => setMemberModalVisible(false)}>
         <View style={styles.modalBg}>
           <View style={[styles.modalCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
-            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <View style={[styles.modalHeaderIconWrap, { backgroundColor: (ROLE_BADGES[selectedMember?.role || "admin"]?.color || colors.primary) + "18" }]}>
-                  <Feather name="user-check" size={18} color={ROLE_BADGES[selectedMember?.role || "admin"]?.color || colors.primary} />
-                </View>
-                <View>
-                  <Text style={[styles.modalTitle, { color: colors.foreground }]}>Member Permissions</Text>
-                  <Text style={[styles.modalSub, { color: colors.mutedForeground }]}>View profile & assign RBAC authority</Text>
-                </View>
-              </View>
-              <TouchableOpacity
-                style={[styles.modalCloseBtn, { backgroundColor: colors.muted }]}
-                onPress={() => setMemberModalVisible(false)}
-              >
-                <Feather name="x" size={18} color={colors.foreground} />
-              </TouchableOpacity>
-            </View>
-
-            {selectedMember && (
-              <ScrollView contentContainerStyle={[styles.modalContent, { paddingBottom: 60 }]} showsVerticalScrollIndicator={false}>
-                {/* Member Profile Header */}
-                <View style={{ alignItems: "center", paddingVertical: 12, gap: 6 }}>
-                  <View style={[styles.avatar, { width: 56, height: 56, borderRadius: 18, backgroundColor: getAvatarColor(selectedMember.name || selectedMember.email || "U") }]}>
-                    <Text style={{ color: "#fff", fontSize: 22, fontFamily: "Inter_800ExtraBold" }}>
-                      {(selectedMember.name || selectedMember.email || "U").charAt(0).toUpperCase()}
-                    </Text>
-                  </View>
-                  <Text style={{ fontSize: 17, fontFamily: "Inter_700Bold", color: colors.foreground }}>
-                    {selectedMember.name}
-                  </Text>
-                  <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>
-                    {selectedMember.email}
-                  </Text>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
-                    <Feather name="briefcase" size={11} color={colors.mutedForeground} />
-                    <Text style={{ fontSize: 11, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>
-                      {selectedMember.organization || settings.organizationName}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Role Switcher Section (Admin Only) - All 4 Roles */}
-                <Text style={[styles.miniLabel, { color: colors.mutedForeground, marginTop: 8 }]}>CHANGE ASSIGNED ROLE</Text>
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 }}>
-                  {(["admin", "accountant", "manager", "employee"] as UserRole[]).map((r) => {
-                    const isSelected = selectedMember.role === r;
-                    const rColor = ROLE_BADGES[r]?.color || colors.primary;
-                    return (
-                      <TouchableOpacity
-                        key={r}
-                        style={[
-                          styles.roleChip,
-                          {
-                            backgroundColor: isSelected ? rColor + "18" : colors.card,
-                            borderColor: isSelected ? rColor : colors.border,
-                            borderWidth: isSelected ? 1.5 : 1,
-                          },
-                        ]}
-                        onPress={() => handleUpdateRole(selectedMember, r)}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={[styles.roleChipText, { color: isSelected ? rColor : colors.mutedForeground }]}>
-                          {r.toUpperCase()}
+            <View style={styles.sheetHandle} />
+            {selectedMember && (() => {
+              const info = ROLE_INFO[selectedMember.role] || ROLE_INFO.employee;
+              const self = isSelf(selectedMember);
+              const pending = isPendingInvite(selectedMember);
+              return (
+                <ScrollView contentContainerStyle={[styles.modalContent, { paddingBottom: 40 + insets.bottom }]} showsVerticalScrollIndicator={false}>
+                  {/* Profile */}
+                  <View style={styles.profileRow}>
+                    <View style={[styles.avatar, styles.avatarLarge, { backgroundColor: getAvatarColor(selectedMember.name || selectedMember.email || "U") }]}>
+                      <Text style={styles.avatarTextLarge}>{initialsOf(selectedMember)}</Text>
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <View style={styles.memberNameRow}>
+                        <Text style={[styles.profileName, { color: colors.foreground }]} numberOfLines={2}>
+                          {selectedMember.name || selectedMember.email}
                         </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-
-                {/* Permissions Description Card */}
-                <View style={[styles.infoBanner, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 14 }]}>
-                  <Feather name="shield" size={14} color={ROLE_BADGES[selectedMember.role]?.color || colors.primary} />
-                  <Text style={[styles.infoBannerText, { color: colors.foreground }]}>
-                    {selectedMember.role === "admin"
-                      ? "Admin has full institutional control, fiscal management, team invitations, and report generation."
-                      : selectedMember.role === "accountant"
-                      ? "Accountant can register transactions, record payroll payouts, and audit receipts."
-                      : selectedMember.role === "manager"
-                      ? "Manager can allocate departmental budgets, approve expenses, and monitor reports."
-                      : "Employee has isolated access to personal salary slip, reimbursement claims, and staff portal."}
-                  </Text>
-                </View>
-
-                {/* Quick Direct Actions */}
-                <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>
-                  <TouchableOpacity
-                    style={[styles.actionBtnSecondary, { flex: 1, backgroundColor: colors.card, borderColor: colors.border }]}
-                    onPress={() => {
-                      safeHaptic(Haptics.ImpactFeedbackStyle.Light);
-                      Linking.openURL(`mailto:${selectedMember.email}`);
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <Feather name="mail" size={14} color={colors.primary} />
-                    <Text style={[styles.actionBtnText, { color: colors.primary }]}>Send Email</Text>
-                  </TouchableOpacity>
-
-                  {selectedMember.email !== user?.email && (
+                        {self ? (
+                          <View style={[styles.miniPill, { backgroundColor: tint(colors.primary) }]}>
+                            <Text style={[styles.miniPillText, { color: colors.primary }]}>You</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                      <Text style={[styles.profileEmail, { color: colors.mutedForeground }]} numberOfLines={1}>{selectedMember.email}</Text>
+                      <View style={styles.memberMetaRow}>
+                        <View style={[styles.roleBadge, { backgroundColor: tint(info.color) }]}>
+                          <Feather name={info.icon as any} size={11} color={info.color} />
+                          <Text style={[styles.roleBadgeText, { color: info.color }]}>{info.title}</Text>
+                        </View>
+                        {pending ? (
+                          <View style={[styles.roleBadge, { backgroundColor: tint(colors.warning) }]}>
+                            <Feather name="clock" size={11} color={colors.warning} />
+                            <Text style={[styles.roleBadgeText, { color: colors.warning }]}>Invite pending</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                    </View>
                     <TouchableOpacity
-                      style={[styles.actionBtnSecondary, { backgroundColor: "#FEE2E2", borderColor: "#FECACA" }]}
-                      onPress={() => handleRemoveMember(selectedMember)}
+                      style={[styles.modalCloseBtn, { backgroundColor: colors.muted }]}
+                      onPress={() => setMemberModalVisible(false)}
+                      accessibilityLabel="Close"
+                    >
+                      <Feather name="x" size={18} color={colors.foreground} />
+                    </TouchableOpacity>
+                  </View>
+
+                  {pending ? (
+                    <View style={[styles.infoBanner, { backgroundColor: tint(colors.warning), borderColor: colors.warning + "40" }]}>
+                      <Feather name="clock" size={14} color={colors.warning} />
+                      <Text style={[styles.infoBannerText, { color: colors.foreground }]}>
+                        Waiting for {selectedMember.name || "this person"} to sign up with {selectedMember.email}.
+                      </Text>
+                    </View>
+                  ) : null}
+
+                  {/* Role */}
+                  <View style={styles.field}>
+                    <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Role</Text>
+                    {self ? (
+                      <Text style={[styles.fieldHint, { color: colors.mutedForeground }]}>You can't change your own role. Ask another admin.</Text>
+                    ) : null}
+                    <View style={styles.roleGrid}>
+                      {ROLE_ORDER.map((r) => {
+                        const rInfo = ROLE_INFO[r];
+                        const isSelected = selectedMember.role === r;
+                        return (
+                          <TouchableOpacity
+                            key={r}
+                            style={[
+                              styles.roleOption,
+                              {
+                                backgroundColor: isSelected ? tint(rInfo.color) : colors.card,
+                                borderColor: isSelected ? rInfo.color : colors.border,
+                                opacity: self && !isSelected ? 0.5 : 1,
+                              },
+                            ]}
+                            onPress={() => handleUpdateRole(selectedMember, r)}
+                            disabled={self || isSelected}
+                            activeOpacity={0.85}
+                            accessibilityState={{ selected: isSelected, disabled: self }}
+                          >
+                            <View style={styles.roleOptionTop}>
+                              <Feather name={rInfo.icon as any} size={15} color={rInfo.color} />
+                              <Text style={[styles.roleOptionTitle, { color: colors.foreground }]}>{rInfo.title}</Text>
+                              {isSelected ? <Feather name="check-circle" size={15} color={rInfo.color} /> : null}
+                            </View>
+                            <Text style={[styles.roleOptionDesc, { color: colors.mutedForeground }]}>{rInfo.description}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+
+                  {/* Actions */}
+                  <View style={styles.actionRow}>
+                    <TouchableOpacity
+                      style={[styles.actionBtn, { flex: 1, backgroundColor: colors.card, borderColor: colors.border }]}
+                      onPress={() => {
+                        safeHaptic(Haptics.ImpactFeedbackStyle.Light);
+                        Linking.openURL(`mailto:${selectedMember.email}`);
+                      }}
                       activeOpacity={0.8}
                     >
-                      <Feather name="user-x" size={14} color="#EF4444" />
-                      <Text style={[styles.actionBtnText, { color: "#EF4444" }]}>Remove</Text>
+                      <Feather name="mail" size={16} color={colors.primary} />
+                      <Text style={[styles.actionBtnText, { color: colors.primary }]}>Email</Text>
                     </TouchableOpacity>
-                  )}
-                </View>
-              </ScrollView>
-            )}
+
+                    {!self && (
+                      <TouchableOpacity
+                        style={[styles.actionBtn, { flex: 1, backgroundColor: tint(colors.expense), borderColor: colors.expense + "40" }]}
+                        onPress={() => handleRemoveMember(selectedMember)}
+                        activeOpacity={0.8}
+                      >
+                        <Feather name="user-x" size={16} color={colors.expense} />
+                        <Text style={[styles.actionBtnText, { color: colors.expense }]}>Remove</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </ScrollView>
+              );
+            })()}
           </View>
         </View>
       </Modal>
 
-      {/* Activity Indicator Overlay */}
+      {/* Sending overlay (automated email) */}
       {sendingInvite && (
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: "rgba(0, 0, 0, 0.65)", justifyContent: "center", alignItems: "center", zIndex: 9999 }]}>
-          <View style={{ backgroundColor: colors.card, padding: 24, borderRadius: 20, borderWidth: 1, borderColor: colors.border, alignItems: "center", gap: 12, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 8 }}>
+        <View style={[StyleSheet.absoluteFill, styles.sendingOverlay]}>
+          <View style={[styles.sendingCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>Sending Gmail Alert...</Text>
-            <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground, textAlign: "center" }}>Please wait a moment</Text>
+            <Text style={[styles.sendingTitle, { color: colors.foreground }]}>Sending invitation…</Text>
+            <Text style={[styles.sendingSub, { color: colors.mutedForeground }]}>Please wait a moment</Text>
           </View>
         </View>
       )}
@@ -923,153 +1005,114 @@ ${orgName}`;
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  header: { paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: 1 },
+  header: { paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1 },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
-  backBtn: { width: 38, height: 38, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  headerTitleWrap: { flex: 1, justifyContent: "center" },
+  backBtn: { width: 40, height: 40, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  headerTitleWrap: { flex: 1, minWidth: 0, justifyContent: "center" },
   headerTitle: { fontSize: 18, fontFamily: "Inter_700Bold" },
-  headerSub: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 1 },
-  scrollArea: { paddingHorizontal: 16, paddingTop: 12, gap: 10 },
-  
-  // Executive Bento Statistics Grid (Balanced, filled, zero wasted space)
-  statsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    rowGap: 8,
-    marginBottom: 0,
-  },
-  statBox: {
-    width: "48.5%",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 14,
-    borderWidth: 1,
-    gap: 7,
-  },
-  statTopRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    width: "100%",
-  },
-  statIconWrap: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-  statVal: {
-    fontSize: 20,
-    fontFamily: "Inter_800ExtraBold",
-    letterSpacing: -0.5,
-  },
-  statBottomWrap: {
-    gap: 1.5,
-  },
-  statLabel: {
-    fontSize: 11,
-    fontFamily: "Inter_700Bold",
-  },
-  statSub: {
-    fontSize: 9.5,
-    fontFamily: "Inter_500Medium",
-  },
+  headerSub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 1 },
+  headerInviteBtn: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  scrollArea: { paddingHorizontal: 16, paddingTop: 14, gap: 10 },
 
-  // Search
-  searchBar: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, height: 42, borderRadius: 12, borderWidth: 1, gap: 10, marginTop: 2, marginBottom: 2 },
-  searchInput: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular" },
-
-  // Filters
+  // List header
+  listHeader: { gap: 12, marginBottom: 2 },
+  summaryCard: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: 16, borderWidth: 1 },
+  summaryIcon: { width: 44, height: 44, borderRadius: 13, alignItems: "center", justifyContent: "center" },
+  summaryValue: { fontSize: 16, fontFamily: "Inter_700Bold" },
+  summarySub: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 17, marginTop: 2 },
+  pendingPill: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 10, flexShrink: 0 },
+  pendingPillText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  searchBar: { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, height: 46, borderRadius: 14, borderWidth: 1, gap: 10 },
+  searchInput: { flex: 1, fontSize: 14, fontFamily: "Inter_400Regular", paddingVertical: 0 },
   filterRow: { gap: 8, paddingVertical: 2 },
-  filterChip: { paddingHorizontal: 13, paddingVertical: 7, borderRadius: 16, borderWidth: 1, alignItems: "center" },
-  filterChipText: { fontSize: 9.5, fontFamily: "Inter_700Bold", letterSpacing: 0.3 },
+  filterChip: { flexDirection: "row", alignItems: "center", gap: 6, paddingLeft: 12, paddingRight: 6, height: 36, borderRadius: 18, borderWidth: 1 },
+  filterChipText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  filterCount: { minWidth: 24, height: 24, borderRadius: 12, paddingHorizontal: 6, alignItems: "center", justifyContent: "center" },
+  filterCountText: { fontSize: 12, fontFamily: "Inter_700Bold" },
+  resultCount: { fontSize: 12, fontFamily: "Inter_400Regular" },
 
-  // Member Card
-  memberCard: { flexDirection: "row", alignItems: "center", padding: 11, borderRadius: 14, borderWidth: 1, gap: 11 },
-  avatar: { width: 42, height: 42, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  avatarText: { color: "#fff", fontSize: 16, fontFamily: "Inter_700Bold" },
-  memberInfo: { flex: 1, gap: 2 },
-  memberName: { fontSize: 13.5, fontFamily: "Inter_700Bold" },
-  selfPill: { paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4, backgroundColor: "#E0E7FF" },
-  selfText: { fontSize: 8.5, fontFamily: "Inter_700Bold", color: "#4F46E5" },
-  memberEmail: { fontSize: 10.5, fontFamily: "Inter_400Regular" },
-  roleBadge: { flexDirection: "row", alignItems: "center", gap: 4.5, paddingHorizontal: 8, paddingVertical: 3.5, borderRadius: 7, borderWidth: 1 },
-  roleDot: { width: 5, height: 5, borderRadius: 2.5 },
-  roleBadgeText: { fontSize: 8.5, fontFamily: "Inter_700Bold", letterSpacing: 0.4 },
+  // Member card
+  memberCard: { flexDirection: "row", alignItems: "center", paddingVertical: 12, paddingHorizontal: 14, borderRadius: 16, borderWidth: 1, gap: 12 },
+  avatar: { width: 46, height: 46, borderRadius: 14, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  avatarText: { color: "#fff", fontSize: 16, fontFamily: "Inter_700Bold", letterSpacing: 0.3 },
+  avatarLarge: { width: 60, height: 60, borderRadius: 18 },
+  avatarTextLarge: { color: "#fff", fontSize: 22, fontFamily: "Inter_700Bold", letterSpacing: 0.3 },
+  memberInfo: { flex: 1, minWidth: 0, gap: 3 },
+  memberNameRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  memberName: { flexShrink: 1, fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  memberEmail: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  memberMetaRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 3 },
+  miniPill: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, flexShrink: 0 },
+  miniPillText: { fontSize: 11, fontFamily: "Inter_700Bold" },
+  roleBadge: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 7 },
+  roleBadgeText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
 
-  // Empty State
-  emptyState: { paddingVertical: 60, alignItems: "center", gap: 12 },
-  emptyIconWrap: { width: 68, height: 68, borderRadius: 34, alignItems: "center", justifyContent: "center" },
+  // Empty state
+  emptyState: { paddingVertical: 48, alignItems: "center", gap: 10 },
+  emptyIconWrap: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center" },
   emptyTitle: { fontSize: 16, fontFamily: "Inter_700Bold" },
-  emptySub: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "center", paddingHorizontal: 30, lineHeight: 18 },
+  emptySub: { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center", paddingHorizontal: 30, lineHeight: 19 },
+  emptyBtn: { marginTop: 4, paddingHorizontal: 16, height: 38, borderRadius: 19, borderWidth: 1, justifyContent: "center" },
+  emptyBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
 
-  // Floating button (Safe placement above system buttons)
+  // Floating invite button
   floatingAddBtn: {
     position: "absolute",
-    right: 20,
+    right: 16,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    paddingVertical: 13,
+    height: 50,
     paddingHorizontal: 20,
-    borderRadius: 28,
-    shadowOffset: { width: 0, height: 4 },
+    borderRadius: 25,
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
-    shadowRadius: 10,
+    shadowRadius: 12,
     elevation: 8,
     zIndex: 100,
   },
-  floatingAddBtnText: { color: "#fff", fontSize: 14, fontFamily: "Inter_700Bold" },
+  floatingAddBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
 
-  // Modal
+  // Sheets
   modalBg: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
-  modalCard: { borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, paddingHorizontal: 16, paddingTop: 16, maxHeight: "90%" },
-  modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingBottom: 14, borderBottomWidth: 1 },
-  modalHeaderIconWrap: { width: 34, height: 34, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  modalCard: { borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, paddingHorizontal: 16, paddingTop: 8, maxHeight: "90%" },
+  sheetHandle: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: "#94A3B8", opacity: 0.5, marginBottom: 10 },
+  modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, paddingBottom: 14, borderBottomWidth: 1 },
+  modalHeaderLeft: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 10 },
+  modalHeaderIconWrap: { width: 38, height: 38, borderRadius: 11, alignItems: "center", justifyContent: "center" },
   modalTitle: { fontSize: 16, fontFamily: "Inter_700Bold" },
-  modalSub: { fontSize: 10.5, fontFamily: "Inter_400Regular", marginTop: 1 },
-  modalCloseBtn: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" },
-  modalContent: { gap: 12, paddingVertical: 14 },
-  modalDescription: { fontSize: 11.5, fontFamily: "Inter_400Regular", lineHeight: 16 },
-  
-  miniLabel: { fontSize: 10, fontFamily: "Inter_600SemiBold", letterSpacing: 0.5, marginTop: 4 },
-  miniInput: { padding: 11, borderRadius: 10, borderWidth: 1, fontSize: 13.5, fontFamily: "Inter_400Regular", marginTop: 4 },
-  
-  roleChip: { flex: 1, paddingVertical: 10, borderRadius: 8, borderWidth: 1, alignItems: "center" },
-  roleChipText: { fontSize: 11, fontFamily: "Inter_700Bold" },
+  modalSub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
+  modalCloseBtn: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  modalContent: { gap: 16, paddingVertical: 16 },
 
-  modalInviteBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, padding: 14, borderRadius: 12, marginTop: 14 },
-  modalInviteBtnText: { color: "#fff", fontSize: 14, fontFamily: "Inter_700Bold" },
+  field: { gap: 8 },
+  fieldLabel: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  fieldHint: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: -4 },
+  fieldInput: { height: 48, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, fontSize: 15, fontFamily: "Inter_400Regular" },
+  fieldError: { fontSize: 12, fontFamily: "Inter_500Medium" },
 
-  actionBtnSecondary: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  actionBtnText: {
-    fontSize: 13,
-    fontFamily: "Inter_700Bold",
-  },
-  infoBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  infoBannerText: {
-    flex: 1,
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    lineHeight: 17,
-  },
+  roleGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", rowGap: 8 },
+  roleOption: { width: "48.5%", padding: 12, borderRadius: 14, borderWidth: 1.2, gap: 6 },
+  roleOptionTop: { flexDirection: "row", alignItems: "center", gap: 6 },
+  roleOptionTitle: { flex: 1, fontSize: 14, fontFamily: "Inter_700Bold" },
+  roleOptionDesc: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 16 },
+
+  profileRow: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  profileName: { flexShrink: 1, fontSize: 18, fontFamily: "Inter_700Bold" },
+  profileEmail: { fontSize: 13, fontFamily: "Inter_400Regular", marginTop: 2 },
+
+  modalInviteBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, height: 52, borderRadius: 14 },
+  modalInviteBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
+
+  actionRow: { flexDirection: "row", gap: 10 },
+  actionBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, height: 48, borderRadius: 14, borderWidth: 1 },
+  actionBtnText: { fontSize: 14, fontFamily: "Inter_700Bold" },
+
+  infoBanner: { flexDirection: "row", alignItems: "flex-start", gap: 10, padding: 12, borderRadius: 12, borderWidth: 1 },
+  infoBannerText: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 19 },
+
+  sendingOverlay: { backgroundColor: "rgba(0, 0, 0, 0.6)", justifyContent: "center", alignItems: "center", zIndex: 9999 },
+  sendingCard: { padding: 24, borderRadius: 20, borderWidth: 1, alignItems: "center", gap: 10, minWidth: 220 },
+  sendingTitle: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  sendingSub: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "center" },
 });

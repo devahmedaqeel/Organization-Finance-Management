@@ -397,7 +397,7 @@ export function FinancialDrillDownModal({
                         <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>
                           {isDeptFilter ? `${selectedDepartment.toUpperCase()} ALLOCATED` : "ALLOCATED BUDGET"}
                         </Text>
-                        <Text style={[styles.kpiVal, { color: activeAllocated > 0 ? colors.foreground : colors.mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                        <Text style={[styles.kpiVal, { color: activeAllocated > 0 ? colors.foreground : colors.mutedForeground }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>
                           {activeAllocated > 0 ? `${currency} ${fmt(activeAllocated)}` : "No Cap Set"}
                         </Text>
                       </View>
@@ -405,19 +405,19 @@ export function FinancialDrillDownModal({
                         <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>
                           {isDeptFilter ? `${selectedDepartment.toUpperCase()} SPENT` : "ACTUAL SPENT"}
                         </Text>
-                        <Text style={[styles.kpiVal, { color: colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{currency} {fmt(activeDeptSpent)}</Text>
+                        <Text style={[styles.kpiVal, { color: colors.expense }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>{currency} {fmt(activeDeptSpent)}</Text>
                       </View>
                       <View style={[styles.kpiCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border }]}>
                         <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>
                           {activeIsOverBudget ? "OVER BUDGET" : "REMAINING CAP"}
                         </Text>
-                        <Text style={[styles.kpiVal, { color: activeIsOverBudget ? colors.expense : colors.income }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                        <Text style={[styles.kpiVal, { color: activeIsOverBudget ? colors.expense : colors.income }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>
                           {activeAllocated > 0 ? `${activeIsOverBudget ? "+" : ""}${currency} ${fmt(Math.abs(activeRemainingBudget))}` : "—"}
                         </Text>
                       </View>
                       <View style={[styles.kpiCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border }]}>
                         <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>USAGE RATIO</Text>
-                        <Text style={[styles.kpiVal, { color: activeIsOverBudget ? colors.expense : colors.income }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                        <Text style={[styles.kpiVal, { color: activeIsOverBudget ? colors.expense : colors.income }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>
                           {activeAllocated > 0 ? `${activeBudgetRatio.toFixed(1)}%` : "0%"}
                         </Text>
                       </View>
@@ -428,21 +428,21 @@ export function FinancialDrillDownModal({
                     <>
                       <View style={[styles.kpiCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border }]}>
                         <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>OPERATING INFLOW</Text>
-                        <Text style={[styles.kpiVal, { color: colors.income }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>+{currency} {fmt(totalIncome)}</Text>
+                        <Text style={[styles.kpiVal, { color: colors.income }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>+{currency} {fmt(totalIncome)}</Text>
                       </View>
                       <View style={[styles.kpiCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border }]}>
                         <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>OPERATING OUTFLOW</Text>
-                        <Text style={[styles.kpiVal, { color: colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>-{currency} {fmt(totalSpent)}</Text>
+                        <Text style={[styles.kpiVal, { color: colors.expense }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>-{currency} {fmt(totalSpent)}</Text>
                       </View>
                       <View style={[styles.kpiCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border }]}>
                         <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>NET OPERATING BALANCE</Text>
-                        <Text style={[styles.kpiVal, { color: isDeficit ? colors.expense : colors.income }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                        <Text style={[styles.kpiVal, { color: isDeficit ? colors.expense : colors.income }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>
                           {isDeficit ? "-" : "+"}{currency} {fmt(Math.abs(netOperatingBalance))}
                         </Text>
                       </View>
                       <View style={[styles.kpiCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border }]}>
                         <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>OPERATING MARGIN</Text>
-                        <Text style={[styles.kpiVal, { color: nobStatusColor }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                        <Text style={[styles.kpiVal, { color: nobStatusColor }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>
                           {isDeficit ? `-${Math.abs(operatingMargin).toFixed(1)}%` : `${operatingMargin.toFixed(1)}%`}
                         </Text>
                       </View>
@@ -519,23 +519,23 @@ export function FinancialDrillDownModal({
                           <View style={[styles.breakdownRow, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border, padding: 12, borderRadius: 12, gap: 8 }]}>
                             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
                               <View style={{ flex: 1, minWidth: 0 }}>
-                                <Text style={[styles.rowTitle, { color: colors.foreground }]} numberOfLines={2}>
+                                <Text style={[styles.rowTitle, { color: colors.foreground }]}>
                                   {selectedDepartment}
                                 </Text>
-                                <Text style={{ fontSize: 11, color: colors.mutedForeground, fontFamily: "Inter_500Medium", marginTop: 1 }} numberOfLines={2}>
+                                <Text style={{ fontSize: 11, color: colors.mutedForeground, fontFamily: "Inter_500Medium", marginTop: 1 }}>
                                   Consolidated Department Operations
                                 </Text>
                               </View>
                               <View style={{ alignItems: "flex-end", flexShrink: 0 }}>
                                 <Text style={[styles.rowVal, { color: activeIsOverBudget ? colors.expense : colors.foreground }]}>
                                   {currency} {fmt(activeDeptSpent)}{" "}
-                                  <Text style={{ color: colors.mutedForeground, fontSize: 10.5, fontFamily: "Inter_500Medium" }}>
+                                  <Text style={{ color: colors.mutedForeground, fontSize: 11, fontFamily: "Inter_500Medium" }}>
                                     / {currency} {fmt(activeAllocated)}
                                   </Text>
                                 </Text>
                                 <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
                                   <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: activeIsOverBudget ? colors.expense : colors.income }} />
-                                  <Text style={{ fontSize: 10.5, fontFamily: "Inter_700Bold", color: activeIsOverBudget ? colors.expense : colors.income }}>
+                                  <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: activeIsOverBudget ? colors.expense : colors.income }}>
                                     {activeBudgetRatio.toFixed(0)}% {activeIsOverBudget ? "Over Limit" : "Used"}
                                   </Text>
                                 </View>
@@ -570,23 +570,23 @@ export function FinancialDrillDownModal({
                         <View key={b.id} style={[styles.breakdownRow, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border, padding: 12, borderRadius: 12, gap: 8 }]}>
                           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
                             <View style={{ flex: 1, minWidth: 0 }}>
-                              <Text style={[styles.rowTitle, { color: colors.foreground }]} numberOfLines={2}>
+                              <Text style={[styles.rowTitle, { color: colors.foreground }]}>
                                 {b.department}
                               </Text>
-                              <Text style={{ fontSize: 11, color: colors.mutedForeground, fontFamily: "Inter_500Medium", marginTop: 1 }} numberOfLines={2}>
+                              <Text style={{ fontSize: 11, color: colors.mutedForeground, fontFamily: "Inter_500Medium", marginTop: 1 }}>
                                 {b.category || "General"}
                               </Text>
                             </View>
                             <View style={{ alignItems: "flex-end", flexShrink: 0 }}>
                               <Text style={[styles.rowVal, { color: isDeptOver ? colors.expense : colors.foreground }]}>
                                 {currency} {fmt(deptSpent)}{" "}
-                                <Text style={{ color: colors.mutedForeground, fontSize: 10.5, fontFamily: "Inter_500Medium" }}>
+                                <Text style={{ color: colors.mutedForeground, fontSize: 11, fontFamily: "Inter_500Medium" }}>
                                   / {currency} {fmt(b.allocated)}
                                 </Text>
                               </Text>
                               <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
                                 <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: isDeptOver ? colors.expense : colors.income }} />
-                                <Text style={{ fontSize: 10.5, fontFamily: "Inter_700Bold", color: isDeptOver ? colors.expense : colors.income }}>
+                                <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: isDeptOver ? colors.expense : colors.income }}>
                                   {pct}% {isDeptOver ? "Over Limit" : "Used"}
                                 </Text>
                               </View>
@@ -618,7 +618,7 @@ export function FinancialDrillDownModal({
                     >
                       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
                         <View style={{ flex: 1, minWidth: 0 }}>
-                          <Text style={[styles.rowTitle, { color: colors.foreground }]} numberOfLines={2}>
+                          <Text style={[styles.rowTitle, { color: colors.foreground }]}>
                             {c.category}
                           </Text>
                           <Text style={{ fontSize: 11, color: colors.mutedForeground, fontFamily: "Inter_500Medium", marginTop: 1 }}>
@@ -777,7 +777,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
   },
   subtitle: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: "Inter_400Regular",
     marginTop: 2,
   },
@@ -818,7 +818,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   insightTitle: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: "Inter_700Bold",
   },
   insightText: {
@@ -839,7 +839,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   kpiLabel: {
-    fontSize: 9,
+    fontSize: 10,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.1,
   },
@@ -869,7 +869,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   eqLabel: {
-    fontSize: 9,
+    fontSize: 10,
     fontFamily: "Inter_500Medium",
   },
   eqVal: {
@@ -892,12 +892,12 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   rowTitle: {
-    fontSize: 12.5,
+    fontSize: 13,
     fontFamily: "Inter_700Bold",
     letterSpacing: -0.2,
   },
   rowVal: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: "Inter_700Bold",
   },
   track: {
@@ -921,7 +921,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   th: {
-    fontSize: 9.5,
+    fontSize: 10,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.5,
   },
@@ -944,11 +944,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   txDesc: {
-    fontSize: 12.5,
+    fontSize: 13,
     fontFamily: "Inter_600SemiBold",
   },
   txMeta: {
-    fontSize: 10.5,
+    fontSize: 11,
     fontFamily: "Inter_400Regular",
     marginTop: 2,
   },

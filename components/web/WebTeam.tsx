@@ -290,7 +290,7 @@ export function WebTeam() {
         </View>
       ) : (
         <View style={[styles.tableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <ScrollView horizontal contentContainerStyle={{ minWidth: "100%" }} showsHorizontalScrollIndicator={true}>
+          <ScrollView horizontal contentContainerStyle={{ width: "100%" }} showsHorizontalScrollIndicator={true}>
             <View style={{ minWidth: 680, width: "100%" }}>
               <View style={[styles.tableHeader, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
                 <View style={[styles.thCol, { flex: 1.5, minWidth: 160, paddingLeft: 14, paddingRight: 8, alignItems: "flex-start", justifyContent: "center" }]}>
@@ -333,14 +333,14 @@ export function WebTeam() {
                         </Text>
                       </View>
                       <View style={{ flex: 1, minWidth: 0 }}>
-                        <Text style={[styles.memberName, { color: colors.foreground }]} numberOfLines={1}>
+                        <Text style={[styles.memberName, { color: colors.foreground }]}>
                           {m.name || m.email?.split("@")[0] || "User"}
                         </Text>
                       </View>
                     </View>
 
                     <View style={[styles.tdCol, { flex: 1.8, minWidth: 170, paddingHorizontal: 8, alignItems: "flex-start", justifyContent: "center" }]}>
-                      <Text style={[styles.memberEmail, { color: colors.mutedForeground }]} numberOfLines={1}>
+                      <Text style={[styles.memberEmail, { color: colors.mutedForeground }]}>
                         {m.email}
                       </Text>
                     </View>

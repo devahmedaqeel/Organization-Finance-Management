@@ -14,7 +14,7 @@ import {
   getRedirectResult,
   signInAnonymously,
 } from "firebase/auth";
-import { doc, getDoc, setDoc, collection, query, where, getDocs, Timestamp, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, setDoc, deleteDoc, collection, query, where, getDocs, Timestamp, onSnapshot } from "firebase/firestore";
 import { Platform } from "react-native";
 import { auth, db } from "../config/firebase";
 import * as WebBrowser from "expo-web-browser";
@@ -222,7 +222,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     let org = existingData.organization || "";
     let orgId = existingData.organizationId || "";
-    const userRole = existingData.role || defaultRole;
+    let userRole: UserRole = existingData.role || defaultRole;
+
+    // Brand-new account (e.g. first Google sign-in): an admin's invitation decides org and role
+    if (!existingData.organizationId && formattedEmail) {
+      try {
+        const inviteDoc = await getDoc(doc(db, "invitations", formattedEmail));
+        const invite = inviteDoc.exists() ? (inviteDoc.data() as any) : null;
+        if (invite?.organizationId) {
+          org = invite.organization || org;
+          orgId = invite.organizationId;
+          userRole = ["admin", "accountant", "manager", "employee"].includes(invite.role) ? invite.role : "employee";
+          setDoc(doc(db, "invitations", formattedEmail), { status: "accepted", acceptedAt: Timestamp.now() }, { merge: true }).catch(() => {});
+        }
+      } catch (e) {}
+    }
 
     // Canonical organization mapping: preserve user org or initialize clean tenant
     if (formattedEmail === "engrahmedaqeel14@gmail.com") {
@@ -489,45 +503,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         organization = orgNameOrInvite.trim() || "My Organization";
         organizationId = "org-" + Math.random().toString(36).substring(2, 11);
       } else if (adminEmail) {
-        // Fast invite check with 2.5s timeout
-        try {
-          const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500));
-          const checkAdminPromise = async () => {
-            const inviteDoc = await getDoc(doc(db, "invitations", normalizedEmail));
-            if (inviteDoc.exists()) {
-              const inviteData = inviteDoc.data() as any;
-              return {
-                org: inviteData.organization || "My Organization",
-                orgId: inviteData.organizationId || "default-org",
-                role: inviteData.role || role,
-              };
+        // Joining an existing organization. The role ALWAYS comes from the admin's invitation,
+        // never from the role picked on the sign-up form (that would let anyone who knows an
+        // admin's email give themselves accountant/manager access).
+        type JoinResult = { org: string; orgId: string; role: UserRole } | { error: string };
+        const lookupJoin = async (): Promise<JoinResult> => {
+          // 1. A personal invitation for this email decides org and role
+          const inviteDoc = await getDoc(doc(db, "invitations", normalizedEmail));
+          if (inviteDoc.exists()) {
+            const inviteData = inviteDoc.data() as any;
+            const invitedRole: UserRole = ["admin", "accountant", "manager", "employee"].includes(inviteData.role)
+              ? inviteData.role
+              : "employee";
+            if (inviteData.organizationId) {
+              return { org: inviteData.organization || "My Organization", orgId: inviteData.organizationId, role: invitedRole };
             }
-            const q = query(collection(db, "users"), where("email", "==", adminEmail), where("role", "==", "admin"));
-            const querySnapshot = await getDocs(q);
-            if (!querySnapshot.empty) {
-              const adminData = querySnapshot.docs[0].data() as User;
-              return {
-                org: adminData.organization || "My Organization",
-                orgId: adminData.organizationId || "default-org",
-                role,
-              };
-            }
-            return null;
-          };
-
-          const found = await Promise.race([checkAdminPromise(), timeoutPromise]);
-          if (found) {
-            organization = found.org;
-            organizationId = found.orgId;
-            assignedRole = found.role;
-          } else {
-            organization = orgNameOrInvite.trim() || "My Organization";
-            organizationId = `org_${adminEmail.replace(/[^a-zA-Z0-9]/g, "_")}`;
           }
+          // 2. No invitation, but a valid admin invite code: join with the lowest role.
+          //    The admin can promote the member from Team Management.
+          const q = query(collection(db, "users"), where("email", "==", adminEmail), where("role", "==", "admin"));
+          const querySnapshot = await getDocs(q);
+          if (!querySnapshot.empty) {
+            const adminData = querySnapshot.docs[0].data() as User;
+            if (adminData.organizationId) {
+              return { org: adminData.organization || "My Organization", orgId: adminData.organizationId, role: "employee" };
+            }
+          }
+          return { error: "We couldn't find an invitation for this email or an admin with that invite code. Ask your admin to invite you, then try again." };
+        };
+
+        let joined: JoinResult;
+        try {
+          const timeout = new Promise<JoinResult>((resolve) =>
+            setTimeout(() => resolve({ error: "Couldn't verify your invitation — check your internet connection and try again." }), 10000)
+          );
+          joined = await Promise.race([lookupJoin(), timeout]);
         } catch (e) {
-          organization = orgNameOrInvite.trim() || "My Organization";
-          organizationId = `org_${adminEmail.replace(/[^a-zA-Z0-9]/g, "_")}`;
+          joined = { error: "Couldn't verify your invitation — check your internet connection and try again." };
         }
+
+        // Never create a made-up organization: stop before the account is created
+        if ("error" in joined) {
+          return { success: false, error: joined.error };
+        }
+        organization = joined.org;
+        organizationId = joined.orgId;
+        assignedRole = joined.role;
       }
 
       // 1. Create User in Firebase Auth
@@ -581,6 +602,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       tasks.push(
         setDoc(doc(db, "invitations", normalizedEmail), { status: "accepted", acceptedAt: Timestamp.now() }, { merge: true }).catch(() => {})
       );
+      // Remove the invite placeholder ("u_<email>") now that the real account exists, so the
+      // team list and role changes always point at this account
+      const placeholderId = `u_${normalizedEmail.replace(/[^a-zA-Z0-9]/g, "_")}`;
+      if (placeholderId !== firebaseUser.uid) {
+        tasks.push(deleteDoc(doc(db, "users", placeholderId)).catch(() => {}));
+      }
 
       await Promise.all(tasks);
 

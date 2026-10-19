@@ -5,7 +5,6 @@ import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
 import { useColors } from "@/hooks/useColors";
 import { openPdfReport, buildPayslipHtml } from "@/services/ReportExportService";
-import { downloadPayslipPDF } from "@/services/payslipExportService";
 import {
   SvgUsers,
   SvgFileText,
@@ -19,6 +18,11 @@ import {
 } from "./SvgIcons";
 import { WebPayrollModal } from "./modals/WebPayrollModal";
 import { WebConfirmModal } from "./modals/WebConfirmModal";
+import { PayslipViewerModal } from "@/components/payslip/PayslipViewerModal";
+import { PayslipTemplateManager } from "@/components/payslip/PayslipTemplateManager";
+import { usePayslipOrganizationProfile, usePayslipTemplates } from "@/hooks/usePayslipTemplates";
+import { buildPayslipRenderData } from "@/services/payslipTemplateRenderer";
+import { generatePayslipsPdf, preparePayslipProfile } from "@/services/payslipDocumentService";
 
 export function WebPayroll() {
   const colors = useColors();
@@ -28,6 +32,12 @@ export function WebPayroll() {
   const { user } = useAuth();
   const { settings } = useSettings();
   const { payroll, deletePayroll, departments } = useFinance();
+
+  const [activePayrollTab, setActivePayrollTab] = useState<"slips" | "templates">("slips");
+  const [viewingSlipEntries, setViewingSlipEntries] = useState<PayrollEntry[]>([]);
+  const templateLib = usePayslipTemplates();
+  const payslipOrg = usePayslipOrganizationProfile();
+  const showTemplatesTab = templateLib.canManage || (templateLib.canSelect && user?.role !== "employee");
 
   const [search, setSearch] = useState("");
   const [selectedDept, setSelectedDept] = useState("all");
@@ -76,30 +86,21 @@ export function WebPayroll() {
   const totalNetDisbursed = totalBase + totalBonus - totalDeductions;
 
   const handleExportEmployeeSlip = async (emp: PayrollEntry) => {
-    const orgEmail = (settings.organizationEmail && !settings.organizationEmail.includes("ofm-cloud.com"))
-      ? settings.organizationEmail
-      : (user?.email && !user.email.includes("ofm-cloud.com"))
-        ? user.email
-        : "";
-    const orgPhone = (settings.organizationPhone && !settings.organizationPhone.includes("555-0199"))
-      ? settings.organizationPhone
-      : "+92-586-444111";
-
-    const orgInfo = {
-      name: settings.organizationName || user?.organization || "DevOrbit Tech Kotli",
-      address: settings.organizationAddress || "Kotli, Azad Kashmir",
-      email: orgEmail,
-      phone: orgPhone,
-      currency: settings.currency || "PKR",
-      fiscalYear: settings.fiscalYear || "2025-2026",
-    };
-    await downloadPayslipPDF(emp, orgInfo);
+    // Uses the organization default template and the profile logo, same as the in-app preview.
+    try {
+      const org = await preparePayslipProfile(payslipOrg);
+      const slip = buildPayslipRenderData(emp, org, { canViewSensitive: templateLib.canViewSensitive || user?.role === "employee" });
+      await generatePayslipsPdf(templateLib.resolve(null), [slip], { organizationId: user?.organizationId });
+    } catch (err) {
+      console.log("[PAYSLIP] Auto export failed, opening viewer instead:", err);
+      setViewingSlipEntries([emp]);
+    }
   };
 
   const hasAutoDownloadedRef = React.useRef(false);
 
   useEffect(() => {
-    if (typeof window !== "undefined" && !hasAutoDownloadedRef.current && payroll.length > 0) {
+    if (typeof window !== "undefined" && !hasAutoDownloadedRef.current && payroll.length > 0 && !templateLib.loading) {
       const params = new URLSearchParams(window.location.search);
       const isExportPayslip =
         params.get("export") === "payslip" ||
@@ -125,7 +126,7 @@ export function WebPayroll() {
         }
       }
     }
-  }, [payroll, settings, user]);
+  }, [payroll, settings, user, templateLib.loading]);
 
   const handleExportPDF = async () => {
     const orgEmail = (settings.organizationEmail && !settings.organizationEmail.includes("ofm-cloud.com"))
@@ -170,19 +171,8 @@ export function WebPayroll() {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const exportType = params.get("export");
-      if (exportType === "payslip" || exportType === "slip") {
-        const empId = params.get("empId") || params.get("employeeId");
-        if (empId && payroll.length > 0) {
-          const matchedEmp = payroll.find(
-            (p) => p.id === empId || p.employeeId === empId || (p.employeeName || "").toLowerCase().includes(empId.toLowerCase())
-          );
-          if (matchedEmp) {
-            setTimeout(() => {
-              handleExportEmployeeSlip(matchedEmp);
-            }, 600);
-          }
-        }
-      } else if (exportType === "payroll" || exportType === "all") {
+      // Payslip exports (?export=payslip) are handled once by the effect above.
+      if (exportType === "payroll" || exportType === "all") {
         setTimeout(() => {
           handleExportPDF();
         }, 600);
@@ -222,9 +212,43 @@ export function WebPayroll() {
               <Text style={styles.primaryBtnText}>Add Entry</Text>
             </TouchableOpacity>
           )}
+          {canEdit && activePayrollTab === "slips" && filteredPayroll.length > 0 && (
+            <TouchableOpacity
+              style={[styles.primaryBtn, { backgroundColor: colors.card, borderWidth: 1, borderColor: "#8B5CF6" }, isMobile && { flex: 1 }]}
+              onPress={() => setViewingSlipEntries(filteredPayroll)}
+              accessibilityLabel="Generate payslips for all filtered records"
+              activeOpacity={0.8}
+            >
+              <SvgFileText size={15} color="#8B5CF6" />
+              <Text style={[styles.primaryBtnText, { color: "#8B5CF6" }]}>Bulk Payslips ({filteredPayroll.length})</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
+      {showTemplatesTab && (
+        <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }} accessibilityRole="tablist">
+          {([["slips", "Salary Slips"], ["templates", "Payslip Templates"]] as const).map(([key, label]) => {
+            const active = activePayrollTab === key;
+            return (
+              <TouchableOpacity
+                key={key}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: active }}
+                onPress={() => setActivePayrollTab(key)}
+                style={[styles.filterChip, { backgroundColor: active ? "#8B5CF6" : colors.card, borderColor: active ? "transparent" : colors.border, paddingVertical: 8, paddingHorizontal: 14 }]}
+              >
+                <Text style={[styles.filterChipText, { color: active ? "#FFFFFF" : colors.foreground }]}>{label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+
+      {activePayrollTab === "templates" && showTemplatesTab ? (
+        <PayslipTemplateManager />
+      ) : (
+      <>
       {/* ─── Payroll KPIs ─── */}
       <View style={styles.metricsGrid}>
         <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 200 }]}>
@@ -332,11 +356,12 @@ export function WebPayroll() {
                   ]}
                 >
                   <View style={styles.mobileCardTop}>
-                    <View>
+                    <View style={{ flex: 1 }}>
                       <Text style={[styles.empName, { color: colors.foreground }]}>{p.employeeName}</Text>
                       <Text style={[styles.empMeta, { color: colors.mutedForeground }]}>
                         {p.employeeId} · {p.designation || p.department}
                       </Text>
+                      <PeriodStatus entry={p} />
                     </View>
                     <Text style={[styles.mobileAmount, { color: "#8B5CF6" }]}>
                       {settings.currency} {net.toLocaleString()}
@@ -367,7 +392,7 @@ export function WebPayroll() {
                   <View style={styles.mobileActionsRow}>
                     <TouchableOpacity
                       style={[styles.mobileActionBtn, { borderColor: "#8B5CF640", backgroundColor: "#8B5CF612" }]}
-                      onPress={() => handleExportEmployeeSlip(p)}
+                      onPress={() => setViewingSlipEntries([p])}
                     >
                       <SvgFileText size={12} color="#8B5CF6" />
                       <Text style={[styles.mobileActionText, { color: "#8B5CF6" }]}>Salary Slip</Text>
@@ -401,7 +426,7 @@ export function WebPayroll() {
         </View>
       ) : (
         <View style={[styles.tableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <ScrollView horizontal contentContainerStyle={{ minWidth: "100%" }} showsHorizontalScrollIndicator={true}>
+          <ScrollView horizontal contentContainerStyle={{ width: "100%" }} showsHorizontalScrollIndicator={true}>
             <View style={{ minWidth: 690, width: "100%" }}>
               <View style={[styles.tableHeader, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
                 <View style={[styles.thCol, { flex: 1.8, minWidth: 140, paddingLeft: 14, paddingRight: 6, justifyContent: "flex-start" }]}>
@@ -441,40 +466,41 @@ export function WebPayroll() {
                   return (
                     <View key={p.id} style={[styles.tableRow, { borderBottomColor: colors.border }]}>
                       <View style={[styles.tdCol, { flex: 1.8, minWidth: 140, paddingLeft: 14, paddingRight: 6, justifyContent: "center" }]}>
-                        <Text style={[styles.empName, { color: colors.foreground }]} numberOfLines={1}>
+                        <Text style={[styles.empName, { color: colors.foreground }]}>
                           {p.employeeName}
                         </Text>
-                        <Text style={[styles.empMeta, { color: colors.mutedForeground }]} numberOfLines={1}>
+                        <Text style={[styles.empMeta, { color: colors.mutedForeground }]}>
                           {p.employeeId} · {p.designation || "Staff"}
                         </Text>
+                        <PeriodStatus entry={p} />
                       </View>
 
                       <View style={[styles.tdCol, { flex: 1.3, minWidth: 100, paddingHorizontal: 6, justifyContent: "center" }]}>
-                        <Text style={[styles.deptText, { color: colors.foreground }]} numberOfLines={1}>
+                        <Text style={[styles.deptText, { color: colors.foreground }]}>
                           {p.department}
                         </Text>
                       </View>
 
                       <View style={[styles.tdCol, { flex: 0.9, minWidth: 75, paddingHorizontal: 6, alignItems: "flex-end", justifyContent: "center" }]}>
-                        <Text style={[styles.amountCell, { color: colors.foreground }]} numberOfLines={1}>
+                        <Text style={[styles.amountCell, { color: colors.foreground }]}>
                           {settings.currency} {p.baseSalary?.toLocaleString()}
                         </Text>
                       </View>
 
                       <View style={[styles.tdCol, { flex: 0.8, minWidth: 65, paddingHorizontal: 6, alignItems: "flex-end", justifyContent: "center" }]}>
-                        <Text style={[styles.amountCell, { color: colors.income }]} numberOfLines={1}>
+                        <Text style={[styles.amountCell, { color: colors.income }]}>
                           +{p.bonus?.toLocaleString() || "0"}
                         </Text>
                       </View>
 
                       <View style={[styles.tdCol, { flex: 0.9, minWidth: 75, paddingHorizontal: 6, alignItems: "flex-end", justifyContent: "center" }]}>
-                        <Text style={[styles.amountCell, { color: colors.expense }]} numberOfLines={1}>
+                        <Text style={[styles.amountCell, { color: colors.expense }]}>
                           -{p.deductions?.toLocaleString() || "0"}
                         </Text>
                       </View>
 
                       <View style={[styles.tdCol, { flex: 1.1, minWidth: 90, paddingHorizontal: 6, alignItems: "flex-end", justifyContent: "center" }]}>
-                        <Text style={[styles.netAmountText, { color: "#8B5CF6" }]} numberOfLines={1}>
+                        <Text style={[styles.netAmountText, { color: "#8B5CF6" }]}>
                           {settings.currency} {net.toLocaleString()}
                         </Text>
                       </View>
@@ -482,7 +508,7 @@ export function WebPayroll() {
                       <View style={[styles.tdCol, { flex: 1.0, minWidth: 80, paddingRight: 14, paddingLeft: 6, flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 4 }]}>
                         <TouchableOpacity
                           style={[styles.actionIconBtn, { borderColor: "#8B5CF640", backgroundColor: "#8B5CF612" }]}
-                          onPress={() => handleExportEmployeeSlip(p)}
+                          onPress={() => setViewingSlipEntries([p])}
                           accessibilityLabel="Generate Salary Slip"
                         >
                           <SvgFileText size={13} color="#8B5CF6" />
@@ -519,8 +545,10 @@ export function WebPayroll() {
           </ScrollView>
         </View>
       )}
+      </>
+      )}
 
-      {/* Modal */}
+      {/* Add / Edit Modal */}
       <WebPayrollModal
         visible={modalVisible}
         onClose={() => {
@@ -528,6 +556,13 @@ export function WebPayroll() {
           setEditingEntry(null);
         }}
         entryToEdit={editingEntry}
+      />
+
+      {/* Template-aware Salary Slip Viewer (individual or bulk) */}
+      <PayslipViewerModal
+        visible={viewingSlipEntries.length > 0}
+        entries={viewingSlipEntries}
+        onClose={() => setViewingSlipEntries([])}
       />
 
       {/* Confirmation Modal */}
@@ -547,7 +582,33 @@ export function WebPayroll() {
   );
 }
 
+/** Pay period + payment status badge (same as the mobile app payroll list). */
+function PeriodStatus({ entry }: { entry: PayrollEntry }) {
+  const colors = useColors();
+  const pending = entry.paymentStatus === "pending";
+  const tone = pending ? "#F59E0B" : colors.income;
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 3, flexWrap: "wrap" }}>
+      <Text style={{ fontSize: 10.5, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>Period: {entry.month}</Text>
+      <View style={{ paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4, backgroundColor: tone + "18", borderWidth: 1, borderColor: tone + "40" }}>
+        <Text style={{ fontSize: 9.5, fontFamily: "Inter_700Bold", color: tone, textTransform: "uppercase" }}>{entry.paymentStatus || "PAID"}</Text>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  tabBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  tabText: {
+    fontSize: 12.5,
+    fontFamily: "Inter_700Bold",
+  },
   container: {
     flex: 1,
     minWidth: 0,

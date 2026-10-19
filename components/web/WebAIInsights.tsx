@@ -37,6 +37,7 @@ import {
   getPresetPeriod,
   getPreviousPeriod,
   filterTransactionsByPeriod,
+  filterTransactionsForPoint,
 } from "@/services/DatePeriodService";
 import {
   calculateTotalIncome,
@@ -188,23 +189,11 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
     return filterTransactionsByPeriod(transactions, activePeriod);
   }, [transactions, activePeriod]);
 
-  // If a specific point/month on the chart is touched, isolate transactions to that point
+  // Same transaction set the chart aggregated for that point, so totals below match the point
   const displayedTxs = useMemo(() => {
-    if (selectedPoint) {
-      const key = selectedPoint.key;
-      if (key) {
-        return transactions.filter((t) => (t.date || "").startsWith(key));
-      }
-      if (selectedPoint.fullDate) {
-        return periodTxs.filter((t) => {
-          const tDate = new Date(t.date);
-          const tMonthStr = tDate.toLocaleDateString("en-US", { month: "short" });
-          return selectedPoint.label === tMonthStr;
-        });
-      }
-    }
+    if (selectedPoint) return filterTransactionsForPoint(periodTxs, selectedPoint);
     return periodTxs;
-  }, [selectedPoint, transactions, periodTxs]);
+  }, [selectedPoint, periodTxs]);
 
   // ─── Authoritative Institutional Budget & Cash Metrics (Single Source of Truth) ───
   const institutionalTotalBudget = useMemo(() => {
@@ -645,7 +634,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
                 },
               ].map((s, i) => (
                 <View key={i} style={[styles.healthStat, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                  <Text style={[styles.healthStatValue, { color: s.color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  <Text style={[styles.healthStatValue, { color: s.color }]}>
                     {s.value}
                   </Text>
                   <Text style={[styles.healthStatLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
@@ -746,7 +735,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
         <View style={styles.cardHeaderRow}>
           <View style={{ flex: 1, paddingRight: 8 }}>
             <Text style={[styles.cardTitle, { color: colors.foreground }]}>Financial Trend</Text>
-            <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>
+            <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
               Income vs Expenses · {activePeriod.label}
             </Text>
           </View>
@@ -906,10 +895,10 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
                     : "Operating Deficit"}
                 </Text>
               </View>
-              <Text style={styles.ringValueSub} numberOfLines={1}>
+              <Text style={styles.ringValueSub}>
                 {authoritativeNetBalance >= 0 ? "+" : "-"}{settings.currency} {fmt(Math.abs(authoritativeNetBalance))}
               </Text>
-              <Text style={{ fontSize: 10, color: colors.mutedForeground, marginTop: 1, fontFamily: "Inter_500Medium" }} numberOfLines={1}>
+              <Text style={{ fontSize: 10, color: colors.mutedForeground, marginTop: 1, fontFamily: "Inter_500Medium" }}>
                 Net Cash Balance
               </Text>
             </View>
@@ -949,10 +938,10 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
                     : "Over Budget"}
                 </Text>
               </View>
-              <Text style={styles.ringValueSub} numberOfLines={1}>
+              <Text style={styles.ringValueSub}>
                 {settings.currency} {fmt(displayedBudgetSpent)} of {fmt(totalAllocatedBudget)}
               </Text>
-              <Text style={{ fontSize: 10, color: colors.mutedForeground, marginTop: 1, fontFamily: "Inter_500Medium" }} numberOfLines={1}>
+              <Text style={{ fontSize: 10, color: colors.mutedForeground, marginTop: 1, fontFamily: "Inter_500Medium" }}>
                 {settings.currency} {fmt(displayedBudgetRemaining)} Remaining
               </Text>
             </View>
@@ -994,10 +983,10 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
                     : "High Burn Alert"}
                 </Text>
               </View>
-              <Text style={styles.ringValueSub} numberOfLines={1}>
+              <Text style={styles.ringValueSub}>
                 {settings.currency} {fmt(displayedExpense)} of {fmt(displayedIncome)}
               </Text>
-              <Text style={{ fontSize: 10, color: colors.mutedForeground, marginTop: 1, fontFamily: "Inter_500Medium" }} numberOfLines={1}>
+              <Text style={{ fontSize: 10, color: colors.mutedForeground, marginTop: 1, fontFamily: "Inter_500Medium" }}>
                 Outflows of Inflow
               </Text>
             </View>
@@ -1071,12 +1060,12 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
                 <View style={{ flexDirection: "row", gap: 8 }}>
                   <View style={{ flex: 1, padding: 8, borderRadius: 8, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }}>
                     <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>Primary Driver</Text>
-                    <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: colors.foreground, marginTop: 2 }} numberOfLines={1}>{deptSpend[0]?.label || "N/A"}</Text>
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: colors.foreground, marginTop: 2 }}>{deptSpend[0]?.label || "N/A"}</Text>
                     <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: colors.expense, marginTop: 2 }}>{settings.currency} {fmt(deptSpend[0]?.value || 0)}</Text>
                   </View>
                   <View style={{ flex: 1, padding: 8, borderRadius: 8, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }}>
                     <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>Secondary Driver</Text>
-                    <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: colors.foreground, marginTop: 2 }} numberOfLines={1}>{deptSpend[1]?.label || "N/A"}</Text>
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: colors.foreground, marginTop: 2 }}>{deptSpend[1]?.label || "N/A"}</Text>
                     <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: colors.expense, marginTop: 2 }}>{settings.currency} {fmt(deptSpend[1]?.value || 0)}</Text>
                   </View>
                   <View style={{ flex: 1, padding: 8, borderRadius: 8, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }}>
@@ -1097,7 +1086,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
               { label: "Top Cost Center", value: deptSpend[0]?.label || "None", color: colors.expense },
             ].map((s, i) => (
               <View key={i} style={[styles.budgetSumCard, { backgroundColor: s.color + "15", borderColor: s.color + "33" }]}>
-                <Text style={[styles.budgetSumValue, { color: s.color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{s.value}</Text>
+                <Text style={[styles.budgetSumValue, { color: s.color }]}>{s.value}</Text>
                 <Text style={[styles.budgetSumLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
               </View>
             ))}
@@ -1141,7 +1130,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
               { label: "Remaining", value: `${settings.currency} ${fmt(displayedBudgetRemaining)}`, color: colors.income },
             ].map((s, i) => (
               <View key={i} style={[styles.budgetSumCard, { backgroundColor: s.color + "15", borderColor: s.color + "33" }]}>
-                <Text style={[styles.budgetSumValue, { color: s.color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{s.value}</Text>
+                <Text style={[styles.budgetSumValue, { color: s.color }]}>{s.value}</Text>
                 <Text style={[styles.budgetSumLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
               </View>
             ))}
@@ -1259,10 +1248,10 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
               </Text>
             </View>
             <Text style={[styles.txStatLabel, { color: colors.mutedForeground }]}>Max Transaction</Text>
-            <Text style={[styles.txStatVal, { color: "#F59E0B" }]} numberOfLines={1}>
+            <Text style={[styles.txStatVal, { color: "#F59E0B" }]}>
               {txStats.maxTx ? `${settings.currency} ${fmt(txStats.maxTx.amount)}` : "None"}
             </Text>
-            <Text style={{ fontSize: 9.5, color: colors.mutedForeground }} numberOfLines={1}>
+            <Text style={{ fontSize: 9.5, color: colors.mutedForeground }}>
               {txStats.maxTx ? `${txStats.maxTx.category || txStats.maxTx.title || "Transaction"}` : "No records"}
             </Text>
           </TouchableOpacity>
@@ -1316,7 +1305,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
                     <conf.Icon size={15} color={conf.color} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.insightTitle, { color: colors.foreground }]} numberOfLines={2}>
+                    <Text style={[styles.insightTitle, { color: colors.foreground }]}>
                       {insight.title}
                     </Text>
                     {insight.metric ? (
@@ -1356,7 +1345,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
               {/* ACTION */}
               {insight.isActionable && (
                 <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 4, flexWrap: "wrap", gap: 8 }}>
-                  <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: conf.color, flex: 1, minWidth: 200 }} numberOfLines={3}>
+                  <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: conf.color, flex: 1, minWidth: 200 }}>
                     👉 {insight.recommendedAction}
                   </Text>
                   {insight.actionRoute && onNavigate && (

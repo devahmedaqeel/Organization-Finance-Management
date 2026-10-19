@@ -55,11 +55,11 @@ function AnimatedBarRow({
   return (
     <View style={styles.row}>
       <View style={[styles.labelCol, { minWidth: labelWidth, maxWidth: labelWidth + 30 }]}>
-        <Text style={[styles.label, { color: colors.foreground }]} numberOfLines={2}>
+        <Text style={[styles.label, { color: colors.foreground }]}>
           {item.label}
         </Text>
         {item.sublabel ? (
-          <Text style={[styles.sublabel, { color: colors.mutedForeground }]} numberOfLines={2}>
+          <Text style={[styles.sublabel, { color: colors.mutedForeground }]}>
             {item.sublabel}
           </Text>
         ) : null}
@@ -79,7 +79,7 @@ function AnimatedBarRow({
         </View>
       </View>
 
-      <Text style={[styles.value, { color: item.color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+      <Text style={[styles.value, { color: item.color }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>
         {formatValue(item.value)}
       </Text>
     </View>
@@ -95,7 +95,7 @@ export function HBarChart({
   if (!items || items.length === 0) {
     return (
       <View style={{ paddingVertical: 14, alignItems: "center", justifyContent: "center" }}>
-        <Text style={{ color: "#94A3B8", fontSize: 12.5, fontWeight: "500", fontFamily: "Inter_500Medium" }}>
+        <Text style={{ color: "#94A3B8", fontSize: 13, fontWeight: "500", fontFamily: "Inter_500Medium" }}>
           No records found for this period
         </Text>
       </View>
@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   sublabel: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "500",
     fontFamily: "Inter_500Medium",
     marginTop: 2,

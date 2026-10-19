@@ -59,7 +59,8 @@ export function WebCountUp({
       const easedProgress = easeOutCubic(progress);
 
       const current = startVal + change * easedProgress;
-      setDisplayValue(current);
+      // Whole numbers while animating so intermediate frames never flash long fractions
+      setDisplayValue(decimals > 0 ? current : Math.round(current));
 
       if (progress < 1) {
         animationFrameRef.current = requestAnimationFrame(animate);
@@ -77,7 +78,7 @@ export function WebCountUp({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [value, duration]);
+  }, [value, duration, decimals]);
 
   const formattedOutput = () => {
     let formattedNum: string;

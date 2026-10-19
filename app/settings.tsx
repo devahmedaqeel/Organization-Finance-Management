@@ -1,4 +1,5 @@
 import { Feather } from "@/components/UniversalIcon";
+import { screenTopPadding } from "@/utils/layout";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
@@ -22,10 +23,12 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useKeyboardAwareScroll } from "@/hooks/useKeyboardAwareScroll";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings, AppTheme } from "@/context/SettingsContext";
 import { POPULAR_CURRENCIES, WORLD_CURRENCIES } from "@/constants/currencies";
 import { useColors } from "@/hooks/useColors";
+import { useRequirePermission } from "@/hooks/useRequirePermission";
 import { showFloatingToast } from "@/utils/toast";
 
 interface FieldConfig {
@@ -47,7 +50,11 @@ const FIELDS: FieldConfig[] = [
 
 export default function SettingsScreen() {
   const colors = useColors();
+  // Role guard: leave if this role can't use this screen (e.g. opened via deep link)
+  useRequirePermission("manage_settings");
   const insets = useSafeAreaInsets();
+  // Keep the focused field visible above the keyboard (Android edge-to-edge does not resize)
+  const kb = useKeyboardAwareScroll();
   const { user } = useAuth();
   const { settings, updateSettings } = useSettings();
   const [form, setForm] = useState({ ...settings });
@@ -223,7 +230,7 @@ export default function SettingsScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
     >
-      <View style={[styles.header, { paddingTop: webTop + insets.top + (Platform.OS === "android" ? 20 : 12), backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { paddingTop: webTop + screenTopPadding(insets.top), backgroundColor: colors.background, borderBottomColor: colors.border }]}>
         <View style={styles.headerRow}>
           <TouchableOpacity
             style={[styles.backBtn, { borderColor: colors.border }]}
@@ -233,7 +240,7 @@ export default function SettingsScreen() {
           </TouchableOpacity>
           <View style={styles.headerTitleWrap}>
             <Text style={[styles.title, { color: colors.foreground }]}>Organization Settings</Text>
-            <Text style={[styles.headerSub, { color: colors.mutedForeground }]} numberOfLines={2}>
+            <Text style={[styles.headerSub, { color: colors.mutedForeground }]}>
               {form.organizationName || "System Preferences"}
             </Text>
           </View>
@@ -242,7 +249,9 @@ export default function SettingsScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.container, { paddingBottom: Math.max(insets.bottom, 16) + 110 }]}
+        ref={kb.scrollRef}
+        onTouchEnd={kb.onTouchEnd}
+        contentContainerStyle={[styles.container, { paddingBottom: Math.max(insets.bottom, 16) + 110 + kb.bottomSpacer }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -301,7 +310,7 @@ export default function SettingsScreen() {
           </TouchableOpacity>
 
           <View style={styles.orgPreviewInfo}>
-            <Text style={[styles.orgPreviewName, { color: colors.foreground }]} numberOfLines={2}>
+            <Text style={[styles.orgPreviewName, { color: colors.foreground }]}>
               {form.organizationName || "Organization Name"}
             </Text>
             <Text style={[styles.orgPreviewSub, { color: colors.mutedForeground }]}>
@@ -338,7 +347,7 @@ export default function SettingsScreen() {
 
             <View style={styles.userAccountDetails}>
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 6 }}>
-                <Text style={[styles.userAccountName, { color: colors.foreground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
+                <Text style={[styles.userAccountName, { color: colors.foreground }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
                   {user?.name || "Authenticated User"}
                 </Text>
                 <View style={[styles.roleBadgePill, { backgroundColor: colors.primary + "16", borderColor: colors.primary + "35" }]}>
@@ -352,7 +361,7 @@ export default function SettingsScreen() {
               {/* Logged in Email Callout */}
               <View style={[styles.emailCalloutRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
                 <Feather name="mail" size={13} color={colors.primary} />
-                <Text style={[styles.emailCalloutText, { color: colors.foreground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75} selectable>
+                <Text style={[styles.emailCalloutText, { color: colors.foreground }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7} selectable>
                   {user?.email || "No email detected"}
                 </Text>
               </View>
@@ -364,7 +373,7 @@ export default function SettingsScreen() {
           <View style={styles.userMetaGrid}>
             <View style={styles.userMetaItem}>
               <Text style={[styles.userMetaLabel, { color: colors.mutedForeground }]}>ORGANIZATION</Text>
-              <Text style={[styles.userMetaValue, { color: colors.foreground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
+              <Text style={[styles.userMetaValue, { color: colors.foreground }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
                 {user?.organization || settings.organizationName || "Devorbit Tech"}
               </Text>
             </View>
@@ -465,7 +474,7 @@ export default function SettingsScreen() {
                 <Text style={[styles.symbolBadgeText, { color: colors.primary }]}>{selectedCurrency?.symbol}</Text>
               </View>
             </View>
-            <Text style={[styles.currencyNameHero, { color: colors.mutedForeground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
+            <Text style={[styles.currencyNameHero, { color: colors.mutedForeground }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
               {selectedCurrency?.name} · {selectedCurrency?.country}
             </Text>
           </View>
@@ -535,7 +544,7 @@ export default function SettingsScreen() {
                       💡 Quick Setup Guide / رہنمائی:
                     </Text>
                     
-                    <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: colors.mutedForeground, lineHeight: 14 }}>
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground, lineHeight: 14 }}>
                       🇬🇧 **English:**{"\n"}
                       1. Register a free account at **emailjs.com**{"\n"}
                       2. Add **Gmail** under "Email Services" and get **Service ID**{"\n"}
@@ -546,7 +555,7 @@ export default function SettingsScreen() {
 
                     <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 8 }} />
 
-                    <Text style={{ fontSize: 10, fontFamily: "Inter_400Regular", color: colors.mutedForeground, lineHeight: 14, textAlign: "left" }}>
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: colors.mutedForeground, lineHeight: 14, textAlign: "left" }}>
                       🇵🇰 **Urdu (Roman Urdu):**{"\n"}
                       1. **emailjs.com** par free account banayen.{"\n"}
                       2. "Email Services" mein apna **Gmail** connect karein aur **Service ID** copy karein.{"\n"}
@@ -701,6 +710,7 @@ export default function SettingsScreen() {
                 keyExtractor={(c) => c.code}
                 showsVerticalScrollIndicator={false}
                 style={styles.currencyList}
+                contentContainerStyle={{ paddingBottom: insets.bottom + 12 }}
                 keyboardShouldPersistTaps="handled"
                 renderItem={({ item: c }) => {
                   const isSelected = form.currency === c.code;
@@ -771,7 +781,7 @@ export default function SettingsScreen() {
         onRequestClose={() => setLogoModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.logoModalSheet, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={[styles.logoModalSheet, { backgroundColor: colors.card, borderColor: colors.border, paddingBottom: 28 + insets.bottom }]}>
             <View style={styles.modalHandle} />
             
             {/* Header */}
@@ -823,9 +833,9 @@ export default function SettingsScreen() {
               <View style={{ flex: 1, gap: 2 }}>
                 <Text
                   style={[styles.logoPreviewOrgName, { color: colors.foreground }]}
-                  numberOfLines={2}
+                  numberOfLines={Platform.OS === "web" ? undefined : 2}
                   adjustsFontSizeToFit
-                  minimumFontScale={0.8}
+                  minimumFontScale={0.7}
                 >
                   {form.organizationName || "Your Organization"}
                 </Text>
@@ -992,7 +1002,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   orgPreviewName: {
-    fontSize: 15.5,
+    fontSize: 16,
     fontFamily: "Inter_700Bold",
     lineHeight: 20,
   },
@@ -1056,7 +1066,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 8,
   },
-  changeActionText: { fontSize: 11.5, fontFamily: "Inter_700Bold" },
+  changeActionText: { fontSize: 12, fontFamily: "Inter_700Bold" },
 
   readonlyBanner: {
     flexDirection: "row", alignItems: "center", gap: 8,
@@ -1090,7 +1100,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   discardBtnText: {
-    fontSize: 13.5,
+    fontSize: 14,
     fontFamily: "Inter_600SemiBold",
   },
   executiveSaveBtn: {
@@ -1108,7 +1118,7 @@ const styles = StyleSheet.create({
   },
   executiveSaveBtnText: {
     color: "#FFFFFF",
-    fontSize: 14.5,
+    fontSize: 15,
     fontFamily: "Inter_700Bold",
   },
   syncedStateRow: {
@@ -1126,7 +1136,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   syncedTitle: {
-    fontSize: 13.5,
+    fontSize: 14,
     fontFamily: "Inter_700Bold",
   },
   syncedSub: {
@@ -1142,7 +1152,7 @@ const styles = StyleSheet.create({
   },
   statusActiveText: {
     color: "#10B981",
-    fontSize: 9.5,
+    fontSize: 10,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.5,
   },
@@ -1159,7 +1169,7 @@ const styles = StyleSheet.create({
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
     paddingHorizontal: 16, marginBottom: 12,
   },
-  modalTitle: { fontSize: 17, fontFamily: "Inter_800ExtraBold" },
+  modalTitle: { fontSize: 18, fontFamily: "Inter_800ExtraBold" },
   modalSub: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 1 },
   modalCloseBtn: {
     width: 32,
@@ -1173,9 +1183,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 16, marginBottom: 8,
     padding: 11, borderRadius: 12, borderWidth: 1,
   },
-  searchInput: { flex: 1, fontSize: 13.5, fontFamily: "Inter_400Regular" },
+  searchInput: { flex: 1, fontSize: 14, fontFamily: "Inter_400Regular" },
   groupLabel: {
-    fontSize: 10.5, fontFamily: "Inter_700Bold", letterSpacing: 0.8,
+    fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.8,
     marginHorizontal: 16, marginVertical: 6,
   },
   popularRow: {
@@ -1196,7 +1206,7 @@ const styles = StyleSheet.create({
   },
   popularFlag: { fontSize: 18 },
   popularCode: { fontSize: 13, fontFamily: "Inter_800ExtraBold" },
-  popularSymbol: { fontSize: 10, fontFamily: "Inter_500Medium" },
+  popularSymbol: { fontSize: 11, fontFamily: "Inter_500Medium" },
   currencyList: { flex: 1 },
   currencyRow: {
     flexDirection: "row", alignItems: "center", gap: 12,
@@ -1212,14 +1222,14 @@ const styles = StyleSheet.create({
   },
   currencyRowFlag: { fontSize: 20 },
   currencyRowInfo: { flex: 1, gap: 2 },
-  currencyRowCode: { fontSize: 14.5, fontFamily: "Inter_800ExtraBold" },
+  currencyRowCode: { fontSize: 15, fontFamily: "Inter_800ExtraBold" },
   symbolMiniPill: {
     paddingHorizontal: 6,
     paddingVertical: 1,
     borderRadius: 4,
   },
-  symbolMiniPillText: { fontSize: 10.5, fontFamily: "Inter_600SemiBold" },
-  currencyRowName: { fontSize: 11.5, fontFamily: "Inter_400Regular" },
+  symbolMiniPillText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  currencyRowName: { fontSize: 12, fontFamily: "Inter_400Regular" },
   checkCircle: {
     width: 24,
     height: 24,
@@ -1268,7 +1278,7 @@ const styles = StyleSheet.create({
     lineHeight: 15,
   },
   miniLabel: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: "Inter_600SemiBold",
     letterSpacing: 0.5,
   },
@@ -1329,7 +1339,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   logoModalTitle: {
-    fontSize: 16.5,
+    fontSize: 16,
     fontFamily: "Inter_800ExtraBold",
   },
   logoModalSub: {
@@ -1414,7 +1424,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   logoModalCancelText: {
-    fontSize: 13.5,
+    fontSize: 14,
     fontFamily: "Inter_600SemiBold",
   },
   userAccountCard: {
@@ -1470,7 +1480,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   roleBadgeText: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.5,
   },
@@ -1502,12 +1512,12 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   userMetaLabel: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: "Inter_600SemiBold",
     letterSpacing: 0.6,
   },
   userMetaValue: {
-    fontSize: 12.5,
+    fontSize: 13,
     fontFamily: "Inter_600SemiBold",
   },
 });

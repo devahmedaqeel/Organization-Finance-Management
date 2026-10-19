@@ -141,22 +141,22 @@ export function NetOperatingBalanceHealthCard({ data, currency, periodLabel }: P
       {/* ─── Compact Metrics Bar ─── */}
       <View style={[styles.kpiBar, { backgroundColor: colors.background, borderColor: colors.border }]}>
         <View style={styles.kpiCol}>
-          <Text style={[styles.kpiLabel, { color: colors.mutedForeground, textAlign: "center" }]} numberOfLines={2}>Operating Margin</Text>
-          <Text style={[styles.kpiNum, { color: data.isDeficit ? colors.expense : colors.income }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
+          <Text style={[styles.kpiLabel, { color: colors.mutedForeground, textAlign: "center" }]}>Operating Margin</Text>
+          <Text style={[styles.kpiNum, { color: data.isDeficit ? colors.expense : colors.income }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
             {data.operatingMargin.toFixed(1)}%
           </Text>
         </View>
         <View style={[styles.kpiDivider, { backgroundColor: colors.border }]} />
         <View style={styles.kpiCol}>
-          <Text style={[styles.kpiLabel, { color: colors.mutedForeground, textAlign: "center" }]} numberOfLines={2}>Expense Ratio</Text>
-          <Text style={[styles.kpiNum, { color: colors.foreground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
+          <Text style={[styles.kpiLabel, { color: colors.mutedForeground, textAlign: "center" }]}>Expense Ratio</Text>
+          <Text style={[styles.kpiNum, { color: colors.foreground }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
             {data.expenseRatio.toFixed(1)}%
           </Text>
         </View>
         <View style={[styles.kpiDivider, { backgroundColor: colors.border }]} />
         <View style={styles.kpiCol}>
-          <Text style={[styles.kpiLabel, { color: colors.mutedForeground, textAlign: "center" }]} numberOfLines={2}>Transactions</Text>
-          <Text style={[styles.kpiNum, { color: colors.foreground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
+          <Text style={[styles.kpiLabel, { color: colors.mutedForeground, textAlign: "center" }]}>Transactions</Text>
+          <Text style={[styles.kpiNum, { color: colors.foreground }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
             {data.transactionCount}
           </Text>
         </View>
@@ -203,7 +203,7 @@ export function NetOperatingBalanceHealthCard({ data, currency, periodLabel }: P
             </View>
             <View style={[styles.calcDivider, { backgroundColor: colors.border }]} />
             <View style={styles.calcRow}>
-              <Text style={{ color: colors.foreground, fontSize: 12.5, fontFamily: "Inter_700Bold" }}>
+              <Text style={{ color: colors.foreground, fontSize: 13, fontFamily: "Inter_700Bold" }}>
                 Net Operating Balance (NOB)
               </Text>
               <Text
@@ -236,7 +236,7 @@ export function NetOperatingBalanceHealthCard({ data, currency, periodLabel }: P
               </Text>
             </View>
             {data.incomeBreakdown.length === 0 ? (
-              <Text style={{ fontSize: 11.5, color: colors.mutedForeground, fontStyle: "italic", paddingVertical: 4 }}>
+              <Text style={{ fontSize: 12, color: colors.mutedForeground, fontStyle: "italic", paddingVertical: 4 }}>
                 No income recorded for this period.
               </Text>
             ) : (
@@ -251,7 +251,7 @@ export function NetOperatingBalanceHealthCard({ data, currency, periodLabel }: P
                 >
                   <View style={{ flex: 1.5 }}>
                     <Text style={[styles.tableItemName, { color: colors.foreground }]}>{item.category}</Text>
-                    <Text style={{ fontSize: 10.5, color: colors.mutedForeground }}>
+                    <Text style={{ fontSize: 11, color: colors.mutedForeground }}>
                       {item.count} {item.count === 1 ? "transaction" : "transactions"}
                     </Text>
                   </View>
@@ -259,7 +259,7 @@ export function NetOperatingBalanceHealthCard({ data, currency, periodLabel }: P
                     <Text style={[styles.tableItemVal, { color: colors.income }]}>
                       +{currency} {fmt(item.amount)}
                     </Text>
-                    <Text style={{ fontSize: 10.5, color: colors.mutedForeground }}>
+                    <Text style={{ fontSize: 11, color: colors.mutedForeground }}>
                       {item.pct.toFixed(1)}% of income
                     </Text>
                   </View>
@@ -277,7 +277,7 @@ export function NetOperatingBalanceHealthCard({ data, currency, periodLabel }: P
               </Text>
             </View>
             {(!data?.expenseBreakdown || data.expenseBreakdown.length === 0) ? (
-              <Text style={{ fontSize: 11.5, color: colors.mutedForeground, fontStyle: "italic", paddingVertical: 4 }}>
+              <Text style={{ fontSize: 12, color: colors.mutedForeground, fontStyle: "italic", paddingVertical: 4 }}>
                 No operating expenses recorded for this period.
               </Text>
             ) : (
@@ -292,7 +292,7 @@ export function NetOperatingBalanceHealthCard({ data, currency, periodLabel }: P
                 >
                   <View style={{ flex: 1.5 }}>
                     <Text style={[styles.tableItemName, { color: colors.foreground }]}>{item.category}</Text>
-                    <Text style={{ fontSize: 10.5, color: colors.mutedForeground }}>
+                    <Text style={{ fontSize: 11, color: colors.mutedForeground }}>
                       {item.count} {item.count === 1 ? "transaction" : "transactions"}
                     </Text>
                   </View>
@@ -300,7 +300,7 @@ export function NetOperatingBalanceHealthCard({ data, currency, periodLabel }: P
                     <Text style={[styles.tableItemVal, { color: colors.expense }]}>
                       -{currency} {fmt(item.amount)}
                     </Text>
-                    <Text style={{ fontSize: 10.5, color: colors.mutedForeground }}>
+                    <Text style={{ fontSize: 11, color: colors.mutedForeground }}>
                       {item.pct.toFixed(1)}% of expenses
                     </Text>
                   </View>
@@ -329,7 +329,7 @@ export function NetOperatingBalanceHealthCard({ data, currency, periodLabel }: P
                 >
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.tableItemName, { color: colors.foreground }]}>{m.month}</Text>
-                    <Text style={{ fontSize: 10.5, color: colors.mutedForeground }}>
+                    <Text style={{ fontSize: 11, color: colors.mutedForeground }}>
                       In: +{currency} {fmt(m.income)} · Out: -{currency} {fmt(m.expense)}
                     </Text>
                   </View>
@@ -343,7 +343,7 @@ export function NetOperatingBalanceHealthCard({ data, currency, periodLabel }: P
                       {m.nob >= 0 ? "+" : "-"}
                       {currency} {fmt(Math.abs(m.nob))}
                     </Text>
-                    <Text style={{ fontSize: 10.5, color: colors.mutedForeground }}>
+                    <Text style={{ fontSize: 11, color: colors.mutedForeground }}>
                       {m.nob >= 0 ? "Operating Surplus" : "Operating Deficit"}
                     </Text>
                   </View>
@@ -373,11 +373,11 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   cardTitle: {
-    fontSize: 15.5,
+    fontSize: 16,
     fontFamily: "Inter_700Bold",
   },
   cardSub: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: "Inter_400Regular",
     marginTop: 2,
   },
@@ -396,7 +396,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   badgeText: {
-    fontSize: 10.5,
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
   },
   mainRow: {
@@ -423,11 +423,11 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   statLabel: {
-    fontSize: 10.5,
+    fontSize: 11,
     fontFamily: "Inter_500Medium",
   },
   statVal: {
-    fontSize: 13.5,
+    fontSize: 14,
     fontFamily: "Inter_700Bold",
     marginTop: 1,
   },
@@ -446,7 +446,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   kpiLabel: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: "Inter_500Medium",
   },
   kpiNum: {
@@ -510,7 +510,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   sectionHeading: {
-    fontSize: 10.5,
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.5,
   },

@@ -136,7 +136,12 @@ export function RingProgress({
 
         {/* Animated Progress Ring with Accurate Calculated Arc */}
         {!isEmpty && (
-          <G rotation={rotationAngle} origin={`${size / 2}, ${size / 2}`}>
+          <G
+            // Web: SVG transform attribute (rotation/origin renders an invalid `transform-origin` DOM prop)
+            {...(Platform.OS === "web"
+              ? { transform: `rotate(${rotationAngle} ${size / 2} ${size / 2})` }
+              : { rotation: rotationAngle, origin: `${size / 2}, ${size / 2}` }) as any}
+          >
             <Circle
               cx={size / 2}
               cy={size / 2}
@@ -179,9 +184,9 @@ export function RingProgress({
                   : 17,
             },
           ]}
-          numberOfLines={1}
+          numberOfLines={Platform.OS === "web" ? undefined : 1}
           adjustsFontSizeToFit
-          minimumFontScale={0.65}
+          minimumFontScale={0.7}
         >
           {centerLabel ? centerLabel : `${rawPct < 0 ? rawPct : displayPct}%`}
         </Text>
@@ -193,7 +198,7 @@ export function RingProgress({
               fontSize: size >= 135 ? 10 : 9,
             },
           ]}
-          numberOfLines={2}
+          numberOfLines={Platform.OS === "web" ? undefined : 2}
           adjustsFontSizeToFit
           minimumFontScale={0.7}
         >
@@ -221,7 +226,7 @@ export function RingProgress({
                 letterSpacing: 0.2,
               },
             ]}
-            numberOfLines={1}
+            numberOfLines={Platform.OS === "web" ? undefined : 1}
             adjustsFontSizeToFit
             minimumFontScale={0.7}
           >

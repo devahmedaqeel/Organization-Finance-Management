@@ -114,10 +114,30 @@ export interface PayrollEntry {
   createdAt?: string;
   updatedAt?: string;
   designation?: string;
-  paymentStatus?: "paid" | "pending" | "processing";
-  status?: "paid" | "pending" | "processing";
+  paymentStatus?: "paid" | "pending" | "processing" | "failed" | "cancelled";
+  status?: "paid" | "pending" | "processing" | "cancelled";
+  payrollStatus?: "draft" | "calculated" | "pending_approval" | "approved" | "finalized" | "paid" | "cancelled";
   bankAccountNumber?: string;
+  bankName?: string;
+  paymentMethod?: string;
   expenseId?: string;
+  cnic?: string;
+  employmentCategory?: string;
+  dateOfJoining?: string;
+  payScale?: string;
+  verificationCode?: string;
+  itemizedEarnings?: any[];
+  itemizedDeductions?: any[];
+  customAllowances?: any[];
+  customDeductions?: any[];
+  loanDeductions?: any[];
+  employerContributions?: any[];
+  taxDetails?: any;
+  attendanceDetails?: any;
+  totalEmployerCost?: number;
+  reversalReason?: string;
+  reversedBy?: string;
+  reversedAt?: string;
 }
 
 export interface Department {
@@ -314,9 +334,10 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       setNotifications([]);
       return;
     }
+    // userId keeps read / removed state per member; every member still receives the organization's notifications
     const unsub = subscribeToNotifications(activeOrgId, (notifs) => {
       setNotifications(notifs);
-    });
+    }, user.id);
     return () => {
       if (typeof unsub === "function") unsub();
     };
@@ -501,28 +522,28 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
             if (restTxs !== null && !hasLiveSnapshotRef.current.transactions) {
               setTransactions((prev) => {
-                const rec = reconcileEntities(restTxs, prev, outboxOps.filter((o) => o.entityType === "transaction"), tombstones);
+                const rec = reconcileEntities(restTxs, prev, outboxOps.filter((o) => o.entityType === "transaction"), tombstones, true);
                 saveLocalEntities(targetOrgId, "transactions", rec);
                 return rec;
               });
             }
             if (restBudgets !== null && !hasLiveSnapshotRef.current.budgets) {
               setBudgets((prev) => {
-                const rec = reconcileEntities(restBudgets, prev, outboxOps.filter((o) => o.entityType === "budget"), tombstones);
+                const rec = reconcileEntities(restBudgets, prev, outboxOps.filter((o) => o.entityType === "budget"), tombstones, true);
                 saveLocalEntities(targetOrgId, "budgets", rec);
                 return rec;
               });
             }
             if (restDepts !== null && !hasLiveSnapshotRef.current.departments) {
               setDepartments((prev) => {
-                const rec = reconcileEntities(restDepts, prev, outboxOps.filter((o) => o.entityType === "department"), tombstones);
+                const rec = reconcileEntities(restDepts, prev, outboxOps.filter((o) => o.entityType === "department"), tombstones, true);
                 saveLocalEntities(targetOrgId, "departments", rec);
                 return rec;
               });
             }
             if (restPayroll !== null && !hasLiveSnapshotRef.current.payroll) {
               setPayroll((prev) => {
-                const rec = reconcileEntities(restPayroll, prev, outboxOps.filter((o) => o.entityType === "payroll"), tombstones);
+                const rec = reconcileEntities(restPayroll, prev, outboxOps.filter((o) => o.entityType === "payroll"), tombstones, true);
                 saveLocalEntities(targetOrgId, "payroll", rec);
                 return rec;
               });
@@ -589,7 +610,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
             remoteList,
             effectiveBase,
             outboxOps.filter((o) => o.entityType === "transaction"),
-            tombstones
+            tombstones,
+            !snapshot.metadata.fromCache
           );
           prevTransactionsRef.current = reconciled;
           saveLocalEntities(canonicalOrgId, "transactions", reconciled);
@@ -644,7 +666,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
             remoteList,
             effectiveBase,
             outboxOps.filter((o) => o.entityType === "budget"),
-            tombstones
+            tombstones,
+            !snapshot.metadata.fromCache
           );
           saveLocalEntities(canonicalOrgId, "budgets", reconciled);
           return reconciled;
@@ -698,7 +721,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
             remoteList,
             effectiveBase,
             outboxOps.filter((o) => o.entityType === "payroll"),
-            tombstones
+            tombstones,
+            !snapshot.metadata.fromCache
           );
           saveLocalEntities(canonicalOrgId, "payroll", reconciled);
           return reconciled;
@@ -752,7 +776,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
             remoteList,
             effectiveBase,
             outboxOps.filter((o) => o.entityType === "department"),
-            tombstones
+            tombstones,
+            !snapshot.metadata.fromCache
           );
           saveLocalEntities(canonicalOrgId, "departments", reconciled);
           return reconciled;
@@ -1376,7 +1401,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       throw new Error(err);
     }
 
-    const netSalary = safeNumber(p.baseSalary, 0) + safeNumber(p.bonus, 0) - safeNumber(p.deductions, 0);
+    const netSalary = p.netSalary !== undefined
+      ? safeNumber(p.netSalary, 0)
+      : safeNumber(p.baseSalary, 0) + safeNumber(p.bonus, 0) - safeNumber(p.deductions, 0);
 
     // 2. Authoritative Insufficient Department Budget Check:
     const dLower = deptName.toLowerCase();
@@ -1403,6 +1430,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     const now = new Date().toISOString();
     const orgName = settings.organizationName || user?.organization || "OFM — Organization Finance Management";
     const orgId = activeOrgId;
+    const verificationCode = p.verificationCode || `OFM-PAY-${id.slice(-6).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
 
     const newPayroll: PayrollEntry = {
       ...p,
@@ -1410,6 +1438,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       organizationId: orgId,
       organization: orgName,
       netSalary,
+      verificationCode,
       createdAt: p.createdAt || now,
       updatedAt: now,
       paymentStatus: p.paymentStatus || "paid",

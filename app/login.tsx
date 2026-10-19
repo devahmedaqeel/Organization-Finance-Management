@@ -351,8 +351,8 @@ export default function LoginScreen() {
           <Text
             style={styles.appName}
             adjustsFontSizeToFit
-            numberOfLines={1}
-            minimumFontScale={0.85}
+            numberOfLines={Platform.OS === "web" ? undefined : 1}
+            minimumFontScale={0.7}
           >
             Organization Finance Management
           </Text>
@@ -768,7 +768,8 @@ export default function LoginScreen() {
           <View
             style={[
               styles.modalSheet,
-              { maxHeight: Math.min(540, windowHeight * 0.85) },
+              // Clear the Android navigation bar / home indicator (the keyboard covers it while open)
+              { maxHeight: Math.min(540, windowHeight * 0.85), paddingBottom: 36 + (keyboardHeight > 0 ? 0 : insets.bottom) },
               Platform.OS === "android" && keyboardHeight > 0
                 ? {
                     paddingBottom: 20,
@@ -915,7 +916,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   appName: {
-    fontSize: 21,
+    fontSize: 20,
     fontFamily: "Inter_800ExtraBold",
     color: "#F8FAFC",
     letterSpacing: -0.3,
@@ -923,7 +924,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   subtitle: {
-    fontSize: 13.5,
+    fontSize: 14,
     fontFamily: "Inter_400Regular",
     color: "#94A3B8",
     textAlign: "center",
@@ -971,7 +972,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   modeBtnText: {
-    fontSize: 13.5,
+    fontSize: 14,
     fontFamily: "Inter_700Bold",
   },
   textActive: {
@@ -1004,7 +1005,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
   },
   roleDesc: {
-    fontSize: 8.5,
+    fontSize: 10,
     fontFamily: "Inter_400Regular",
     color: "#64748B",
   },
@@ -1014,7 +1015,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   fieldLabel: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: "Inter_700Bold",
     color: "#94A3B8",
     letterSpacing: 0.6,
@@ -1024,7 +1025,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   forgotLink: {
-    fontSize: 12.5,
+    fontSize: 13,
     fontFamily: "Inter_600SemiBold",
     color: "#60A5FA",
   },
@@ -1050,7 +1051,7 @@ const styles = StyleSheet.create({
   },
   textInput: {
     flex: 1,
-    fontSize: 14.5,
+    fontSize: 15,
     fontFamily: "Inter_500Medium",
     color: "#F8FAFC",
     paddingVertical: 0,
@@ -1134,7 +1135,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   googleBtnText: {
-    fontSize: 14.5,
+    fontSize: 15,
     fontFamily: "Inter_700Bold",
     color: "#F8FAFC",
   },
@@ -1149,7 +1150,7 @@ const styles = StyleSheet.create({
     alignSelf: "center",
   },
   securityText: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: "Inter_400Regular",
     color: "#64748B",
     textAlign: "center",
@@ -1210,7 +1211,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   modalTitle: {
-    fontSize: 17,
+    fontSize: 18,
     fontFamily: "Inter_700Bold",
     color: "#F8FAFC",
   },

@@ -83,7 +83,7 @@ const styles = StyleSheet.create({
     width: 10,
   },
   label: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: "Inter_400Regular",
     textAlign: "center",
   },

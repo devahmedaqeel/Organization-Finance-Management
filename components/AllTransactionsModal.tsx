@@ -123,21 +123,21 @@ export function AllTransactionsModal({
           <View style={styles.metricRow}>
             <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>Total Inflows</Text>
-              <Text style={[styles.metricVal, { color: colors.income }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>+{fmt(totalInflows)}</Text>
+              <Text style={[styles.metricVal, { color: colors.income }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>+{fmt(totalInflows)}</Text>
               <Text style={[styles.metricCount, { color: colors.mutedForeground }]}>
                 {transactions.filter((t) => t.type === "income").length} Records
               </Text>
             </View>
             <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>Total Outflows</Text>
-              <Text style={[styles.metricVal, { color: colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>-{fmt(totalOutflows)}</Text>
+              <Text style={[styles.metricVal, { color: colors.expense }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>-{fmt(totalOutflows)}</Text>
               <Text style={[styles.metricCount, { color: colors.mutedForeground }]}>
                 {transactions.filter((t) => t.type === "expense").length} Records
               </Text>
             </View>
             <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>Net Ledger</Text>
-              <Text style={[styles.metricVal, { color: netTotal >= 0 ? colors.income : colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>
+              <Text style={[styles.metricVal, { color: netTotal >= 0 ? colors.income : colors.expense }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>
                 {netTotal >= 0 ? "+" : ""}{fmt(netTotal)}
               </Text>
               <Text style={[styles.metricCount, { color: colors.mutedForeground }]}>Balance</Text>
@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   title: {
-    fontSize: 16.5,
+    fontSize: 16,
     fontFamily: "Inter_800ExtraBold",
   },
   sub: {
@@ -294,7 +294,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   metricLabel: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: "Inter_500Medium",
   },
   metricVal: {
@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_800ExtraBold",
   },
   metricCount: {
-    fontSize: 9.5,
+    fontSize: 10,
     fontFamily: "Inter_400Regular",
   },
   searchBar: {
@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   filterText: {
-    fontSize: 10.5,
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.3,
   },
@@ -360,7 +360,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
   },
   emptyDesc: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: "Inter_400Regular",
     textAlign: "center",
     paddingHorizontal: 30,

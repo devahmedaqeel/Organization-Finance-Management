@@ -198,6 +198,67 @@ export function FinancialAnalyticsSuite({
     };
   }, [activeDepartmentMetric, budget, colors, currency]);
 
+  // Web desktop-only insight blocks (native / narrow layouts are unchanged)
+  const showDesktopInsights = Platform.OS === "web" && !isMobile && !isCompact;
+
+  const topUtilizationDepts = useMemo(() => {
+    return effectiveDeptMetrics
+      .filter((d) => (d.allocated || 0) > 0 || (d.spent || 0) > 0)
+      .map((d) => {
+        const hasCap = (d.allocated || 0) > 0;
+        const pct = hasCap && Number.isFinite(d.utilizationPct) ? Math.max(0, d.utilizationPct) : 0;
+        const isOver = hasCap && d.spent > d.allocated;
+        return {
+          id: d.id,
+          name: d.name,
+          pct,
+          barPct: hasCap ? Math.min(100, pct) : 100,
+          label: hasCap ? `${pct.toFixed(0)}%` : "No cap",
+          color: !hasCap ? colors.mutedForeground : isOver ? colors.expense : pct >= 80 ? colors.warning : colors.income,
+        };
+      })
+      .sort((a, b) => b.pct - a.pct)
+      .slice(0, 3);
+  }, [effectiveDeptMetrics, colors]);
+
+  const operatingRatios = useMemo(() => {
+    const rev = Number(margin.operatingRevenue) || 0;
+    const exp = Number(margin.operatingExpenses) || 0;
+    const expenseRatio = rev > 0 ? (exp / rev) * 100 : null;
+    const savingsRate = rev > 0 ? ((rev - exp) / rev) * 100 : null;
+    const coverage = exp > 0 ? rev / exp : null;
+    return [
+      {
+        label: "Expense ratio",
+        value: expenseRatio === null ? "—" : `${expenseRatio.toFixed(0)}%`,
+        color: expenseRatio !== null && expenseRatio > 100 ? colors.expense : colors.warning,
+      },
+      {
+        label: "Savings rate",
+        value: savingsRate === null ? "—" : `${savingsRate.toFixed(0)}%`,
+        color: savingsRate !== null && savingsRate < 0 ? colors.expense : colors.income,
+      },
+      {
+        label: "Cost coverage",
+        value: coverage === null ? "—" : `${coverage.toFixed(2)}×`,
+        color: coverage !== null && coverage < 1 ? colors.expense : colors.primary,
+      },
+    ];
+  }, [margin.operatingRevenue, margin.operatingExpenses, colors]);
+
+  const marginScale = useMemo(() => {
+    const rev = Number(margin.operatingRevenue) || 0;
+    const exp = Number(margin.operatingExpenses) || 0;
+    if (rev <= 0) return null;
+    const rate = ((rev - exp) / rev) * 100;
+    const clamped = Math.max(-50, Math.min(100, rate));
+    return {
+      pos: ((clamped + 50) / 150) * 100,
+      label: rate < 0 ? "Deficit" : rate < 20 ? "Thin margin" : "Healthy",
+      color: rate < 0 ? colors.expense : rate < 20 ? colors.warning : colors.income,
+    };
+  }, [margin.operatingRevenue, margin.operatingExpenses, colors]);
+
   // Active interaction mode states
   const [budgetMode, setBudgetMode] = useState<"used" | "spent" | "remaining">("used");
   const [marginMode, setMarginMode] = useState<"margin" | "outflow" | "net">("margin");
@@ -532,9 +593,9 @@ export function FinancialAnalyticsSuite({
                 <View style={styles.titleWithHelpRow}>
                   <Text
                     style={[styles.cardTitle, { color: colors.foreground }]}
-                    numberOfLines={1}
+                    numberOfLines={Platform.OS === "web" ? undefined : 1}
                     adjustsFontSizeToFit
-                    minimumFontScale={0.82}
+                    minimumFontScale={0.7}
                   >
                     Budget Utilization
                   </Text>
@@ -545,7 +606,7 @@ export function FinancialAnalyticsSuite({
                     <Text style={[styles.helpIcon, { color: colors.mutedForeground }]}>ⓘ</Text>
                   </TouchableOpacity>
                 </View>
-                <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>
+                <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
                   {activeBudgetView.isDept
                     ? activeBudgetView.totalAllocated > 0
                       ? `Cap: ${formatCompactCurrency(activeBudgetView.totalAllocated, currency)} · ${activeBudgetView.name}`
@@ -581,12 +642,12 @@ export function FinancialAnalyticsSuite({
           {/* Contextual Status Strip (Uniform 46px minHeight across all cards) */}
           <View style={[styles.statusStrip, { backgroundColor: activeBudgetView.statusColor + "14", borderColor: activeBudgetView.statusColor + "30" }]}>
             <View style={[styles.statusDot, { backgroundColor: activeBudgetView.statusColor }]} />
-            <Text style={[styles.statusStripText, { color: activeBudgetView.statusColor }]} numberOfLines={4}>
+            <Text style={[styles.statusStripText, { color: activeBudgetView.statusColor }]}>
               {activeBudgetView.statusLabel} · {activeBudgetView.remainingText}
             </Text>
             {activeBudgetView.isDept && (
               <View style={[styles.deptIndicatorBadge, { backgroundColor: activeBudgetView.statusColor + "20" }]}>
-                <Text style={[styles.deptIndicatorText, { color: activeBudgetView.statusColor }]} numberOfLines={1}>
+                <Text style={[styles.deptIndicatorText, { color: activeBudgetView.statusColor }]}>
                   {activeBudgetView.name}
                 </Text>
               </View>
@@ -684,7 +745,7 @@ export function FinancialAnalyticsSuite({
               <View style={styles.flowBarLegend}>
                 <View style={styles.flowLegendItem}>
                   <View style={[styles.flowDot, { backgroundColor: colors.expense }]} />
-                  <Text style={[styles.flowLegendText, { color: colors.mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                  <Text style={[styles.flowLegendText, { color: colors.mutedForeground }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>
                     Spent:{" "}
                     <Text style={{ color: colors.expense, fontFamily: "Inter_700Bold" }}>
                       {formatCompactCurrency(activeBudgetView.actualSpending, currency)} ({activeBudgetView.rawUtilizationPct.toFixed(0)}%)
@@ -693,7 +754,7 @@ export function FinancialAnalyticsSuite({
                 </View>
                 <View style={[styles.flowLegendItem, { justifyContent: "flex-end" }]}>
                   <View style={[styles.flowDot, { backgroundColor: colors.income }]} />
-                  <Text style={[styles.flowLegendText, { color: colors.mutedForeground, textAlign: "right" }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                  <Text style={[styles.flowLegendText, { color: colors.mutedForeground, textAlign: "right" }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>
                     Left:{" "}
                     <Text style={{ color: colors.income, fontFamily: "Inter_700Bold" }}>
                       {formatCompactCurrency(activeBudgetView.remainingAmount, currency)} ({Math.max(0, 100 - activeBudgetView.rawUtilizationPct).toFixed(0)}%)
@@ -715,7 +776,7 @@ export function FinancialAnalyticsSuite({
             <View style={styles.deptOptionsContainer}>
               <View style={styles.deptOptionsHeader}>
                 <Text style={[styles.deptOptionsLabel, { color: colors.mutedForeground }]}>
-                  SELECT DEPARTMENT OPTION:
+                  FILTER BY DEPARTMENT
                 </Text>
                 {activeBudgetView.isDept ? (
                   <TouchableOpacity
@@ -772,7 +833,6 @@ export function FinancialAnalyticsSuite({
                           { color: isSelected ? "#FFFFFF" : colors.foreground },
                           isSelected && { fontFamily: "Inter_700Bold" },
                         ]}
-                        numberOfLines={1}
                       >
                         {dept.name}
                       </Text>
@@ -834,9 +894,9 @@ export function FinancialAnalyticsSuite({
                       { color: isSelected ? "#FFFFFF" : colors.mutedForeground },
                       isSelected && { fontFamily: "Inter_700Bold" },
                     ]}
-                    numberOfLines={1}
+                    numberOfLines={Platform.OS === "web" ? undefined : 1}
                     adjustsFontSizeToFit
-                    minimumFontScale={0.85}
+                    minimumFontScale={0.7}
                   >
                     {opt.label}
                   </Text>
@@ -845,22 +905,42 @@ export function FinancialAnalyticsSuite({
             })}
           </View>
 
+          {/* Web desktop: top departments by utilisation (fills the card instead of empty space) */}
+          {showDesktopInsights && topUtilizationDepts.length > 0 && (
+            <View style={[styles.insightBlock, { borderColor: colors.border }]}>
+              <Text style={[styles.insightTitle, { color: colors.mutedForeground }]}>TOP DEPARTMENTS BY USAGE</Text>
+              {topUtilizationDepts.map((d) => (
+                <View key={d.id} style={styles.insightRow}>
+                  <View style={styles.insightRowHead}>
+                    <Text style={[styles.insightName, { color: colors.foreground }]} numberOfLines={1}>
+                      {d.name}
+                    </Text>
+                    <Text style={[styles.insightValue, { color: d.color }]}>{d.label}</Text>
+                  </View>
+                  <View style={[styles.insightTrack, { backgroundColor: colors.border }]}>
+                    <View style={[styles.insightFill, { width: `${d.barPct}%`, backgroundColor: d.color }]} />
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+
           {/* 3-Metric Structured Bento Box (Pinned to bottom) */}
           <View style={[styles.bentoRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
             <View style={styles.bentoCol}>
               <Text
                 style={[styles.bentoLabel, { color: colors.mutedForeground }]}
-                numberOfLines={1}
+                numberOfLines={Platform.OS === "web" ? undefined : 1}
                 adjustsFontSizeToFit
-                minimumFontScale={0.72}
+                minimumFontScale={0.7}
               >
                 DISBURSED
               </Text>
               <Text
                 style={[styles.bentoVal, { color: colors.expense }]}
-                numberOfLines={1}
+                numberOfLines={Platform.OS === "web" ? undefined : 1}
                 adjustsFontSizeToFit
-                minimumFontScale={0.75}
+                minimumFontScale={0.7}
               >
                 {formatCompactCurrency(activeBudgetView.actualSpending, currency)}
               </Text>
@@ -869,17 +949,17 @@ export function FinancialAnalyticsSuite({
             <View style={styles.bentoCol}>
               <Text
                 style={[styles.bentoLabel, { color: colors.mutedForeground }]}
-                numberOfLines={1}
+                numberOfLines={Platform.OS === "web" ? undefined : 1}
                 adjustsFontSizeToFit
-                minimumFontScale={0.72}
+                minimumFontScale={0.7}
               >
                 ALLOCATED
               </Text>
               <Text
                 style={[styles.bentoVal, { color: activeBudgetView.isValid && activeBudgetView.totalAllocated > 0 ? colors.foreground : colors.mutedForeground }]}
-                numberOfLines={1}
+                numberOfLines={Platform.OS === "web" ? undefined : 1}
                 adjustsFontSizeToFit
-                minimumFontScale={0.75}
+                minimumFontScale={0.7}
               >
                 {activeBudgetView.isValid && activeBudgetView.totalAllocated > 0 ? formatCompactCurrency(activeBudgetView.totalAllocated, currency) : "Not Set"}
               </Text>
@@ -888,9 +968,9 @@ export function FinancialAnalyticsSuite({
             <View style={styles.bentoCol}>
               <Text
                 style={[styles.bentoLabel, { color: colors.mutedForeground }]}
-                numberOfLines={1}
+                numberOfLines={Platform.OS === "web" ? undefined : 1}
                 adjustsFontSizeToFit
-                minimumFontScale={0.72}
+                minimumFontScale={0.7}
               >
                 {activeBudgetView.isOverBudget ? "OVER BUDGET" : "REMAINING"}
               </Text>
@@ -905,9 +985,9 @@ export function FinancialAnalyticsSuite({
                       : colors.mutedForeground,
                   },
                 ]}
-                numberOfLines={1}
+                numberOfLines={Platform.OS === "web" ? undefined : 1}
                 adjustsFontSizeToFit
-                minimumFontScale={0.75}
+                minimumFontScale={0.7}
               >
                 {activeBudgetView.isValid && activeBudgetView.totalAllocated > 0
                   ? activeBudgetView.isOverBudget
@@ -938,7 +1018,7 @@ export function FinancialAnalyticsSuite({
                   }}
                   hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                 >
-                  <Text style={{ fontSize: 10, color: "#0EA5E9", fontFamily: "Inter_700Bold" }}>
+                  <Text style={{ fontSize: 12, color: "#0EA5E9", fontFamily: "Inter_700Bold" }}>
                     View Roster →
                   </Text>
                 </TouchableOpacity>
@@ -961,9 +1041,9 @@ export function FinancialAnalyticsSuite({
                 <View style={styles.titleWithHelpRow}>
                   <Text
                     style={[styles.cardTitle, { color: colors.foreground }]}
-                    numberOfLines={1}
+                    numberOfLines={Platform.OS === "web" ? undefined : 1}
                     adjustsFontSizeToFit
-                    minimumFontScale={0.82}
+                    minimumFontScale={0.7}
                   >
                     Net Operating Margin
                   </Text>
@@ -974,7 +1054,7 @@ export function FinancialAnalyticsSuite({
                     <Text style={[styles.helpIcon, { color: colors.mutedForeground }]}>ⓘ</Text>
                   </TouchableOpacity>
                 </View>
-                <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>
+                <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
                   {margin.statusLabel}
                 </Text>
               </View>
@@ -1006,7 +1086,7 @@ export function FinancialAnalyticsSuite({
           {/* Contextual Status Strip with Trend (Uniform 46px minHeight across all cards) */}
           <View style={[styles.statusStrip, { backgroundColor: margin.statusColor + "14", borderColor: margin.statusColor + "30" }]}>
             <View style={[styles.statusDot, { backgroundColor: margin.statusColor }]} />
-            <Text style={[styles.statusStripText, { color: margin.statusColor, flex: 1 }]} numberOfLines={4}>
+            <Text style={[styles.statusStripText, { color: margin.statusColor, flex: 1 }]}>
               {margin.explanationText}
             </Text>
             {margin.marginChangeVsPrevious !== null && margin.marginChangeVsPrevious !== undefined && (
@@ -1021,7 +1101,6 @@ export function FinancialAnalyticsSuite({
                     styles.trendText,
                     { color: margin.trendDirection === "up" ? colors.income : colors.expense },
                   ]}
-                  numberOfLines={1}
                 >
                   {Math.abs(margin.marginChangeVsPrevious).toFixed(1)}% vs prev
                 </Text>
@@ -1140,7 +1219,7 @@ export function FinancialAnalyticsSuite({
                 <View style={styles.flowBarLegend}>
                   <View style={styles.flowLegendItem}>
                     <View style={[styles.flowDot, { backgroundColor: colors.income }]} />
-                    <Text style={[styles.flowLegendText, { color: colors.mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                    <Text style={[styles.flowLegendText, { color: colors.mutedForeground }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>
                       Income:{" "}
                       <Text style={{ color: colors.income, fontFamily: "Inter_700Bold" }}>
                         +{formatCompactCurrency(rev, currency)} ({inflowPct.toFixed(0)}%)
@@ -1149,7 +1228,7 @@ export function FinancialAnalyticsSuite({
                   </View>
                   <View style={[styles.flowLegendItem, { justifyContent: "flex-end" }]}>
                     <View style={[styles.flowDot, { backgroundColor: colors.expense }]} />
-                    <Text style={[styles.flowLegendText, { color: colors.mutedForeground, textAlign: "right" }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                    <Text style={[styles.flowLegendText, { color: colors.mutedForeground, textAlign: "right" }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>
                       Expenses:{" "}
                       <Text style={{ color: colors.expense, fontFamily: "Inter_700Bold" }}>
                         -{formatCompactCurrency(exp, currency)} ({outflowPct.toFixed(0)}%)
@@ -1200,9 +1279,9 @@ export function FinancialAnalyticsSuite({
                       { color: isSelected ? "#FFFFFF" : colors.mutedForeground },
                       isSelected && { fontFamily: "Inter_700Bold" },
                     ]}
-                    numberOfLines={1}
+                    numberOfLines={Platform.OS === "web" ? undefined : 1}
                     adjustsFontSizeToFit
-                    minimumFontScale={0.85}
+                    minimumFontScale={0.7}
                   >
                     {opt.label}
                   </Text>
@@ -1211,22 +1290,58 @@ export function FinancialAnalyticsSuite({
             })}
           </View>
 
+          {/* Web desktop: key operating ratios */}
+          {showDesktopInsights && (
+            <View style={[styles.insightBlock, { borderColor: colors.border }]}>
+              <Text style={[styles.insightTitle, { color: colors.mutedForeground }]}>KEY OPERATING RATIOS</Text>
+              <View style={styles.ratioRow}>
+                {operatingRatios.map((r) => (
+                  <View key={r.label} style={[styles.ratioTile, { backgroundColor: r.color + "12", borderColor: r.color + "33" }]}>
+                    <Text style={[styles.ratioValue, { color: r.color }]}>{r.value}</Text>
+                    <Text style={[styles.ratioLabel, { color: colors.mutedForeground }]}>{r.label}</Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* Margin health scale: -50% … +100%, marker at the current savings rate */}
+              {marginScale && (
+                <View style={{ gap: 6, marginTop: 4 }}>
+                  <View style={styles.insightRowHead}>
+                    <Text style={[styles.insightTitle, { color: colors.mutedForeground }]}>MARGIN HEALTH</Text>
+                    <Text style={[styles.insightValue, { color: marginScale.color }]}>{marginScale.label}</Text>
+                  </View>
+                  <View style={styles.scaleTrack}>
+                    <View style={[styles.scaleZone, { flex: 50, backgroundColor: colors.expense + "55" }]} />
+                    <View style={[styles.scaleZone, { flex: 20, backgroundColor: colors.warning + "66" }]} />
+                    <View style={[styles.scaleZone, { flex: 80, backgroundColor: colors.income + "66" }]} />
+                    <View style={[styles.scaleMarker, { left: `${marginScale.pos}%`, borderColor: marginScale.color, backgroundColor: colors.foreground }]} />
+                  </View>
+                  <View style={styles.insightRowHead}>
+                    <Text style={[styles.scaleTick, { color: colors.mutedForeground }]}>Deficit</Text>
+                    <Text style={[styles.scaleTick, { color: colors.mutedForeground }]}>Break-even</Text>
+                    <Text style={[styles.scaleTick, { color: colors.mutedForeground }]}>Healthy 20%+</Text>
+                  </View>
+                </View>
+              )}
+            </View>
+          )}
+
           {/* 3-Metric Structured Bento Box (Pinned to bottom) */}
           <View style={[styles.bentoRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
             <View style={styles.bentoCol}>
               <Text
                 style={[styles.bentoLabel, { color: colors.mutedForeground }]}
-                numberOfLines={1}
+                numberOfLines={Platform.OS === "web" ? undefined : 1}
                 adjustsFontSizeToFit
-                minimumFontScale={0.72}
+                minimumFontScale={0.7}
               >
                 INCOME
               </Text>
               <Text
                 style={[styles.bentoVal, { color: colors.income }]}
-                numberOfLines={1}
+                numberOfLines={Platform.OS === "web" ? undefined : 1}
                 adjustsFontSizeToFit
-                minimumFontScale={0.75}
+                minimumFontScale={0.7}
               >
                 +{formatCompactCurrency(margin.operatingRevenue, currency)}
               </Text>
@@ -1235,17 +1350,17 @@ export function FinancialAnalyticsSuite({
             <View style={styles.bentoCol}>
               <Text
                 style={[styles.bentoLabel, { color: colors.mutedForeground }]}
-                numberOfLines={1}
+                numberOfLines={Platform.OS === "web" ? undefined : 1}
                 adjustsFontSizeToFit
-                minimumFontScale={0.72}
+                minimumFontScale={0.7}
               >
                 EXPENSES
               </Text>
               <Text
                 style={[styles.bentoVal, { color: colors.expense }]}
-                numberOfLines={1}
+                numberOfLines={Platform.OS === "web" ? undefined : 1}
                 adjustsFontSizeToFit
-                minimumFontScale={0.75}
+                minimumFontScale={0.7}
               >
                 -{formatCompactCurrency(margin.operatingExpenses, currency)}
               </Text>
@@ -1254,9 +1369,9 @@ export function FinancialAnalyticsSuite({
             <View style={styles.bentoCol}>
               <Text
                 style={[styles.bentoLabel, { color: colors.mutedForeground }]}
-                numberOfLines={1}
+                numberOfLines={Platform.OS === "web" ? undefined : 1}
                 adjustsFontSizeToFit
-                minimumFontScale={0.72}
+                minimumFontScale={0.7}
               >
                 {margin.isLoss ? "NET DEFICIT" : "NET SURPLUS"}
               </Text>
@@ -1265,9 +1380,9 @@ export function FinancialAnalyticsSuite({
                   styles.bentoVal,
                   { color: margin.isLoss ? colors.expense : colors.income },
                 ]}
-                numberOfLines={1}
+                numberOfLines={Platform.OS === "web" ? undefined : 1}
                 adjustsFontSizeToFit
-                minimumFontScale={0.75}
+                minimumFontScale={0.7}
               >
                 {margin.isLoss ? "-" : "+"}
                 {formatCompactCurrency(Math.abs(margin.operatingIncome), currency)}
@@ -1290,9 +1405,9 @@ export function FinancialAnalyticsSuite({
                 <View style={styles.titleWithHelpRow}>
                   <Text
                     style={[styles.cardTitle, { color: colors.foreground }]}
-                    numberOfLines={1}
+                    numberOfLines={Platform.OS === "web" ? undefined : 1}
                     adjustsFontSizeToFit
-                    minimumFontScale={0.82}
+                    minimumFontScale={0.7}
                   >
                     Expense Distribution
                   </Text>
@@ -1303,7 +1418,7 @@ export function FinancialAnalyticsSuite({
                     <Text style={[styles.helpIcon, { color: colors.mutedForeground }]}>ⓘ</Text>
                   </TouchableOpacity>
                 </View>
-                <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>
+                <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
                   {activeDistView.titleSubtitle}
                 </Text>
               </View>
@@ -1335,7 +1450,7 @@ export function FinancialAnalyticsSuite({
           {/* Contextual Status Strip (Uniform 46px minHeight across all cards) */}
           <View style={[styles.statusStrip, { backgroundColor: (activeDistView.isDept ? "#3B82F6" : "#8B5CF6") + "14", borderColor: (activeDistView.isDept ? "#3B82F6" : "#8B5CF6") + "30" }]}>
             <View style={[styles.statusDot, { backgroundColor: activeDistView.isDept ? "#3B82F6" : "#8B5CF6" }]} />
-            <Text style={[styles.statusStripText, { color: activeDistView.isDept ? "#3B82F6" : "#8B5CF6" }]} numberOfLines={4}>
+            <Text style={[styles.statusStripText, { color: activeDistView.isDept ? "#3B82F6" : "#8B5CF6" }]}>
               {activeDistView.explanation}
             </Text>
           </View>
@@ -1497,7 +1612,6 @@ export function FinancialAnalyticsSuite({
                         { color: isSelected ? "#FFFFFF" : colors.foreground },
                         isSelected && { fontFamily: "Inter_700Bold" },
                       ]}
-                      numberOfLines={1}
                     >
                       {dm.name}
                     </Text>
@@ -1610,9 +1724,9 @@ export function FinancialAnalyticsSuite({
                         <Text style={styles.deptIcon}>🏢</Text>
                         <Text
                           style={[styles.deptCardTitle, { color: colors.foreground }]}
-                          numberOfLines={1}
+                          numberOfLines={Platform.OS === "web" ? undefined : 1}
                           adjustsFontSizeToFit
-                          minimumFontScale={0.85}
+                          minimumFontScale={0.7}
                         >
                           {dm.name} Department
                         </Text>
@@ -1628,9 +1742,9 @@ export function FinancialAnalyticsSuite({
                         <Text style={[styles.deptKpiLabel, { color: colors.mutedForeground }]}>Budget</Text>
                         <Text
                           style={[styles.deptKpiVal, { color: colors.foreground }]}
-                          numberOfLines={1}
+                          numberOfLines={Platform.OS === "web" ? undefined : 1}
                           adjustsFontSizeToFit
-                          minimumFontScale={0.72}
+                          minimumFontScale={0.7}
                         >
                           {dm.allocated > 0 ? formatCompactCurrency(dm.allocated, currency) : "No Cap"}
                         </Text>
@@ -1643,9 +1757,9 @@ export function FinancialAnalyticsSuite({
                             styles.deptKpiVal,
                             { color: isOver ? colors.expense : "#F59E0B" },
                           ]}
-                          numberOfLines={1}
+                          numberOfLines={Platform.OS === "web" ? undefined : 1}
                           adjustsFontSizeToFit
-                          minimumFontScale={0.72}
+                          minimumFontScale={0.7}
                         >
                           {formatCompactCurrency(dm.spent, currency)}
                         </Text>
@@ -1664,9 +1778,9 @@ export function FinancialAnalyticsSuite({
                                 : colors.mutedForeground,
                             },
                           ]}
-                          numberOfLines={1}
+                          numberOfLines={Platform.OS === "web" ? undefined : 1}
                           adjustsFontSizeToFit
-                          minimumFontScale={0.72}
+                          minimumFontScale={0.7}
                         >
                           {dm.allocated > 0 ? formatCompactCurrency(dm.remaining, currency) : "Uncapped"}
                         </Text>
@@ -1787,9 +1901,9 @@ export function FinancialAnalyticsSuite({
                                   <View style={styles.deptCatHeader}>
                                     <Text
                                       style={[styles.deptCatName, { color: colors.foreground }]}
-                                      numberOfLines={1}
+                                      numberOfLines={Platform.OS === "web" ? undefined : 1}
                                       adjustsFontSizeToFit
-                                      minimumFontScale={0.8}
+                                      minimumFontScale={0.7}
                                     >
                                       {catName}
                                     </Text>
@@ -1847,9 +1961,9 @@ export function FinancialAnalyticsSuite({
             <View style={styles.bentoCol}>
               <Text
                 style={[styles.bentoLabel, { color: colors.mutedForeground }]}
-                numberOfLines={1}
+                numberOfLines={Platform.OS === "web" ? undefined : 1}
                 adjustsFontSizeToFit
-                minimumFontScale={0.72}
+                minimumFontScale={0.7}
               >
                 {activeDistView.bentoCol1Label}
               </Text>
@@ -1858,9 +1972,9 @@ export function FinancialAnalyticsSuite({
                   styles.bentoVal,
                   { color: activeDistView.bentoCol1Color },
                 ]}
-                numberOfLines={1}
+                numberOfLines={Platform.OS === "web" ? undefined : 1}
                 adjustsFontSizeToFit
-                minimumFontScale={0.75}
+                minimumFontScale={0.7}
               >
                 {activeDistView.bentoCol1Val}
               </Text>
@@ -1869,17 +1983,17 @@ export function FinancialAnalyticsSuite({
             <View style={styles.bentoCol}>
               <Text
                 style={[styles.bentoLabel, { color: colors.mutedForeground }]}
-                numberOfLines={1}
+                numberOfLines={Platform.OS === "web" ? undefined : 1}
                 adjustsFontSizeToFit
-                minimumFontScale={0.72}
+                minimumFontScale={0.7}
               >
                 {activeDistView.bentoCol2Label}
               </Text>
               <Text
                 style={[styles.bentoVal, { color: colors.foreground }]}
-                numberOfLines={1}
+                numberOfLines={Platform.OS === "web" ? undefined : 1}
                 adjustsFontSizeToFit
-                minimumFontScale={0.75}
+                minimumFontScale={0.7}
               >
                 {activeDistView.bentoCol2Val}
               </Text>
@@ -1888,17 +2002,17 @@ export function FinancialAnalyticsSuite({
             <View style={styles.bentoCol}>
               <Text
                 style={[styles.bentoLabel, { color: colors.mutedForeground }]}
-                numberOfLines={1}
+                numberOfLines={Platform.OS === "web" ? undefined : 1}
                 adjustsFontSizeToFit
-                minimumFontScale={0.72}
+                minimumFontScale={0.7}
               >
                 {activeDistView.bentoCol3Label}
               </Text>
               <Text
                 style={[styles.bentoVal, { color: colors.foreground }]}
-                numberOfLines={1}
+                numberOfLines={Platform.OS === "web" ? undefined : 1}
                 adjustsFontSizeToFit
-                minimumFontScale={0.75}
+                minimumFontScale={0.7}
               >
                 {activeDistView.bentoCol3Val}
               </Text>
@@ -1929,11 +2043,16 @@ const styles = StyleSheet.create({
     alignItems: "stretch",
   },
   card: {
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 1,
-    padding: 16,
-    gap: 10,
+    padding: 18,
+    gap: 14,
     justifyContent: "flex-start",
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 2,
   },
   cardDesktop: {
     flex: 1,
@@ -1943,14 +2062,14 @@ const styles = StyleSheet.create({
   cardMobile: {
     width: "100%",
     minWidth: "100%",
-    padding: 14,
+    padding: 16,
   },
   cardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    gap: 8,
-    minHeight: 38,
+    gap: 12,
+    minHeight: 40,
   },
   headerTitleRow: {
     flexDirection: "row",
@@ -1966,70 +2085,67 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   helpIcon: {
-    fontSize: 13,
+    fontSize: 15,
     fontFamily: "Inter_600SemiBold",
   },
   iconBadge: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
   },
   cardTitle: {
-    fontSize: 14.5,
+    fontSize: 16,
     fontFamily: "Inter_700Bold",
     letterSpacing: -0.2,
     flexShrink: 1,
   },
   cardSub: {
-    fontSize: 11.5,
+    fontSize: 13,
     fontFamily: "Inter_400Regular",
-    letterSpacing: -0.1,
-    marginTop: 1,
+    marginTop: 2,
   },
   linkText: {
-    fontSize: 11.5,
+    fontSize: 13,
     fontFamily: "Inter_600SemiBold",
-    letterSpacing: 0.1,
     flexShrink: 0,
   },
   tooltipBanner: {
-    padding: 9,
-    borderRadius: 8,
+    padding: 12,
+    borderRadius: 12,
     borderWidth: 1,
-    gap: 2,
+    gap: 4,
   },
   tooltipText: {
-    fontSize: 11.5,
+    fontSize: 13,
     fontFamily: "Inter_600SemiBold",
   },
   tooltipSub: {
-    fontSize: 10.5,
+    fontSize: 12,
     fontFamily: "Inter_400Regular",
   },
   statusStrip: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
     borderWidth: 1,
     minHeight: 46,
   },
   statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     flexShrink: 0,
   },
   statusStripText: {
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 13,
+    lineHeight: 18,
     fontFamily: "Inter_600SemiBold",
-    letterSpacing: -0.1,
     flex: 1,
   },
   trendBadge: {
@@ -2039,7 +2155,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   trendText: {
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: "Inter_700Bold",
   },
   ringCenterWrap: {
@@ -2055,20 +2171,20 @@ const styles = StyleSheet.create({
     marginVertical: 2,
   },
   flowBarSection: {
-    gap: 5,
-    marginVertical: 4,
+    gap: 8,
+    marginVertical: 2,
     paddingHorizontal: 2,
   },
   flowBarTrack: {
-    height: 6,
-    borderRadius: 3,
+    height: 8,
+    borderRadius: 4,
     flexDirection: "row",
     overflow: "hidden",
     gap: 2,
   },
   flowBarFill: {
     height: "100%",
-    borderRadius: 3,
+    borderRadius: 4,
   },
   flowBarLegend: {
     flexDirection: "row",
@@ -2087,19 +2203,18 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   flowDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     flexShrink: 0,
   },
   flowLegendText: {
-    fontSize: 9.5,
+    fontSize: 12,
     fontFamily: "Inter_500Medium",
-    letterSpacing: -0.2,
   },
   deptOptionsContainer: {
-    gap: 6,
-    marginVertical: 4,
+    gap: 10,
+    marginVertical: 2,
   },
   deptOptionsHeader: {
     flexDirection: "row",
@@ -2108,49 +2223,48 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   deptOptionsLabel: {
-    fontSize: 9,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: 0.5,
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 0.6,
   },
   resetDeptText: {
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: "Inter_600SemiBold",
   },
   deptChipsScroll: {
-    gap: 6,
+    gap: 8,
     paddingVertical: 2,
   },
   deptChip: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 16,
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 18,
     borderWidth: 1,
   },
   deptChipText: {
-    fontSize: 10.5,
+    fontSize: 13,
     fontFamily: "Inter_600SemiBold",
-    letterSpacing: -0.1,
   },
   deptChipBadge: {
-    paddingHorizontal: 5,
-    paddingVertical: 1.5,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
     borderRadius: 8,
   },
   deptChipBadgeText: {
-    fontSize: 9,
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
   },
   deptIndicatorBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
     marginLeft: "auto",
   },
   deptIndicatorText: {
-    fontSize: 9.5,
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
   },
   deptSubMetaRow: {
@@ -2158,59 +2272,62 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     flexWrap: "wrap",
-    gap: 6,
-    paddingTop: 8,
-    marginTop: 4,
+    gap: 8,
+    paddingTop: 12,
+    marginTop: 2,
     borderTopWidth: 1,
   },
   deptSubMetaText: {
-    fontSize: 10.5,
+    fontSize: 12,
     flex: 1,
     minWidth: 170,
   },
   uncappedNotice: {
-    padding: 8,
-    borderRadius: 8,
+    padding: 12,
+    borderRadius: 12,
     borderWidth: 1,
     alignItems: "center",
     marginVertical: 4,
   },
   uncappedNoticeText: {
-    fontSize: 10.5,
+    fontSize: 12,
     fontFamily: "Inter_500Medium",
   },
   chipsRow: {
     flexDirection: "row",
-    gap: 6,
+    gap: 8,
     justifyContent: "center",
     alignItems: "center",
-    marginVertical: 4,
+    marginVertical: 2,
   },
   chip: {
-    paddingHorizontal: 8,
-    paddingVertical: 4.5,
-    borderRadius: 20,
+    flex: 1,
+    maxWidth: 140,
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 12,
     borderWidth: 1,
   },
   chipText: {
-    fontSize: 10.5,
+    fontSize: 13,
     fontFamily: "Inter_600SemiBold",
   },
   bentoRow: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 10,
+    borderRadius: 14,
     borderWidth: 1,
-    paddingVertical: 9,
-    paddingHorizontal: 4,
+    paddingVertical: 12,
+    paddingHorizontal: 6,
     marginTop: "auto",
   },
   bentoCol: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 2,
-    gap: 2,
+    paddingHorizontal: 4,
+    gap: 4,
     minWidth: 0,
   },
   bentoDivider: {
@@ -2218,13 +2335,13 @@ const styles = StyleSheet.create({
     height: "75%",
   },
   bentoLabel: {
-    fontSize: 8.5,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: 0.1,
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 0.6,
     textAlign: "center",
   },
   bentoVal: {
-    fontSize: 12,
+    fontSize: 15,
     fontFamily: "Inter_700Bold",
     textAlign: "center",
   },
@@ -2232,8 +2349,93 @@ const styles = StyleSheet.create({
     maxHeight: 250,
     marginVertical: 3,
   },
+  insightBlock: {
+    borderTopWidth: 1,
+    borderStyle: "dashed",
+    paddingTop: 12,
+    marginTop: 2,
+    gap: 9,
+  },
+  insightTitle: {
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.8,
+  },
+  insightRow: {
+    gap: 5,
+  },
+  insightRowHead: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 8,
+  },
+  insightName: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+  },
+  insightValue: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+  },
+  insightTrack: {
+    height: 6,
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  insightFill: {
+    height: "100%",
+    borderRadius: 3,
+  },
+  ratioRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  ratioTile: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
+    alignItems: "center",
+    gap: 4,
+  },
+  ratioValue: {
+    fontSize: 18,
+    fontFamily: "Inter_800ExtraBold",
+    letterSpacing: -0.3,
+  },
+  scaleTrack: {
+    height: 8,
+    borderRadius: 4,
+    flexDirection: "row",
+    overflow: "visible",
+    position: "relative",
+  },
+  scaleZone: {
+    height: "100%",
+  },
+  scaleMarker: {
+    position: "absolute",
+    top: -4,
+    width: 16,
+    height: 16,
+    marginLeft: -8,
+    borderRadius: 8,
+    borderWidth: 3,
+  },
+  scaleTick: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+  },
+  ratioLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    textAlign: "center",
+  },
   categoryRankedList: {
-    gap: 6,
+    gap: 8,
     paddingVertical: 1,
   },
   dimensionToggleRow: {
@@ -2244,13 +2446,13 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   dimensionTab: {
-    paddingHorizontal: 12,
-    paddingVertical: 5.5,
-    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
     borderWidth: 1,
   },
   dimensionTabText: {
-    fontSize: 11,
+    fontSize: 13,
     fontFamily: "Inter_600SemiBold",
   },
   deptFilterSection: {
@@ -2261,7 +2463,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   deptFilterLabel: {
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: "Inter_700Bold",
     flexShrink: 0,
   },
@@ -2272,10 +2474,10 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   deptBreakdownCard: {
-    padding: 10,
-    borderRadius: 10,
-    marginBottom: 6,
-    gap: 6,
+    padding: 14,
+    borderRadius: 14,
+    marginBottom: 8,
+    gap: 10,
   },
   deptCardHeader: {
     flexDirection: "row",
@@ -2283,67 +2485,67 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   deptIcon: {
-    fontSize: 13,
+    fontSize: 14,
   },
   deptCardTitle: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: "Inter_700Bold",
     letterSpacing: -0.2,
   },
   deptKpiRow: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
-    paddingVertical: 5,
+    paddingVertical: 10,
     paddingHorizontal: 4,
   },
   deptKpiCol: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 2,
-    gap: 1.5,
+    paddingHorizontal: 4,
+    gap: 3,
   },
   deptKpiDivider: {
     width: 1,
     height: "70%",
   },
   deptKpiLabel: {
-    fontSize: 8.5,
+    fontSize: 11,
     fontFamily: "Inter_600SemiBold",
     letterSpacing: 0.1,
   },
   deptKpiVal: {
-    fontSize: 11,
+    fontSize: 13,
     fontFamily: "Inter_700Bold",
   },
   deptUsageRow: {
-    gap: 2.5,
+    gap: 6,
   },
   deptUsageLabel: {
-    fontSize: 9.5,
+    fontSize: 11,
     fontFamily: "Inter_500Medium",
   },
   deptUsagePct: {
-    fontSize: 9.5,
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
   },
   deptProgressTrack: {
-    height: 4.5,
-    borderRadius: 2.5,
+    height: 6,
+    borderRadius: 3,
     overflow: "hidden",
   },
   deptProgressFill: {
     height: "100%",
-    borderRadius: 2.5,
+    borderRadius: 3,
   },
   deptTapHint: {
     alignItems: "center",
     paddingTop: 1,
   },
   deptTapHintText: {
-    fontSize: 9.5,
+    fontSize: 11,
     fontFamily: "Inter_600SemiBold",
   },
   deptExpandedContent: {
@@ -2351,13 +2553,13 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   expandedSectionBox: {
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 1,
-    padding: 8,
-    gap: 5,
+    padding: 12,
+    gap: 8,
   },
   expandedSectionHeading: {
-    fontSize: 9,
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.4,
   },
@@ -2367,11 +2569,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   overviewLabel: {
-    fontSize: 10.5,
+    fontSize: 12,
     fontFamily: "Inter_500Medium",
   },
   overviewValue: {
-    fontSize: 10.5,
+    fontSize: 12,
     fontFamily: "Inter_700Bold",
   },
   expandedDivider: {
@@ -2389,7 +2591,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   emptyDeptCatText: {
-    fontSize: 10.5,
+    fontSize: 12,
     fontFamily: "Inter_400Regular",
     textAlign: "center",
   },
@@ -2403,77 +2605,77 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   deptCatName: {
-    fontSize: 10.5,
+    fontSize: 12,
     fontFamily: "Inter_500Medium",
     flex: 1,
     minWidth: 0,
   },
   deptCatAmt: {
-    fontSize: 10.5,
+    fontSize: 12,
     fontFamily: "Inter_600SemiBold",
   },
   deptCatPct: {
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: "Inter_700Bold",
   },
   deptCatTrack: {
-    height: 4,
-    borderRadius: 2,
+    height: 6,
+    borderRadius: 3,
     overflow: "hidden",
   },
   deptCatFill: {
     height: "100%",
-    borderRadius: 2,
+    borderRadius: 3,
   },
   deptDrillDownBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 7,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
     borderWidth: 1,
     alignItems: "center",
     marginTop: 3,
   },
   deptDrillDownBtnText: {
-    fontSize: 10.5,
+    fontSize: 12,
     fontFamily: "Inter_600SemiBold",
   },
   deptFilterChip: {
-    paddingHorizontal: 9,
-    paddingVertical: 3.5,
-    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
     borderWidth: 1,
   },
   deptFilterChipText: {
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: "Inter_600SemiBold",
   },
   inspectorCard: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
     borderWidth: 1,
     gap: 8,
     marginVertical: 2,
   },
   inspectorTitle: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: "Inter_700Bold",
   },
   inspectorSub: {
-    fontSize: 10.5,
+    fontSize: 12,
     fontFamily: "Inter_500Medium",
   },
   inspectLinkBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
     borderWidth: 1,
   },
   inspectLinkText: {
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: "Inter_700Bold",
   },
   inspectCloseBtn: {
@@ -2485,11 +2687,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   distItemCard: {
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 9,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 12,
     borderWidth: 1,
-    gap: 5,
+    gap: 8,
   },
   distItemTopRow: {
     flexDirection: "row",
@@ -2497,17 +2699,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   itemCountBadge: {
-    paddingHorizontal: 5,
-    paddingVertical: 1,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
     borderRadius: 6,
   },
   itemCountText: {
-    fontSize: 9,
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
   },
   itemPctBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 1.5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: 8,
     borderWidth: 1,
     minWidth: 42,
@@ -2515,7 +2717,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   itemPctBadgeText: {
-    fontSize: 9.5,
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
   },
   distItemBottomRow: {
@@ -2528,36 +2730,36 @@ const styles = StyleSheet.create({
     paddingTop: 1,
   },
   distItemSubtext: {
-    fontSize: 10.5,
+    fontSize: 12,
     fontFamily: "Inter_500Medium",
     flex: 1,
     minWidth: 160,
-    lineHeight: 14.5,
+    lineHeight: 17,
   },
   distItemLink: {
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: "Inter_700Bold",
     flexShrink: 0,
     alignSelf: "center",
   },
   clearFilterChip: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 12,
     borderWidth: 1,
     marginLeft: "auto",
   },
   clearFilterText: {
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: "Inter_600SemiBold",
   },
   rankedRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 10,
-    paddingVertical: 5.5,
-    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
     borderWidth: 1,
   },
   rankedLeft: {
@@ -2568,13 +2770,13 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   catColorDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     flexShrink: 0,
   },
   rankedCatName: {
-    fontSize: 11,
+    fontSize: 13,
     fontFamily: "Inter_600SemiBold",
     flex: 1,
   },
@@ -2585,11 +2787,11 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   rankedAmount: {
-    fontSize: 11,
+    fontSize: 13,
     fontFamily: "Inter_700Bold",
   },
   rankedPct: {
-    fontSize: 10.5,
+    fontSize: 12,
     fontFamily: "Inter_600SemiBold",
     minWidth: 38,
     textAlign: "right",
@@ -2599,15 +2801,15 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   expandText: {
-    fontSize: 11,
+    fontSize: 13,
     fontFamily: "Inter_600SemiBold",
   },
   shareBarsWrap: {
-    gap: 6,
+    gap: 10,
     marginVertical: 4,
   },
   shareBarRow: {
-    gap: 3,
+    gap: 6,
   },
   shareBarHeader: {
     flexDirection: "row",
@@ -2615,24 +2817,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   shareBarName: {
-    fontSize: 10.5,
+    fontSize: 12,
     fontFamily: "Inter_600SemiBold",
     flex: 1,
     minWidth: 0,
   },
   shareBarPct: {
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: "Inter_700Bold",
     flexShrink: 0,
   },
   shareBarTrack: {
-    height: 5,
-    borderRadius: 2.5,
+    height: 6,
+    borderRadius: 3,
     overflow: "hidden",
   },
   shareBarFill: {
     height: "100%",
-    borderRadius: 2.5,
+    borderRadius: 3,
   },
   emptyContainer: {
     paddingVertical: 24,
@@ -2640,7 +2842,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   emptyText: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: "Inter_400Regular",
   },
 });

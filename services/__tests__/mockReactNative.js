@@ -28,7 +28,15 @@ Module.prototype.require = function (id) {
     return asyncStorageMock;
   }
   if (id === "react-native") {
-    return require("react-native-web");
+    try {
+      return origRequire.call(this, "react-native-web");
+    } catch {
+      return {
+        Platform: { OS: "web", select: (obj) => obj.web || obj.default },
+        Share: { share: async () => {} },
+        StyleSheet: { create: (s) => s },
+      };
+    }
   }
   if (id === "expo-file-system/legacy" || id === "expo-file-system") {
     return {

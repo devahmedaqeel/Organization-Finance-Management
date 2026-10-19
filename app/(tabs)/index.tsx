@@ -2,10 +2,12 @@ import { Feather } from "@/components/UniversalIcon";
 import { router } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
+import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Path, Stop } from "react-native-svg";
 import React, { useMemo, useState, useEffect, useCallback } from "react";
 import {
   ActivityIndicator,
   Animated,
+  AppState,
   BackHandler,
   Dimensions,
   KeyboardAvoidingView,
@@ -35,9 +37,11 @@ import { useFinance, Department } from "@/context/FinanceContext";
 import { WebDepartmentStaffModal } from "@/components/web/modals/WebDepartmentStaffModal";
 import { useSettings } from "@/context/SettingsContext";
 import { useColors } from "@/hooks/useColors";
+import { can } from "@/services/permissionService";
 import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
 import { WORLD_CURRENCIES } from "@/constants/currencies";
 import { useResponsive } from "@/hooks/useResponsive";
+import { screenTopPadding } from "@/utils/layout";
 import {
   NormalizedPeriod,
   getPresetPeriod,
@@ -46,6 +50,7 @@ import {
   getBudgetInsight,
   getNobInsight,
   getExpenseDistributionInsight,
+  buildMonthlySeries,
 } from "@/services/DatePeriodService";
 import {
   buildAuthoritativeFinancialModel,
@@ -113,7 +118,7 @@ function AnimatedQuickAction({
 
   const handlePressIn = () => {
     Animated.spring(scale, {
-      toValue: 0.94,
+      toValue: 0.97,
       useNativeDriver: true,
       speed: 50,
       bounciness: 4,
@@ -130,7 +135,7 @@ function AnimatedQuickAction({
   };
 
   return (
-    <Animated.View style={{ width: "48.5%", marginBottom: 10, transform: [{ scale }] }}>
+    <Animated.View style={{ width: "48.5%", marginBottom: 12, transform: [{ scale }] }}>
       <TouchableOpacity
         style={[
           styles.actionCard,
@@ -148,29 +153,270 @@ function AnimatedQuickAction({
         activeOpacity={0.88}
       >
         <View style={styles.actionTopRow}>
-          <View style={[styles.actionIconWrap, { backgroundColor: color + "20" }]}>
+          <View style={[styles.actionIconWrap, { backgroundColor: color + (colors.isDark ? "2A" : "16") }]}>
             <Feather name={icon} size={18} color={color} />
           </View>
           {badge && (
-            <View style={[styles.actionBadge, { backgroundColor: color + "18", borderColor: color + "35" }]}>
-              <Text
-                style={[styles.actionBadgeText, { color }]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.75}
-              >
+            <View style={[styles.actionBadge, { backgroundColor: color + (colors.isDark ? "26" : "14") }]}>
+              <Text style={[styles.actionBadgeText, { color }]} numberOfLines={1}>
                 {badge}
               </Text>
             </View>
           )}
         </View>
         <View style={{ gap: 2 }}>
-          <Text style={[styles.actionTitleText, { color: colors.foreground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8}>
+          <Text style={[styles.actionTitleText, { color: colors.foreground }]} numberOfLines={1}>
             {label}
           </Text>
-          <Text style={[styles.actionSubText, { color: colors.mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+          <Text style={[styles.actionSubText, { color: colors.mutedForeground }]} numberOfLines={1}>
             {sub}
           </Text>
+        </View>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+}
+
+type KpiSegment = { pct: number; color: string };
+
+/** Bar width for a real percentage: exact, clamped to 0–100, with a hairline minimum only when the value is non-zero. */
+function barWidth(pct: number): number {
+  if (!isFinite(pct) || pct <= 0) return 0;
+  return Math.min(Math.max(pct, 1.5), 100);
+}
+
+/** Area sparkline (react-native-svg) with optional month labels; flat baseline when every value is zero. */
+function Sparkline({
+  data,
+  color,
+  labels,
+  height = 44,
+}: {
+  data: number[];
+  color: string;
+  labels?: string[];
+  height?: number;
+}) {
+  const colors = useColors();
+  const [w, setW] = useState(0);
+  const gradId = `spark${React.useId().replace(/[^a-zA-Z0-9]/g, "")}`;
+  const max = Math.max(...data, 0);
+  const n = data.length;
+  const inset = 4; // keep the end dots inside the drawing area
+  const pts = data.map((v, i) => ({
+    x: n > 1 ? inset + (i / (n - 1)) * (w - inset * 2) : w / 2,
+    y: max > 0 ? height - 4 - (v / max) * (height - 10) : height - 4,
+  }));
+  const line = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+  const area = pts.length ? `${line} L${pts[pts.length - 1].x.toFixed(1)},${height} L${pts[0].x.toFixed(1)},${height} Z` : "";
+  const last = pts[pts.length - 1];
+
+  return (
+    <View onLayout={(e) => setW(Math.round(e.nativeEvent.layout.width))}>
+      <View style={{ height }}>
+        {w > 0 && pts.length > 0 ? (
+          <Svg width={w} height={height}>
+            <Defs>
+              <SvgLinearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor={color} stopOpacity={0.3} />
+                <Stop offset="1" stopColor={color} stopOpacity={0} />
+              </SvgLinearGradient>
+            </Defs>
+            <Path d={area} fill={`url(#${gradId})`} />
+            <Path d={line} fill="none" stroke={color} strokeWidth={2.2} strokeLinejoin="round" strokeLinecap="round" />
+            {pts.map((p, i) => (
+              <Circle key={i} cx={p.x} cy={p.y} r={i === pts.length - 1 ? 3.5 : 1.8} fill={i === pts.length - 1 ? color : colors.card} stroke={color} strokeWidth={1.4} />
+            ))}
+            {last ? <Circle cx={last.x} cy={last.y} r={7} fill={color} opacity={0.15} /> : null}
+          </Svg>
+        ) : null}
+      </View>
+      {labels && labels.length === n ? (
+        <View style={styles.sparkLabels}>
+          {labels.map((l, i) => (
+            <Text
+              key={`${l}-${i}`}
+              style={[
+                styles.sparkLabel,
+                { color: i === n - 1 ? color : colors.mutedForeground, fontFamily: i === n - 1 ? "Inter_700Bold" : "Inter_500Medium" },
+              ]}
+            >
+              {l}
+            </Text>
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * Dashboard KPI box.
+ *  "wide"    → full-width: amount + this-month figures on the left, labelled 6-month chart on the right.
+ *  "compact" → half-width: amount, exact progress bar and a wrapping caption (no truncated text).
+ */
+function KpiCard({
+  layout = "compact",
+  icon,
+  color,
+  label,
+  prefix,
+  value,
+  subValue,
+  valueColor,
+  tag,
+  tagColor,
+  spark,
+  segments,
+  footLeft,
+  footLeftColor,
+  footRight,
+  footRightColor,
+  footStats,
+  onPress,
+}: {
+  layout?: "wide" | "compact";
+  icon: any;
+  color: string;
+  label: string;
+  /** Small text before the amount, e.g. "+PKR" */
+  prefix?: string;
+  value: string;
+  /** Small explanatory line under the amount */
+  subValue?: string;
+  valueColor?: string;
+  tag?: string | null;
+  tagColor?: string;
+  spark?: { data: number[]; labels?: string[]; caption: string; change?: string | null; changeColor?: string };
+  segments: KpiSegment[];
+  footLeft: string;
+  footLeftColor?: string;
+  footRight?: string | null;
+  footRightColor?: string;
+  /** Optional labelled figures shown under the bar instead of the single caption row; an empty value shows the label alone */
+  footStats?: Array<{ value: string; label: string; color?: string }>;
+  onPress: () => void;
+}) {
+  const colors = useColors();
+  const scale = React.useRef(new Animated.Value(1)).current;
+  const spring = (toValue: number) =>
+    Animated.spring(scale, { toValue, useNativeDriver: true, speed: 50, bounciness: 5 }).start();
+  const statusColor = tagColor ?? color;
+  const wide = layout === "wide";
+
+  const amount = (
+    <Text
+      style={[styles.kpiValueText, wide && styles.kpiValueWide, { color: valueColor ?? colors.foreground }]}
+      numberOfLines={Platform.OS === "web" ? undefined : 1}
+      adjustsFontSizeToFit
+      minimumFontScale={0.6}
+    >
+      {prefix ? <Text style={[styles.kpiValuePrefix, { color: colors.mutedForeground }]}>{prefix} </Text> : null}
+      {value}
+    </Text>
+  );
+
+  return (
+    <Animated.View style={[styles.kpiCell, { transform: [{ scale }] }]}>
+      <TouchableOpacity
+        style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+        onPressIn={() => spring(0.98)}
+        onPressOut={() => spring(1)}
+        onPress={() => {
+          if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          onPress();
+        }}
+        activeOpacity={0.92}
+        accessibilityRole="button"
+        accessibilityLabel={`${label}: ${prefix ? prefix + " " : ""}${value}`}
+      >
+        {/* Soft accent glow in the corner */}
+        <LinearGradient
+          colors={[color + (colors.isDark ? "26" : "14"), color + "00"]}
+          start={{ x: 1, y: 0 }}
+          end={{ x: 0.25, y: 0.85 }}
+          style={StyleSheet.absoluteFill}
+          pointerEvents="none"
+        />
+
+        {/* Icon · label · status */}
+        <View style={styles.kpiTopRow}>
+          <View style={[styles.kpiIconWrap, { backgroundColor: color + (colors.isDark ? "2E" : "1A") }]}>
+            <Feather name={icon} size={17} color={color} />
+          </View>
+          {wide ? (
+            <Text style={[styles.kpiLabelText, { color: colors.foreground }]} numberOfLines={2}>
+              {label}
+            </Text>
+          ) : (
+            <View style={{ flex: 1 }} />
+          )}
+          {tag ? (
+            <View style={[styles.kpiTag, { backgroundColor: statusColor + (colors.isDark ? "2A" : "16") }]}>
+              <Text style={[styles.kpiTagText, { color: statusColor }]}>{tag}</Text>
+            </View>
+          ) : (
+            <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+          )}
+        </View>
+
+        {wide && spark ? (
+          <View style={styles.kpiWideBody}>
+            <View style={styles.kpiWideLeft}>
+              {amount}
+              <Text style={[styles.kpiMonthText, { color: colors.mutedForeground }]}>{spark.caption}</Text>
+              {spark.change ? (
+                <View style={[styles.kpiChangePill, { backgroundColor: (spark.changeColor ?? colors.mutedForeground) + "16" }]}>
+                  <Text style={[styles.kpiChangeText, { color: spark.changeColor ?? colors.mutedForeground }]}>{spark.change}</Text>
+                </View>
+              ) : null}
+            </View>
+            <View style={styles.kpiWideChart}>
+              <Sparkline data={spark.data} labels={spark.labels} color={color} />
+            </View>
+          </View>
+        ) : (
+          <View style={styles.kpiCompactBody}>
+            <Text style={[styles.kpiLabelText, { color: colors.foreground }]}>{label}</Text>
+            {amount}
+            {subValue ? <Text style={[styles.kpiSubValue, { color: colors.mutedForeground }]}>{subValue}</Text> : null}
+          </View>
+        )}
+
+        <View style={styles.kpiFooter}>
+          <View style={[styles.kpiTrack, { backgroundColor: colors.muted }]}>
+            {segments.map((s, i) => (
+              <View
+                key={i}
+                style={{
+                  height: "100%",
+                  width: `${barWidth(s.pct)}%`,
+                  backgroundColor: s.color,
+                  borderTopLeftRadius: i === 0 ? 4 : 0,
+                  borderBottomLeftRadius: i === 0 ? 4 : 0,
+                  borderTopRightRadius: i === segments.length - 1 ? 4 : 0,
+                  borderBottomRightRadius: i === segments.length - 1 ? 4 : 0,
+                }}
+              />
+            ))}
+          </View>
+          {footStats && footStats.length > 0 ? (
+            <View style={styles.kpiStatList}>
+              {footStats.map((s) => (
+                <View key={s.label} style={styles.kpiStatRow}>
+                  {s.value ? <Text style={[styles.kpiStatValue, { color: s.color ?? colors.foreground }]}>{s.value}</Text> : null}
+                  <Text style={[styles.kpiStatLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.kpiFootRow}>
+              <Text style={[styles.kpiCaption, { color: footLeftColor ?? colors.mutedForeground }]}>{footLeft}</Text>
+              {footRight ? (
+                <Text style={[styles.kpiFootRight, { color: footRightColor ?? colors.foreground }]}>{footRight}</Text>
+              ) : null}
+            </View>
+          )}
         </View>
       </TouchableOpacity>
     </Animated.View>
@@ -224,34 +470,35 @@ export default function DashboardScreen() {
   const selectedCurrency = useMemo(() => WORLD_CURRENCIES.find(c => c.code === settings.currency), [settings.currency]);
   const orgDisplayName = settings.organizationName || user?.organization || "Organization Finance Management";
 
-  // Dynamic maximum width calculation for the organization badge pill
-  // Hugs short names cleanly; expands for longer names without crowding header controls
-  const maxOrgBadgeWidth = useMemo(() => {
-    const availableHeaderWidth = width - (hPad * 2);
-    // headerActions reserve: bell (32) + gap (6) + roleBadge (~60) + gap (6) + logout (32) + header gap (8) = ~144px
-    const actionsReserve = isSmall ? 138 : 146;
-    const dynamicMax = Math.max(130, availableHeaderWidth - actionsReserve);
-    return isTablet ? Math.min(dynamicMax, 380) : dynamicMax;
-  }, [width, hPad, isSmall, isTablet]);
-
-  const dynamicOrgFontSize = useMemo(() => {
-    const len = orgDisplayName.length;
-    if (len <= 14) return 12;
-    if (len <= 22) return 11.5;
-    if (len <= 34) return 10.5;
-    return 9.8;
-  }, [orgDisplayName]);
-
-  const dynamicOrgLineHeight = useMemo(() => {
-    const len = orgDisplayName.length;
-    if (len <= 14) return 15;
-    if (len <= 22) return 14.5;
-    if (len <= 34) return 13.5;
-    return 12.8;
-  }, [orgDisplayName]);
+  // First name and a time-of-day greeting for the header
+  const firstName = (user?.name || "").trim().split(/\s+/)[0] || "there";
+  // Greeting follows the phone's clock: re-checked every minute and whenever the app comes back to the foreground
+  const [clockHour, setClockHour] = useState(() => new Date().getHours());
+  useEffect(() => {
+    const tick = () => setClockHour(new Date().getHours());
+    const timer = setInterval(tick, 60_000);
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") tick();
+    });
+    return () => {
+      clearInterval(timer);
+      sub.remove();
+    };
+  }, []);
+  const greetingText =
+    clockHour >= 5 && clockHour < 12
+      ? "Good morning"
+      : clockHour >= 12 && clockHour < 17
+      ? "Good afternoon"
+      : clockHour >= 17 && clockHour < 21
+      ? "Good evening"
+      : "Good night";
   const webTop = Platform.OS === "web" ? 67 : 0;
   const isDark = colors.background === "#0B1120" || (settings.theme === "dark");
   const roleKey = (user?.role || "admin").toLowerCase();
+  // Role chip next to the bell: readable title + matching icon
+  const roleTitle = roleKey.charAt(0).toUpperCase() + roleKey.slice(1);
+  const roleIcon = ({ admin: "shield", accountant: "edit-3", manager: "briefcase", employee: "user" } as Record<string, string>)[roleKey] ?? "user";
   const activeRoleBadgeStyle = (ROLE_BADGE_STYLES[roleKey] ?? ROLE_BADGE_STYLES.admin)[isDark ? "dark" : "light"];
   const roleColor = activeRoleBadgeStyle.text;
   const [balanceViewMode, setBalanceViewMode] = useState<"cashflow" | "expenses">("cashflow");
@@ -486,14 +733,130 @@ export default function DashboardScreen() {
   const incomeGrowth = prevMonthIncome > 0 ? ((curMonthIncome - prevMonthIncome) / prevMonthIncome) * 100 : (curMonthIncome > 0 ? 100 : 0);
   const chartWidth = chartW;
 
+  // ─── KPI box values (status rules unchanged; bars use the exact percentages they describe) ───
+  const overBudget = totalBudgetSpent > totalAllocatedBudget;
+
+  // Inflow bar = share of inflow still available (unallocated when budgets exist, otherwise retained)
+  const inflowKeptPct = totalIncome === 0 || isEffectiveDeficit
+    ? 0
+    : totalAllocatedBudget > 0
+    ? (unallocatedFunds / totalIncome) * 100
+    : incomeRetainedPct;
+
+  const expenseStatusColor = totalExpenses === 0
+    ? colors.income
+    : totalAllocatedBudget > 0
+    ? overBudget ? colors.expense : colors.primary
+    : isDeficit
+    ? colors.expense
+    : totalExpenses === totalIncome
+    ? colors.warning
+    : colors.primary;
+  const expenseStatusText = totalExpenses === 0
+    ? "No Outflow"
+    : totalAllocatedBudget > 0
+    ? overBudget ? "Over Budget" : "Within Budget"
+    : isDeficit
+    ? "Over Inflow"
+    : totalExpenses === totalIncome
+    ? "Break-even"
+    : null;
+  // Expense bar = total expenses as a share of total inflow (exactly what the box amount relates to).
+  // Budget usage has its own box, so it is not mixed in here. No inflow → no percentage is invented.
+  const expenseOfInflowPct = totalIncome > 0 ? (totalExpenses / totalIncome) * 100 : 0;
+  const expenseBarPct = totalExpenses === 0 ? 0 : totalIncome > 0 ? expenseOfInflowPct : 100;
+  const expenseBarColor = totalExpenses === 0
+    ? colors.income
+    : isEffectiveDeficit || expenseBarPct > 100
+    ? colors.expense
+    : expenseBarPct > 85
+    ? colors.warning
+    : colors.income;
+
+  // What the budget covers: departments with a budget, or budget lines when no department has one
+  const budgetedDeptCount = departments.filter((d) => (d.budgetAllocated || 0) > 0).length;
+  const budgetScopeLabel = budgetedDeptCount > 0
+    ? `${budgetedDeptCount} ${budgetedDeptCount === 1 ? "department" : "departments"}`
+    : budgets.length > 0
+    ? `${budgets.length} budget ${budgets.length === 1 ? "line" : "lines"}`
+    : "";
+
+  const budgetColor = totalAllocatedBudget === 0
+    ? colors.mutedForeground
+    : netBudgetUtilization > 100
+    ? colors.expense
+    : netBudgetUtilization > 80
+    ? colors.warning
+    : "#3B82F6";
+
+  // Payroll counted exactly as the ledger books it (FinanceContext): skip failed payments,
+  // use the saved net salary when present, and ignore non-positive amounts.
+  const activePayroll = payroll.filter((p) => p && (p as any).paymentStatus !== "failed");
+  const payrollNet = (p: (typeof payroll)[number]) => {
+    const saved = p.netSalary == null ? NaN : Number(p.netSalary);
+    return Number.isFinite(saved) ? saved : (p.baseSalary || 0) + (p.bonus || 0) - (p.deductions || 0);
+  };
+  const payrollTotal = activePayroll.reduce((s, p) => s + Math.max(payrollNet(p), 0), 0);
+  // Unique people, not payroll entries (one employee paid for 6 months is 1 staff member)
+  const staffCount = new Set(activePayroll.map((p) => (p.employeeId || p.employeeName || p.id).trim().toLowerCase())).size;
+  // Payroll to date as a share of total inflow (same all-time basis on both sides).
+  // null = no base to compare with, so nothing is invented (no NaN / Infinity).
+  const payrollShareOf = (base: number): number | null =>
+    base > 0 && Number.isFinite(payrollTotal) ? (payrollTotal / base) * 100 : null;
+  const payrollOfInflowPct = payrollShareOf(totalIncome);
+  // Average net salary per payslip, and the most recent payroll month (YYYY-MM → "Oct 2026")
+  const avgNetSalary = activePayroll.length > 0 ? payrollTotal / activePayroll.length : 0;
+  const lastPayrollKey = activePayroll.reduce((latest, p) => {
+    const k = (p.month || p.createdAt || "").slice(0, 7);
+    return /^\d{4}-\d{2}$/.test(k) && k > latest ? k : latest;
+  }, "");
+  const lastPayrollLabel = lastPayrollKey
+    ? `${ALL_MONTHS[Number(lastPayrollKey.slice(5, 7)) - 1]} ${lastPayrollKey.slice(0, 4)}`
+    : "";
+  /** Percentage text that never rounds a near value onto 100% or 0% (99.6% stays 99.6%, not 100%). */
+  const exactPctText = (p: number): string => {
+    if (Number.isInteger(p)) return `${p}%`;
+    let digits = p < 1 || (p > 99 && p < 101) ? 1 : 0;
+    let text = p.toFixed(digits);
+    while (digits < 4 && /^(100|0)(\.0+)?$/.test(text)) {
+      digits++;
+      text = p.toFixed(digits);
+    }
+    return `${text}%`;
+  };
+
+  // Last 6 calendar months (oldest → current) for the trend lines — same counting rules as the totals
+  const sixMonths = useMemo(() => buildMonthlySeries(transactions, 6), [transactions]);
+
+  /** "▲ 12% vs last month" style label comparing the current month with the previous one. */
+  const monthChange = (series: number[], goodWhenUp: boolean) => {
+    const cur = series[series.length - 1];
+    const prev = series[series.length - 2];
+    if (prev <= 0) return cur > 0 ? { text: "New this month", color: colors.mutedForeground } : null;
+    const pct = ((cur - prev) / prev) * 100;
+    if (Math.abs(pct) < 0.5) return { text: "Same as last month", color: colors.mutedForeground };
+    const up = pct > 0;
+    return {
+      text: `${up ? "▲" : "▼"} ${Math.abs(pct).toFixed(0)}% vs last month`,
+      color: up === goodWhenUp ? colors.income : colors.expense,
+    };
+  };
+  const thisMonthIncome = sixMonths.income[sixMonths.income.length - 1];
+  const thisMonthExpense = sixMonths.expense[sixMonths.expense.length - 1];
+  const thisMonthCount = sixMonths.count[sixMonths.count.length - 1];
+  const inflowChange = monthChange(sixMonths.income, true);
+  const expenseChange = monthChange(sixMonths.expense, false);
+  const txChange = monthChange(sixMonths.count, true);
+  const fmtPct = (p: number) => `${p > 0 && p < 1 ? p.toFixed(1) : Math.round(p)}%`;
+
   return (
     <ScrollView
       style={[styles.flex, { backgroundColor: colors.background }]}
       contentContainerStyle={[
         styles.container,
         {
-          paddingTop: Platform.OS === "web" ? 67 + insets.top + 12 : Math.max(insets.top, 20) + 14,
-          paddingBottom: Math.max(insets.bottom, 16) + 95,
+          paddingTop: Platform.OS === "web" ? 67 + insets.top + 12 : screenTopPadding(insets.top),
+          paddingBottom: 24, // tab bar is docked and already reserves the bottom inset
           paddingHorizontal: hPad,
         },
       ]}
@@ -507,52 +870,46 @@ export default function DashboardScreen() {
         />
       }
     >
-      {/* ─── Executive 2-Tier Header ─── */}
+      {/* ─── Header: greeting · organization + role · notifications · logout ─── */}
       <View style={styles.headerContainer}>
-        {/* Tier 1: Brand / Organization & Action Controls */}
-        <View style={styles.headerTopBar}>
-          <View
-            style={[
-              styles.orgBadge,
-              {
-                backgroundColor: colors.card,
-                borderColor: colors.border,
-                maxWidth: maxOrgBadgeWidth,
-              },
-            ]}
-          >
-            <Text style={{ fontSize: 13, transform: [{ translateY: Platform.OS === 'ios' ? 0.5 : 0 }] }}>{selectedCurrency?.flag ?? "🌐"}</Text>
-            <Text
-              style={[
-                styles.orgName,
-                {
-                  color: colors.mutedForeground,
-                  fontSize: dynamicOrgFontSize,
-                  lineHeight: dynamicOrgLineHeight,
-                  letterSpacing: orgDisplayName.length > 24 ? -0.2 : 0,
-                },
-              ]}
-              numberOfLines={2}
-              adjustsFontSizeToFit
-              minimumFontScale={0.72}
-            >
+        <View style={styles.identityRow}>
+          <View style={styles.identityText}>
+            <View style={styles.greetingRow}>
+              <View
+                style={[styles.syncDot, { backgroundColor: syncStatus === "synced" ? "#10B981" : "#F59E0B" }]}
+                accessibilityLabel={syncStatus === "synced" ? "Cloud sync up to date" : "Syncing"}
+              />
+              <Text style={[styles.greeting, { color: colors.mutedForeground }]} numberOfLines={1}>
+                {greetingText}, {firstName}
+              </Text>
+            </View>
+            <Text style={[styles.name, { color: colors.foreground }]} numberOfLines={1}>
               {orgDisplayName}
             </Text>
           </View>
 
           <View style={styles.headerActions}>
+            <View
+              style={[styles.roleChip, { backgroundColor: activeRoleBadgeStyle.bg, borderColor: activeRoleBadgeStyle.border }]}
+              accessibilityLabel={`Your role: ${roleTitle}`}
+            >
+              <Feather name={roleIcon as any} size={14} color={activeRoleBadgeStyle.text} />
+              <Text style={[styles.roleChipText, { color: activeRoleBadgeStyle.text }]} numberOfLines={1}>
+                {roleTitle}
+              </Text>
+            </View>
             <TouchableOpacity
               onPress={() => {
                 if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 setNotificationModalVisible(true);
               }}
-              style={[styles.iconBtn, { borderColor: colors.border, backgroundColor: colors.card, position: "relative" }]}
+              style={[styles.iconBtn, { borderColor: colors.border, backgroundColor: colors.card }]}
               activeOpacity={0.7}
-              accessibilityLabel="Notifications"
+              accessibilityLabel={unreadNotificationCount > 0 ? `Notifications, ${unreadNotificationCount} unread` : "Notifications"}
             >
-              <Feather name="bell" size={15} color={colors.foreground} />
+              <Feather name="bell" size={18} color={colors.foreground} />
               {unreadNotificationCount > 0 && (
-                <View style={styles.notifBadge}>
+                <View style={[styles.notifBadge, { borderColor: colors.background }]}>
                   <Text style={styles.notifBadgeText}>
                     {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
                   </Text>
@@ -560,81 +917,17 @@ export default function DashboardScreen() {
               )}
             </TouchableOpacity>
 
-            <View
-              style={[
-                styles.roleBadge,
-                {
-                  backgroundColor: activeRoleBadgeStyle.bg,
-                  borderColor: activeRoleBadgeStyle.border,
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.roleText,
-                  { color: activeRoleBadgeStyle.text },
-                ]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.85}
-              >
-                {(user?.role || "admin").toUpperCase()}
-              </Text>
-            </View>
-
             <TouchableOpacity
               onPress={() => {
                 if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 setLogoutModalVisible(true);
               }}
-              style={[styles.iconBtn, styles.logoutIconBtn, { borderColor: colors.border, backgroundColor: colors.card }]}
+              style={[styles.iconBtn, styles.logoutIconBtn]}
               activeOpacity={0.7}
               accessibilityLabel="Log Out"
             >
-              <Feather name="log-out" size={15} color="#EF4444" />
+              <Feather name="log-out" size={17} color="#EF4444" />
             </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Tier 2: User Identity & Live Sync Status */}
-        <View style={styles.headerUserBar}>
-          <View style={styles.userNameWrap}>
-            <Text
-              style={[styles.name, { color: colors.foreground }]}
-              numberOfLines={2}
-              adjustsFontSizeToFit
-              minimumFontScale={0.8}
-            >
-              {user?.name ?? "User"}
-            </Text>
-          </View>
-
-          <View
-            style={[
-              styles.syncBadge,
-              {
-                backgroundColor: syncStatus === "synced" ? "rgba(16, 185, 129, 0.12)" : "rgba(245, 158, 11, 0.12)",
-                borderColor: syncStatus === "synced" ? "rgba(16, 185, 129, 0.3)" : "rgba(245, 158, 11, 0.3)",
-              },
-            ]}
-          >
-            <View
-              style={[
-                styles.syncDot,
-                { backgroundColor: syncStatus === "synced" ? "#10B981" : "#F59E0B" },
-              ]}
-            />
-            <Text
-              style={[
-                styles.syncText,
-                { color: syncStatus === "synced" ? "#10B981" : "#F59E0B" },
-              ]}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.85}
-            >
-              {syncStatus === "synced" ? "Cloud Sync" : "Syncing..."}
-            </Text>
           </View>
         </View>
       </View>
@@ -649,7 +942,8 @@ export default function DashboardScreen() {
           {
             borderRadius: 22,
             padding: 18,
-            borderWidth: 1.2,
+            gap: 16,
+            borderWidth: 1,
             borderColor: "rgba(255, 255, 255, 0.18)",
             shadowColor: "#1d4ed8",
             shadowOffset: { width: 0, height: 10 },
@@ -658,7 +952,7 @@ export default function DashboardScreen() {
             elevation: 10,
             overflow: "hidden",
             position: "relative",
-            marginBottom: 16,
+            marginBottom: 4,
           },
         ]}
       >
@@ -667,715 +961,347 @@ export default function DashboardScreen() {
         <View style={styles.ambientGlowBottomLeft} pointerEvents="none" />
 
         {/* Top Row: Title + Privacy Eye + Fiscal Dossier Button */}
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1, minWidth: 0, marginRight: 8 }}>
-            <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: "rgba(56, 189, 248, 0.18)", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <Feather name="shield" size={11} color="#38BDF8" />
+        <View style={styles.heroTopRow}>
+          <View style={styles.heroLabelWrap}>
+            <View style={styles.heroLabelIcon}>
+              <Feather name="shield" size={12} color="#7DD3FC" />
             </View>
-            <Text
-              style={{
-                color: "#FFFFFF",
-                fontSize: width < 380 ? 11 : 12,
-                fontFamily: "Inter_800ExtraBold",
-                letterSpacing: 0.4,
-                flexShrink: 1,
-              }}
-              numberOfLines={2}
-              adjustsFontSizeToFit
-              minimumFontScale={0.8}
-            >
-              {balanceViewMode === "cashflow"
-                ? (width < 400 ? "AVAILABLE CASH" : "NET CASH / AVAILABLE CASH")
-                : (width < 400 ? "OUTFLOW AUDIT" : "TOTAL DISBURSEMENTS")}
+            <Text style={styles.heroLabel} numberOfLines={1}>
+              {balanceViewMode === "cashflow" ? "Net Cash Available" : "Total Disbursements"}
             </Text>
             <TouchableOpacity
               onPress={() => {
                 setHideBalance(!hideBalance);
                 if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               }}
-              style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: "rgba(255, 255, 255, 0.12)", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+              style={styles.heroEyeBtn}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               activeOpacity={0.7}
+              accessibilityLabel={hideBalance ? "Show balance" : "Hide balance"}
             >
-              <Feather name={hideBalance ? "eye-off" : "eye"} size={11} color="#FFFFFF" />
+              <Feather name={hideBalance ? "eye-off" : "eye"} size={13} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
 
           {/* Direct Trigger to Open Net Operating Balance Dossier */}
           <TouchableOpacity
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 4.5,
-              backgroundColor: "rgba(255, 255, 255, 0.12)",
-              paddingHorizontal: 8.5,
-              paddingVertical: 5.5,
-              borderRadius: 20,
-              borderWidth: 1,
-              borderColor: "rgba(255, 255, 255, 0.25)",
-              flexShrink: 0,
-            }}
+            style={styles.heroDossierPill}
             onPress={() => {
               if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               setNetModalVisible(true);
             }}
             activeOpacity={0.8}
           >
-            <Feather name="bar-chart-2" size={11} color="#38BDF8" style={{ flexShrink: 0 }} />
-            <Text
-              style={{
-                color: "#FFFFFF",
-                fontSize: 10.5,
-                fontFamily: "Inter_700Bold",
-                letterSpacing: 0.2,
-                flexShrink: 0,
-              }}
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.85}
-            >
-              Fiscal Dossier
-            </Text>
-            <Feather name="arrow-right" size={11} color="#FFFFFF" style={{ flexShrink: 0, marginLeft: 1 }} />
+            <Feather name="bar-chart-2" size={12} color="#7DD3FC" />
+            <Text style={styles.heroDossierText} numberOfLines={1}>Fiscal Dossier</Text>
+            <Feather name="chevron-right" size={13} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
 
-        {/* View Mode Switcher Pills (Symmetrical Side-by-Side Flex, 8px Gap, Zero Touch) */}
-        <View style={{ flexDirection: "row", gap: 8, marginBottom: 14 }}>
-          <TouchableOpacity
-            style={{
-              flex: 1,
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 4,
-              paddingHorizontal: 4,
-              paddingVertical: 5.5,
-              borderRadius: 10,
-              backgroundColor: balanceViewMode === "cashflow" ? "rgba(59, 130, 246, 0.30)" : "rgba(255, 255, 255, 0.08)",
-              borderWidth: 1.2,
-              borderColor: balanceViewMode === "cashflow" ? "#60A5FA" : "rgba(255, 255, 255, 0.15)",
-            }}
-            onPress={() => {
-              setBalanceViewMode("cashflow");
-              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            }}
-            activeOpacity={0.8}
-          >
-            <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: "#10B981", flexShrink: 0 }} />
-            <Text
-              style={{
-                color: balanceViewMode === "cashflow" ? "#FFFFFF" : "rgba(255, 255, 255, 0.75)",
-                fontSize: 9.5,
-                fontFamily: "Inter_700Bold",
-                textAlign: "center",
-              }}
-              numberOfLines={2}
-              adjustsFontSizeToFit
-              minimumFontScale={0.7}
-            >
-              Net Cash ({netCash >= 0 ? "+" : "-"}{settings.currency} {fmt(Math.abs(netCash))})
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={{
-              flex: 1,
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 4,
-              paddingHorizontal: 4,
-              paddingVertical: 5.5,
-              borderRadius: 10,
-              backgroundColor: balanceViewMode === "expenses" ? "rgba(244, 63, 94, 0.30)" : "rgba(255, 255, 255, 0.08)",
-              borderWidth: 1.2,
-              borderColor: balanceViewMode === "expenses" ? "#F43F5E" : "rgba(255, 255, 255, 0.15)",
-            }}
-            onPress={() => {
-              setBalanceViewMode("expenses");
-              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            }}
-            activeOpacity={0.8}
-          >
-            <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: "#F43F5E", flexShrink: 0 }} />
-            <Text
-              style={{
-                color: balanceViewMode === "expenses" ? "#FFFFFF" : "rgba(255, 255, 255, 0.75)",
-                fontSize: 9.5,
-                fontFamily: "Inter_700Bold",
-                textAlign: "center",
-              }}
-              numberOfLines={2}
-              adjustsFontSizeToFit
-              minimumFontScale={0.7}
-            >
-              Outflows (-{settings.currency} {fmt(totalExpenses)})
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Balance Hero Amount Display + Margin Pill (Matching Web Exactly) */}
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+        {/* Balance Hero Amount Display + Margin Pill */}
+        <View style={styles.heroAmountSection}>
           <TouchableOpacity
             onPress={() => {
               if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               setNetModalVisible(true);
             }}
             activeOpacity={0.85}
-            style={{ flex: 1, marginRight: 8 }}
+            style={{ flex: 1, minWidth: 0, marginRight: 10 }}
           >
-            {hideBalance ? (
-              <Text style={styles.heroAmountText} numberOfLines={1}>
-                {settings.currency} ••••••
-              </Text>
-            ) : (
-              <Text
-                style={[
-                  styles.heroAmountText,
-                  {
-                    fontSize: 30,
-                    color: balanceViewMode === "expenses" ? "#FB7185" : "#FFFFFF",
-                    fontFamily: "Inter_800ExtraBold",
-                    letterSpacing: -0.8,
-                  },
-                ]}
-                numberOfLines={2}
-                adjustsFontSizeToFit
-                minimumFontScale={0.6}
-              >
-                {`${currentHeroBalance >= 0 ? "+" : "-"}${settings.currency} ${fmt(Math.abs(currentHeroBalance))}`}
-              </Text>
-            )}
+            <Text
+              style={[styles.heroAmountText, { color: !hideBalance && balanceViewMode === "expenses" ? "#FDA4AF" : "#FFFFFF" }]}
+              numberOfLines={Platform.OS === "web" ? undefined : 1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.65}
+            >
+              {hideBalance
+                ? `${settings.currency} ••••••`
+                : `${currentHeroBalance >= 0 ? "+" : "-"}${settings.currency} ${fmt(Math.abs(currentHeroBalance))}`}
+            </Text>
           </TouchableOpacity>
 
-          {/* Growth Pill Badge Matching Web */}
           {heroBadgeText ? (
             <TouchableOpacity
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 5,
-                paddingHorizontal: 11,
-                paddingVertical: 6,
-                borderRadius: 18,
-                backgroundColor: heroBadgeBg,
-                borderWidth: 1.5,
-                borderColor: heroBadgeBorder,
-                flexShrink: 0,
-              }}
+              style={[styles.heroGrowthPill, { backgroundColor: heroBadgeBg, borderColor: heroBadgeBorder }]}
               onPress={() => {
                 if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 setNetModalVisible(true);
               }}
               activeOpacity={0.8}
             >
-              <Feather
-                name={heroBadgeIcon as any}
-                size={12}
-                color={heroBadgeColor}
-              />
-              <Text style={{ color: heroBadgeColor, fontSize: 12, fontFamily: "Inter_700Bold" }}>
-                {heroBadgeText}
-              </Text>
+              <Feather name={heroBadgeIcon as any} size={12} color={heroBadgeColor} />
+              <Text style={[styles.heroGrowthText, { color: heroBadgeColor }]}>{heroBadgeText}</Text>
             </TouchableOpacity>
           ) : null}
         </View>
 
         {/* Dynamic Cash Flow / Budget Status Bar & Labels */}
-        <View style={{ gap: 7, marginTop: 2 }}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-            <Text
-              style={{ color: "#CBD5E1", fontSize: 10.5, fontFamily: "Inter_600SemiBold", flexShrink: 1 }}
-              numberOfLines={2}
-              adjustsFontSizeToFit
-              minimumFontScale={0.75}
-            >
-              {totalAllocatedBudget > 0
-                ? `Available to Allocate: ${settings.currency} ${fmt(availableToAllocate)}`
-                : totalExpenses === 0
-                ? "0% Outflows"
-                : `${expensePctOfIncome}% Spent`}
-            </Text>
-            <Text
-              style={{
-                color: isEffectiveDeficit ? "#FB7185" : "#34D399",
-                fontSize: 10.5,
-                fontFamily: "Inter_700Bold",
-                textAlign: "right",
-                flexShrink: 1,
-              }}
-              numberOfLines={2}
-              adjustsFontSizeToFit
-              minimumFontScale={0.75}
-            >
-              {totalAllocatedBudget > 0
-                ? `Allocated: ${settings.currency} ${fmt(totalAllocatedBudget)} · Remaining: ${settings.currency} ${fmt(netBudgetRemaining)} (${budgetUsedPct}% Spent)`
-                : isDeficit
-                ? `Deficit (-${settings.currency} ${fmt(totalExpenses - totalIncome)})`
-                : `${incomeRetainedPct}% Retained`}
-            </Text>
-          </View>
-          <View style={{ height: 6, borderRadius: 3, backgroundColor: "rgba(255, 255, 255, 0.12)", overflow: "hidden" }}>
+        <View style={styles.retentionContainer}>
+          <View style={styles.retentionTrack}>
             <View
-              style={{
-                height: "100%",
-                borderRadius: 3,
-                width: `${totalAllocatedBudget > 0 ? Math.min(Math.max(budgetUsedPct, 2.5), 100) : (totalIncome > 0 ? Math.min(Math.max(expensePctOfIncome, 2.5), 100) : (totalExpenses > 0 ? 100 : 0))}%`,
-                backgroundColor: isEffectiveDeficit || (totalAllocatedBudget > 0 && budgetUsedPct > 100) ? "#FB7185" : "#38BDF8",
-              }}
+              style={[
+                styles.retentionFill,
+                {
+                  width: `${barWidth(totalAllocatedBudget > 0 ? netBudgetUtilization : totalIncome > 0 ? (totalExpenses / totalIncome) * 100 : totalExpenses > 0 ? 100 : 0)}%`,
+                  backgroundColor: isEffectiveDeficit || (totalAllocatedBudget > 0 && budgetUsedPct > 100) ? "#FB7185" : "#38BDF8",
+                },
+              ]}
             />
           </View>
+          <View style={styles.retentionLabels}>
+            <Text style={[styles.retentionText, { flexShrink: 1 }]} numberOfLines={Platform.OS === "web" ? undefined : 1}>
+              {totalAllocatedBudget > 0
+                ? `Available to allocate: ${settings.currency} ${fmt(availableToAllocate)}`
+                : totalExpenses === 0
+                ? "Nothing spent yet"
+                : totalIncome === 0
+                ? "No inflow recorded yet"
+                : `${expensePctOfIncome}% of inflow spent`}
+            </Text>
+            <Text
+              style={[styles.retentionText, styles.retentionStatus, { color: isEffectiveDeficit ? "#FDA4AF" : "#6EE7B7" }]}
+              numberOfLines={1}
+            >
+              {totalAllocatedBudget > 0
+                ? `${budgetUsedPct}% of budget used`
+                : isDeficit
+                ? `Deficit -${settings.currency} ${fmt(totalExpenses - totalIncome)}`
+                : `${incomeRetainedPct}% retained`}
+            </Text>
+          </View>
+        </View>
+
+        {/* Budget breakdown (only when department budgets exist) */}
+        {totalAllocatedBudget > 0 && (
+          <View style={styles.heroStatsRow}>
+            <View style={styles.heroStat}>
+              <Text style={styles.heroStatLabel}>Allocated</Text>
+              <Text style={styles.heroStatValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                {settings.currency} {fmt(totalAllocatedBudget)}
+              </Text>
+            </View>
+            <View style={styles.heroStatDivider} />
+            <View style={styles.heroStat}>
+              <Text style={styles.heroStatLabel}>Remaining</Text>
+              <Text style={styles.heroStatValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                {settings.currency} {fmt(netBudgetRemaining)}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* View Mode Switcher (segmented control) */}
+        <View style={styles.heroSegment}>
+          {([
+            { key: "cashflow", label: "Net Cash", amount: `${netCash >= 0 ? "+" : "-"}${settings.currency} ${fmt(Math.abs(netCash))}`, dot: "#34D399" },
+            { key: "expenses", label: "Outflows", amount: `-${settings.currency} ${fmt(totalExpenses)}`, dot: "#FB7185" },
+          ] as const).map((opt) => {
+            const active = balanceViewMode === opt.key;
+            return (
+              <TouchableOpacity
+                key={opt.key}
+                style={[styles.heroSegmentBtn, active && styles.heroSegmentBtnActive]}
+                onPress={() => {
+                  setBalanceViewMode(opt.key);
+                  if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                }}
+                activeOpacity={0.8}
+                accessibilityState={{ selected: active }}
+              >
+                <View style={styles.heroSegmentLabelRow}>
+                  <View style={[styles.heroStatusDot, { backgroundColor: opt.dot }]} />
+                  <Text style={[styles.heroSegmentLabel, { color: active ? "#FFFFFF" : "rgba(255,255,255,0.7)" }]}>{opt.label}</Text>
+                </View>
+                <Text
+                  style={[styles.heroSegmentAmount, { color: active ? "#FFFFFF" : "rgba(255,255,255,0.75)" }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.7}
+                >
+                  {hideBalance ? `${settings.currency} ••••` : opt.amount}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </LinearGradient>
 
-      {/* ─── Horizontal Quick KPI Stats Bar ─── */}
-      <View style={styles.statsScrollWrapper}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.statsScroll}
-        >
-          {/* Card 1: Total Income */}
-          <TouchableOpacity
-            style={[
-              styles.kpiCard,
-              {
-                backgroundColor: colors.card,
-                borderColor: colors.border,
-                width: Math.max(statCardW, 224),
-              },
-            ]}
-            onPress={() => {
-              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push("/(tabs)/income");
+      {/* ─── KPI Overview Grid ─── */}
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Overview</Text>
+        <Text style={[styles.sectionHint, { color: colors.mutedForeground }]}>Tap a card for details</Text>
+      </View>
+      <View style={styles.kpiGrid}>
+        <View style={styles.kpiRow}>
+          <KpiCard
+            layout="wide"
+            icon="arrow-down-left"
+            color={colors.income}
+            label="Total Inflow"
+            prefix={`+${settings.currency}`}
+            value={fmt(totalIncome)}
+            spark={{
+              data: sixMonths.income,
+              labels: sixMonths.labels,
+              caption: thisMonthIncome > 0 ? `This month: ${settings.currency} ${fmt(thisMonthIncome)}` : "Nothing received this month",
+              change: inflowChange?.text,
+              changeColor: inflowChange?.color,
             }}
-            activeOpacity={0.75}
-          >
-            <View style={styles.kpiTopRow}>
-              <View style={[styles.kpiIconWrap, { backgroundColor: colors.income + "20" }]}>
-                <Feather name="arrow-up-circle" size={17} color={colors.income} />
-              </View>
-              <View style={[styles.kpiTag, { backgroundColor: colors.income + "18" }]}>
-                <Text style={[styles.kpiTagText, { color: colors.income }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-                  Inflow
-                </Text>
-              </View>
-            </View>
-            <Text style={[styles.kpiValueText, { color: colors.foreground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
-              +{settings.currency} {fmt(totalIncome)}
-            </Text>
-            <Text style={[styles.kpiLabelText, { color: colors.mutedForeground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.78}>
-              Total Income
-            </Text>
-            <Text
-              style={{
-                fontSize: 9.5,
-                color: isEffectiveDeficit ? colors.expense : colors.income,
-                fontFamily: "Inter_600SemiBold",
-                marginTop: -2,
-                minHeight: 24,
-              }}
-              numberOfLines={2}
-              adjustsFontSizeToFit
-              minimumFontScale={0.8}
-            >
-              {totalIncome === 0
-                ? "No Income (0%)"
+            segments={[{ pct: inflowKeptPct, color: isEffectiveDeficit ? colors.expense : colors.income }]}
+            footLeft={
+              totalIncome === 0
+                ? "No inflow recorded yet"
                 : totalAllocatedBudget > 0
-                ? `Available: ${settings.currency} ${fmt(availableToAllocate)}`
+                ? `${settings.currency} ${fmt(availableToAllocate)} unallocated`
                 : isDeficit
-                ? "0% Retained (Deficit)"
-                : `${incomeRetainedPct}% Retained`}
-            </Text>
-            <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 4, overflow: "hidden" }}>
-              <View
-                style={{
-                  height: "100%",
-                  width: `${totalIncome === 0 ? 0 : isEffectiveDeficit ? 0 : Math.min(Math.max(totalAllocatedBudget > 0 && totalIncome > 0 ? (unallocatedFunds / totalIncome) * 100 : incomeRetainedPct, 2), 100)}%`,
-                  backgroundColor: isEffectiveDeficit ? colors.expense : colors.income,
-                  borderRadius: 2,
-                }}
-              />
-            </View>
-          </TouchableOpacity>
+                ? "Deficit · nothing retained"
+                : "Retained after expenses"
+            }
+            footLeftColor={totalIncome === 0 ? undefined : isEffectiveDeficit ? colors.expense : undefined}
+            footRight={totalIncome > 0 ? fmtPct(inflowKeptPct) : null}
+            footRightColor={isEffectiveDeficit ? colors.expense : colors.income}
+            onPress={() => router.push("/(tabs)/income")}
+          />
+        </View>
 
-          {/* Card 2: Total Expenses */}
-          <TouchableOpacity
-            style={[
-              styles.kpiCard,
+        <View style={styles.kpiRow}>
+          <KpiCard
+            layout="wide"
+            icon="arrow-up-right"
+            color={colors.expense}
+            label="Total Expenses"
+            prefix={`-${settings.currency}`}
+            value={fmt(totalExpenses)}
+            tag={expenseStatusText}
+            tagColor={expenseStatusColor}
+            spark={{
+              data: sixMonths.expense,
+              labels: sixMonths.labels,
+              caption: thisMonthExpense > 0 ? `This month: ${settings.currency} ${fmt(thisMonthExpense)}` : "Nothing spent this month",
+              change: expenseChange?.text,
+              changeColor: expenseChange?.color,
+            }}
+            segments={[{ pct: expenseBarPct, color: expenseBarColor }]}
+            footLeft={
+              totalExpenses === 0
+                ? "Nothing spent yet"
+                : totalIncome === 0
+                ? "No inflow recorded to cover this"
+                : expenseOfInflowPct > 100
+                ? "of total inflow · spending exceeds inflow"
+                : "of total inflow spent"
+            }
+            footLeftColor={totalExpenses > 0 && (totalIncome === 0 || expenseOfInflowPct > 100) ? colors.expense : undefined}
+            footRight={totalExpenses > 0 && totalIncome > 0 ? fmtPct(expenseOfInflowPct) : null}
+            footRightColor={expenseBarColor}
+            onPress={() => router.push("/(tabs)/expenses")}
+          />
+        </View>
+
+        <View style={styles.kpiRow}>
+          <KpiCard
+            icon="pie-chart"
+            color={budgetColor}
+            label="Department Budget"
+            prefix={settings.currency}
+            value={fmt(totalAllocatedBudget)}
+            tag={
+              totalAllocatedBudget === 0
+                ? "No budget"
+                : netBudgetUtilization > 100
+                ? "Over limit"
+                : netBudgetUtilization > 80
+                ? "Near limit"
+                : "On track"
+            }
+            segments={[{ pct: totalAllocatedBudget === 0 ? 0 : netBudgetUtilization, color: budgetColor }]}
+            subValue={budgetScopeLabel ? `Across ${budgetScopeLabel}` : undefined}
+            footLeft={totalAllocatedBudget > 0 ? "" : "No budget set yet"}
+            footStats={
+              totalAllocatedBudget > 0
+                ? [
+                    // Same number-led style as the Total Payroll box
+                    { value: fmtPct(netBudgetUtilization), label: "of budget used", color: budgetColor },
+                    overBudget
+                      ? {
+                          value: `${settings.currency} ${fmt(totalBudgetSpent - totalAllocatedBudget)}`,
+                          label: "over budget",
+                          color: colors.expense,
+                        }
+                      : { value: `${settings.currency} ${fmt(netBudgetRemaining)}`, label: "left to spend" },
+                  ]
+                : undefined
+            }
+            onPress={() => router.push("/budget")}
+          />
+          <KpiCard
+            icon="users"
+            color="#8B5CF6"
+            label="Total Payroll"
+            prefix={settings.currency}
+            value={fmt(payrollTotal)}
+            subValue={activePayroll.length > 0 ? `Avg salary ${settings.currency} ${fmt(Math.round(avgNetSalary))}` : undefined}
+            tag={`${staffCount} Staff`}
+            tagColor={staffCount > 0 ? "#8B5CF6" : colors.mutedForeground}
+            segments={[
               {
-                backgroundColor: colors.card,
-                borderColor: colors.border,
-                width: Math.max(statCardW, 224),
+                pct: payrollOfInflowPct ?? 0,
+                color: (payrollOfInflowPct ?? 0) > 100 ? colors.expense : "#8B5CF6",
               },
             ]}
-            onPress={() => {
-              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push("/(tabs)/expenses");
-            }}
-            activeOpacity={0.75}
-          >
-            <View style={styles.kpiTopRow}>
-              <View style={[styles.kpiIconWrap, { backgroundColor: colors.expense + "20" }]}>
-                <Feather name="arrow-down-circle" size={17} color={colors.expense} />
-              </View>
-              <View
-                style={[
-                  styles.kpiTag,
-                  {
-                    backgroundColor:
-                      (totalExpenses === 0
-                        ? colors.income
-                        : totalAllocatedBudget > 0
-                        ? totalBudgetSpent > totalAllocatedBudget
-                          ? colors.expense
-                          : colors.primary
-                        : isDeficit
-                        ? colors.expense
-                        : totalExpenses === totalIncome
-                        ? colors.warning
-                        : colors.primary) + "18",
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.kpiTagText,
-                    {
-                      color:
-                        totalExpenses === 0
-                          ? colors.income
-                          : totalAllocatedBudget > 0
-                          ? totalBudgetSpent > totalAllocatedBudget
-                            ? colors.expense
-                            : colors.primary
-                          : isDeficit
-                          ? colors.expense
-                          : totalExpenses === totalIncome
-                          ? colors.warning
-                          : colors.primary,
-                    },
-                  ]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.75}
-                >
-                  {totalExpenses === 0
-                    ? "No Outflow"
-                    : totalAllocatedBudget > 0
-                    ? totalBudgetSpent > totalAllocatedBudget
-                      ? "Over Budget"
-                      : "Within Budget"
-                    : isDeficit
-                    ? "Over Inflow"
-                    : "Outflow"}
-                </Text>
-              </View>
-            </View>
-            <Text style={[styles.kpiValueText, { color: colors.foreground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
-              -{settings.currency} {fmt(totalExpenses)}
-            </Text>
-            <Text style={[styles.kpiLabelText, { color: colors.mutedForeground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.78}>
-              Total Expenses
-            </Text>
-            <Text
-              style={{
-                fontSize: 9.5,
-                color:
-                  totalExpenses === 0
-                    ? colors.income
-                    : totalAllocatedBudget > 0
-                    ? totalBudgetSpent > totalAllocatedBudget
-                      ? colors.expense
-                      : colors.income
-                    : isDeficit
-                    ? colors.expense
-                    : colors.foreground,
-                fontFamily: "Inter_600SemiBold",
-                marginTop: -2,
-                minHeight: 26,
-                lineHeight: 13,
-              }}
-              numberOfLines={2}
-              adjustsFontSizeToFit
-              minimumFontScale={0.75}
-            >
-              {totalExpenses === 0
-                ? "0% Outflow"
-                : totalAllocatedBudget > 0
-                ? `${settings.currency} ${fmt(totalBudgetSpent)} of ${fmt(totalAllocatedBudget)} Budget Spent`
-                : `${expensePctOfIncome}% of Inflow`}
-            </Text>
-            <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 4, overflow: "hidden" }}>
-              <View
-                style={{
-                  height: "100%",
-                  width: `${totalExpenses === 0 ? 0 : Math.min(Math.max(totalAllocatedBudget > 0 ? budgetUsedPct : expensePctOfIncome, 4), 100)}%`,
-                  backgroundColor:
-                    totalExpenses === 0
-                      ? colors.income
-                      : isEffectiveDeficit
-                      ? colors.expense
-                      : (totalAllocatedBudget > 0 ? budgetUsedPct : expensePctOfIncome) > 85
-                      ? colors.warning
-                      : colors.income,
-                  borderRadius: 2,
-                }}
-              />
-            </View>
-          </TouchableOpacity>
+            footLeft={payrollTotal > 0 ? "" : "No payroll yet"}
+            footStats={
+              payrollTotal > 0
+                ? [
+                    // Short, number-led lines: "16% of total income", "Oct 2026 last payroll run"
+                    payrollOfInflowPct === null
+                      ? { value: "", label: "No income recorded yet" }
+                      : {
+                          value: exactPctText(payrollOfInflowPct),
+                          label: "of total income",
+                          color: payrollOfInflowPct > 100 ? colors.expense : "#8B5CF6",
+                        },
+                    ...(lastPayrollLabel ? [{ value: lastPayrollLabel, label: "last payroll run" }] : []),
+                  ]
+                : undefined
+            }
+            onPress={() => router.push("/payroll")}
+          />
+        </View>
 
-          {/* Card 3: Department Budget */}
-          <TouchableOpacity
-            style={[
-              styles.kpiCard,
-              {
-                backgroundColor: colors.card,
-                borderColor: colors.border,
-                width: Math.max(statCardW, 224),
-              },
-            ]}
-            onPress={() => {
-              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push("/budget");
+        <View style={styles.kpiRow}>
+          <KpiCard
+            layout="wide"
+            icon="list"
+            color={colors.primary}
+            label="Transactions"
+            value={`${transactions.length} ${transactions.length === 1 ? "record" : "records"}`}
+            tag={transactions.length > 0 ? "Active" : "Empty"}
+            tagColor={transactions.length > 0 ? colors.primary : colors.mutedForeground}
+            spark={{
+              data: sixMonths.count,
+              labels: sixMonths.labels,
+              caption: thisMonthCount > 0 ? `This month: ${thisMonthCount} ${thisMonthCount === 1 ? "record" : "records"}` : "No records this month",
+              change: txChange?.text,
+              changeColor: txChange?.color,
             }}
-            activeOpacity={0.75}
-          >
-            <View style={styles.kpiTopRow}>
-              <View
-                style={[
-                  styles.kpiIconWrap,
-                  {
-                    backgroundColor:
-                      (totalAllocatedBudget === 0
-                        ? colors.muted
-                        : budgetUsedPct > 100
-                        ? colors.expense
-                        : budgetUsedPct > 80
-                        ? colors.warning
-                        : "#3B82F6") + "20",
-                  },
-                ]}
-              >
-                <Feather
-                  name="pie-chart"
-                  size={17}
-                  color={
-                    totalAllocatedBudget === 0
-                      ? colors.mutedForeground
-                      : budgetUsedPct > 100
-                      ? colors.expense
-                      : budgetUsedPct > 80
-                      ? colors.warning
-                      : "#3B82F6"
-                  }
-                />
-              </View>
-              <View
-                style={[
-                  styles.kpiTag,
-                  {
-                    backgroundColor:
-                      (totalAllocatedBudget === 0
-                        ? colors.muted
-                        : budgetUsedPct > 100
-                        ? colors.expense
-                        : budgetUsedPct > 80
-                        ? colors.warning
-                        : "#3B82F6") + "18",
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.kpiTagText,
-                    {
-                      color:
-                        totalAllocatedBudget === 0
-                          ? colors.mutedForeground
-                          : budgetUsedPct > 100
-                          ? colors.expense
-                          : budgetUsedPct > 80
-                          ? colors.warning
-                          : "#3B82F6",
-                    },
-                  ]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.65}
-                >
-                  {totalAllocatedBudget === 0 ? "No Budget" : budgetUsedPct > 100 ? "Over Limit" : `${budgetUsedPct}% Used`}
-                </Text>
-              </View>
-            </View>
-            <Text
-              style={[
-                styles.kpiValueText,
-                {
-                  color: colors.foreground,
-                },
-              ]}
-              numberOfLines={2}
-              adjustsFontSizeToFit
-              minimumFontScale={0.65}
-            >
-              {settings.currency} {fmt(totalAllocatedBudget)}
-            </Text>
-            <Text style={[styles.kpiLabelText, { color: colors.mutedForeground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.78}>
-              Department Budget
-            </Text>
-            <Text
-              style={{
-                fontSize: 9.5,
-                color: totalAllocatedBudget === 0 ? colors.mutedForeground : totalBudgetSpent > totalAllocatedBudget ? colors.expense : colors.income,
-                fontFamily: "Inter_600SemiBold",
-                marginTop: -2,
-                minHeight: 24,
-              }}
-              numberOfLines={2}
-              adjustsFontSizeToFit
-              minimumFontScale={0.8}
-            >
-              {totalAllocatedBudget === 0
-                ? "No Active Budget"
-                : totalBudgetSpent > totalAllocatedBudget
-                ? `${settings.currency} ${fmt(totalBudgetSpent - totalAllocatedBudget)} Over Limit`
-                : `${settings.currency} ${fmt(netBudgetRemaining)} Available`}
-            </Text>
-            <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 4, overflow: "hidden" }}>
-              <View
-                style={{
-                  height: "100%",
-                  width: `${totalAllocatedBudget === 0 ? 0 : Math.min(Math.max(budgetUsedPct, 4), 100)}%`,
-                  backgroundColor:
-                    budgetUsedPct > 100
-                      ? colors.expense
-                      : budgetUsedPct > 80
-                      ? colors.warning
-                      : "#3B82F6",
-                  borderRadius: 2,
-                }}
-              />
-            </View>
-          </TouchableOpacity>
-
-          {/* Card 4: Transactions */}
-          <TouchableOpacity
-            style={[
-              styles.kpiCard,
-              {
-                backgroundColor: colors.card,
-                borderColor: colors.border,
-                width: Math.max(statCardW, 224),
-              },
-            ]}
-            onPress={() => {
-              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setTxModalVisible(true);
-            }}
-            activeOpacity={0.75}
-          >
-            <View style={styles.kpiTopRow}>
-              <View style={[styles.kpiIconWrap, { backgroundColor: colors.primary + "20" }]}>
-                <Feather name="list" size={17} color={colors.primary} />
-              </View>
-              <View style={[styles.kpiTag, { backgroundColor: (transactions.length > 0 ? colors.primary : colors.muted) + "18" }]}>
-                <Text style={[styles.kpiTagText, { color: transactions.length > 0 ? colors.primary : colors.mutedForeground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
-                  {transactions.length > 0 ? "Active" : "Empty"}
-                </Text>
-              </View>
-            </View>
-            <Text style={[styles.kpiValueText, { color: colors.foreground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
-              {transactions.length}
-            </Text>
-            <Text style={[styles.kpiLabelText, { color: colors.mutedForeground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.78}>
-              Transactions
-            </Text>
-            <Text
-              style={{ fontSize: 9.5, color: transactions.length > 0 ? colors.primary : colors.mutedForeground, fontFamily: "Inter_600SemiBold", marginTop: -2 }}
-              numberOfLines={2}
-              adjustsFontSizeToFit
-              minimumFontScale={0.8}
-            >
-              {transactions.length > 0
-                ? `${transactions.filter(t => t.type === 'income').length} In · ${transactions.filter(t => t.type === 'expense').length} Out`
-                : "No Transactions"}
-            </Text>
-            <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 4, overflow: "hidden", flexDirection: "row" }}>
-              {transactions.length > 0 ? (
-                <>
-                  <View
-                    style={{
-                      height: "100%",
-                      width: `${(transactions.filter(t => t.type === 'income').length / transactions.length) * 100}%`,
-                      backgroundColor: colors.income,
-                    }}
-                  />
-                  <View
-                    style={{
-                      height: "100%",
-                      width: `${(transactions.filter(t => t.type === 'expense').length / transactions.length) * 100}%`,
-                      backgroundColor: colors.expense,
-                    }}
-                  />
-                </>
-              ) : null}
-            </View>
-          </TouchableOpacity>
-
-          {/* Card 5: Payroll */}
-          <TouchableOpacity
-            style={[
-              styles.kpiCard,
-              {
-                backgroundColor: colors.card,
-                borderColor: colors.border,
-                width: Math.max(statCardW, 224),
-              },
-            ]}
-            onPress={() => {
-              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push("/payroll");
-            }}
-            activeOpacity={0.75}
-          >
-            <View style={styles.kpiTopRow}>
-              <View style={[styles.kpiIconWrap, { backgroundColor: "#8B5CF625" }]}>
-                <Feather name="users" size={17} color="#8B5CF6" />
-              </View>
-              <View style={[styles.kpiTag, { backgroundColor: (payroll.length > 0 ? "#8B5CF6" : colors.muted) + "18" }]}>
-                <Text style={[styles.kpiTagText, { color: payroll.length > 0 ? "#8B5CF6" : colors.mutedForeground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
-                  {payroll.length} Staff
-                </Text>
-              </View>
-            </View>
-            <Text style={[styles.kpiValueText, { color: colors.foreground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
-              {settings.currency} {fmt(payroll.reduce((s, p) => s + (p.baseSalary || 0) + (p.bonus || 0) - (p.deductions || 0), 0))}
-            </Text>
-            <Text style={[styles.kpiLabelText, { color: colors.mutedForeground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.78}>
-              Staff Payroll
-            </Text>
-            <Text
-              style={{ fontSize: 9.5, color: payroll.length > 0 ? "#8B5CF6" : colors.mutedForeground, fontFamily: "Inter_600SemiBold", marginTop: -2 }}
-              numberOfLines={2}
-              adjustsFontSizeToFit
-              minimumFontScale={0.8}
-            >
-              {payroll.length > 0 ? `${payroll.length} Disbursals` : "No Payroll"}
-            </Text>
-            <View style={{ height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 4, overflow: "hidden" }}>
-              <View
-                style={{
-                  height: "100%",
-                  width: `${payroll.length === 0 ? 0 : Math.min(Math.max(totalExpenses > 0 ? (payroll.reduce((s, p) => s + (p.baseSalary || 0) + (p.bonus || 0) - (p.deductions || 0), 0) / totalExpenses) * 100 : 0, 6), 100)}%`,
-                  backgroundColor: "#8B5CF6",
-                  borderRadius: 2,
-                }}
-              />
-            </View>
-          </TouchableOpacity>
-        </ScrollView>
+            segments={
+              transactions.length > 0
+                ? [
+                    { pct: (incomeCount / transactions.length) * 100, color: colors.income },
+                    { pct: (expenseCount / transactions.length) * 100, color: colors.expense },
+                  ]
+                : []
+            }
+            footLeft={transactions.length > 0 ? `${incomeCount} inflow · ${expenseCount} expense records` : "No transactions yet"}
+            footRight={
+              transactions.length > 0
+                ? `${Math.round((incomeCount / transactions.length) * 100)}% in · ${Math.round((expenseCount / transactions.length) * 100)}% out`
+                : null
+            }
+            onPress={() => setTxModalVisible(true)}
+          />
+        </View>
       </View>
 
       {/* Monthly Trend Chart */}
@@ -1395,7 +1321,7 @@ export default function DashboardScreen() {
         </View>
         <AreaLineChart
           data={chartData}
-          width={chartWidth - 28}
+          width={chartWidth - 32}
           height={160}
           currency={settings.currency}
           activeRange={customSelection ? undefined : trendRange}
@@ -1457,7 +1383,7 @@ export default function DashboardScreen() {
           <View style={styles.cardHeader}>
             <View>
               <Text style={[styles.cardTitle, { color: colors.foreground }]}>Departments</Text>
-              <Text style={[styles.cardSub, { color: colors.mutedForeground, fontSize: 11 }]}>
+              <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
                 {expenseByDept.length} Active Cost Centers
               </Text>
             </View>
@@ -1469,11 +1395,11 @@ export default function DashboardScreen() {
               }}
               activeOpacity={0.75}
             >
-              <Text style={[styles.miniViewPillText, { color: colors.primary }]}>View All →</Text>
+              <Text style={[styles.miniViewPillText, { color: colors.primary }]}>View All</Text>
             </TouchableOpacity>
           </View>
 
-          <View style={{ gap: 12, marginVertical: 6 }}>
+          <View style={{ gap: 16, marginTop: 2 }}>
             {expenseByDept.slice(0, 3).map((dept, idx) => {
               const deptColors = ["#EC4899", "#3B82F6", "#8B5CF6", "#F59E0B"];
               const itemColor = deptColors[idx % deptColors.length];
@@ -1483,7 +1409,7 @@ export default function DashboardScreen() {
               return (
                 <TouchableOpacity
                   key={dept.department}
-                  style={{ gap: 5 }}
+                  style={{ gap: 8 }}
                   activeOpacity={0.75}
                   onPress={() => {
                     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -1495,16 +1421,18 @@ export default function DashboardScreen() {
                   }}
                 >
                   <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1, marginRight: 6 }}>
-                      <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: itemColor }} />
-                      <Text style={{ fontSize: 11.5, fontFamily: "Inter_600SemiBold", color: colors.foreground, flex: 1 }}>
-                        {cleanName}
-                      </Text>
-                      <Text style={{ fontSize: 10, color: "#0EA5E9", fontFamily: "Inter_500Medium" }}>
-                        View Roster →
-                      </Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1, minWidth: 0, marginRight: 10 }}>
+                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: itemColor }} />
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.foreground }} numberOfLines={1}>
+                          {cleanName}
+                        </Text>
+                        <Text style={{ fontSize: 12, color: colors.mutedForeground, fontFamily: "Inter_400Regular", marginTop: 1 }}>
+                          {pct}% of expenses · <Text style={{ color: colors.primary, fontFamily: "Inter_500Medium" }}>View roster</Text>
+                        </Text>
+                      </View>
                     </View>
-                    <Text style={{ fontSize: 11.5, fontFamily: "Inter_700Bold", color: colors.foreground }}>
+                    <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: colors.foreground }}>
                       {settings.currency} {fmt(dept.total)}
                     </Text>
                   </View>
@@ -1531,16 +1459,16 @@ export default function DashboardScreen() {
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.cardHeader}>
           <View style={{ flex: 1, minWidth: 0, marginRight: 8 }}>
-            <Text style={[styles.cardTitle, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+            <Text style={[styles.cardTitle, { color: colors.foreground }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>
               Quick Actions
             </Text>
-            <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+            <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>
               Instant financial shortcuts
             </Text>
           </View>
           <View style={[styles.actionSectionPill, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "30", flexShrink: 0, paddingHorizontal: 9, paddingVertical: 3.5 }]}>
             <Feather name="zap" size={12} color={colors.primary} />
-            <Text style={[styles.actionSectionPillText, { color: colors.primary, includeFontPadding: false }]} numberOfLines={1}>
+            <Text style={[styles.actionSectionPillText, { color: colors.primary, includeFontPadding: false }]}>
               Active
             </Text>
           </View>
@@ -1548,7 +1476,7 @@ export default function DashboardScreen() {
 
         <View style={styles.actionsGrid}>
           <AnimatedQuickAction
-            label="Add Income"
+            label="Add Inflow"
             sub="Deposit & grant"
             badge={`${incomeCount} ${incomeCount === 1 ? "Record" : "Records"}`}
             icon="plus-circle"
@@ -1582,7 +1510,7 @@ export default function DashboardScreen() {
           <AnimatedQuickAction
             label="Staff Payroll"
             sub="Salaries & bonus"
-            badge={`${payroll.length} ${payroll.length === 1 ? "Staff" : "Staff"}`}
+            badge={`${staffCount} Staff`}
             icon="users"
             color="#8B5CF6"
             onPress={() => router.push("/payroll")}
@@ -1599,9 +1527,9 @@ export default function DashboardScreen() {
       </View>
 
       {/* Recent Transactions */}
-      <View style={styles.cardHeader}>
+      <View style={[styles.cardHeader, { marginTop: 4, marginBottom: -4 }]}>
         <View style={{ flex: 1, minWidth: 0, marginRight: 8 }}>
-          <Text style={[styles.cardTitle, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+          <Text style={[styles.cardTitle, { color: colors.foreground }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>
             Recent Transactions
           </Text>
         </View>
@@ -1612,7 +1540,7 @@ export default function DashboardScreen() {
             setTxModalVisible(true);
           }}
         >
-          <Text style={[styles.seeAllText, { color: colors.primary }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+          <Text style={[styles.seeAllText, { color: colors.primary }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>
             See All
           </Text>
           <Feather name="arrow-right" size={12} color={colors.primary} />
@@ -1623,7 +1551,7 @@ export default function DashboardScreen() {
         <TransactionItem
           key={t.id}
           item={t}
-          canDelete={user?.role === "admin"}
+          canDelete={can(user, "delete_transaction")}
           onDelete={deleteTransaction}
         />
       ))}
@@ -1674,22 +1602,22 @@ export default function DashboardScreen() {
             {/* Quick Financial Summary Banner */}
             <View style={[styles.txSummaryBanner, { backgroundColor: colors.cardAlt ?? colors.muted, borderColor: colors.border }]}>
               <View style={styles.txSummaryCol}>
-                <Text style={[styles.txSummaryLabel, { color: colors.income }]}>▲ Income</Text>
-                <Text style={[styles.txSummaryVal, { color: colors.income }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
+                <Text style={[styles.txSummaryLabel, { color: colors.income }]}>▲ Inflow</Text>
+                <Text style={[styles.txSummaryVal, { color: colors.income }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
                   {settings.currency} {fmt(totalIncome)}
                 </Text>
               </View>
               <View style={[styles.txSummaryDivider, { backgroundColor: colors.border }]} />
               <View style={styles.txSummaryCol}>
                 <Text style={[styles.txSummaryLabel, { color: colors.expense }]}>▼ Expenses</Text>
-                <Text style={[styles.txSummaryVal, { color: colors.expense }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
+                <Text style={[styles.txSummaryVal, { color: colors.expense }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
                   {settings.currency} {fmt(totalExpenses)}
                 </Text>
               </View>
               <View style={[styles.txSummaryDivider, { backgroundColor: colors.border }]} />
               <View style={styles.txSummaryCol}>
                 <Text style={[styles.txSummaryLabel, { color: colors.primary }]}>Net Flow</Text>
-                <Text style={[styles.txSummaryVal, { color: netBalance >= 0 ? colors.income : colors.expense }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
+                <Text style={[styles.txSummaryVal, { color: netBalance >= 0 ? colors.income : colors.expense }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
                   {settings.currency} {fmt(Math.abs(netBalance))}
                 </Text>
               </View>
@@ -1716,7 +1644,7 @@ export default function DashboardScreen() {
             <View style={styles.txFilterRow}>
               {[
                 { key: "all", label: `All (${transactions.length})` },
-                { key: "income", label: `Income (${transactions.filter(t => t.type === "income").length})` },
+                { key: "income", label: `Inflow (${transactions.filter(t => t.type === "income").length})` },
                 { key: "expense", label: `Expenses (${transactions.filter(t => t.type === "expense").length})` },
               ].map((f) => {
                 const isSelected = txTypeFilter === f.key;
@@ -1760,7 +1688,7 @@ export default function DashboardScreen() {
                 <TransactionItem
                   key={t.id}
                   item={t}
-                  canDelete={user?.role === "admin"}
+                  canDelete={can(user, "delete_transaction")}
                   onDelete={deleteTransaction}
                 />
               ))}
@@ -1952,128 +1880,142 @@ export default function DashboardScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  container: { paddingHorizontal: 16, gap: 12 },
+  container: { paddingHorizontal: 16, gap: 16 },
 
-  // Executive 2-Tier Header System
+  // Header: avatar + identity on the left, actions on the right
   headerContainer: {
-    marginBottom: 6,
-    gap: 8,
+    marginBottom: 2,
   },
-  headerTopBar: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 8,
-  },
-  orgBadge: {
+  identityRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5.5,
-    paddingHorizontal: 9,
-    paddingVertical: 4.5,
-    borderRadius: 12,
-    borderWidth: 1,
-    flexShrink: 1,
+    gap: 12,
+  },
+  avatar: {
+    width: 46,
+    height: 46,
+    flexShrink: 0,
+    shadowColor: "#2563EB",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  avatarFill: {
+    flex: 1,
+    borderRadius: 15,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarStatus: {
+    position: "absolute",
+    right: -2,
+    bottom: -2,
+    width: 13,
+    height: 13,
+    borderRadius: 6.5,
+    borderWidth: 2.5,
+  },
+  identityText: {
+    flex: 1,
     minWidth: 0,
+    justifyContent: "center",
   },
+  greetingRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  syncDot: { width: 7, height: 7, borderRadius: 3.5, flexShrink: 0 },
+  roleChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    height: 42,
+    paddingHorizontal: 12,
+    borderRadius: 13,
+    borderWidth: 1,
+    flexShrink: 0,
+  },
+  roleChipText: {
+    fontSize: 13,
+    lineHeight: 16,
+    fontFamily: "Inter_700Bold",
+    includeFontPadding: false,
+  },
+  greeting: { fontSize: 13, lineHeight: 17, fontFamily: "Inter_500Medium", includeFontPadding: false },
+  name: {
+    marginTop: 2,
+    fontSize: 18,
+    lineHeight: 24,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: -0.3,
+    includeFontPadding: false,
+  },
+  orgLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    height: 18,
+    marginTop: 3,
+  },
+  orgFlag: { fontSize: 12, lineHeight: 16, includeFontPadding: false },
   orgName: {
-    fontFamily: "Inter_600SemiBold",
     flexShrink: 1,
+    fontSize: 12,
+    lineHeight: 16,
+    fontFamily: "Inter_500Medium",
+    includeFontPadding: false,
+  },
+  roleBadge: {
+    height: 18,
+    paddingHorizontal: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    flexShrink: 0,
+    justifyContent: "center",
+  },
+  roleText: {
+    fontSize: 10,
+    lineHeight: 12,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.6,
+    includeFontPadding: false,
   },
   headerActions: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    flexShrink: 0,
-  },
-  headerUserBar: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
     gap: 8,
-    marginTop: 2,
-  },
-  userNameWrap: {
-    flex: 1,
-    minWidth: 0,
-    marginRight: 8,
-  },
-  name: {
-    fontSize: 21,
-    fontFamily: "Inter_800ExtraBold",
-    letterSpacing: -0.4,
-  },
-  syncBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5.5,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
     flexShrink: 0,
-  },
-  syncDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    flexShrink: 0,
-  },
-  syncText: {
-    fontSize: 11,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: 0.2,
-    flexShrink: 0,
-  },
-  roleBadge: {
-    height: 32,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-    borderWidth: 1.2,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-  roleText: {
-    fontSize: 11,
-    fontFamily: "Inter_800ExtraBold",
-    letterSpacing: 0.5,
-    textAlign: "center",
   },
   iconBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+    width: 42,
+    height: 42,
+    borderRadius: 13,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
   },
   logoutIconBtn: {
-    borderColor: "rgba(239, 68, 68, 0.25)",
-    backgroundColor: "rgba(239, 68, 68, 0.06)",
+    borderColor: "rgba(239, 68, 68, 0.28)",
+    backgroundColor: "rgba(239, 68, 68, 0.08)",
   },
   notifBadge: {
     position: "absolute",
-    top: -3,
-    right: -3,
-    minWidth: 15,
-    height: 15,
-    borderRadius: 7.5,
+    top: -5,
+    right: -5,
+    minWidth: 19,
+    height: 19,
+    borderRadius: 9.5,
+    borderWidth: 2,
     backgroundColor: "#EF4444",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 2,
+    paddingHorizontal: 3,
   },
   notifBadgeText: {
-    fontSize: 8.5,
+    fontSize: 10,
+    lineHeight: 12,
     fontFamily: "Inter_800ExtraBold",
     color: "#FFFFFF",
+    includeFontPadding: false,
   },
-
-  // Legacy header aliases for safety
-  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 2 },
-  headerLeft: { gap: 2, flex: 1, marginRight: 12 },
-  greeting: { fontSize: 11, fontFamily: "Inter_400Regular", flex: 1 },
 
   // Logout Confirmation Modal
   logoutModalOverlay: {
@@ -2115,14 +2057,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   logoutModalTitle: {
-    fontSize: 19,
+    fontSize: 18,
     fontFamily: "Inter_800ExtraBold",
     marginBottom: 6,
     textAlign: "center",
     letterSpacing: -0.3,
   },
   logoutModalMsg: {
-    fontSize: 13.5,
+    fontSize: 14,
     fontFamily: "Inter_400Regular",
     textAlign: "center",
     lineHeight: 19,
@@ -2145,7 +2087,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.2,
   },
   logoutCancelText: {
-    fontSize: 13.5,
+    fontSize: 14,
     fontFamily: "Inter_600SemiBold",
   },
   logoutConfirmBtn: {
@@ -2158,7 +2100,7 @@ const styles = StyleSheet.create({
   },
   logoutConfirmText: {
     color: "#FFFFFF",
-    fontSize: 13.5,
+    fontSize: 14,
     fontFamily: "Inter_700Bold",
   },
 
@@ -2197,131 +2139,182 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 4,
+    gap: 8,
   },
   heroLabelWrap: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    flexShrink: 1,
-    marginRight: 8,
+    gap: 7,
+    flex: 1,
+    minWidth: 0,
+  },
+  heroLabelIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 8,
+    backgroundColor: "rgba(56, 189, 248, 0.18)",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
   },
   heroLabel: {
-    color: "#FFFFFF",
-    fontSize: 11,
-    fontFamily: "Inter_800ExtraBold",
-    letterSpacing: 0.8,
+    color: "rgba(255, 255, 255, 0.88)",
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    flexShrink: 1,
   },
   heroEyeBtn: {
-    padding: 3.5,
-    backgroundColor: "rgba(255, 255, 255, 0.14)",
-    borderRadius: 10,
-    marginLeft: 2,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "rgba(255, 255, 255, 0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
   },
-  heroGrowthPill: {
+  heroDossierPill: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4.5,
-    paddingHorizontal: 10,
-    paddingVertical: 5.5,
-    borderRadius: 14,
-    borderWidth: 1.2,
+    gap: 5,
+    backgroundColor: "rgba(255, 255, 255, 0.12)",
+    paddingLeft: 10,
+    paddingRight: 8,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.22)",
+    flexShrink: 0,
   },
-  heroGrowthText: {
-    fontSize: 11.5,
-    fontFamily: "Inter_800ExtraBold",
-  },
-  heroGrowthSub: {
+  heroDossierText: {
     color: "#FFFFFF",
-    fontSize: 9.5,
+    fontSize: 12,
     fontFamily: "Inter_600SemiBold",
-    opacity: 0.9,
-  },
-  heroStatusDot: {
-    width: 6.5,
-    height: 6.5,
-    borderRadius: 3.5,
   },
   heroAmountSection: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: -1,
   },
   heroAmountText: {
     color: "#FFFFFF",
-    fontSize: 34,
+    fontSize: 32,
     fontFamily: "Inter_800ExtraBold",
     letterSpacing: -0.8,
-    textShadowColor: "rgba(0, 0, 0, 0.25)",
-    textShadowOffset: { width: 0, height: 1.5 },
-    textShadowRadius: 4,
-    flex: 1,
   },
-  heroDossierPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4.5,
-    backgroundColor: "rgba(255, 255, 255, 0.18)",
-    paddingHorizontal: 9.5,
-    paddingVertical: 5,
-    borderRadius: 12,
-    borderWidth: 1.2,
-    borderColor: "rgba(255, 255, 255, 0.28)",
-  },
-  heroDossierText: {
-    color: "#FFFFFF",
-    fontSize: 10.5,
-    fontFamily: "Inter_700Bold",
-  },
-  heroStatusBadge: {
+  heroGrowthPill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 5,
-    backgroundColor: "rgba(255, 255, 255, 0.15)",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: 10,
+    height: 28,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.2)",
+    flexShrink: 0,
   },
-  statusDotLive: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+  heroGrowthText: {
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
   },
-  heroStatusText: {
-    color: "#FFFFFF",
-    fontSize: 10,
-    fontFamily: "Inter_600SemiBold",
+  heroStatusDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
   },
 
-  // Retention ratio track
+  // Spend / retention progress inside the hero card
   retentionContainer: {
-    gap: 4.5,
-    marginTop: -2,
-    marginBottom: 2,
+    gap: 8,
   },
   retentionLabels: {
     flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "center",
+    gap: 10,
   },
   retentionText: {
-    color: "#FFFFFF",
-    fontSize: 10,
-    fontFamily: "Inter_600SemiBold",
-    opacity: 0.95,
+    color: "rgba(226, 232, 240, 0.9)",
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+  },
+  retentionStatus: {
+    fontFamily: "Inter_700Bold",
+    textAlign: "right",
+    flexShrink: 0,
   },
   retentionTrack: {
-    height: 4.5,
-    borderRadius: 2.5,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "rgba(255, 255, 255, 0.14)",
     overflow: "hidden",
   },
   retentionFill: {
     height: "100%",
-    borderRadius: 2.5,
-    backgroundColor: "#60a5fa",
+    borderRadius: 3,
+  },
+
+  // Allocated / Remaining budget figures
+  heroStatsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.07)",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.10)",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  heroStat: { flex: 1, minWidth: 0, gap: 2 },
+  heroStatLabel: {
+    color: "rgba(203, 213, 225, 0.85)",
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+  },
+  heroStatValue: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
+  },
+  heroStatDivider: {
+    width: 1,
+    alignSelf: "stretch",
+    backgroundColor: "rgba(255, 255, 255, 0.14)",
+    marginHorizontal: 12,
+  },
+
+  // Net Cash / Outflows segmented control
+  heroSegment: {
+    flexDirection: "row",
+    gap: 6,
+    padding: 4,
+    borderRadius: 14,
+    backgroundColor: "rgba(0, 0, 0, 0.18)",
+  },
+  heroSegmentBtn: {
+    flex: 1,
+    minWidth: 0,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    gap: 2,
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  heroSegmentBtnActive: {
+    backgroundColor: "rgba(255, 255, 255, 0.14)",
+    borderColor: "rgba(255, 255, 255, 0.22)",
+  },
+  heroSegmentLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  heroSegmentLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+  },
+  heroSegmentAmount: {
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
   },
 
   // Frosted Glass Metric Cards
@@ -2357,92 +2350,159 @@ const styles = StyleSheet.create({
   },
   glassCardLabel: {
     color: "rgba(255, 255, 255, 0.85)",
-    fontSize: 8,
+    fontSize: 10,
     fontFamily: "Inter_800ExtraBold",
     letterSpacing: 0.3,
     textAlign: "center",
   },
   glassCardValue: {
     color: "#FFFFFF",
-    fontSize: 10.5,
+    fontSize: 11,
     fontFamily: "Inter_800ExtraBold",
     marginTop: 0.5,
     textAlign: "center",
   },
 
-  statsScrollWrapper: { marginHorizontal: -16 },
-  statsScroll: { flexDirection: "row", gap: 10, paddingHorizontal: 16 },
-  kpiCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 13,
-    gap: 6,
-    minHeight: 134,
+  // Section label above the KPI grid
+  sectionHeader: {
+    flexDirection: "row",
     justifyContent: "space-between",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
+    alignItems: "baseline",
+    marginTop: 4,
+    marginBottom: -2,
+  },
+  sectionTitle: { fontSize: 16, fontFamily: "Inter_700Bold", letterSpacing: -0.2 },
+  sectionHint: { fontSize: 12, fontFamily: "Inter_500Medium" },
+
+  // KPI grid: two equal columns per row, cards stretch to the tallest neighbour
+  kpiGrid: { gap: 12 },
+  kpiRow: { flexDirection: "row", gap: 12, alignItems: "stretch" },
+  kpiCell: { flex: 1, minWidth: 0 },
+  kpiCard: {
+    flex: 1,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 16,
+    gap: 14,
+    overflow: "hidden",
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.07,
+    shadowRadius: 14,
+    elevation: 3,
   },
   kpiTopRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    gap: 10,
   },
   kpiIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+    width: 34,
+    height: 34,
+    borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
+    flexShrink: 0,
+  },
+  kpiLabelText: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 14,
+    lineHeight: 18,
+    fontFamily: "Inter_600SemiBold",
   },
   kpiTag: {
-    paddingHorizontal: 9,
+    paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
     flexShrink: 0,
-    minWidth: 52,
-    alignItems: "center",
-    justifyContent: "center",
   },
   kpiTagText: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
     includeFontPadding: false,
-    textAlign: "center",
   },
   kpiValueText: {
-    fontSize: 15.5,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: -0.4,
-    marginTop: 2,
+    fontSize: 20,
+    fontFamily: "Inter_800ExtraBold",
+    letterSpacing: -0.5,
   },
-  kpiLabelText: {
-    fontSize: 10.5,
+  kpiValueWide: { fontSize: 24, letterSpacing: -0.7 },
+  kpiCompactBody: { gap: 4 },
+  kpiSubValue: { fontSize: 12, lineHeight: 16, fontFamily: "Inter_500Medium" },
+  kpiStatList: { gap: 4 },
+  kpiStatRow: { flexDirection: "row", alignItems: "baseline", flexWrap: "wrap", columnGap: 6 },
+  kpiStatValue: { fontSize: 14, lineHeight: 19, fontFamily: "Inter_800ExtraBold" },
+  kpiStatLabel: { flexShrink: 1, fontSize: 12, lineHeight: 17, fontFamily: "Inter_500Medium" },
+  kpiValuePrefix: {
+    fontSize: 13,
     fontFamily: "Inter_600SemiBold",
+    letterSpacing: 0,
+  },
+  // Wide card: figures (left) + 6-month chart (right)
+  kpiWideBody: { flexDirection: "row", alignItems: "flex-end", gap: 14 },
+  kpiWideLeft: { flex: 1.1, minWidth: 0, gap: 6 },
+  kpiWideChart: { flex: 1, minWidth: 0 },
+  kpiMonthText: { fontSize: 13, lineHeight: 17, fontFamily: "Inter_500Medium" },
+  kpiChangePill: { alignSelf: "flex-start", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  kpiChangeText: { fontSize: 12, fontFamily: "Inter_700Bold" },
+  sparkLabels: { flexDirection: "row", justifyContent: "space-between", marginTop: 4 },
+  sparkLabel: { fontSize: 11, textAlign: "center" },
+  kpiFooter: { gap: 8, marginTop: "auto" },
+  /** Progress track at the bottom of each KPI box */
+  kpiTrack: {
+    height: 8,
+    borderRadius: 4,
+    flexDirection: "row",
+    overflow: "hidden",
+  },
+  kpiFootRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 10 },
+  kpiCaption: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 12,
+    lineHeight: 17,
+    fontFamily: "Inter_500Medium",
+  },
+  kpiFootRight: {
+    fontSize: 13,
+    lineHeight: 17,
+    fontFamily: "Inter_800ExtraBold",
+    flexShrink: 0,
+    textAlign: "right",
   },
 
   statCard: { width: 125, borderRadius: 14, borderWidth: 1, padding: 12, gap: 4, alignItems: "center" },
   statIcon: { width: 32, height: 32, borderRadius: 9, alignItems: "center", justifyContent: "center", marginBottom: 2 },
   statCardValue: { fontSize: 13, fontFamily: "Inter_700Bold", textAlign: "center" },
-  statCardLabel: { fontSize: 9, fontFamily: "Inter_400Regular", textAlign: "center" },
+  statCardLabel: { fontSize: 10, fontFamily: "Inter_400Regular", textAlign: "center" },
 
-  card: { borderRadius: 16, borderWidth: 1, padding: 16, gap: 12 },
-  cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  cardTitle: { fontSize: 15, fontFamily: "Inter_700Bold" },
-  cardSub: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2 },
-  seeAllBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1, flexShrink: 0 },
-  seeAllText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
-  miniViewPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
+  card: {
+    borderRadius: 20,
     borderWidth: 1,
+    padding: 18,
+    gap: 16,
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12 },
+  cardTitle: { fontSize: 16, fontFamily: "Inter_700Bold", letterSpacing: -0.2 },
+  cardSub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 3 },
+  seeAllBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, height: 30, borderRadius: 15, borderWidth: 1, flexShrink: 0 },
+  seeAllText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  miniViewPill: {
+    paddingHorizontal: 12,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 1,
+    justifyContent: "center",
   },
   miniViewPillText: {
-    fontSize: 10,
-    fontFamily: "Inter_700Bold",
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
   },
 
   miniInsightStrip: {
@@ -2453,7 +2513,7 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   miniInsightText: {
-    fontSize: 10.5,
+    fontSize: 11,
     fontFamily: "Inter_600SemiBold",
     lineHeight: 14.5,
   },
@@ -2475,7 +2535,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   halfCardFooterText: {
-    fontSize: 9.5,
+    fontSize: 10,
     fontFamily: "Inter_600SemiBold",
   },
   ringsRow: { alignItems: "center", justifyContent: "center" },
@@ -2491,10 +2551,15 @@ const styles = StyleSheet.create({
 
   actionsGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" },
   actionCard: {
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1,
-    padding: 13,
-    gap: 10,
+    padding: 14,
+    gap: 14,
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   actionTopRow: {
     flexDirection: "row",
@@ -2502,29 +2567,31 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   actionIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
   },
   actionBadge: {
-    paddingHorizontal: 7,
-    paddingVertical: 2.5,
-    borderRadius: 6,
-    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    flexShrink: 1,
+    marginLeft: 8,
   },
   actionBadgeText: {
-    fontSize: 9.5,
-    fontFamily: "Inter_700Bold",
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    includeFontPadding: false,
   },
   actionTitleText: {
-    fontSize: 12.5,
+    fontSize: 14,
     fontFamily: "Inter_700Bold",
   },
   actionSubText: {
-    fontSize: 10,
-    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
   },
   actionSectionPill: {
     flexDirection: "row",
@@ -2536,7 +2603,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   actionSectionPillText: {
-    fontSize: 10.5,
+    fontSize: 12,
     fontFamily: "Inter_700Bold",
   },
 
@@ -2584,7 +2651,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
   },
   txModalSub: {
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: "Inter_500Medium",
     marginTop: 1,
   },
@@ -2611,11 +2678,11 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   txSummaryLabel: {
-    fontSize: 9.5,
+    fontSize: 12,
     fontFamily: "Inter_600SemiBold",
   },
   txSummaryVal: {
-    fontSize: 12.5,
+    fontSize: 14,
     fontFamily: "Inter_700Bold",
   },
   txSummaryDivider: {
@@ -2627,14 +2694,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    height: 44,
     borderRadius: 12,
     borderWidth: 1,
     marginBottom: 10,
   },
   txSearchInput: {
     flex: 1,
-    fontSize: 12.5,
+    fontSize: 14,
     fontFamily: "Inter_500Medium",
     padding: 0,
   },
@@ -2644,13 +2711,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   txFilterPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     borderRadius: 16,
     borderWidth: 1,
   },
   txFilterText: {
-    fontSize: 11,
+    fontSize: 13,
     fontFamily: "Inter_600SemiBold",
   },
   txListContent: {
@@ -2668,7 +2735,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
   },
   txEmptySub: {
-    fontSize: 11,
+    fontSize: 13,
     fontFamily: "Inter_400Regular",
     textAlign: "center",
   },
@@ -2680,7 +2747,7 @@ const styles = StyleSheet.create({
   },
   txClearBtnText: {
     color: "#FFFFFF",
-    fontSize: 11,
+    fontSize: 13,
     fontFamily: "Inter_700Bold",
   },
 });

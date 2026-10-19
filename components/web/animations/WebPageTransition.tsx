@@ -15,6 +15,8 @@ export function WebPageTransition({
   return (
     <View
       key={pageKey}
+      // @ts-ignore - RN-Web maps dataSet to data-* attributes (drives the enter animation in webStyles.ts)
+      dataSet={{ ofmPage: pageKey }}
       style={[
         {
           flex: 1,

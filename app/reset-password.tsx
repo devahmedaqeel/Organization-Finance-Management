@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useKeyboardAwareScroll } from "@/hooks/useKeyboardAwareScroll";
 import { Feather } from "@/components/UniversalIcon";
 import { OFMBrandLogo } from "@/components/OFMBrandLogo";
 import {
@@ -21,6 +22,8 @@ import {
 
 export default function ResetPasswordScreen() {
   const insets = useSafeAreaInsets();
+  // Keep the focused field visible above the keyboard (Android edge-to-edge does not resize)
+  const kb = useKeyboardAwareScroll();
   const params = useLocalSearchParams<{ oobCode?: string; token?: string }>();
   const resolveToken = (): string => {
     if (typeof window !== "undefined" && window.location) {
@@ -142,11 +145,13 @@ export default function ResetPasswordScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <ScrollView
+        ref={kb.scrollRef}
+        onTouchEnd={kb.onTouchEnd}
         contentContainerStyle={[
           styles.scrollContent,
           {
             paddingTop: Math.max(insets.top, 24) + 20,
-            paddingBottom: Math.max(insets.bottom, 24) + 30,
+            paddingBottom: Math.max(insets.bottom, 24) + 30 + kb.bottomSpacer,
           },
         ]}
         showsVerticalScrollIndicator={false}
@@ -356,7 +361,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   brandSubtitle: {
-    fontSize: 12.5,
+    fontSize: 13,
     fontFamily: "Inter_400Regular",
     color: "#94A3B8",
     textAlign: "center",
@@ -400,7 +405,7 @@ const styles = StyleSheet.create({
     color: "#F8FAFC",
   },
   cardSubtitle: {
-    fontSize: 12.5,
+    fontSize: 13,
     fontFamily: "Inter_400Regular",
     color: "#94A3B8",
     marginTop: 2,
@@ -434,7 +439,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     flex: 1,
-    fontSize: 12.5,
+    fontSize: 13,
     fontFamily: "Inter_500Medium",
     color: "#EF4444",
     lineHeight: 17,
@@ -466,7 +471,7 @@ const styles = StyleSheet.create({
     color: "#F8FAFC",
   },
   hintText: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: "Inter_400Regular",
     color: "#64748B",
     marginLeft: 2,
@@ -486,7 +491,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   primaryBtnText: {
-    fontSize: 14.5,
+    fontSize: 15,
     fontFamily: "Inter_700Bold",
     color: "#FFFFFF",
   },
@@ -522,7 +527,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   stateDesc: {
-    fontSize: 13.5,
+    fontSize: 14,
     fontFamily: "Inter_400Regular",
     color: "#94A3B8",
     textAlign: "center",

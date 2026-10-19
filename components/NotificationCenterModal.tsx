@@ -358,7 +358,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   sevText: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
   },
   timeText: {

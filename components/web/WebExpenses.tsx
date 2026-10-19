@@ -367,7 +367,7 @@ export function WebExpenses({ onOpenReport }: WebExpensesProps) {
         </View>
       ) : (
         <View style={[styles.tableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <ScrollView horizontal contentContainerStyle={{ minWidth: "100%" }} showsHorizontalScrollIndicator={true}>
+          <ScrollView horizontal contentContainerStyle={{ width: "100%" }} showsHorizontalScrollIndicator={true}>
             <View style={{ minWidth: 700, width: "100%" }}>
               {/* Table Header */}
               <View style={[styles.tableHeader, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
@@ -445,18 +445,18 @@ export function WebExpenses({ onOpenReport }: WebExpensesProps) {
                 filteredTransactions.map((tx) => (
                   <View key={tx.id} style={[styles.tableRow, { borderBottomColor: colors.border }]}>
                     <View style={[styles.tdCol, { width: 92, paddingLeft: 14, paddingRight: 4 }]}>
-                      <Text style={[styles.dateText, { color: colors.foreground }]} numberOfLines={1}>{tx.date}</Text>
+                      <Text style={[styles.dateText, { color: colors.foreground }]}>{tx.date}</Text>
                     </View>
 
                     <View style={[styles.tdCol, { width: 108, paddingHorizontal: 4 }]}>
                       <View style={[styles.catBadge, { backgroundColor: colors.expense + "18" }]}>
-                        <Text style={[styles.catBadgeText, { color: colors.expense }]} numberOfLines={1}>{tx.category}</Text>
+                        <Text style={[styles.catBadgeText, { color: colors.expense }]}>{tx.category}</Text>
                       </View>
                     </View>
 
                     <View style={[styles.tdCol, { flex: 1, minWidth: 120, paddingHorizontal: 6, overflow: "hidden" }]}>
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                        <Text style={[styles.descText, { color: colors.foreground }]} numberOfLines={1}>
+                        <Text style={[styles.descText, { color: colors.foreground }]}>
                           {tx.description || "No description provided"}
                         </Text>
                         {(tx.expenseSource === "payroll" || tx.payrollId) && (
@@ -467,25 +467,25 @@ export function WebExpenses({ onOpenReport }: WebExpensesProps) {
                           </View>
                         )}
                       </View>
-                      <Text style={[styles.refText, { color: colors.mutedForeground }]} numberOfLines={1}>
+                      <Text style={[styles.refText, { color: colors.mutedForeground }]}>
                         {tx.referenceNumber || `TXN-${tx.id.slice(-6).toUpperCase()}`}
                       </Text>
                     </View>
 
                     <View style={[styles.tdCol, { width: 135, paddingHorizontal: 4 }]}>
-                      <Text style={[styles.deptText, { color: colors.foreground }]} numberOfLines={1}>
+                      <Text style={[styles.deptText, { color: colors.foreground }]}>
                         {tx.department}
                       </Text>
                     </View>
 
                     <View style={[styles.tdCol, { width: 110, paddingHorizontal: 4 }]}>
-                      <Text style={[styles.methodText, { color: colors.mutedForeground }]} numberOfLines={1}>
+                      <Text style={[styles.methodText, { color: colors.mutedForeground }]}>
                         {tx.paymentMethod || "Electronic"}
                       </Text>
                     </View>
 
                     <View style={[styles.tdCol, { width: 125, paddingHorizontal: 4, alignItems: "flex-end" }]}>
-                      <Text style={[styles.amountText, { color: colors.expense, textAlign: "right" }]} numberOfLines={1}>
+                      <Text style={[styles.amountText, { color: colors.expense, textAlign: "right" }]}>
                         -{settings.currency} {tx.amount.toLocaleString()}
                       </Text>
                     </View>

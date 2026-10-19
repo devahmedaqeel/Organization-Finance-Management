@@ -68,6 +68,9 @@ export interface AggregatedPoint {
   expense: number;
   net: number;
   count: number;
+  /** Inclusive YYYY-MM-DD bounds; set for week points, whose key ("W1") is not a date prefix. */
+  rangeStart?: string;
+  rangeEnd?: string;
 }
 
 const MONTH_NAMES_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -459,6 +462,55 @@ export function filterTransactionsByPeriod(
   });
 }
 
+export interface MonthlySeries {
+  /** YYYY-MM, oldest → current month */
+  keys: string[];
+  /** Short month names for chart labels (Jan, Feb, …) */
+  labels: string[];
+  income: number[];
+  expense: number[];
+  /** Every record dated in that month (same population as a plain record count) */
+  count: number[];
+}
+
+/**
+ * Month-by-month totals for the last `months` calendar months, counted exactly like the dashboard
+ * totals (calculateTotalIncome / calculateTotalExpenses over all transactions): failed records and
+ * non-positive amounts are excluded. Dates are normalised ("2026/10/05", ISO with time) so every
+ * record lands in its real month.
+ */
+export function buildMonthlySeries(transactions: Transaction[], months = 6, now: Date = new Date()): MonthlySeries {
+  const keys: string[] = [];
+  for (let i = months - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    keys.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+  }
+  const index = new Map(keys.map((k, i) => [k, i]));
+  const income = keys.map(() => 0);
+  const expense = keys.map(() => 0);
+  const count = keys.map(() => 0);
+
+  (transactions || []).forEach((t) => {
+    if (!t || !t.date) return;
+    const idx = index.get((t.date || "").trim().slice(0, 10).replace(/\//g, "-").slice(0, 7));
+    if (idx === undefined) return;
+    count[idx] += 1;
+    if ((t as any).status === "failed") return;
+    const amount = Number(t.amount);
+    if (!Number.isFinite(amount) || amount <= 0) return;
+    if (t.type === "income") income[idx] += amount;
+    else if (t.type === "expense") expense[idx] += amount;
+  });
+
+  return {
+    keys,
+    labels: keys.map((k) => MONTH_NAMES_SHORT[Number(k.slice(5, 7)) - 1]),
+    income,
+    expense,
+    count,
+  };
+}
+
 export function computePeriodMetrics(
   transactions: Transaction[],
   period?: NormalizedPeriod
@@ -699,6 +751,30 @@ export function getExpenseDistributionInsight(
  * Authoritative financial aggregation engine computing 100% true data from database transactions.
  * Never invents mock numbers or synthetic wave profiles.
  */
+/**
+ * Transactions behind one chart point, so drill-downs match the point's own totals.
+ * Pass the transactions already filtered to the active period (the chart aggregates the same set).
+ */
+export function filterTransactionsForPoint(
+  periodTransactions: Transaction[],
+  point: Pick<AggregatedPoint, "key" | "label"> & Partial<Pick<AggregatedPoint, "rangeStart" | "rangeEnd">>
+): Transaction[] {
+  if (point.rangeStart && point.rangeEnd) {
+    const { rangeStart, rangeEnd } = point;
+    return periodTransactions.filter((t) => {
+      const d = (t.date || "").slice(0, 10);
+      return d >= rangeStart && d <= rangeEnd;
+    });
+  }
+  // Day / month / year keys are date prefixes: YYYY-MM-DD, YYYY-MM, YYYY
+  if (point.key && /^\d{4}(-\d{2}){0,2}$/.test(point.key)) {
+    return periodTransactions.filter((t) => (t.date || "").startsWith(point.key));
+  }
+  return periodTransactions.filter(
+    (t) => new Date(t.date).toLocaleDateString("en-US", { month: "short" }) === point.label
+  );
+}
+
 export function aggregateTransactionsByGranularity(
   transactions: Transaction[],
   period: NormalizedPeriod,
@@ -793,6 +869,8 @@ export function aggregateTransactionsByGranularity(
         expense: exp,
         net: inc - exp,
         count: weekTxs.length,
+        rangeStart: sYMD,
+        rangeEnd: eYMD,
       });
     }
     return points;

@@ -8,6 +8,15 @@
 import { PayrollEntry } from "@/context/FinanceContext";
 import { OrganizationInfo } from "@/services/payslipPdfService";
 
+function escapeHtml(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export function buildPayslipHtml(payslip: PayrollEntry, orgInfo?: OrganizationInfo): string {
   const orgName = orgInfo?.name || payslip.organization || "DevOrbit Tech Kotli";
   const orgAddress = orgInfo?.address || "Kotli, Azad Kashmir";
@@ -18,6 +27,50 @@ export function buildPayslipHtml(payslip: PayrollEntry, orgInfo?: OrganizationIn
   const bonus = Number(payslip.bonus || 0);
   const deductions = Number(payslip.deductions || 0);
   const netSalary = Number(payslip.netSalary || (baseSalary + bonus - deductions));
+
+  const rawAllowances: any[] = Array.isArray(payslip.customAllowances) && payslip.customAllowances.length > 0
+    ? payslip.customAllowances
+    : Array.isArray(payslip.itemizedEarnings) && payslip.itemizedEarnings.length > 0
+    ? payslip.itemizedEarnings
+    : [];
+
+  const rawDeductionsList: any[] = Array.isArray(payslip.customDeductions) && payslip.customDeductions.length > 0
+    ? payslip.customDeductions
+    : Array.isArray(payslip.itemizedDeductions) && payslip.itemizedDeductions.length > 0
+    ? payslip.itemizedDeductions
+    : [];
+
+  const allowanceRows = rawAllowances.length > 0
+    ? rawAllowances.map((item) => `
+        <tr>
+          <td><strong>${escapeHtml(item.name || item.label || "Allowance")}</strong></td>
+          <td>Allowance / Earning</td>
+          <td class="num">+${currency} ${Number(item.amount ?? item.calculatedAmount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+        </tr>`).join("")
+    : bonus > 0
+    ? `
+        <tr>
+          <td><strong>Performance Incentives & Allowances</strong></td>
+          <td>Earnings Addition</td>
+          <td class="num">+${currency} ${bonus.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+        </tr>`
+    : "";
+
+  const deductionRows = rawDeductionsList.length > 0
+    ? rawDeductionsList.map((item) => `
+        <tr>
+          <td><strong>${escapeHtml(item.name || item.label || "Deduction")}</strong></td>
+          <td>Payroll Withholding</td>
+          <td class="num" style="color: #EF4444;">-${currency} ${Number(item.amount ?? item.calculatedAmount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+        </tr>`).join("")
+    : deductions > 0
+    ? `
+        <tr>
+          <td><strong>Statutory & Operational Deductions</strong></td>
+          <td>Payroll Withholding</td>
+          <td class="num" style="color: #EF4444;">-${currency} ${deductions.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+        </tr>`
+    : "";
 
   const now = new Date();
   const printDate = now.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
@@ -253,16 +306,8 @@ export function buildPayslipHtml(payslip: PayrollEntry, orgInfo?: OrganizationIn
           <td>Contractual Base</td>
           <td class="num">${currency} ${baseSalary.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
         </tr>
-        <tr>
-          <td><strong>Performance Incentives & Allowances</strong></td>
-          <td>Earnings Addition</td>
-          <td class="num">+${currency} ${bonus.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-        </tr>
-        <tr>
-          <td><strong>Statutory & Operational Deductions</strong></td>
-          <td>Payroll Withholding</td>
-          <td class="num" style="color: #EF4444;">-${currency} ${deductions.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-        </tr>
+        ${allowanceRows}
+        ${deductionRows}
       </tbody>
     </table>
   </div>

@@ -1,4 +1,5 @@
 import { Feather } from "@/components/UniversalIcon";
+import { screenTopPadding } from "@/utils/layout";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import React, { useMemo, useState, useEffect } from "react";
@@ -15,7 +16,6 @@ import { NetOperatingBalanceHealthCard } from "@/components/NetOperatingBalanceH
 import { FinancialDrillDownModal, DrillDownType } from "@/components/FinancialDrillDownModal";
 import { useFinance, Department } from "@/context/FinanceContext";
 import { WebDepartmentStaffModal } from "@/components/web/modals/WebDepartmentStaffModal";
-import { redirectMobileToWebReportPdf } from "@/services/mobileWebPdfRedirectService";
 import { useSettings } from "@/context/SettingsContext";
 import { useColors } from "@/hooks/useColors";
 import { useResponsive } from "@/hooks/useResponsive";
@@ -206,18 +206,9 @@ export default function ReportsScreen() {
   const netCapitalSurplus = netCash;
   const retainedCapitalPct = (metrics?.totalIncome || 0) > 0 ? (Math.max(0, netCash) / (metrics?.totalIncome || 1)) * 100 : 0;
 
-  const handleExportPDF = async () => {
-    if (Platform.OS !== "web") {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      await redirectMobileToWebReportPdf({
-        reportType: "consolidated_statement",
-        scope: activePeriod.presetId ? "period" : "custom",
-        startDate: activePeriod.startDate || "",
-        endDate: activePeriod.endDate || "",
-        dept: "all",
-      });
-      return;
-    }
+  // Same export sheet on every platform: report type, custom date range, filters, sections → PDF generated on-device
+  const handleExportPDF = () => {
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setExportModalVisible(true);
   };
 
@@ -228,7 +219,7 @@ export default function ReportsScreen() {
         style={[
           styles.header,
           {
-            paddingTop: webTop + Math.max(insets.top, 20) + 14,
+            paddingTop: webTop + screenTopPadding(insets.top),
             paddingHorizontal: hPad,
             borderBottomColor: colors.border,
             backgroundColor: colors.background,
@@ -238,7 +229,7 @@ export default function ReportsScreen() {
         <View style={styles.headerRow}>
           <View style={[styles.headerTitleWrap, { flex: 1, marginRight: 8 }]}>
             <Text style={[styles.title, { color: colors.foreground }]}>Financial Analytics</Text>
-            <Text style={[styles.orgText, { color: colors.mutedForeground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
+            <Text style={[styles.orgText, { color: colors.mutedForeground }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
               {settings.organizationName}
             </Text>
           </View>
@@ -326,20 +317,20 @@ export default function ReportsScreen() {
             <View style={styles.kpiRow}>
               <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>INCOME</Text>
-                <Text style={[styles.kpiVal, { color: colors.income }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
+                <Text style={[styles.kpiVal, { color: colors.income }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
                   +{settings.currency} {fmt(metrics.totalIncome)}
                 </Text>
-                <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
+                <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
                   {metrics.recordCount} Inflows
                 </Text>
               </View>
 
               <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>EXPENSES</Text>
-                <Text style={[styles.kpiVal, { color: colors.expense }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
+                <Text style={[styles.kpiVal, { color: colors.expense }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
                   -{settings.currency} {fmt(metrics.totalExpense)}
                 </Text>
-                <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
+                <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
                   {budgetUtilPct.toFixed(1)}% of Budget Used
                 </Text>
               </View>
@@ -348,21 +339,21 @@ export default function ReportsScreen() {
             <View style={styles.kpiRow}>
               <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>DEPARTMENT BUDGET</Text>
-                <Text style={[styles.kpiVal, { color: colors.primary }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
+                <Text style={[styles.kpiVal, { color: colors.primary }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
                   {settings.currency} {fmt(totalAllocatedBudget)}
                 </Text>
-                <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
+                <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
                   Unallocated: {settings.currency} {fmt(unallocatedFunds)}
                 </Text>
               </View>
 
               <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>NET CASH POSITION</Text>
-                <Text style={[styles.kpiVal, { color: netCapitalSurplus >= 0 ? colors.income : colors.expense }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
+                <Text style={[styles.kpiVal, { color: netCapitalSurplus >= 0 ? colors.income : colors.expense }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
                   {netCapitalSurplus >= 0 ? "+" : "-"}
                   {settings.currency} {fmt(Math.abs(netCapitalSurplus))}
                 </Text>
-                <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
+                <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
                   {retainedCapitalPct.toFixed(0)}% Income Retained
                 </Text>
               </View>
@@ -372,31 +363,31 @@ export default function ReportsScreen() {
           <View style={styles.kpiRow}>
             <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>INCOME</Text>
-              <Text style={[styles.kpiVal, { color: colors.income }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
+              <Text style={[styles.kpiVal, { color: colors.income }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
                 {settings.currency} {fmt(metrics.totalIncome)}
               </Text>
-              <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
+              <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
                 {metrics.recordCount} Transactions
               </Text>
             </View>
 
             <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>EXPENSES</Text>
-              <Text style={[styles.kpiVal, { color: colors.expense }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
+              <Text style={[styles.kpiVal, { color: colors.expense }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
                 {settings.currency} {fmt(metrics.totalExpense)}
               </Text>
-              <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
+              <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
                 {metrics.durationDays} Days Period
               </Text>
             </View>
 
             <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>NET SURPLUS</Text>
-              <Text style={[styles.kpiVal, { color: metrics.netBalance >= 0 ? colors.income : colors.expense }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
+              <Text style={[styles.kpiVal, { color: metrics.netBalance >= 0 ? colors.income : colors.expense }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
                 {metrics.netBalance >= 0 ? "+" : ""}
                 {settings.currency} {fmt(metrics.netBalance)}
               </Text>
-              <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
+              <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
                 {metrics.savingsRate.toFixed(1)}% margin
               </Text>
             </View>
@@ -405,7 +396,7 @@ export default function ReportsScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingHorizontal: hPad, paddingBottom: Math.max(insets.bottom, 16) + 95 }]}
+        contentContainerStyle={[styles.content, { paddingHorizontal: hPad, paddingBottom: 24 }]}
         showsVerticalScrollIndicator={false}
       >
         {/* ─── 1. Financial Trend Analytics Area Graph ─── */}
@@ -576,7 +567,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
   },
   orgText: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: "Inter_400Regular",
     marginTop: 2,
   },
@@ -627,7 +618,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   exportBtnText: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: "Inter_700Bold",
   },
   aiBtn: {
@@ -640,7 +631,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   aiBtnText: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: "Inter_700Bold",
   },
   kpiRow: {
@@ -655,12 +646,12 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   kpiLabel: {
-    fontSize: 9,
+    fontSize: 10,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.5,
   },
   kpiVal: {
-    fontSize: 13.5,
+    fontSize: 14,
     fontFamily: "Inter_700Bold",
   },
   content: {
@@ -694,7 +685,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   badgeText: {
-    fontSize: 10.5,
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
   },
   budgetRow: {
@@ -717,11 +708,11 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   statLabel: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: "Inter_400Regular",
   },
   statValue: {
-    fontSize: 12.5,
+    fontSize: 13,
     fontFamily: "Inter_700Bold",
   },
 });

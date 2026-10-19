@@ -20,7 +20,7 @@ import {
 } from "@/components/web/SvgIcons";
 import * as Haptics from "expo-haptics";
 import { useColors } from "@/hooks/useColors";
-import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
+import { useBottomSheetLayout } from "@/hooks/useBottomSheetLayout";
 import { Transaction } from "@/context/FinanceContext";
 import {
   NormalizedPeriod,
@@ -58,7 +58,7 @@ export function DatePeriodSelectorModal({
   transactions = [],
 }: Props) {
   const colors = useColors();
-  const keyboardHeight = useKeyboardHeight();
+  const { maxHeight: sheetMaxHeight, keyboardHeight, scrollRef: sheetScrollRef, onTouchEnd: sheetOnTouchEnd } = useBottomSheetLayout();
   const effectivePeriod = currentPeriod || activePeriod || getPresetPeriod("last_6m");
   const [activeTab, setActiveTab] = useState<SelectionMode>(effectivePeriod?.mode || "days");
 
@@ -274,7 +274,7 @@ export function DatePeriodSelectorModal({
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
       >
-        <View style={[styles.sheet, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={[styles.sheet, { backgroundColor: colors.card, borderColor: colors.border }, Platform.OS !== "web" && { maxHeight: sheetMaxHeight }]}>
           <View style={styles.handle} />
 
           {/* Header */}
@@ -317,6 +317,8 @@ export function DatePeriodSelectorModal({
           </View>
 
           <ScrollView
+            ref={sheetScrollRef}
+            onTouchEnd={sheetOnTouchEnd}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={styles.scrollBody}
@@ -343,7 +345,7 @@ export function DatePeriodSelectorModal({
                           setEndDay(null);
                         }}
                       >
-                        <Text style={{ fontSize: 10.5, color: colors.primary, fontFamily: "Inter_600SemiBold" }}>Today</Text>
+                        <Text style={{ fontSize: 11, color: colors.primary, fontFamily: "Inter_600SemiBold" }}>Today</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={() => {
@@ -351,7 +353,7 @@ export function DatePeriodSelectorModal({
                           setEndDay(daysInMonth);
                         }}
                       >
-                        <Text style={{ fontSize: 10.5, color: colors.primary, fontFamily: "Inter_600SemiBold" }}>Whole Month</Text>
+                        <Text style={{ fontSize: 11, color: colors.primary, fontFamily: "Inter_600SemiBold" }}>Whole Month</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -547,7 +549,7 @@ export function DatePeriodSelectorModal({
                         <Text style={[styles.yearTitle, { color: isSelected ? "#fff" : colors.foreground }, isSelected && { fontFamily: "Inter_700Bold" }]}>
                           {yr}
                         </Text>
-                        <Text style={{ fontSize: 10, color: isSelected ? "#e2e8f0" : colors.mutedForeground }}>
+                        <Text style={{ fontSize: 11, color: isSelected ? "#e2e8f0" : colors.mutedForeground }}>
                           All 12 Months
                         </Text>
                       </TouchableOpacity>
@@ -675,20 +677,20 @@ const styles = StyleSheet.create({
   tabBar: { flexDirection: "row", marginHorizontal: 14, padding: 3, borderRadius: 12, borderWidth: 1, gap: 2 },
   tabBtn: { flex: 1, paddingVertical: 6, alignItems: "center", justifyContent: "center", borderRadius: 8 },
   tabBtnActive: { elevation: 2 },
-  tabText: { fontSize: 10.5, fontFamily: "Inter_600SemiBold" },
+  tabText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
   scrollBody: { paddingHorizontal: 14, paddingTop: 10, paddingBottom: 100, gap: 10 },
   sectionWrap: { gap: 8 },
-  labelSmall: { fontSize: 9.5, fontFamily: "Inter_700Bold", letterSpacing: 0.6 },
+  labelSmall: { fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 0.6 },
   navBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 8, borderRadius: 12, borderWidth: 1 },
   navArrow: { padding: 6 },
-  navTitle: { fontSize: 13.5, fontFamily: "Inter_700Bold" },
+  navTitle: { fontSize: 14, fontFamily: "Inter_700Bold" },
   chipSmall: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, borderWidth: 1 },
   chipText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
   customDaysRow: { flexDirection: "row", alignItems: "center", gap: 8, padding: 8, borderRadius: 10, borderWidth: 1, marginTop: 2 },
   customDaysInput: { flex: 1, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6, borderWidth: 1, fontSize: 12, fontFamily: "Inter_600SemiBold" },
   customDaysBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
   weekdayRow: { flexDirection: "row", justifyContent: "space-around", marginTop: 4 },
-  weekdayText: { fontSize: 10, fontFamily: "Inter_600SemiBold", width: 36, textAlign: "center" },
+  weekdayText: { fontSize: 11, fontFamily: "Inter_600SemiBold", width: 36, textAlign: "center" },
   dayGrid: { flexDirection: "row", flexWrap: "wrap", rowGap: 4 },
   dayCellEmpty: { width: "14.28%", height: 36 },
   dayCell: { width: "14.28%", height: 36, alignItems: "center", justifyContent: "center", borderRadius: 8 },
@@ -697,25 +699,25 @@ const styles = StyleSheet.create({
   dayText: { fontSize: 12, fontFamily: "Inter_500Medium" },
   monthGrid: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   monthChip: { width: "23%", paddingVertical: 8, alignItems: "center", borderRadius: 10, borderWidth: 1 },
-  monthText: { fontSize: 11.5, fontFamily: "Inter_600SemiBold" },
+  monthText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   yearGrid: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   yearCard: { width: "48%", paddingVertical: 12, alignItems: "center", borderRadius: 10, borderWidth: 1, gap: 2 },
   yearTitle: { fontSize: 15, fontFamily: "Inter_700Bold" },
   presetGrid: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   presetCard: { width: "48.5%", flexDirection: "row", alignItems: "center", gap: 6, padding: 10, borderRadius: 10, borderWidth: 1 },
-  presetText: { fontSize: 11.5, fontFamily: "Inter_600SemiBold" },
+  presetText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   summaryBanner: { padding: 10, borderRadius: 12, borderWidth: 1, gap: 8 },
-  summaryLabelTitle: { fontSize: 12.5, fontFamily: "Inter_700Bold", flex: 1 },
+  summaryLabelTitle: { fontSize: 13, fontFamily: "Inter_700Bold", flex: 1 },
   metricsGrid: { flexDirection: "row", justifyContent: "space-around" },
   metricItem: { alignItems: "center", gap: 1 },
-  metricLabel: { fontSize: 8.5, fontFamily: "Inter_700Bold", color: "#94a3b8" },
-  metricVal: { fontSize: 11.5, fontFamily: "Inter_700Bold" },
+  metricLabel: { fontSize: 10, fontFamily: "Inter_700Bold", color: "#94a3b8" },
+  metricVal: { fontSize: 12, fontFamily: "Inter_700Bold" },
   optionsWrap: { padding: 10, borderRadius: 12, borderWidth: 1, gap: 8 },
   granularityRow: { flexDirection: "row", gap: 6 },
   granularityChip: { flex: 1, paddingVertical: 6, alignItems: "center", borderRadius: 8, borderWidth: 1 },
   actionRow: { flexDirection: "row", gap: 8, marginTop: 4 },
   cancelBtn: { flex: 1, paddingVertical: 12, alignItems: "center", borderRadius: 12, borderWidth: 1 },
-  cancelText: { fontSize: 13.5, fontFamily: "Inter_600SemiBold" },
+  cancelText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
   applyBtn: { flex: 2, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 12, borderRadius: 12 },
-  applyBtnText: { color: "#FFFFFF", fontSize: 13.5, fontFamily: "Inter_700Bold" },
+  applyBtnText: { color: "#FFFFFF", fontSize: 14, fontFamily: "Inter_700Bold" },
 });

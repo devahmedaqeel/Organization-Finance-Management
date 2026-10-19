@@ -166,11 +166,11 @@ export function WebDepartments() {
                         {p.employeeName ? p.employeeName.trim()[0].toUpperCase() : "E"}
                       </Text>
                     </View>
-                    <Text style={[styles.kpiEmpName, { color: colors.foreground }]} numberOfLines={1}>
+                    <Text style={[styles.kpiEmpName, { color: colors.foreground }]}>
                       {p.employeeName}
                     </Text>
                     <View style={styles.kpiDeptBadge}>
-                      <Text style={styles.kpiDeptBadgeText} numberOfLines={1}>
+                      <Text style={styles.kpiDeptBadgeText}>
                         {p.department || "General"}
                       </Text>
                     </View>
@@ -244,7 +244,7 @@ export function WebDepartments() {
                     <SvgLayers size={18} color="#0EA5E9" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.deptName, { color: colors.foreground }]} numberOfLines={1}>
+                    <Text style={[styles.deptName, { color: colors.foreground }]}>
                       {dept.name}
                     </Text>
                     <Text style={[styles.deptHead, { color: colors.mutedForeground }]}>
@@ -345,7 +345,7 @@ export function WebDepartments() {
                   <View style={[styles.metaDivider, { backgroundColor: colors.border }]} />
                   <View style={styles.metaItem}>
                     <Text style={[styles.metaLabel, { color: colors.mutedForeground }]}>CONTACT</Text>
-                    <Text style={[styles.metaValue, { color: colors.foreground }]} numberOfLines={1}>
+                    <Text style={[styles.metaValue, { color: colors.foreground }]}>
                       {dept.contactEmail || "N/A"}
                     </Text>
                   </View>
@@ -384,14 +384,12 @@ export function WebDepartments() {
                             <View style={styles.deptEmpDot} />
                             <Text
                               style={[styles.deptEmpName, { color: colors.foreground }]}
-                              numberOfLines={1}
                             >
                               {emp.employeeName}
                             </Text>
                             {emp.designation ? (
                               <Text
                                 style={[styles.deptEmpRole, { color: colors.mutedForeground }]}
-                                numberOfLines={1}
                               >
                                 • {emp.designation}
                               </Text>

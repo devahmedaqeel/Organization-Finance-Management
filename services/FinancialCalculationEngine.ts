@@ -68,7 +68,11 @@ export interface PayrollEntry {
   deductions?: number;
   netSalary?: number;
   month: string;
-  paymentStatus?: "paid" | "pending" | "processing";
+  paymentStatus?: "paid" | "pending" | "processing" | "failed" | "cancelled";
+  customAllowances?: any[];
+  customDeductions?: any[];
+  itemizedEarnings?: any[];
+  itemizedDeductions?: any[];
 }
 
 // --- Color Palette for Expense Visualization ---

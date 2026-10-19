@@ -277,7 +277,7 @@ export function WebSettings() {
               </View>
 
               <View style={{ flex: 1, gap: 4 }}>
-                <Text style={[styles.logoOrgName, { color: colors.foreground }]} numberOfLines={1}>
+                <Text style={[styles.logoOrgName, { color: colors.foreground }]}>
                   {form.organizationName || "Your Organization"}
                 </Text>
                 <Text style={[styles.logoStatus, { color: colors.mutedForeground }]}>
@@ -369,7 +369,7 @@ export function WebSettings() {
                     <Text style={[styles.symbolText, { color: colors.primary }]}>{selectedCurrency.symbol}</Text>
                   </View>
                 </View>
-                <Text style={[styles.selectedName, { color: colors.mutedForeground }]} numberOfLines={1}>
+                <Text style={[styles.selectedName, { color: colors.mutedForeground }]}>
                   {selectedCurrency.name} · {selectedCurrency.country}
                 </Text>
               </View>
@@ -405,7 +405,7 @@ export function WebSettings() {
 
               <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                  <Text style={[styles.userSessionName, { color: colors.foreground }]} numberOfLines={1}>
+                  <Text style={[styles.userSessionName, { color: colors.foreground }]}>
                     {user?.name || "Authenticated User"}
                   </Text>
                   <View style={[styles.userSessionRolePill, { backgroundColor: colors.primary + "15", borderColor: colors.primary + "35" }]}>
@@ -419,7 +419,7 @@ export function WebSettings() {
                 {/* Email Callout */}
                 <View style={[styles.userSessionEmailRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
                   <SvgMail size={13} color={colors.primary} />
-                  <Text style={[styles.userSessionEmailText, { color: colors.foreground }]} numberOfLines={1} selectable>
+                  <Text style={[styles.userSessionEmailText, { color: colors.foreground }]} selectable>
                     {user?.email || ""}
                   </Text>
                 </View>
@@ -429,7 +429,7 @@ export function WebSettings() {
             <View style={{ gap: 8, marginTop: 4 }}>
               <View style={styles.userSessionMetaRow}>
                 <Text style={[styles.userSessionMetaLabel, { color: colors.mutedForeground }]}>Organization</Text>
-                <Text style={[styles.userSessionMetaValue, { color: colors.foreground }]} numberOfLines={1}>
+                <Text style={[styles.userSessionMetaValue, { color: colors.foreground }]}>
                   {user?.organization || settings.organizationName || "Devorbit Tech"}
                 </Text>
               </View>

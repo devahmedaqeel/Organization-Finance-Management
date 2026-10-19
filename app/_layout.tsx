@@ -29,6 +29,7 @@ import { requestNotificationPermissions } from "@/hooks/NotificationHelper";
 
 LogBox.ignoreLogs([
   /Cannot connect to Expo CLI/,
+  /Deep imports from the .react-native. package/,
   /Cannot connect to Metro/,
   /Require cycle:/,
   /Can't perform a React state update/,
@@ -174,10 +175,10 @@ function GlobalToast() {
             <SvgBell size={16} color="#fff" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={toastStyles.toastTitle} numberOfLines={1}>
+            <Text style={toastStyles.toastTitle}>
               {toast.title}
             </Text>
-            <Text style={toastStyles.toastMsg} numberOfLines={2}>
+            <Text style={toastStyles.toastMsg}>
               {toast.message}
             </Text>
           </View>
@@ -231,12 +232,12 @@ const toastStyles = StyleSheet.create({
   },
   toastTitle: {
     color: "#fff",
-    fontSize: 13.5,
+    fontSize: 14,
     fontFamily: "Inter_700Bold",
   },
   toastMsg: {
     color: "#cbd5e1",
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: "Inter_400Regular",
     marginTop: 2,
     lineHeight: 15,
@@ -316,6 +317,7 @@ function RootLayoutNav() {
       <Stack.Screen name="(tabs)" options={{ gestureEnabled: false }} />
       <Stack.Screen name="budget" options={{ presentation: "card", animation: "slide_from_right", gestureEnabled: true }} />
       <Stack.Screen name="payroll" options={{ presentation: "card", animation: "slide_from_right", gestureEnabled: true }} />
+      <Stack.Screen name="payslip-templates" options={{ presentation: "card", animation: "slide_from_right", gestureEnabled: true }} />
       <Stack.Screen name="departments" options={{ presentation: "card", animation: "slide_from_right", gestureEnabled: true }} />
       <Stack.Screen name="ai-insights" options={{ presentation: "card", animation: "slide_from_right", gestureEnabled: true }} />
       <Stack.Screen name="settings" options={{ presentation: "card", animation: "slide_from_right", gestureEnabled: true }} />

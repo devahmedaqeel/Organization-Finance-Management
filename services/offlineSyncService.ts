@@ -424,7 +424,10 @@ export function reconcileEntities<T extends { id: string; updatedAt?: string; da
   remoteItems: T[],
   localItems: T[],
   outboxOps: PendingOperation[],
-  tombstones: Set<string>
+  tombstones: Set<string>,
+  // true when remoteItems came straight from the server (not a cache/offline read), so an
+  // empty list really means "deleted everywhere" (e.g. the last item was removed on another device)
+  remoteAuthoritative = false
 ): T[] {
   const itemMap = new Map<string, T>();
 
@@ -437,13 +440,13 @@ export function reconcileEntities<T extends { id: string; updatedAt?: string; da
 
   // 2. Safety Net: If remote is empty, but local items exist, retain local items
   // (Prevents offline or initial empty snapshots from wiping valid local data)
-  if (remoteItems.length === 0 && localItems.length > 0) {
+  if (remoteItems.length === 0 && localItems.length > 0 && !remoteAuthoritative) {
     for (const item of localItems) {
       if (!tombstones.has(item.id)) {
         itemMap.set(item.id, item);
       }
     }
-  } else if (remoteItems.length > 0 && localItems.length > 0) {
+  } else if ((remoteItems.length > 0 || remoteAuthoritative) && localItems.length > 0) {
     // Preserve local items that are pending in outbox (e.g. created offline but not yet on remote)
     const pendingIds = new Set(outboxOps.map((o) => o.entityId));
     for (const local of localItems) {

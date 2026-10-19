@@ -1,4 +1,5 @@
 import { Feather } from "@/components/UniversalIcon";
+import { screenTopPadding } from "@/utils/layout";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import React, { useMemo, useState, useEffect } from "react";
@@ -29,8 +30,10 @@ import {
   validateBudgetAllocationAgainstNetCash,
 } from "@/services/FinancialCalculationEngine";
 import { useColors } from "@/hooks/useColors";
+import { can } from "@/services/permissionService";
+import { useRequirePermission } from "@/hooks/useRequirePermission";
 import { useSettings } from "@/context/SettingsContext";
-import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
+import { useBottomSheetLayout } from "@/hooks/useBottomSheetLayout";
 import { showFloatingToast } from "@/utils/toast";
 import { isSalaryExpenseCategory } from "@/constants/categories";
 
@@ -38,11 +41,13 @@ const DEPT_COLORS = ["#3B82F6", "#10B981", "#8B5CF6", "#F59E0B", "#F43F5E", "#0E
 
 export default function DepartmentsScreen() {
   const colors = useColors();
+  // Role guard: leave if this role can't use this screen (e.g. opened via deep link)
+  useRequirePermission("view_departments");
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { departments, transactions, addDepartment, updateDepartment, deleteDepartment, budgets } = useFinance();
   const { settings } = useSettings();
-  const keyboardHeight = useKeyboardHeight();
+  const { maxHeight: sheetMaxHeight, keyboardHeight, scrollRef: sheetScrollRef, onTouchEnd: sheetOnTouchEnd, sheetBottomInset } = useBottomSheetLayout();
 
   const netCash = useMemo(
     () => calculateTotalIncome(transactions) - calculateTotalExpenses(transactions),
@@ -73,7 +78,7 @@ export default function DepartmentsScreen() {
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<"all" | "healthy" | "warning" | "over">("all");
 
-  const canEdit = user?.role === "admin";
+  const canEdit = can(user, "manage_departments");
   const webTop = Platform.OS === "web" ? 67 : 0;
 
   const fmt = (n: number) => {
@@ -261,7 +266,7 @@ export default function DepartmentsScreen() {
         style={[
           styles.header,
           {
-            paddingTop: webTop + insets.top + (Platform.OS === "android" ? 16 : 10),
+            paddingTop: webTop + screenTopPadding(insets.top),
             backgroundColor: colors.background,
             borderBottomColor: colors.border,
           },
@@ -332,7 +337,7 @@ export default function DepartmentsScreen() {
                   <Feather name="pie-chart" size={15} color="#38BDF8" />
                 </View>
                 <View style={styles.statContentWrap}>
-                  <Text style={[styles.statVal, { color: colors.foreground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
+                  <Text style={[styles.statVal, { color: colors.foreground }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
                     {fmt(totalAllocated)}
                   </Text>
                   <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Total Budget</Text>
@@ -345,7 +350,7 @@ export default function DepartmentsScreen() {
                   <Feather name="activity" size={15} color={overallBurnRate > 90 ? colors.expense : colors.income} />
                 </View>
                 <View style={styles.statContentWrap}>
-                  <Text style={[styles.statVal, { color: overallBurnRate > 90 ? colors.expense : colors.income }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
+                  <Text style={[styles.statVal, { color: overallBurnRate > 90 ? colors.expense : colors.income }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
                     {fmt(totalSpent)}
                   </Text>
                   <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>
@@ -428,10 +433,10 @@ export default function DepartmentsScreen() {
                   <Feather name="layers" size={17} color={accentColor} />
                 </View>
                 <View style={[styles.deptInfo, { flex: 1, minWidth: 0, marginRight: 6 }]}>
-                  <Text style={[styles.deptName, { color: colors.foreground }]} numberOfLines={2}>
+                  <Text style={[styles.deptName, { color: colors.foreground }]}>
                     {item.name}
                   </Text>
-                  <Text style={[styles.deptMeta, { color: colors.mutedForeground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  <Text style={[styles.deptMeta, { color: colors.mutedForeground }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
                     {item.headCount} Employees · Avg: {settings.currency} {fmtShort(item.headCount > 0 ? item.budgetAllocated / item.headCount : 0)}/head
                   </Text>
                 </View>
@@ -462,37 +467,37 @@ export default function DepartmentsScreen() {
               <View style={[styles.deptFiscalStrip, { flexWrap: "wrap", gap: 6 }]}>
                 <View style={[styles.deptFiscalBox, { backgroundColor: colors.background, borderColor: colors.border, minWidth: "47%", flex: 1 }]}>
                   <Text style={[styles.deptFiscalLabel, { color: colors.mutedForeground }]}>Allocated</Text>
-                  <Text style={[styles.deptFiscalVal, { color: colors.foreground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
+                  <Text style={[styles.deptFiscalVal, { color: colors.foreground }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
                     {fmt(item.budgetAllocated)}
                   </Text>
                 </View>
                 <View style={[styles.deptFiscalBox, { backgroundColor: colors.background, borderColor: colors.border, minWidth: "47%", flex: 1 }]}>
                   <Text style={[styles.deptFiscalLabel, { color: "#8B5CF6" }]}>Payroll Spend</Text>
-                  <Text style={[styles.deptFiscalVal, { color: "#8B5CF6" }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
+                  <Text style={[styles.deptFiscalVal, { color: "#8B5CF6" }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
                     {fmt(item.payrollSpending || 0)}
                   </Text>
                 </View>
                 <View style={[styles.deptFiscalBox, { backgroundColor: colors.background, borderColor: colors.border, minWidth: "47%", flex: 1 }]}>
                   <Text style={[styles.deptFiscalLabel, { color: colors.mutedForeground }]}>Other Exp</Text>
-                  <Text style={[styles.deptFiscalVal, { color: colors.mutedForeground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
+                  <Text style={[styles.deptFiscalVal, { color: colors.mutedForeground }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
                     {fmt(item.otherSpending || 0)}
                   </Text>
                 </View>
                 <View style={[styles.deptFiscalBox, { backgroundColor: colors.background, borderColor: colors.border, minWidth: "47%", flex: 1 }]}>
                   <Text style={[styles.deptFiscalLabel, { color: colors.mutedForeground }]}>Total Spend</Text>
-                  <Text style={[styles.deptFiscalVal, { color: colors.expense }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
+                  <Text style={[styles.deptFiscalVal, { color: colors.expense }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
                     {fmt(item.spent)}
                   </Text>
                 </View>
                 <View style={[styles.deptFiscalBox, { backgroundColor: colors.background, borderColor: colors.border, minWidth: "47%", flex: 1 }]}>
                   <Text style={[styles.deptFiscalLabel, { color: colors.mutedForeground }]}>Remaining</Text>
-                  <Text style={[styles.deptFiscalVal, { color: item.remaining >= 0 ? colors.income : colors.expense }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
+                  <Text style={[styles.deptFiscalVal, { color: item.remaining >= 0 ? colors.income : colors.expense }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
                     {item.remaining >= 0 ? "+" : "-"}{fmt(Math.abs(item.remaining))}
                   </Text>
                 </View>
                 <View style={[styles.deptFiscalBox, { backgroundColor: colors.background, borderColor: colors.border, minWidth: "47%", flex: 1 }]}>
                   <Text style={[styles.deptFiscalLabel, { color: colors.mutedForeground }]}>Utilization</Text>
-                  <Text style={[styles.deptFiscalVal, { color: statusTextColor }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
+                  <Text style={[styles.deptFiscalVal, { color: statusTextColor }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
                     {item.utilPct.toFixed(1)}%
                   </Text>
                 </View>
@@ -568,7 +573,7 @@ export default function DepartmentsScreen() {
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
         >
-          <View style={[styles.sheet, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={[styles.sheet, { backgroundColor: colors.card, borderColor: colors.border, maxHeight: sheetMaxHeight }]}>
             <View style={styles.handle} />
             <Text style={[styles.modalTitle, { color: colors.foreground }]}>
               {editingDept ? "Edit Monitored Department" : "Add Monitored Department"}
@@ -577,7 +582,7 @@ export default function DepartmentsScreen() {
               {editingDept ? "Modify allocation cap and staff headcount." : "Register a new administrative or academic unit into organizational tracking."}
             </Text>
 
-            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 20 }}>
+            <ScrollView ref={sheetScrollRef} onTouchEnd={sheetOnTouchEnd} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 20 + sheetBottomInset }}>
               {[
                 { label: "DEPARTMENT NAME", value: name, onChange: setName, placeholder: "e.g. Computer Science & IT", keyboard: "default" as const },
                 { label: "EMPLOYEE HEADCOUNT", value: headCount, onChange: setHeadCount, placeholder: "Number of active staff", keyboard: "number-pad" as const },
@@ -603,7 +608,7 @@ export default function DepartmentsScreen() {
                           {settings.currency} {maxAvailableForDept.toLocaleString()}
                         </Text>
                       </View>
-                      <Text style={{ fontSize: 10, color: colors.mutedForeground }}>
+                      <Text style={{ fontSize: 11, color: colors.mutedForeground }}>
                         Total Net Cash: {settings.currency} {netCash.toLocaleString()} · Other Units: {settings.currency} {Math.max(0, netCash - maxAvailableForDept).toLocaleString()}
                       </Text>
                     </View>
@@ -712,12 +717,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   statVal: {
-    fontSize: 15.5,
+    fontSize: 16,
     fontFamily: "Inter_800ExtraBold",
-    lineHeight: 19,
+    lineHeight: 20,
   },
   statLabel: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: "Inter_500Medium",
     marginTop: 1,
   },
@@ -750,7 +755,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   filterChipText: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.3,
   },
@@ -780,7 +785,7 @@ const styles = StyleSheet.create({
     gap: 1,
   },
   deptName: {
-    fontSize: 14.5,
+    fontSize: 15,
     fontFamily: "Inter_700Bold",
   },
   deptMeta: {
@@ -794,7 +799,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   statusBadgeText: {
-    fontSize: 9,
+    fontSize: 10,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.3,
   },
@@ -813,11 +818,11 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   deptFiscalLabel: {
-    fontSize: 9,
+    fontSize: 10,
     fontFamily: "Inter_500Medium",
   },
   deptFiscalVal: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: "Inter_800ExtraBold",
   },
 
@@ -840,7 +845,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
   },
   emptyText: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: "Inter_400Regular",
     textAlign: "center",
     paddingHorizontal: 25,
@@ -863,7 +868,7 @@ const styles = StyleSheet.create({
   },
   floatingAddBtnText: {
     color: "#fff",
-    fontSize: 13.5,
+    fontSize: 14,
     fontFamily: "Inter_700Bold",
   },
 
@@ -890,7 +895,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   modalTitle: {
-    fontSize: 17,
+    fontSize: 18,
     fontFamily: "Inter_800ExtraBold",
   },
   modalSub: {
@@ -899,7 +904,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   fieldLabel: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.5,
     marginBottom: 5,
@@ -913,7 +918,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
   },
   error: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: "Inter_500Medium",
     marginBottom: 6,
   },

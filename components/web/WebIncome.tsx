@@ -291,7 +291,7 @@ export function WebIncome({ onOpenReport }: WebIncomeProps) {
         </View>
       ) : (
         <View style={[styles.tableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <ScrollView horizontal contentContainerStyle={{ minWidth: "100%" }} showsHorizontalScrollIndicator={true}>
+          <ScrollView horizontal contentContainerStyle={{ width: "100%" }} showsHorizontalScrollIndicator={true}>
             <View style={{ minWidth: 650, width: "100%" }}>
               {/* Table Header */}
               <View style={[styles.tableHeader, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
@@ -365,32 +365,32 @@ export function WebIncome({ onOpenReport }: WebIncomeProps) {
                 filteredTransactions.map((tx) => (
                   <View key={tx.id} style={[styles.tableRow, { borderBottomColor: colors.border }]}>
                     <View style={[styles.tdCol, { width: 95, paddingLeft: 14, paddingRight: 4 }]}>
-                      <Text style={[styles.dateText, { color: colors.foreground }]} numberOfLines={1}>{tx.date}</Text>
+                      <Text style={[styles.dateText, { color: colors.foreground }]}>{tx.date}</Text>
                     </View>
 
                     <View style={[styles.tdCol, { width: 120, paddingHorizontal: 4 }]}>
                       <View style={[styles.catBadge, { backgroundColor: colors.income + "18" }]}>
-                        <Text style={[styles.catBadgeText, { color: colors.income }]} numberOfLines={1}>{tx.category}</Text>
+                        <Text style={[styles.catBadgeText, { color: colors.income }]}>{tx.category}</Text>
                       </View>
                     </View>
 
                     <View style={[styles.tdCol, { flex: 1, minWidth: 140, paddingHorizontal: 6, overflow: "hidden" }]}>
-                      <Text style={[styles.descText, { color: colors.foreground }]} numberOfLines={1}>
+                      <Text style={[styles.descText, { color: colors.foreground }]}>
                         {tx.description || "No description provided"}
                       </Text>
-                      <Text style={[styles.refText, { color: colors.mutedForeground }]} numberOfLines={1}>
+                      <Text style={[styles.refText, { color: colors.mutedForeground }]}>
                         {tx.referenceNumber || `TXN-${tx.id.slice(-6).toUpperCase()}`}
                       </Text>
                     </View>
 
                     <View style={[styles.tdCol, { width: 130, paddingHorizontal: 4 }]}>
-                      <Text style={[styles.methodText, { color: colors.mutedForeground }]} numberOfLines={1}>
+                      <Text style={[styles.methodText, { color: colors.mutedForeground }]}>
                         {tx.paymentMethod || "Electronic"}
                       </Text>
                     </View>
 
                     <View style={[styles.tdCol, { width: 130, paddingHorizontal: 4, alignItems: "flex-end" }]}>
-                      <Text style={[styles.amountText, { color: colors.income, textAlign: "right" }]} numberOfLines={1}>
+                      <Text style={[styles.amountText, { color: colors.income, textAlign: "right" }]}>
                         +{settings.currency} {tx.amount.toLocaleString()}
                       </Text>
                     </View>

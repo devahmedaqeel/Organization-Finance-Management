@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   title: {
-    fontSize: 19,
+    fontSize: 18,
     fontFamily: "Inter_700Bold",
     textAlign: "center",
     marginBottom: 6,
@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
   },
   entityDetails: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: "Inter_500Medium",
   },
   amountBadge: {

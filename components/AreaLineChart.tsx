@@ -394,9 +394,9 @@ export function AreaLineChart({
                 activeOpacity={0.7}
               >
                 <Text
-                  numberOfLines={1}
+                  numberOfLines={Platform.OS === "web" ? undefined : 1}
                   adjustsFontSizeToFit
-                  minimumFontScale={0.85}
+                  minimumFontScale={0.7}
                   style={[
                     styles.rangeText,
                     { color: isSelected ? "#FFFFFF" : colors.mutedForeground },
@@ -442,7 +442,6 @@ export function AreaLineChart({
               { color: currentPeriod.mode !== "presets" ? "#FFFFFF" : colors.foreground },
               currentPeriod.mode !== "presets" && { fontFamily: "Inter_700Bold" },
             ]}
-            numberOfLines={1}
           >
             Custom
           </Text>
@@ -463,7 +462,7 @@ export function AreaLineChart({
         <View style={styles.inspectorHeaderRow}>
           <View style={styles.dateBadgeWrap}>
             <SvgCalendar size={12} color={colors.primary} />
-            <Text style={[styles.inspectorDate, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82}>
+            <Text style={[styles.inspectorDate, { color: colors.foreground }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>
               {activePoint ? (activePoint.fullDate || activePoint.label) : "-"}
             </Text>
           </View>
@@ -482,9 +481,9 @@ export function AreaLineChart({
                 styles.netSurplusText,
                 { color: isNetPositive ? colors.income : colors.expense },
               ]}
-              numberOfLines={1}
+              numberOfLines={Platform.OS === "web" ? undefined : 1}
               adjustsFontSizeToFit
-              minimumFontScale={0.78}
+              minimumFontScale={0.7}
             >
               Net: {isNetPositive ? "+" : "-"}{currency} {Number(Math.abs(netSurplus) || 0).toLocaleString()}
             </Text>
@@ -496,13 +495,13 @@ export function AreaLineChart({
           <View style={[styles.statBadge, { backgroundColor: colors.income + "14", borderColor: colors.income + "30" }]}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 3.5, flexShrink: 0 }}>
               <View style={[styles.legendDot, { backgroundColor: colors.income }]} />
-              <Text style={[styles.statBadgeLabel, { color: colors.income }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>Income</Text>
+              <Text style={[styles.statBadgeLabel, { color: colors.income }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>Inflow</Text>
             </View>
             <Text
               style={[styles.statBadgeValue, { color: colors.income }]}
-              numberOfLines={1}
+              numberOfLines={Platform.OS === "web" ? undefined : 1}
               adjustsFontSizeToFit
-              minimumFontScale={0.75}
+              minimumFontScale={0.7}
             >
               {currency} {Number(activePoint ? activePoint.income : 0).toLocaleString()}
             </Text>
@@ -511,13 +510,13 @@ export function AreaLineChart({
           <View style={[styles.statBadge, { backgroundColor: colors.expense + "14", borderColor: colors.expense + "30" }]}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 3.5, flexShrink: 0 }}>
               <View style={[styles.legendDot, { backgroundColor: colors.expense }]} />
-              <Text style={[styles.statBadgeLabel, { color: colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>Expenses</Text>
+              <Text style={[styles.statBadgeLabel, { color: colors.expense }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>Expenses</Text>
             </View>
             <Text
               style={[styles.statBadgeValue, { color: colors.expense }]}
-              numberOfLines={1}
+              numberOfLines={Platform.OS === "web" ? undefined : 1}
               adjustsFontSizeToFit
-              minimumFontScale={0.75}
+              minimumFontScale={0.7}
             >
               {currency} {Number(activePoint ? activePoint.expense : 0).toLocaleString()}
             </Text>
@@ -642,7 +641,7 @@ export function AreaLineChart({
                       x={padLeft - 6}
                       y={y + 3.5}
                       fill={colors.mutedForeground}
-                      fontSize={8.5}
+                      fontSize={10}
                       fontWeight="500"
                       textAnchor="end"
                     >
@@ -688,7 +687,7 @@ export function AreaLineChart({
                         r={3.5}
                         fill={colors.income}
                         opacity={0.85}
-                        onPress={() => handleTouchAtX(px, true)}
+                        {...{ [Platform.OS === "web" ? "onClick" : "onPress"]: () => handleTouchAtX(px, true) }}
                       />
                     )}
                     {d.expense > 0 && (
@@ -698,7 +697,7 @@ export function AreaLineChart({
                         r={3.5}
                         fill={colors.expense}
                         opacity={0.85}
-                        onPress={() => handleTouchAtX(px, true)}
+                        {...{ [Platform.OS === "web" ? "onClick" : "onPress"]: () => handleTouchAtX(px, true) }}
                       />
                     )}
                   </React.Fragment>
@@ -765,7 +764,6 @@ export function AreaLineChart({
                         { color: isAct ? colors.primary : colors.mutedForeground, textAlign: "center" },
                         isAct && { fontFamily: "Inter_700Bold" },
                       ]}
-                      numberOfLines={1}
                     >
                       {showText ? d.label : "·"}
                     </Text>
@@ -801,9 +799,9 @@ export function AreaLineChart({
                     { color: isAct ? "#FFFFFF" : colors.foreground },
                     isAct && { fontFamily: "Inter_700Bold" },
                   ]}
-                  numberOfLines={1}
+                  numberOfLines={Platform.OS === "web" ? undefined : 1}
                   adjustsFontSizeToFit
-                  minimumFontScale={0.8}
+                  minimumFontScale={0.7}
                 >
                   {g.charAt(0).toUpperCase() + g.slice(1)}
                 </Text>
@@ -868,7 +866,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   rangeText: {
-    fontSize: 11,
+    fontSize: 13,
     fontFamily: "Inter_600SemiBold",
     textAlign: "center",
     includeFontPadding: false,
@@ -884,7 +882,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   calendarBtnText: {
-    fontSize: 10.5,
+    fontSize: 12,
     fontFamily: "Inter_600SemiBold",
     includeFontPadding: false,
   },
@@ -908,7 +906,7 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   inspectorDate: {
-    fontSize: 11.5,
+    fontSize: 13,
     fontFamily: "Inter_700Bold",
   },
   netSurplusPill: {
@@ -918,7 +916,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   netSurplusText: {
-    fontSize: 10.5,
+    fontSize: 12,
     fontFamily: "Inter_700Bold",
   },
   inspectorBadgesRow: {
@@ -944,13 +942,13 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   statBadgeLabel: {
-    fontSize: 9.5,
+    fontSize: 11,
     fontFamily: "Inter_600SemiBold",
     includeFontPadding: false,
     flexShrink: 0,
   },
   statBadgeValue: {
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: "Inter_700Bold",
     includeFontPadding: false,
     flexShrink: 1,
@@ -973,11 +971,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   scrollNavBtnText: {
-    fontSize: 10.5,
+    fontSize: 12,
     fontFamily: "Inter_700Bold",
   },
   scrollHintText: {
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: "Inter_500Medium",
   },
   xAxisRow: {
@@ -990,7 +988,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   xLabel: {
-    fontSize: 9.5,
+    fontSize: 11,
     fontFamily: "Inter_500Medium",
   },
   emptyBox: {
@@ -999,7 +997,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   emptyText: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: "Inter_500Medium",
   },
   granularityControlRow: {
@@ -1011,7 +1009,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   granularityTitle: {
-    fontSize: 10.5,
+    fontSize: 12,
     fontFamily: "Inter_600SemiBold",
     flexShrink: 0,
   },
@@ -1029,7 +1027,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   granPillText: {
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: "Inter_600SemiBold",
   },
 });

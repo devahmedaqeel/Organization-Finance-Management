@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   langText: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
   },
   volumeBtn: {

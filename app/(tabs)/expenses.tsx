@@ -1,4 +1,5 @@
 import { Feather } from "@/components/UniversalIcon";
+import { screenTopPadding } from "@/utils/layout";
 import * as Haptics from "expo-haptics";
 import React, { useMemo, useState } from "react";
 import {
@@ -17,7 +18,9 @@ import { useAuth } from "@/context/AuthContext";
 import { useFinance } from "@/context/FinanceContext";
 import { Transaction } from "@/context/FinanceContext";
 import { useColors } from "@/hooks/useColors";
+import { can } from "@/services/permissionService";
 import { useSettings } from "@/context/SettingsContext";
+import { LinearGradient } from "expo-linear-gradient";
 
 const CATS = ["All", "Salary / Payroll", "Salaries", "Utilities", "Equipment", "Research", "Maintenance", "Travel", "Other"];
 
@@ -37,11 +40,23 @@ export default function ExpensesScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [editItem, setEditItem] = useState<Transaction | null>(null);
 
-  const canEdit = user?.role === "admin" || user?.role === "accountant";
+  const canEdit = can(user, "edit_transaction");
+  const isEmployee = user?.role === "employee";
+
+  // Employees only see their own records (matched by name, as on the Payroll screen),
+  // never the organization's full expense ledger.
+  const isOwnRecord = (t: Transaction) => {
+    if (!isEmployee) return true;
+    const who = (t.employeeName || "").trim().toLowerCase();
+    const name = (user?.name || "").trim().toLowerCase();
+    const emailUser = (user?.email || "").split("@")[0].toLowerCase();
+    return !!who && (who === name || (!!emailUser && who.includes(emailUser)));
+  };
 
   const expenses = useMemo(() =>
     transactions
       .filter((t) => t.type === "expense")
+      .filter(isOwnRecord)
       .filter((t) => filterCat === "All" || t.category === filterCat)
       .filter((t) =>
         search.trim() === "" ||
@@ -51,7 +66,7 @@ export default function ExpensesScreen() {
         (t.employeeName && t.employeeName.toLowerCase().includes(search.toLowerCase())) ||
         (t.referenceNumber && t.referenceNumber.toLowerCase().includes(search.toLowerCase()))
       ),
-    [transactions, search, filterCat]
+    [transactions, search, filterCat, isEmployee, user?.name, user?.email]
   );
 
   const total = expenses.reduce((s, t) => s + t.amount, 0);
@@ -71,28 +86,45 @@ export default function ExpensesScreen() {
   return (
     <View style={[styles.flex, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: webTop + Math.max(insets.top, 20) + 14, backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { paddingTop: webTop + screenTopPadding(insets.top), backgroundColor: colors.background, borderBottomColor: colors.border }]}>
         <View style={styles.headerRow}>
-          <View>
-            <Text style={[styles.title, { color: colors.foreground }]}>Expenses</Text>
-            <Text style={[styles.count, { color: colors.mutedForeground }]}>{expenses.length} records</Text>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={[styles.title, { color: colors.foreground }]}>{isEmployee ? "My Claims" : "Expenses"}</Text>
+            <Text style={[styles.count, { color: colors.mutedForeground }]}>{isEmployee ? "Your salary and expense records" : "Money spent by your organization"}</Text>
           </View>
-          <View style={styles.headerRight}>
-            <View style={[styles.totalBadge, { backgroundColor: colors.expense + "22" }]}>
-              <Feather name="trending-down" size={12} color={colors.expense} />
-              <Text style={[styles.totalText, { color: colors.expense }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>{formatAmt(total)}</Text>
-            </View>
-            {canEdit && (
-              <TouchableOpacity
-                style={[styles.addBtn, { backgroundColor: colors.expense }]}
-                onPress={openAdd}
-                activeOpacity={0.85}
-              >
-                <Feather name="plus" size={18} color="#fff" />
-              </TouchableOpacity>
-            )}
-          </View>
+          {canEdit && (
+            <TouchableOpacity
+              style={[styles.addBtn, { backgroundColor: colors.expense, shadowColor: colors.expense }]}
+              onPress={openAdd}
+              activeOpacity={0.85}
+              accessibilityLabel="Add expense"
+            >
+              <Feather name="plus" size={17} color="#fff" />
+              <Text style={styles.addBtnText}>Add</Text>
+            </TouchableOpacity>
+          )}
         </View>
+
+        {/* Summary card */}
+        <LinearGradient
+          colors={colors.isDark ? ["#881337", "#9F1239"] : ["#E11D48", "#F43F5E"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.summaryCard}
+        >
+          <View style={styles.summaryIcon}>
+            <Feather name="trending-down" size={18} color="#FFFFFF" />
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.summaryLabel}>{filterCat === "All" ? (isEmployee ? "MY TOTAL" : "TOTAL EXPENSES") : filterCat.toUpperCase()}</Text>
+            <Text style={styles.summaryValue} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>
+              {formatAmt(total)}
+            </Text>
+          </View>
+          <View style={styles.summaryPill}>
+            <Text style={styles.summaryPillText}>{expenses.length} {expenses.length === 1 ? "record" : "records"}</Text>
+          </View>
+        </LinearGradient>
 
         {/* Search Bar */}
         <View style={[styles.searchBar, { backgroundColor: colors.input, borderColor: colors.border }]}>
@@ -139,7 +171,7 @@ export default function ExpensesScreen() {
       <FlatList
         data={expenses}
         keyExtractor={(t) => t.id}
-        contentContainerStyle={[styles.list, { paddingBottom: Math.max(insets.bottom, 16) + 105 }]}
+        contentContainerStyle={[styles.list, { paddingBottom: 24 }]}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
@@ -183,27 +215,35 @@ export default function ExpensesScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  header: { paddingHorizontal: 16, paddingBottom: 8, borderBottomWidth: 1, gap: 10 },
-  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-  title: { fontSize: 26, fontFamily: "Inter_700Bold" },
+  header: { paddingHorizontal: 16, paddingBottom: 10, borderBottomWidth: 1, gap: 12 },
+  headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12 },
+  title: { fontSize: 22, fontFamily: "Inter_700Bold", letterSpacing: -0.4 },
   count: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
-  headerRight: { flexDirection: "row", alignItems: "center", gap: 10 },
-  totalBadge: {
-    flexDirection: "row", alignItems: "center", gap: 5,
-    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20,
-  },
-  totalText: { fontSize: 13, fontFamily: "Inter_700Bold" },
   addBtn: {
-    width: 36, height: 36, borderRadius: 18,
-    alignItems: "center", justifyContent: "center",
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5,
+    paddingHorizontal: 14, height: 38, borderRadius: 19,
+    shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 10, elevation: 5,
   },
+  addBtnText: { color: "#FFFFFF", fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  summaryCard: {
+    flexDirection: "row", alignItems: "center", gap: 12,
+    padding: 16, borderRadius: 20,
+  },
+  summaryIcon: {
+    width: 42, height: 42, borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center",
+  },
+  summaryLabel: { color: "rgba(255,255,255,0.88)", fontSize: 12, fontFamily: "Inter_600SemiBold", letterSpacing: 0.6 },
+  summaryValue: { color: "#FFFFFF", fontSize: 22, fontFamily: "Inter_700Bold", letterSpacing: -0.4, marginTop: 2 },
+  summaryPill: { backgroundColor: "rgba(255,255,255,0.2)", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
+  summaryPillText: { color: "#FFFFFF", fontSize: 12, fontFamily: "Inter_700Bold" },
   searchBar: {
-    flexDirection: "row", alignItems: "center", gap: 8,
-    padding: 12, borderRadius: 12, borderWidth: 1,
+    flexDirection: "row", alignItems: "center", gap: 10,
+    paddingHorizontal: 14, height: 44, borderRadius: 14, borderWidth: 1,
   },
   searchInput: { flex: 1, fontSize: 14, fontFamily: "Inter_400Regular" },
-  filterRow: { gap: 8, paddingVertical: 4 },
-  filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+  filterRow: { gap: 8, paddingVertical: 2 },
+  filterChip: { paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
   filterText: { fontSize: 13, fontFamily: "Inter_500Medium" },
   list: { padding: 16, gap: 0 },
   empty: { alignItems: "center", gap: 12, paddingVertical: 60 },

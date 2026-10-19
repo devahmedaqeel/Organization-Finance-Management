@@ -10,16 +10,15 @@ import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants, { ExecutionEnvironment } from "expo-constants";
 import {
+  arrayUnion,
   collection,
   doc,
+  getDoc,
   setDoc,
   updateDoc,
-  deleteDoc,
   onSnapshot,
   query,
   where,
-  orderBy,
-  limit,
 } from "firebase/firestore";
 import { db } from "@/config/firebase";
 import {
@@ -48,7 +47,14 @@ export interface AppNotification {
   createdAt: string;
   entityId?: string;
   idempotencyKey?: string;
+  /** Members who have read this notification (read state is per person, not shared) */
+  readBy?: string[];
+  /** Members who removed it from their own list (it stays for everyone else) */
+  hiddenFor?: string[];
 }
+
+/** Newest notifications kept in each member's list */
+const MAX_NOTIFICATIONS = 50;
 
 const STORAGE_NOTIF_KEY = "@ofm_cached_notifications";
 const PROCESSED_KEYS_KEY = "@ofm_processed_idempotency_keys";
@@ -57,6 +63,28 @@ const PROCESSED_KEYS_KEY = "@ofm_processed_idempotency_keys";
 const processedKeysSet = new Set<string>();
 const activeListeners = new Set<(notifications: AppNotification[]) => void>();
 let currentNotificationsCache: AppNotification[] = [];
+// Signed-in member, used for per-person read / hide state
+let currentNotifUserId: string | null = null;
+
+/** Stable document id for an event, so every member's device writes the SAME notification (no duplicates). */
+function notificationDocId(idempotencyKey?: string): string {
+  if (!idempotencyKey) return `notif_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  return `notif_k_${idempotencyKey.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 300)}`;
+}
+
+/** Applies this member's own read / hidden state to the shared organization notifications. */
+function personalize(list: AppNotification[]): AppNotification[] {
+  const uid = currentNotifUserId;
+  return list
+    .filter((n) => !(uid && n.hiddenFor?.includes(uid)))
+    .map((n) => ({
+      ...n,
+      // Older records only had a shared `read` flag; keep honouring it when no per-person list exists
+      read: uid && Array.isArray(n.readBy) ? n.readBy.includes(uid) : n.read === true,
+    }))
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .slice(0, MAX_NOTIFICATIONS);
+}
 
 function broadcastNotifications(notifs: AppNotification[]) {
   currentNotificationsCache = notifs;
@@ -135,7 +163,16 @@ export async function dispatchNotification(
     } catch {}
   }
 
-  const notifId = `notif_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const notifId = notificationDocId(event.idempotencyKey);
+
+  // 1.2 Another member's device may already have created this exact event: then don't create it again
+  if (event.idempotencyKey) {
+    try {
+      const existing = await getDoc(doc(db, "notifications", notifId));
+      if (existing.exists()) return false;
+    } catch {}
+  }
+
   const notification: AppNotification = {
     id: notifId,
     organizationId: orgId,
@@ -146,6 +183,8 @@ export async function dispatchNotification(
     severity: event.severity,
     actionRoute: event.actionRoute,
     read: false,
+    readBy: [],
+    hiddenFor: [],
     createdAt: new Date().toISOString(),
     entityId: event.entityId,
     idempotencyKey: event.idempotencyKey,
@@ -157,9 +196,9 @@ export async function dispatchNotification(
     let list: AppNotification[] = rawStored ? JSON.parse(rawStored) : [];
     if (!list.some((n) => n.id === notification.id || (n.idempotencyKey && n.idempotencyKey === notification.idempotencyKey))) {
       list.unshift(notification);
-      if (list.length > 50) list = list.slice(0, 50);
+      if (list.length > MAX_NOTIFICATIONS) list = list.slice(0, MAX_NOTIFICATIONS);
       await AsyncStorage.setItem(STORAGE_NOTIF_KEY, JSON.stringify(list));
-      broadcastNotifications(list);
+      broadcastNotifications(personalize(list));
     }
   } catch {}
 
@@ -326,22 +365,25 @@ export async function syncLedgerNotificationEvents(
 }
 
 /**
- * Subscribes to real-time notifications for an organization.
+ * Subscribes to real-time notifications for an organization. Every member (web and mobile, any role)
+ * receives the organization's notifications; read / hidden state is kept per member via `userId`.
  */
 export function subscribeToNotifications(
   orgId: string,
-  onUpdate: (notifications: AppNotification[]) => void
+  onUpdate: (notifications: AppNotification[]) => void,
+  userId?: string
 ): () => void {
   if (!orgId) {
     onUpdate([]);
     return () => {};
   }
 
+  currentNotifUserId = userId || null;
   activeListeners.add(onUpdate);
 
   // 1. Instantly push in-memory cache or local disk storage on frame 0
   if (currentNotificationsCache.length > 0) {
-    onUpdate(currentNotificationsCache);
+    onUpdate(personalize(currentNotificationsCache));
   } else {
     AsyncStorage.getItem(STORAGE_NOTIF_KEY)
       .then((raw) => {
@@ -350,7 +392,7 @@ export function subscribeToNotifications(
             const cached: AppNotification[] = JSON.parse(raw);
             if (cached && cached.length > 0) {
               currentNotificationsCache = cached;
-              onUpdate(cached);
+              onUpdate(personalize(cached));
             }
           } catch {}
         }
@@ -359,17 +401,15 @@ export function subscribeToNotifications(
   }
 
   try {
-    const q = query(
-      collection(db, "notifications"),
-      where("organizationId", "==", orgId),
-      limit(25)
-    );
+    // No server-side limit: an unsorted limit returns the OLDEST documents (ids start with the time),
+    // so new notifications would never arrive. Sorting + trimming to the newest happens in personalize().
+    const q = query(collection(db, "notifications"), where("organizationId", "==", orgId));
 
     const unsubscribe = onSnapshot(
       q,
       (snapshot) => {
         const notifs: AppNotification[] = [];
-        snapshot.forEach((d) => notifs.push(d.data() as AppNotification));
+        snapshot.forEach((d) => notifs.push({ ...(d.data() as AppNotification), id: d.id }));
         notifs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
         // Merge with local disk cache so locally generated notifications aren't overwritten
@@ -381,19 +421,22 @@ export function subscribeToNotifications(
                 const localNotifs: AppNotification[] = JSON.parse(raw);
                 const map = new Map<string, AppNotification>();
                 notifs.forEach((n) => map.set(n.id, n));
+                const cloudKeys = new Set(notifs.map((n) => n.idempotencyKey).filter(Boolean));
                 localNotifs.forEach((n) => {
-                  if (!map.has(n.id)) map.set(n.id, n);
+                  // Skip local copies of an event that already exists in the cloud under its shared id
+                  if (!map.has(n.id) && !(n.idempotencyKey && cloudKeys.has(n.idempotencyKey))) map.set(n.id, n);
                 });
                 merged = Array.from(map.values());
                 merged.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
               } catch {}
             }
+            merged = merged.slice(0, 200);
             AsyncStorage.setItem(STORAGE_NOTIF_KEY, JSON.stringify(merged)).catch(() => {});
-            broadcastNotifications(merged);
+            broadcastNotifications(personalize(merged));
           })
           .catch(() => {
-            AsyncStorage.setItem(STORAGE_NOTIF_KEY, JSON.stringify(notifs)).catch(() => {});
-            broadcastNotifications(notifs);
+            AsyncStorage.setItem(STORAGE_NOTIF_KEY, JSON.stringify(notifs.slice(0, 200))).catch(() => {});
+            broadcastNotifications(personalize(notifs));
           });
       },
       (error) => {
@@ -402,9 +445,7 @@ export function subscribeToNotifications(
         AsyncStorage.getItem(STORAGE_NOTIF_KEY)
           .then((raw) => {
             if (raw) {
-              const cached = JSON.parse(raw);
-              cached.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-              broadcastNotifications(cached);
+              broadcastNotifications(personalize(JSON.parse(raw)));
             }
           })
           .catch(() => {});
@@ -423,70 +464,60 @@ export function subscribeToNotifications(
   }
 }
 
-/**
- * Marks a notification as read.
- */
-export async function markNotificationAsRead(id: string): Promise<void> {
+/** Adds `field` (readBy / hiddenFor) for the current member to the given notifications, locally and in the cloud. */
+async function addMemberMark(ids: string[], field: "readBy" | "hiddenFor"): Promise<void> {
+  const uid = currentNotifUserId;
+  if (ids.length === 0) return;
+  const idSet = new Set(ids);
+
   // Optimistically update local storage & broadcast immediately
   try {
     const raw = await AsyncStorage.getItem(STORAGE_NOTIF_KEY);
     if (raw) {
       const list: AppNotification[] = JSON.parse(raw);
-      const updated = list.map((n) => (n.id === id ? { ...n, read: true } : n));
+      const updated = list.map((n) => {
+        if (!idSet.has(n.id)) return n;
+        if (!uid) return field === "readBy" ? { ...n, read: true } : n;
+        const current = Array.isArray(n[field]) ? (n[field] as string[]) : [];
+        return current.includes(uid) ? n : { ...n, [field]: [...current, uid] };
+      });
       await AsyncStorage.setItem(STORAGE_NOTIF_KEY, JSON.stringify(updated));
-      broadcastNotifications(updated);
+      broadcastNotifications(personalize(updated));
     }
   } catch {}
 
-  try {
-    const notifRef = doc(db, "notifications", id);
-    await updateDoc(notifRef, { read: true, updatedAt: new Date().toISOString() });
-  } catch (err) {
-    console.warn("[NOTIFICATIONS] Error marking as read:", err);
-  }
-}
-
-/**
- * Marks all notifications as read for an organization.
- */
-export async function markAllNotificationsAsRead(notifications: AppNotification[]): Promise<void> {
-  // Optimistically update local storage & broadcast immediately
-  try {
-    const raw = await AsyncStorage.getItem(STORAGE_NOTIF_KEY);
-    if (raw) {
-      const list: AppNotification[] = JSON.parse(raw);
-      const updated = list.map((n) => ({ ...n, read: true }));
-      await AsyncStorage.setItem(STORAGE_NOTIF_KEY, JSON.stringify(updated));
-      broadcastNotifications(updated);
-    }
-  } catch {}
-
-  const unread = notifications.filter((n) => !n.read);
   await Promise.all(
-    unread.map((n) =>
-      updateDoc(doc(db, "notifications", n.id), { read: true, updatedAt: new Date().toISOString() }).catch(() => {})
+    ids.map((id) =>
+      updateDoc(
+        doc(db, "notifications", id),
+        uid
+          ? { [field]: arrayUnion(uid), updatedAt: new Date().toISOString() }
+          : field === "readBy"
+          ? { read: true, updatedAt: new Date().toISOString() }
+          : { updatedAt: new Date().toISOString() }
+      ).catch((err) => console.warn(`[NOTIFICATIONS] Error updating ${field}:`, err))
     )
   );
 }
 
 /**
- * Deletes a notification.
+ * Marks a notification as read for the current member only (other members still see it as new).
+ */
+export async function markNotificationAsRead(id: string): Promise<void> {
+  await addMemberMark([id], "readBy");
+}
+
+/**
+ * Marks all of the current member's unread notifications as read (for this member only).
+ */
+export async function markAllNotificationsAsRead(notifications: AppNotification[]): Promise<void> {
+  await addMemberMark(notifications.filter((n) => !n.read).map((n) => n.id), "readBy");
+}
+
+/**
+ * Removes a notification from the current member's list only. It stays visible to everyone else
+ * in the organization (deleting the shared record would remove it for the whole company).
  */
 export async function deleteNotificationRecord(id: string): Promise<void> {
-  // Optimistically update local storage & broadcast immediately
-  try {
-    const raw = await AsyncStorage.getItem(STORAGE_NOTIF_KEY);
-    if (raw) {
-      const list: AppNotification[] = JSON.parse(raw);
-      const updated = list.filter((n) => n.id !== id);
-      await AsyncStorage.setItem(STORAGE_NOTIF_KEY, JSON.stringify(updated));
-      broadcastNotifications(updated);
-    }
-  } catch {}
-
-  try {
-    await deleteDoc(doc(db, "notifications", id));
-  } catch (err) {
-    console.warn("[NOTIFICATIONS] Error deleting notification:", err);
-  }
+  await addMemberMark([id], "hiddenFor");
 }

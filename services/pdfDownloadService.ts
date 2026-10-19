@@ -36,37 +36,9 @@ export function sanitizeFilename(filename: string): string {
     .replace(/_+/g, "_");
 }
 
-/**
- * Safe 8-bit & Unicode-safe Base64 encoder.
- * Handles both raw binary streams and UTF-8 multibyte characters without throwing DOMException.
- */
-export function safeBinaryToBase64(str: string): string {
-  if (!str) return "";
-  try {
-    // 1. If ASCII/Latin1, try btoa directly
-    return btoa(str);
-  } catch {
-    try {
-      // 2. Clamp each character to 0..255 byte code
-      let binary = "";
-      for (let i = 0; i < str.length; i++) {
-        binary += String.fromCharCode(str.charCodeAt(i) & 0xff);
-      }
-      return btoa(binary);
-    } catch {
-      // 3. UTF-8 multi-byte fallback via TextEncoder
-      if (typeof TextEncoder !== "undefined") {
-        const bytes = new TextEncoder().encode(str);
-        let bin = "";
-        for (let i = 0; i < bytes.length; i++) {
-          bin += String.fromCharCode(bytes[i]);
-        }
-        return btoa(bin);
-      }
-      return btoa(unescape(encodeURIComponent(str)));
-    }
-  }
-}
+import { safeBinaryToBase64 } from "@/utils/base64";
+export { safeBinaryToBase64 };
+
 
 /**
  * Validates that a Base64 string represents a real, non-empty PDF document starting with %PDF-.
@@ -279,6 +251,39 @@ export async function downloadPayslipPdf(
   return await saveBase64PdfToDevice(base64Data, filename, `Official Payslip - ${payslip.employeeName}`);
 }
 
+const REPORT_FILE_LABELS: Record<string, string> = {
+  consolidated_statement: "Financial_Statement",
+  executive_summary: "Executive_Summary",
+  payroll_audit: "Payroll_Audit",
+  payroll: "Payroll_Audit",
+  expense_analysis: "Expense_Analysis",
+  expense: "Expenses",
+  revenue_analysis: "Revenue_Statement",
+  income: "Income",
+  department_analysis: "Department_Report",
+  budget_performance: "Budget_Performance",
+  general_ledger: "General_Ledger",
+};
+
+/**
+ * Descriptive, unique report filename: org, report type, date range and a time stamp,
+ * e.g. OFM_Acme_Financial_Statement_2026-01-01_to_2026-06-30_143052.pdf.
+ * Accepts both ReportOptions and EnterpriseReportData.
+ */
+export function buildReportFilename(opts: any): string {
+  const isEnterprise = !!(opts?.metadata && opts?.executiveSummary);
+  const org = sanitizeFilename((isEnterprise ? opts.metadata.organizationName : opts?.organizationName) || "OFM").slice(0, 40);
+  const typeKey = (isEnterprise ? opts.reportType : opts?.reportMode) || "consolidated_statement";
+  const typeLabel = REPORT_FILE_LABELS[typeKey] || "Financial_Statement";
+  const start = isEnterprise ? opts.filters?.startDate : opts?.startDate;
+  const end = isEnterprise ? opts.filters?.endDate : opts?.endDate;
+  const range = start && end ? `_${start}_to_${end}` : "";
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const stamp = `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  return sanitizeFilename(`OFM_${org}_${typeLabel}${range}_${stamp}.pdf`);
+}
+
 /**
  * Exports real vector binary PDF directly on Web or returns payload
  */
@@ -286,11 +291,7 @@ export function downloadPdfBinaryDirectly(
   opts: ReportOptions,
   customFilename?: string
 ): { success: boolean; uri: string; filename: string } {
-  const isExpenseOnly = opts.reportMode === "expense";
-  const isIncomeOnly = opts.reportMode === "income";
-  const cleanType = isExpenseOnly ? "Expenses" : isIncomeOnly ? "Income" : "Consolidated_Financial_Statement";
-  const sanitizedOrg = sanitizeFilename(opts.organizationName || "OFM");
-  const filename = customFilename || `OFM_${sanitizedOrg}_${cleanType}_${new Date().toISOString().substring(0, 10)}.pdf`;
+  const filename = customFilename || buildReportFilename(opts);
 
   const pdfBinary = buildFinancialPdfBinary(opts);
   const blob = new Blob([pdfBinary], { type: "application/pdf" });
@@ -318,11 +319,8 @@ export function downloadPdfBinaryDirectly(
 export async function downloadFinancialReportPdf(
   opts: ReportOptions
 ): Promise<PdfExportResult> {
-  const isExpenseOnly = opts.reportMode === "expense";
-  const isIncomeOnly = opts.reportMode === "income";
-  const cleanType = isExpenseOnly ? "Expenses" : isIncomeOnly ? "Income" : "Consolidated_Financial_Statement";
-  const sanitizedOrg = sanitizeFilename(opts.organizationName || "OFM");
-  const filename = `OFM_${sanitizedOrg}_${cleanType}_${new Date().toISOString().substring(0, 10)}.pdf`;
+  const filename = buildReportFilename(opts);
+  const periodLabel = (opts as any).filters?.periodLabel || opts.periodLabel || "Selected Period";
   const html = generateFinancialHtmlReport(opts);
 
   // 1. Web Platform: Instant Full Multi-Page Printable PDF Dossier with all Charts, Departments & Payroll
@@ -385,7 +383,6 @@ export async function downloadFinancialReportPdf(
     const printCss = `
       <style>
         @media print {
-          body { font-size: 8.5px !important; line-height: 1.35 !important; }
           .avoid-break { page-break-inside: avoid !important; break-inside: avoid-page !important; }
           .section-title { page-break-after: avoid !important; }
           tr { page-break-inside: avoid !important; }
@@ -412,16 +409,27 @@ export async function downloadFinancialReportPdf(
     });
 
     if (pdfResult?.uri) {
-      const permanentUri = `${FileSystem.documentDirectory}${filename}`;
-      await FileSystem.moveAsync({ from: pdfResult.uri, to: permanentUri }).catch(() => {});
-      const finalUri = await FileSystem.getInfoAsync(permanentUri).then(
-        (info) => (info.exists ? permanentUri : pdfResult.uri)
-      ).catch(() => pdfResult.uri);
+      // Give the printed file its report name inside the app cache (readable by Open / Share / Save).
+      // If that copy fails, keep expo-print's own cache file, which expo-sharing can read as-is.
+      let finalUri = pdfResult.uri;
+      try {
+        finalUri = await copyPdfToCache(pdfResult.uri, filename);
+      } catch (copyErr) {
+        logPdfIssue("Copying the printed PDF", pdfResult.uri, copyErr);
+      }
+      await assertPdfExists(finalUri);
 
+      let fileSize: number | undefined;
+      try {
+        const { File } = require("expo-file-system");
+        fileSize = new File(finalUri).size || undefined;
+      } catch {}
       return {
         success: true,
         uri: finalUri,
         filename,
+        fileSize,
+        mimeType: "application/pdf",
         message: "Official Financial Statement PDF saved successfully.",
       };
     }
@@ -435,14 +443,14 @@ export async function downloadFinancialReportPdf(
     const res = await generatePdfCallable({
       html,
       filename,
-      organizationId: (opts.transactions?.[0] as any)?.organizationId,
+      organizationId: ((opts.transactions || (opts as any).generalLedger?.transactions)?.[0] as any)?.organizationId,
       documentType: "financial_report",
     });
 
     const data = res.data;
     const base64Payload = data?.base64 || data?.base64Pdf;
     if (data && data.success && base64Payload) {
-      return await saveBase64PdfToDevice(base64Payload, filename, `Financial Statement (${opts.periodLabel})`);
+      return await saveBase64PdfToDevice(base64Payload, filename, `Financial Statement (${periodLabel})`);
     }
   } catch (cloudErr: any) {
     console.log("[PDF_SERVICE] Cloud HTMLPDF.dev endpoint unavailable:", cloudErr?.message);
@@ -451,43 +459,107 @@ export async function downloadFinancialReportPdf(
   // 4. Last Resort: Local Vector Binary Fallback
   const pdfBinary = buildFinancialPdfBinary(opts);
   const base64Data = safeBinaryToBase64(pdfBinary);
-  return await saveBase64PdfToDevice(base64Data, filename, `Financial Statement (${opts.periodLabel})`);
+  return await saveBase64PdfToDevice(base64Data, filename, `Financial Statement (${periodLabel})`);
+}
+
+/** Throws a readable error when the generated file is missing or empty (e.g. the app cache was cleared). */
+async function assertPdfExists(uri: string): Promise<void> {
+  if (Platform.OS === "web" || uri.startsWith("content://")) return;
+  if (!uri || !uri.startsWith("file://")) {
+    throw new Error("The PDF file could not be found on this device. Please generate it again.");
+  }
+  let exists = false;
+  let size = 0;
+  try {
+    const { File } = require("expo-file-system");
+    const file = new File(uri);
+    exists = !!file.exists;
+    size = file.size || 0;
+  } catch {
+    const info: any = await FileSystem.getInfoAsync(uri).catch(() => null);
+    exists = !!info?.exists;
+    size = info?.size || 0;
+  }
+  if (!exists || !size) {
+    throw new Error("The PDF file could not be found on this device. Please generate it again.");
+  }
+}
+
+/** Development-only diagnostics: logs which step failed and the file's folder, never report contents. */
+function logPdfIssue(step: string, uri: string | undefined, err: any) {
+  if (typeof __DEV__ !== "undefined" && __DEV__) {
+    const folder = (uri || "").replace(/[^/]+$/, "");
+    console.warn(`[PDF_SERVICE] ${step} failed`, { folder, message: err?.message || String(err) });
+  }
 }
 
 /**
- * Opens a local PDF file in the device's default PDF viewer or browser.
+ * Copies a local PDF into the app's cache folder under `filename` using the new expo-file-system API
+ * and returns the copy's URI, verified to exist and be non-empty.
+ *
+ * Why: expo-sharing only shares files it is allowed to read, checked on `Uri.parse(url).path`. File URIs
+ * built by joining the legacy `documentDirectory` string with a name do not survive that decoding inside
+ * Expo Go's sandboxed project folder (its name contains URL-encoded characters), so shareAsync rejected
+ * them with "Not allowed to read file under given URL". `new File(Paths.cache, name).uri` is produced
+ * natively and correctly encoded, so Open / Share / Save all receive a readable path.
  */
-export async function openPdfFile(uri: string, title?: string): Promise<void> {
+async function copyPdfToCache(srcUri: string, filename: string): Promise<string> {
+  const { File, Paths } = require("expo-file-system");
+  const source = new File(srcUri);
+  if (!source.exists || !source.size) {
+    throw new Error("The PDF file was not created correctly. Please generate it again.");
+  }
+  const target = new File(Paths.cache, sanitizeFilename(filename.endsWith(".pdf") ? filename : `${filename}.pdf`));
+  if (target.uri !== source.uri) {
+    source.copySync(target, { overwrite: true });
+  }
+  if (!target.exists || !target.size) {
+    throw new Error("The PDF file could not be prepared. Please generate it again.");
+  }
+  return target.uri;
+}
+
+/** "viewer" = opened in a PDF app; "share-sheet" = the system sheet was shown (iOS, or Android without a PDF app). */
+export type OpenPdfMethod = "viewer" | "share-sheet";
+
+/**
+ * Opens a local PDF so the user can read it.
+ *  Android → the phone's PDF viewer (Drive PDF Viewer, Adobe, Files…) via a VIEW intent;
+ *            if no PDF app is installed, the "Open with" sheet so one can be picked.
+ *  iOS     → the system sheet (Quick Look preview, Open in…, Save to Files). Screens that want an
+ *            in-app reader on iOS use PdfViewerModal instead.
+ */
+export async function openPdfFile(uri: string, title?: string): Promise<OpenPdfMethod> {
   const cleanName = sanitizeFilename(title || "Document.pdf");
 
   if (Platform.OS === "web") {
     window.open(uri, "_blank");
-    return;
+    return "viewer";
   }
 
-  // 1. Try expo-sharing for native OS intent with full read permissions
-  try {
-    const Sharing = require("expo-sharing");
-    const isAvailable = await Sharing.isAvailableAsync();
-    if (isAvailable) {
-      await Sharing.shareAsync(uri, {
-        mimeType: "application/pdf",
-        dialogTitle: cleanName,
-        UTI: "com.adobe.pdf",
+  await assertPdfExists(uri);
+
+  if (Platform.OS === "android") {
+    try {
+      const IntentLauncher = require("expo-intent-launcher");
+      const contentUri = uri.startsWith("content://") ? uri : await FileSystem.getContentUriAsync(uri);
+      await IntentLauncher.startActivityAsync("android.intent.action.VIEW", {
+        data: contentUri,
+        type: "application/pdf",
+        flags: 1, // FLAG_GRANT_READ_URI_PERMISSION: lets the viewer app read our private file
       });
-      return;
+      return "viewer";
+    } catch (err: any) {
+      console.log("[PDF_SERVICE] No PDF viewer handled the intent, showing Open-with sheet:", err?.message || err);
     }
-  } catch (sharingErr) {
-    console.log("[PDF_SERVICE] expo-sharing fallback to react-native Share:", sharingErr);
   }
 
-  // 2. Fallback to native React Native Share
-  const contentUri = await FileSystem.getContentUriAsync(uri).catch(() => uri);
-  await Share.share(
-    Platform.OS === "ios"
-      ? { url: uri, title: cleanName }
-      : { url: contentUri, title: cleanName }
-  );
+  const Sharing = require("expo-sharing");
+  if (!(await Sharing.isAvailableAsync())) {
+    throw new Error("No app on this device can open PDF files.");
+  }
+  await Sharing.shareAsync(uri, { mimeType: "application/pdf", dialogTitle: `Open ${cleanName}`, UTI: "com.adobe.pdf" });
+  return "share-sheet";
 }
 
 /**
@@ -525,44 +597,154 @@ export async function sharePdfFile(uri: string, filename?: string): Promise<void
     return;
   }
 
-  // 2. Native Mobile (Android & iOS): Shares genuine file attachment via content:// URI
-  const contentUri = await FileSystem.getContentUriAsync(uri).catch(() => uri);
-  await Share.share(
-    Platform.OS === "ios"
-      ? { url: uri, title: cleanName }
-      : { url: contentUri, title: cleanName }
-  );
+  // 2. Native Mobile: expo-sharing attaches the real PDF file (RN Share ignores `url` on Android)
+  // The file must live in an app-owned folder (documentDirectory / cacheDirectory) — expo-sharing
+  // rejects anything else with "Not allowed to read file under given URL".
+  await assertPdfExists(uri);
+  // Hand expo-sharing a natively-built cache URI it is allowed to read (also fixes PDFs saved by older flows)
+  let shareUri = uri;
+  if (!uri.startsWith("content://")) {
+    try {
+      shareUri = await copyPdfToCache(uri, cleanName);
+    } catch (copyErr) {
+      logPdfIssue("Preparing the PDF for sharing", uri, copyErr);
+    }
+  }
+
+  let sharingError: any = null;
+  try {
+    const Sharing = require("expo-sharing");
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(shareUri, { mimeType: "application/pdf", dialogTitle: cleanName, UTI: "com.adobe.pdf" });
+      return;
+    }
+  } catch (err: any) {
+    sharingError = err;
+    logPdfIssue("Sharing", shareUri, err);
+  }
+
+  if (Platform.OS === "android") {
+    // React Native Share cannot attach files on Android, so report the real problem instead of sharing nothing.
+    const msg = String(sharingError?.message || "");
+    if (/in progress|being processed/i.test(msg)) {
+      throw new Error("A share window is already open. Close it and try again.");
+    }
+    throw new Error(msg ? `Unable to share the PDF: ${msg}` : "Sharing is not available on this device.");
+  }
+
+  // 3. iOS fallback: React Native Share accepts a file URL
+  await Share.share({ url: shareUri, title: cleanName });
 }
 
 /**
  * Saves a local PDF file to the phone's native file storage / Downloads using StorageAccessFramework on Android or Sharing.
  */
 export async function saveToPhoneFileManager(uri: string, filename?: string): Promise<boolean> {
+  try {
+    const res = await savePdfToPhone(uri, filename);
+    return res.saved;
+  } catch (e) {
+    console.log("[PDF_SERVICE] Save to phone failed:", e);
+    return false;
+  }
+}
+
+const SAVE_DIR_KEY = "ofm.pdf.saveDirectoryUri";
+
+/** Forgets the remembered Android save folder so the next save asks again. */
+export async function resetPdfSaveFolder(): Promise<void> {
+  if (Platform.OS !== "android") return;
+  const AsyncStorage = require("@react-native-async-storage/async-storage").default;
+  await AsyncStorage.removeItem(SAVE_DIR_KEY).catch(() => {});
+}
+
+/** Readable name of the remembered Android save folder, or null when none is set yet. */
+export async function getPdfSaveFolderLabel(): Promise<string | null> {
+  if (Platform.OS !== "android") return null;
+  const AsyncStorage = require("@react-native-async-storage/async-storage").default;
+  const dir: string | null = await AsyncStorage.getItem(SAVE_DIR_KEY).catch(() => null);
+  return dir ? folderLabel(dir) : null;
+}
+
+export interface SavePdfToPhoneResult {
+  saved: boolean;
+  /** "folder" = written to a user-visible folder; "share-sheet" = iOS Files / share sheet opened; "cancelled" = user backed out. */
+  method: "folder" | "share-sheet" | "cancelled";
+  uri?: string;
+  message: string;
+}
+
+async function writePdfToSafFolder(dirUri: string, srcUri: string, cleanName: string): Promise<string> {
+  const SAF = FileSystem.StorageAccessFramework;
+  // Read the PDF first (new API, natively-resolved path) so a failed read never leaves an empty file behind
+  let base64Data: string;
+  try {
+    const { File } = require("expo-file-system");
+    base64Data = await new File(srcUri).base64();
+  } catch (readErr) {
+    logPdfIssue("Reading the PDF for saving", srcUri, readErr);
+    base64Data = await FileSystem.readAsStringAsync(srcUri, { encoding: FileSystem.EncodingType.Base64 });
+  }
+  const destUri = await SAF.createFileAsync(dirUri, cleanName.replace(/\.pdf$/i, ""), "application/pdf");
+  await FileSystem.writeAsStringAsync(destUri, base64Data, { encoding: FileSystem.EncodingType.Base64 });
+  return destUri;
+}
+
+/**
+ * Saves a generated PDF where the user can actually find it.
+ *  Android → a folder the user picks once (e.g. Download); the choice is remembered for next time.
+ *  iOS     → the system sheet, where "Save to Files" stores it in the Files app.
+ */
+export async function savePdfToPhone(uri: string, filename?: string): Promise<SavePdfToPhoneResult> {
   const cleanName = sanitizeFilename(filename || "Document.pdf");
+  if (Platform.OS === "web") return { saved: true, method: "folder", uri, message: "PDF downloaded." };
+  await assertPdfExists(uri);
 
   if (Platform.OS === "android" && FileSystem.StorageAccessFramework) {
-    try {
-      const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
-      if (permissions.granted) {
-        const destUri = await FileSystem.StorageAccessFramework.createFileAsync(
-          permissions.directoryUri,
-          cleanName.replace(/\.pdf$/i, ""),
-          "application/pdf"
-        );
-        const base64Data = await FileSystem.readAsStringAsync(uri, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-        await FileSystem.writeAsStringAsync(destUri, base64Data, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-        return true;
+    const AsyncStorage = require("@react-native-async-storage/async-storage").default;
+    const SAF = FileSystem.StorageAccessFramework;
+
+    // 1. Reuse the folder chosen last time (permission persists until the user revokes it)
+    const remembered: string | null = await AsyncStorage.getItem(SAVE_DIR_KEY).catch(() => null);
+    if (remembered) {
+      try {
+        const destUri = await writePdfToSafFolder(remembered, uri, cleanName);
+        return { saved: true, method: "folder", uri: destUri, message: `Saved to your ${folderLabel(remembered)} folder.` };
+      } catch {
+        await AsyncStorage.removeItem(SAVE_DIR_KEY).catch(() => {});
       }
-    } catch (e) {
-      console.log("[PDF_SERVICE] SAF save failed, using native file viewer fallback:", e);
     }
+
+    // 2. Ask once for a folder. Start in Documents: Android 11+ does not let apps pick the Download
+    //    folder itself (the picker says "Can't use this folder"), while Documents is allowed.
+    let initial: string | undefined;
+    try {
+      initial = SAF.getUriForDirectoryInRoot("Documents");
+    } catch {
+      initial = undefined;
+    }
+    const permissions = await SAF.requestDirectoryPermissionsAsync(initial);
+    if (!permissions.granted) {
+      return { saved: false, method: "cancelled", message: "No folder selected, so the PDF was not saved. Tap Save again and choose a folder (for example Documents)." };
+    }
+    await AsyncStorage.setItem(SAVE_DIR_KEY, permissions.directoryUri).catch(() => {});
+    const destUri = await writePdfToSafFolder(permissions.directoryUri, uri, cleanName);
+    return { saved: true, method: "folder", uri: destUri, message: `Saved to your ${folderLabel(permissions.directoryUri)} folder.` };
   }
 
-  // Fallback to native sharing / file export
-  await openPdfFile(uri, cleanName);
-  return true;
+  // iOS: the share sheet includes "Save to Files"
+  const Sharing = require("expo-sharing");
+  await Sharing.shareAsync(uri, { mimeType: "application/pdf", dialogTitle: cleanName, UTI: "com.adobe.pdf" });
+  return { saved: true, method: "share-sheet", uri, message: 'Choose "Save to Files" to keep the PDF on your iPhone.' };
+}
+
+/** Readable folder name from a SAF tree URI, e.g. ".../tree/primary%3ADownload%2FPayslips" → "Download/Payslips". */
+function folderLabel(dirUri: string): string {
+  try {
+    const tail = decodeURIComponent(dirUri.split("/tree/")[1] || "");
+    const path = tail.includes(":") ? tail.split(":").slice(1).join(":") : tail;
+    return path || "selected";
+  } catch {
+    return "selected";
+  }
 }

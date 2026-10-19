@@ -1,4 +1,5 @@
 import { Feather } from "@/components/UniversalIcon";
+import { screenTopPadding } from "@/utils/layout";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import React, { useMemo, useState, useEffect } from "react";
@@ -30,8 +31,10 @@ import {
   validateBudgetAllocationAgainstNetCash,
 } from "@/services/FinancialCalculationEngine";
 import { useColors } from "@/hooks/useColors";
+import { can } from "@/services/permissionService";
+import { useRequirePermission } from "@/hooks/useRequirePermission";
 import { useSettings } from "@/context/SettingsContext";
-import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
+import { useBottomSheetLayout } from "@/hooks/useBottomSheetLayout";
 import { showFloatingToast } from "@/utils/toast";
 
 const DEPARTMENTS = [
@@ -65,6 +68,8 @@ function fmtNum(n: number) {
 
 export default function BudgetScreen() {
   const colors = useColors();
+  // Role guard: leave if this role can't use this screen (e.g. opened via deep link)
+  useRequirePermission("view_budgets");
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const {
@@ -83,7 +88,7 @@ export default function BudgetScreen() {
     departmentMetrics,
   } = useFinance();
   const { settings } = useSettings();
-  const keyboardHeight = useKeyboardHeight();
+  const { maxHeight: sheetMaxHeight, keyboardHeight, scrollRef: sheetScrollRef, onTouchEnd: sheetOnTouchEnd } = useBottomSheetLayout();
 
   const availableDepts = useMemo(() => {
     const list = departments && departments.length > 0 ? departments.map((d) => d.name) : [];
@@ -103,7 +108,7 @@ export default function BudgetScreen() {
   const [error, setError] = useState("");
   const [selectedDeptFilter, setSelectedDeptFilter] = useState<string>("All");
 
-  const canEdit = user?.role === "admin";
+  const canEdit = can(user, "manage_budgets");
   const webTop = Platform.OS === "web" ? 67 : 0;
 
   // Operating cash and Available to Allocate buffer
@@ -250,7 +255,7 @@ export default function BudgetScreen() {
         style={[
           styles.header,
           {
-            paddingTop: webTop + insets.top + (Platform.OS === "android" ? 22 : 12),
+            paddingTop: webTop + screenTopPadding(insets.top),
             backgroundColor: colors.background,
             borderBottomColor: colors.border,
           },
@@ -287,10 +292,10 @@ export default function BudgetScreen() {
           {/* Card 1: TOTAL INCOME */}
           <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.kpiCardTop}>
-              <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]} numberOfLines={2}>TOTAL INCOME</Text>
+              <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>TOTAL INCOME</Text>
               <Feather name="trending-up" size={12} color={colors.income} />
             </View>
-            <Text style={[styles.kpiVal, { color: colors.income }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
+            <Text style={[styles.kpiVal, { color: colors.income }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
               {settings.currency} {fmtNum(totalIncome)}
             </Text>
           </View>
@@ -298,10 +303,10 @@ export default function BudgetScreen() {
           {/* Card 2: TOTAL ALLOCATED */}
           <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.kpiCardTop}>
-              <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]} numberOfLines={2}>ALLOCATED</Text>
+              <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>ALLOCATED</Text>
               <Feather name="pie-chart" size={12} color={colors.primary} />
             </View>
-            <Text style={[styles.kpiVal, { color: colors.foreground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
+            <Text style={[styles.kpiVal, { color: colors.foreground }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
               {settings.currency} {fmtNum(totalAllocated)}
             </Text>
           </View>
@@ -309,10 +314,10 @@ export default function BudgetScreen() {
           {/* Card 3: AVAILABLE TO ALLOCATE */}
           <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: availableToAllocate > 0 ? colors.income + "40" : colors.border }]}>
             <View style={styles.kpiCardTop}>
-              <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]} numberOfLines={2}>AVAILABLE</Text>
+              <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>AVAILABLE</Text>
               <Feather name="check-circle" size={12} color={availableToAllocate > 0 ? colors.income : colors.warning} />
             </View>
-            <Text style={[styles.kpiVal, { color: availableToAllocate > 0 ? colors.income : colors.warning }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
+            <Text style={[styles.kpiVal, { color: availableToAllocate > 0 ? colors.income : colors.warning }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
               {settings.currency} {fmtNum(availableToAllocate)}
             </Text>
           </View>
@@ -320,10 +325,10 @@ export default function BudgetScreen() {
           {/* Card 4: TOTAL DEPARTMENT SPENDING */}
           <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.kpiCardTop}>
-              <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]} numberOfLines={2}>SPENDING</Text>
+              <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>SPENDING</Text>
               <Feather name="arrow-up-right" size={12} color={colors.expense} />
             </View>
-            <Text style={[styles.kpiVal, { color: colors.expense }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
+            <Text style={[styles.kpiVal, { color: colors.expense }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
               {settings.currency} {fmtNum(totalSpent)}
             </Text>
           </View>
@@ -331,10 +336,10 @@ export default function BudgetScreen() {
           {/* Card 5: REMAINING DEPARTMENT FUNDS */}
           <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.kpiCardTop}>
-              <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]} numberOfLines={2}>REMAINING</Text>
+              <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>REMAINING</Text>
               <Feather name="shield" size={12} color={totalRemaining >= 0 ? colors.primary : colors.expense} />
             </View>
-            <Text style={[styles.kpiVal, { color: totalRemaining >= 0 ? colors.income : colors.expense }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
+            <Text style={[styles.kpiVal, { color: totalRemaining >= 0 ? colors.income : colors.expense }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
               {settings.currency} {fmtNum(totalRemaining)}
             </Text>
           </View>
@@ -521,21 +526,21 @@ export default function BudgetScreen() {
               <View style={[styles.deptMetricsRow, { borderColor: colors.border, backgroundColor: colors.background }]}>
                 <View style={styles.deptMetricItem}>
                   <Text style={[styles.deptMetricLabel, { color: colors.mutedForeground }]}>ALLOCATED</Text>
-                  <Text style={[styles.deptMetricVal, { color: colors.foreground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
+                  <Text style={[styles.deptMetricVal, { color: colors.foreground }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
                     {settings.currency} {fmtNum(dm.allocated)}
                   </Text>
                 </View>
                 <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
                 <View style={styles.deptMetricItem}>
                   <Text style={[styles.deptMetricLabel, { color: colors.mutedForeground }]}>SPENT</Text>
-                  <Text style={[styles.deptMetricVal, { color: colors.expense }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
+                  <Text style={[styles.deptMetricVal, { color: colors.expense }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
                     {settings.currency} {fmtNum(dm.spent)}
                   </Text>
                 </View>
                 <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
                 <View style={styles.deptMetricItem}>
                   <Text style={[styles.deptMetricLabel, { color: colors.mutedForeground }]}>REMAINING</Text>
-                  <Text style={[styles.deptMetricVal, { color: dm.remaining >= 0 ? colors.income : colors.expense }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
+                  <Text style={[styles.deptMetricVal, { color: dm.remaining >= 0 ? colors.income : colors.expense }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
                     {settings.currency} {fmtNum(dm.remaining)}
                   </Text>
                 </View>
@@ -667,13 +672,13 @@ export default function BudgetScreen() {
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
         >
-          <View style={[styles.sheet, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={[styles.sheet, { backgroundColor: colors.card, borderColor: colors.border, maxHeight: sheetMaxHeight }]}>
             <View style={styles.handle} />
             <Text style={[styles.modalTitle, { color: colors.foreground }]}>
               {editingBudget ? "Modify Budget Allocation" : "Add Department Budget"}
             </Text>
             
-            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 100 }}>
+            <ScrollView ref={sheetScrollRef} onTouchEnd={sheetOnTouchEnd} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 100 }}>
               {/* Available Net Cash Status Banner */}
               <View
                 style={{
@@ -694,7 +699,7 @@ export default function BudgetScreen() {
                     {settings.currency || "PKR"} {unallocatedNetCash.toLocaleString()}
                   </Text>
                 </View>
-                <Text style={{ fontSize: 10.5, color: colors.mutedForeground, marginTop: 2 }}>
+                <Text style={{ fontSize: 11, color: colors.mutedForeground, marginTop: 2 }}>
                   {unallocatedNetCash <= 0
                     ? `Total Net Cash is ${settings.currency || "PKR"} ${netCash.toLocaleString()}, all of which is already committed to existing budgets.`
                     : `Total Net Cash: ${settings.currency || "PKR"} ${netCash.toLocaleString()} · Already Allocated: ${settings.currency || "PKR"} ${totalAllocatedBudget.toLocaleString()}`}
@@ -703,7 +708,7 @@ export default function BudgetScreen() {
 
               <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>SELECT DEPARTMENT</Text>
               {availableDepts.length === 0 ? (
-                <Text style={{ color: colors.mutedForeground, fontSize: 12.5, fontStyle: "italic", marginBottom: 8 }}>
+                <Text style={{ color: colors.mutedForeground, fontSize: 13, fontStyle: "italic", marginBottom: 8 }}>
                   No departments created yet. Please create a department first.
                 </Text>
               ) : (
@@ -864,7 +869,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   kpiLabel: {
-    fontSize: 9,
+    fontSize: 10,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.5,
   },
@@ -887,12 +892,12 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   deptMetricLabel: {
-    fontSize: 8.5,
+    fontSize: 10,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.4,
   },
   deptMetricVal: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: "Inter_700Bold",
   },
   deptActionBtn: {
@@ -923,7 +928,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   summaryColLabel: {
-    fontSize: 9,
+    fontSize: 10,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.5,
   },
@@ -966,7 +971,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   utilBadgeText: {
-    fontSize: 10.5,
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
   },
   filterPillsSection: {
@@ -974,7 +979,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   filterLabel: {
-    fontSize: 9.5,
+    fontSize: 10,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.6,
   },
@@ -1004,7 +1009,7 @@ const styles = StyleSheet.create({
     borderRadius: 3.5,
   },
   deptPillText: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: "Inter_600SemiBold",
   },
   listHeaderRow: {
@@ -1033,7 +1038,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
   },
   budgetDept: {
-    fontSize: 13.5,
+    fontSize: 14,
     fontFamily: "Inter_700Bold",
   },
   budgetCat: {
@@ -1047,7 +1052,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   statusBadgeText: {
-    fontSize: 9.5,
+    fontSize: 10,
     fontFamily: "Inter_700Bold",
   },
   trashBtn: {
@@ -1072,7 +1077,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   cardAmtText: {
-    fontSize: 10.5,
+    fontSize: 11,
     fontFamily: "Inter_500Medium",
   },
   empty: {
@@ -1106,12 +1111,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   modalTitle: {
-    fontSize: 17,
+    fontSize: 18,
     fontFamily: "Inter_700Bold",
     marginBottom: 4,
   },
   fieldLabel: {
-    fontSize: 10,
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.8,
   },

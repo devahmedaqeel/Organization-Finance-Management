@@ -1,8 +1,10 @@
 import { Feather } from "@/components/UniversalIcon";
+import { screenTopPadding } from "@/utils/layout";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import React, { useMemo, useState, useEffect } from "react";
 import {
+  ActivityIndicator,
   Alert,
   BackHandler,
   FlatList,
@@ -23,18 +25,20 @@ import { useFinance, PayrollEntry } from "@/context/FinanceContext";
 import { calculateEffectiveDepartmentBudget } from "@/services/FinancialCalculationEngine";
 import { useColors } from "@/hooks/useColors";
 import { useSettings } from "@/context/SettingsContext";
-import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
+import { useBottomSheetLayout } from "@/hooks/useBottomSheetLayout";
 import { openPdfReport, ReportOptions } from "@/services/ReportExportService";
 import {
-  downloadPayslipPDF,
-  sharePayslipPDF,
   downloadPayslipImage,
   sharePayslipImage,
 } from "@/services/payslipExportService";
 import { PdfSuccessModal } from "@/components/PdfSuccessModal";
 import { ConfirmDeleteModal } from "@/components/ConfirmDeleteModal";
 import { showFloatingToast } from "@/utils/toast";
-import { redirectMobileToWebPayslipPdf } from "@/services/mobileWebPdfRedirectService";
+import { PayslipViewerModal } from "@/components/payslip/PayslipViewerModal";
+import { usePayslipOrganizationProfile, usePayslipTemplates } from "@/hooks/usePayslipTemplates";
+import { getLastUsedTemplateId } from "@/services/PayslipTemplateService";
+import { buildPayslipRenderData } from "@/services/payslipTemplateRenderer";
+import { preparePayslipProfile, sharePayslipsPdf } from "@/services/payslipDocumentService";
 
 const DEPARTMENTS = ["Software Engineering", "Administration", "Research & Development", "Finance"];
 
@@ -44,7 +48,7 @@ export default function PayrollScreen() {
   const { user } = useAuth();
   const { payroll, addPayroll, updatePayroll, deletePayroll, departments, budgets, transactions } = useFinance();
   const { settings } = useSettings();
-  const keyboardHeight = useKeyboardHeight();
+  const { maxHeight: sheetMaxHeight, keyboardHeight, scrollRef: sheetScrollRef, onTouchEnd: sheetOnTouchEnd } = useBottomSheetLayout();
 
   const now = new Date();
   const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -54,17 +58,35 @@ export default function PayrollScreen() {
   const [editingEntry, setEditingEntry] = useState<PayrollEntry | null>(null);
   const [deletingEntry, setDeletingEntry] = useState<PayrollEntry | null>(null);
   const [slipModalEntry, setSlipModalEntry] = useState<PayrollEntry | null>(null);
+  const [viewerEntries, setViewerEntries] = useState<PayrollEntry[]>([]);
+  const templateLib = usePayslipTemplates();
+  const payslipOrg = usePayslipOrganizationProfile();
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
-  // Form Fields
+  interface CustomPayrollItem {
+    id: string;
+    name: string;
+    amount: number;
+  }
+
   const [name, setName] = useState("");
   const [empId, setEmpId] = useState("");
   const [dept, setDept] = useState(departments[0]?.name || "");
+  const [designation, setDesignation] = useState("");
+  const [bankAccountNumber, setBankAccountNumber] = useState("");
+  const [paymentStatus, setPaymentStatus] = useState<"paid" | "pending" | "processing" | "failed" | "cancelled">("paid");
   const [salary, setSalary] = useState("");
-  const [bonus, setBonus] = useState("");
-  const [deductions, setDeductions] = useState("");
+  const [customAllowances, setCustomAllowances] = useState<CustomPayrollItem[]>([]);
+  const [customDeductions, setCustomDeductions] = useState<CustomPayrollItem[]>([]);
+  const [newAllowanceName, setNewAllowanceName] = useState("");
+  const [newAllowanceAmount, setNewAllowanceAmount] = useState("");
+  const [newDeductionName, setNewDeductionName] = useState("");
+  const [newDeductionAmount, setNewDeductionAmount] = useState("");
   const [month, setMonth] = useState(defaultMonth);
   const [error, setError] = useState("");
+
+  const ALLOWANCE_PRESETS = ["House Rent", "Medical Allowance", "Conveyance", "Fuel Allowance", "Performance Bonus", "Overtime"];
+  const DEDUCTION_PRESETS = ["Income Tax", "Tax Deduction", "Provident Fund", "EOBI", "Late Penalty", "Advance Recovery"];
 
   const isAdmin = user?.role === "admin";
   const isAccountant = user?.role === "accountant";
@@ -106,13 +128,18 @@ export default function PayrollScreen() {
   }, [knownEmployees, name]);
 
   useEffect(() => {
-    if (matchedStaff && matchedStaff.department && matchedStaff.department !== dept) {
-      setDept(matchedStaff.department);
+    if (matchedStaff) {
+      if (matchedStaff.department && matchedStaff.department !== dept) {
+        setDept(matchedStaff.department);
+      }
       if (matchedStaff.employeeId && (!empId || empId.startsWith("EMP"))) {
         setEmpId(matchedStaff.employeeId);
       }
       if (matchedStaff.baseSalary && !salary) {
         setSalary(String(matchedStaff.baseSalary));
+      }
+      if (matchedStaff.designation && !designation) {
+        setDesignation(matchedStaff.designation);
       }
     }
   }, [matchedStaff]);
@@ -141,11 +168,79 @@ export default function PayrollScreen() {
       .reduce((s, t) => s + (Number(t.amount) || 0), 0);
   }, [transactions, dept, editingEntry]);
 
+  const totalAllowances = useMemo(() => {
+    return customAllowances.reduce((s, a) => s + (Number(a.amount) || 0), 0);
+  }, [customAllowances]);
+
+  const totalDeductions = useMemo(() => {
+    return customDeductions.reduce((s, d) => s + (Number(d.amount) || 0), 0);
+  }, [customDeductions]);
+
   const deptRemainingBudget = Math.max(0, deptBudgetAllocated - deptCurrentSpent);
-  const currentNet = Math.max(0, (parseFloat(salary) || 0) + (parseFloat(bonus) || 0) - (parseFloat(deductions) || 0));
+  const currentNet = Math.max(0, (parseFloat(salary) || 0) + totalAllowances - totalDeductions);
   const projectedRemaining = deptRemainingBudget - currentNet;
   const isZeroBudget = deptBudgetAllocated <= 0;
   const isOverBudget = currentNet > deptRemainingBudget && !isZeroBudget;
+
+  const handleAddAllowance = (presetName?: string) => {
+    const nameToUse = (presetName || newAllowanceName).trim();
+    const val = parseFloat(newAllowanceAmount);
+    if (!nameToUse) {
+      setError("Please enter or select an allowance / earning category name");
+      return;
+    }
+    if (isNaN(val) || val <= 0) {
+      setError("Please enter a valid allowance amount");
+      return;
+    }
+    setError("");
+    setCustomAllowances((prev) => [
+      ...prev,
+      {
+        id: `alw_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+        name: nameToUse,
+        amount: val,
+      },
+    ]);
+    setNewAllowanceName("");
+    setNewAllowanceAmount("");
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const handleRemoveAllowance = (id: string) => {
+    setCustomAllowances((prev) => prev.filter((a) => a.id !== id));
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const handleAddDeduction = (presetName?: string) => {
+    const nameToUse = (presetName || newDeductionName).trim();
+    const val = parseFloat(newDeductionAmount);
+    if (!nameToUse) {
+      setError("Please enter or select a deduction / tax category name");
+      return;
+    }
+    if (isNaN(val) || val <= 0) {
+      setError("Please enter a valid deduction amount");
+      return;
+    }
+    setError("");
+    setCustomDeductions((prev) => [
+      ...prev,
+      {
+        id: `ded_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
+        name: nameToUse,
+        amount: val,
+      },
+    ]);
+    setNewDeductionName("");
+    setNewDeductionAmount("");
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const handleRemoveDeduction = (id: string) => {
+    setCustomDeductions((prev) => prev.filter((d) => d.id !== id));
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
 
   const fmt = (n: number) => {
     return `${settings.currency} ${Number(n || 0).toLocaleString()}`;
@@ -192,9 +287,16 @@ export default function PayrollScreen() {
     setName("");
     setEmpId(`EMP${Math.floor(1000 + Math.random() * 9000)}`);
     setDept(availableDepts[0] || DEPARTMENTS[0]);
+    setDesignation("");
+    setBankAccountNumber("");
+    setPaymentStatus("paid");
     setSalary("");
-    setBonus("0");
-    setDeductions("0");
+    setCustomAllowances([]);
+    setCustomDeductions([]);
+    setNewAllowanceName("");
+    setNewAllowanceAmount("");
+    setNewDeductionName("");
+    setNewDeductionAmount("");
     setMonth(defaultMonth);
     setError("");
     setModalVisible(true);
@@ -205,10 +307,57 @@ export default function PayrollScreen() {
     setName(item.employeeName);
     setEmpId(item.employeeId);
     setDept(item.department || availableDepts[0]);
+    setDesignation(item.designation || "");
+    setBankAccountNumber(item.bankAccountNumber || "");
+    setPaymentStatus(item.paymentStatus || "paid");
     setSalary(String(item.baseSalary || ""));
-    setBonus(String(item.bonus || 0));
-    setDeductions(String(item.deductions || 0));
     setMonth(item.month || defaultMonth);
+
+    // Load custom allowances
+    const existingAllowances: CustomPayrollItem[] = [];
+    const srcAllowances = item.customAllowances || item.itemizedEarnings || [];
+    if (Array.isArray(srcAllowances) && srcAllowances.length > 0) {
+      srcAllowances.forEach((a: any, idx: number) => {
+        if (/^(basic|0001|bp)$/i.test(a.code || "") || /basic/i.test(a.name || "")) return;
+        existingAllowances.push({
+          id: a.id || `alw_${idx}_${Date.now()}`,
+          name: a.name || a.label || "Allowance",
+          amount: Number(a.amount ?? a.calculatedAmount ?? 0),
+        });
+      });
+    } else if (Number(item.bonus || 0) > 0) {
+      existingAllowances.push({
+        id: "bonus_legacy",
+        name: "Bonus / Allowance",
+        amount: Number(item.bonus),
+      });
+    }
+    setCustomAllowances(existingAllowances);
+
+    // Load custom deductions
+    const existingDeductions: CustomPayrollItem[] = [];
+    const srcDeductions = item.customDeductions || item.itemizedDeductions || [];
+    if (Array.isArray(srcDeductions) && srcDeductions.length > 0) {
+      srcDeductions.forEach((d: any, idx: number) => {
+        existingDeductions.push({
+          id: d.id || `ded_${idx}_${Date.now()}`,
+          name: d.name || d.label || "Deduction",
+          amount: Number(d.amount ?? d.calculatedAmount ?? 0),
+        });
+      });
+    } else if (Number(item.deductions || 0) > 0) {
+      existingDeductions.push({
+        id: "deduct_legacy",
+        name: "Deductions / Tax",
+        amount: Number(item.deductions),
+      });
+    }
+    setCustomDeductions(existingDeductions);
+    setNewAllowanceName("");
+    setNewAllowanceAmount("");
+    setNewDeductionName("");
+    setNewDeductionAmount("");
+
     setError("");
     setModalVisible(true);
   };
@@ -245,10 +394,40 @@ export default function PayrollScreen() {
       employeeName: name.trim(),
       employeeId: empId.trim() || `EMP${Date.now().toString().slice(-4)}`,
       department: dept,
+      designation: designation.trim(),
+      bankAccountNumber: bankAccountNumber.trim(),
+      paymentStatus,
       baseSalary: sal,
-      bonus: parseFloat(bonus) || 0,
-      deductions: parseFloat(deductions) || 0,
+      bonus: totalAllowances,
+      deductions: totalDeductions,
+      netSalary: currentNet,
       month: month || defaultMonth,
+      customAllowances: customAllowances.map((a, i) => ({
+        id: a.id,
+        code: String(1000 + i * 10),
+        name: a.name.trim(),
+        amount: Number(a.amount),
+      })),
+      customDeductions: customDeductions.map((d, i) => ({
+        id: d.id,
+        code: String(3000 + i * 10),
+        name: d.name.trim(),
+        amount: Number(d.amount),
+      })),
+      itemizedEarnings: customAllowances.map((a, i) => ({
+        id: a.id,
+        code: String(1000 + i * 10),
+        name: a.name.trim(),
+        amount: Number(a.amount),
+        calculatedAmount: Number(a.amount),
+      })),
+      itemizedDeductions: customDeductions.map((d, i) => ({
+        id: d.id,
+        code: String(3000 + i * 10),
+        name: d.name.trim(),
+        amount: Number(d.amount),
+        calculatedAmount: Number(d.amount),
+      })),
     };
 
     try {
@@ -291,49 +470,10 @@ export default function PayrollScreen() {
     fiscalYear: settings.fiscalYear || "2025-2026",
   });
 
-  const handleExportEmployeeSlip = async (emp: PayrollEntry) => {
-    try {
-      if (Platform.OS !== "web") {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        await redirectMobileToWebPayslipPdf({
-          payrollId: emp.id,
-          empId: emp.employeeId || emp.id,
-          employeeName: emp.employeeName,
-          month: emp.month,
-          department: emp.department,
-        });
-        return;
-      }
-
-      setIsGeneratingPdf(true);
-      setPdfSuccessMessage(null);
-      setPdfErrorMessage(null);
-
-      setIsSavingPdf(true);
-      const result = await downloadPayslipPDF(emp, getOrgInfo());
-      
-      setPdfSuccessMessage(`Saved: ${result.filename}`);
-      
-      setSuccessModalData({
-        visible: true,
-        filename: result.filename,
-        fileUri: result.uri,
-        fileSize: result.fileSize,
-        title: "PDF Ready ✓",
-        subtitle: `Your PDF has been downloaded successfully.`,
-      });
-
-      setTimeout(() => {
-        setPdfSuccessMessage(null);
-      }, 5000);
-    } catch (err: any) {
-      console.error("[PAYSLIP] PDF generation error:", err);
-      setPdfErrorMessage(err?.message || "Unable to save PDF. Please try again.");
-      Alert.alert("PDF Generation Failed", err?.message || "Unable to generate payslip PDF. Please check employee data and try again.");
-    } finally {
-      setIsGeneratingPdf(false);
-      setIsSavingPdf(false);
-    }
+  const handleExportEmployeeSlip = (emp: PayrollEntry) => {
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setSlipModalEntry(null);
+    setViewerEntries([emp]);
   };
 
   const [isSavingImage, setIsSavingImage] = useState(false);
@@ -342,8 +482,11 @@ export default function PayrollScreen() {
     try {
       setIsSharingPdf(true);
       if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
-      await sharePayslipPDF(emp, getOrgInfo());
+      const lastUsed = user?.organizationId ? await getLastUsedTemplateId(user.organizationId, user.id) : null;
+      const template = templateLib.resolve(templateLib.canSelect ? lastUsed : null);
+      const org = await preparePayslipProfile(payslipOrg);
+      const slip = buildPayslipRenderData(emp, org, { canViewSensitive: templateLib.canViewSensitive || isEmployee });
+      await sharePayslipsPdf(template, [slip], { organizationId: user?.organizationId });
     } catch (err: any) {
       console.error("[PAYSLIP] Share error:", err);
       Alert.alert("Share Failed", err?.message || "Unable to share payslip PDF.");
@@ -406,7 +549,7 @@ export default function PayrollScreen() {
   return (
     <View style={[styles.flex, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: webTop + insets.top + (Platform.OS === "android" ? 16 : 10), backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { paddingTop: webTop + screenTopPadding(insets.top), backgroundColor: colors.background, borderBottomColor: colors.border }]}>
         <View style={styles.headerRow}>
           <TouchableOpacity onPress={handleGoBack} hitSlop={10}>
             <Feather name="arrow-left" size={22} color={colors.foreground} />
@@ -415,10 +558,31 @@ export default function PayrollScreen() {
             <Text style={[styles.title, { color: colors.foreground }]}>
               {isEmployee ? "My Salary Slip" : "Staff Payroll"}
             </Text>
-            <Text style={{ fontSize: 10.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
+            <Text style={{ fontSize: 11, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
               Role: <Text style={{ color: colors.primary, fontFamily: "Inter_700Bold" }}>{user?.role?.toUpperCase() || "ADMIN"}</Text>
             </Text>
           </View>
+          <View style={{ flexDirection: "row", gap: 6 }}>
+          {templateLib.canManage || (templateLib.canSelect && !isEmployee) ? (
+            <TouchableOpacity
+              onPress={() => router.push("/payslip-templates")}
+              accessibilityLabel="Payslip templates"
+              style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: "#8B5CF622", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#8B5CF655" }}
+              hitSlop={6}
+            >
+              <Feather name="layout" size={16} color="#8B5CF6" />
+            </TouchableOpacity>
+          ) : null}
+          {canEdit && filteredUserPayroll.length > 1 ? (
+            <TouchableOpacity
+              onPress={() => setViewerEntries(filteredUserPayroll)}
+              accessibilityLabel="Generate payslips for all listed records"
+              style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: "#8B5CF622", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#8B5CF655" }}
+              hitSlop={6}
+            >
+              <Feather name="layers" size={16} color="#8B5CF6" />
+            </TouchableOpacity>
+          ) : null}
           {canEdit ? (
             <TouchableOpacity
               onPress={handleOpenAdd}
@@ -439,6 +603,7 @@ export default function PayrollScreen() {
           ) : (
             <View style={{ width: 34 }} />
           )}
+          </View>
         </View>
 
         {/* Total Net Pay Banner */}
@@ -450,13 +615,13 @@ export default function PayrollScreen() {
             <Text style={[styles.totalLabel, { color: colors.mutedForeground }]}>
               {isEmployee ? "My Net Take-Home Salary" : "Total Organization Net Pay"}
             </Text>
-            <Text style={[styles.totalValue, { color: "#8B5CF6" }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>{fmt(totalNetPay)}</Text>
+            <Text style={[styles.totalValue, { color: "#8B5CF6" }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>{fmt(totalNetPay)}</Text>
           </View>
           <View style={{ alignItems: "flex-end" }}>
             <Text style={[styles.empCount, { color: colors.mutedForeground }]}>
               {isEmployee ? "Confidential" : `${userPayroll.length} Staff Records`}
             </Text>
-            <Text style={{ fontSize: 10, color: "#10B981", fontFamily: "Inter_700Bold" }}>✓ Auto Synced</Text>
+            <Text style={{ fontSize: 11, color: "#10B981", fontFamily: "Inter_700Bold" }}>✓ Auto Synced</Text>
           </View>
         </View>
 
@@ -494,12 +659,37 @@ export default function PayrollScreen() {
                   <Text style={[styles.payAvatarText, { color: "#8B5CF6" }]}>{(item.employeeName || item.employeeId || "E").charAt(0).toUpperCase()}</Text>
                 </View>
                 <View style={styles.payInfo}>
-                  <Text style={[styles.payName, { color: colors.foreground }]} numberOfLines={2}>{item.employeeName}</Text>
-                  <Text style={[styles.payMeta, { color: colors.mutedForeground }]} numberOfLines={2}>{item.employeeId} · {item.department}</Text>
-                  <Text style={[styles.payMonth, { color: colors.mutedForeground }]}>Period: {item.month}</Text>
+                  <Text style={[styles.payName, { color: colors.foreground }]}>{item.employeeName}</Text>
+                  <Text style={[styles.payMeta, { color: colors.mutedForeground }]}>
+                    {item.employeeId} · {item.department} {item.designation ? `· ${item.designation}` : ""}
+                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 }}>
+                    <Text style={[styles.payMonth, { color: colors.mutedForeground }]}>Period: {item.month}</Text>
+                    <View
+                      style={{
+                        paddingHorizontal: 6,
+                        paddingVertical: 1.5,
+                        borderRadius: 4,
+                        backgroundColor: (item.paymentStatus === "pending" ? "#F59E0B" : colors.income) + "18",
+                        borderWidth: 1,
+                        borderColor: (item.paymentStatus === "pending" ? "#F59E0B" : colors.income) + "40",
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          fontFamily: "Inter_700Bold",
+                          color: item.paymentStatus === "pending" ? "#F59E0B" : colors.income,
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        {item.paymentStatus || "PAID"}
+                      </Text>
+                    </View>
+                  </View>
                 </View>
                 <View style={styles.payRight}>
-                  <Text style={[styles.payNet, { color: "#8B5CF6" }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>{fmt(netPay)}</Text>
+                  <Text style={[styles.payNet, { color: "#8B5CF6" }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>{fmt(netPay)}</Text>
                   
                   {/* Action Buttons Row */}
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 }}>
@@ -523,7 +713,7 @@ export default function PayrollScreen() {
                       activeOpacity={0.8}
                     >
                       <Feather name="file-text" size={11} color="#8B5CF6" />
-                      <Text style={{ fontSize: 10.5, fontFamily: "Inter_700Bold", color: "#8B5CF6" }}>
+                      <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: "#8B5CF6" }}>
                         PDF Slip
                       </Text>
                     </TouchableOpacity>
@@ -572,15 +762,19 @@ export default function PayrollScreen() {
               <View style={[styles.payBreakdown, { borderTopColor: colors.border, backgroundColor: colors.background + "66" }]}>
                 <View style={styles.payBreakdownItem}>
                   <Text style={[styles.bLabel, { color: colors.mutedForeground }]}>Base Salary</Text>
-                  <Text style={[styles.bValue, { color: colors.foreground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>{fmt(item.baseSalary)}</Text>
+                  <Text style={[styles.bValue, { color: colors.foreground }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>{fmt(item.baseSalary)}</Text>
                 </View>
                 <View style={styles.payBreakdownItem}>
-                  <Text style={[styles.bLabel, { color: colors.mutedForeground }]}>Bonus</Text>
-                  <Text style={[styles.bValue, { color: colors.income }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>+{fmt(item.bonus || 0)}</Text>
+                  <Text style={[styles.bLabel, { color: colors.mutedForeground }]}>
+                    Allowances {item.customAllowances?.length ? `(${item.customAllowances.length})` : ""}
+                  </Text>
+                  <Text style={[styles.bValue, { color: colors.income }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>+{fmt(item.bonus || 0)}</Text>
                 </View>
                 <View style={styles.payBreakdownItem}>
-                  <Text style={[styles.bLabel, { color: colors.mutedForeground }]}>Deductions</Text>
-                  <Text style={[styles.bValue, { color: colors.expense }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>-{fmt(item.deductions || 0)}</Text>
+                  <Text style={[styles.bLabel, { color: colors.mutedForeground }]}>
+                    Deductions {item.customDeductions?.length ? `(${item.customDeductions.length})` : ""}
+                  </Text>
+                  <Text style={[styles.bValue, { color: colors.expense }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>-{fmt(item.deductions || 0)}</Text>
                 </View>
               </View>
             </View>
@@ -651,12 +845,32 @@ export default function PayrollScreen() {
                     <Text style={{ color: colors.foreground, fontSize: 13, fontFamily: "Inter_700Bold" }}>{slipModalEntry.employeeName}</Text>
                   </View>
                   <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                    <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: "Inter_500Medium" }}>Employee ID</Text>
-                    <Text style={{ color: colors.foreground, fontSize: 12, fontFamily: "Inter_600SemiBold" }}>{slipModalEntry.employeeId}</Text>
+                    <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: "Inter_500Medium" }}>Employee ID & Scale</Text>
+                    <Text style={{ color: colors.foreground, fontSize: 12, fontFamily: "Inter_600SemiBold" }}>
+                      {slipModalEntry.employeeId} {slipModalEntry.payScale ? `· ${slipModalEntry.payScale}` : ""}
+                    </Text>
                   </View>
                   <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                    <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: "Inter_500Medium" }}>Department</Text>
-                    <Text style={{ color: colors.foreground, fontSize: 12, fontFamily: "Inter_600SemiBold" }}>{slipModalEntry.department}</Text>
+                    <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: "Inter_500Medium" }}>Department & Role</Text>
+                    <Text style={{ color: colors.foreground, fontSize: 12, fontFamily: "Inter_600SemiBold" }}>
+                      {slipModalEntry.department} · {slipModalEntry.designation || "Staff Specialist"}
+                    </Text>
+                  </View>
+                  {slipModalEntry.cnic ? (
+                    <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                      <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: "Inter_500Medium" }}>CNIC</Text>
+                      <Text style={{ color: colors.foreground, fontSize: 12, fontFamily: "Inter_600SemiBold" }}>{slipModalEntry.cnic}</Text>
+                    </View>
+                  ) : null}
+                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: "Inter_500Medium" }}>Disbursement Acct</Text>
+                    <Text style={{ color: colors.foreground, fontSize: 12, fontFamily: "Inter_600SemiBold" }}>
+                      {slipModalEntry.bankAccountNumber
+                        ? slipModalEntry.bankAccountNumber.length > 8
+                          ? "•••• " + slipModalEntry.bankAccountNumber.slice(-4)
+                          : slipModalEntry.bankAccountNumber
+                        : "•••• 4821"}
+                    </Text>
                   </View>
                 </View>
 
@@ -667,26 +881,82 @@ export default function PayrollScreen() {
                     <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>Basic Salary</Text>
                     <Text style={{ color: colors.foreground, fontSize: 12, fontFamily: "Inter_600SemiBold" }}>{fmtExact(slipModalEntry.baseSalary)}</Text>
                   </View>
-                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                    <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>Performance Bonus / Incentives</Text>
-                    <Text style={{ color: colors.income, fontSize: 12, fontFamily: "Inter_600SemiBold" }}>+{fmtExact(slipModalEntry.bonus || 0)}</Text>
-                  </View>
+                  {Array.isArray(slipModalEntry.customAllowances) && slipModalEntry.customAllowances.length > 0 ? (
+                    slipModalEntry.customAllowances.map((a: any, idx: number) => (
+                      <View key={a.id || idx} style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                        <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>{a.name || "Allowance"}</Text>
+                        <Text style={{ color: colors.income, fontSize: 12, fontFamily: "Inter_600SemiBold" }}>+{fmtExact(Number(a.amount || 0))}</Text>
+                      </View>
+                    ))
+                  ) : Array.isArray(slipModalEntry.itemizedEarnings) && slipModalEntry.itemizedEarnings.length > 0 ? (
+                    slipModalEntry.itemizedEarnings
+                      .filter((e: any) => !/^(basic|0001|bp)$/i.test(e.code || "") && !/basic/i.test(e.name || ""))
+                      .map((a: any, idx: number) => (
+                        <View key={a.id || idx} style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                          <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>{a.name || "Allowance"}</Text>
+                          <Text style={{ color: colors.income, fontSize: 12, fontFamily: "Inter_600SemiBold" }}>+{fmtExact(Number(a.amount ?? a.calculatedAmount ?? 0))}</Text>
+                        </View>
+                      ))
+                  ) : Number(slipModalEntry.bonus || 0) > 0 ? (
+                    <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                      <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>Performance Bonus & Allowances</Text>
+                      <Text style={{ color: colors.income, fontSize: 12, fontFamily: "Inter_600SemiBold" }}>+{fmtExact(slipModalEntry.bonus || 0)}</Text>
+                    </View>
+                  ) : null}
+
                   <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 2 }} />
                   <Text style={{ color: colors.expense, fontSize: 12, fontFamily: "Inter_700Bold", letterSpacing: 0.5 }}>DEDUCTIONS & WITHHOLDINGS</Text>
-                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                    <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>Tax / Provident Fund / Deductions</Text>
-                    <Text style={{ color: colors.expense, fontSize: 12, fontFamily: "Inter_600SemiBold" }}>-{fmtExact(slipModalEntry.deductions || 0)}</Text>
-                  </View>
+                  {Array.isArray(slipModalEntry.customDeductions) && slipModalEntry.customDeductions.length > 0 ? (
+                    slipModalEntry.customDeductions.map((d: any, idx: number) => (
+                      <View key={d.id || idx} style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                        <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>{d.name || "Deduction"}</Text>
+                        <Text style={{ color: colors.expense, fontSize: 12, fontFamily: "Inter_600SemiBold" }}>-{fmtExact(Number(d.amount || 0))}</Text>
+                      </View>
+                    ))
+                  ) : Array.isArray(slipModalEntry.itemizedDeductions) && slipModalEntry.itemizedDeductions.length > 0 ? (
+                    slipModalEntry.itemizedDeductions.map((d: any, idx: number) => (
+                      <View key={d.id || idx} style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                        <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>{d.name || "Deduction"}</Text>
+                        <Text style={{ color: colors.expense, fontSize: 12, fontFamily: "Inter_600SemiBold" }}>-{fmtExact(Number(d.amount ?? d.calculatedAmount ?? 0))}</Text>
+                      </View>
+                    ))
+                  ) : Number(slipModalEntry.deductions || 0) > 0 ? (
+                    <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                      <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>Tax & Statutory Contributions</Text>
+                      <Text style={{ color: colors.expense, fontSize: 12, fontFamily: "Inter_600SemiBold" }}>-{fmtExact(slipModalEntry.deductions || 0)}</Text>
+                    </View>
+                  ) : (
+                    <Text style={{ color: colors.mutedForeground, fontSize: 11, fontStyle: "italic" }}>No deductions applied</Text>
+                  )}
+
+                  {Array.isArray(slipModalEntry.loanDeductions) && slipModalEntry.loanDeductions.length > 0 ? (
+                    <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                      <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>Active Loan / Advance Recovery</Text>
+                      <Text style={{ color: "#F59E0B", fontSize: 12, fontFamily: "Inter_600SemiBold" }}>
+                        -{fmtExact(slipModalEntry.loanDeductions.reduce((s: number, l: any) => s + (l.currentDeduction || 0), 0))}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
 
                 {/* Net Salary Payable Highlight Card */}
                 <View style={{ backgroundColor: "#8B5CF622", padding: 16, borderRadius: 14, borderWidth: 1.5, borderColor: "#8B5CF666", alignItems: "center", gap: 4 }}>
                   <Text style={{ color: colors.mutedForeground, fontSize: 11, fontFamily: "Inter_600SemiBold", letterSpacing: 0.8 }}>NET SALARY PAYABLE</Text>
                   <Text style={{ color: "#8B5CF6", fontSize: 24, fontFamily: "Inter_800ExtraBold" }}>
-                    {fmtExact((slipModalEntry.baseSalary || 0) + (slipModalEntry.bonus || 0) - (slipModalEntry.deductions || 0))}
+                    {fmtExact(slipModalEntry.netSalary !== undefined ? slipModalEntry.netSalary : (slipModalEntry.baseSalary || 0) + (slipModalEntry.bonus || 0) - (slipModalEntry.deductions || 0))}
                   </Text>
-                  <Text style={{ color: colors.mutedForeground, fontSize: 10, textAlign: "center", marginTop: 2 }}>
+                  <Text style={{ color: colors.mutedForeground, fontSize: 11, textAlign: "center", marginTop: 2 }}>
                     Official digital record generated securely via OFM.
+                  </Text>
+                </View>
+
+                {/* Digital Verification Code Badge */}
+                <View style={{ alignItems: "center", paddingVertical: 4 }}>
+                  <Text style={{ fontSize: 11, color: colors.mutedForeground }}>
+                    Verification Code:{" "}
+                    <Text style={{ color: "#10B981", fontFamily: "Inter_700Bold" }}>
+                      {slipModalEntry.verificationCode || `OFM-PAY-${slipModalEntry.id.slice(-6).toUpperCase()}`}
+                    </Text>
                   </Text>
                 </View>
 
@@ -701,16 +971,16 @@ export default function PayrollScreen() {
                   </View>
                 )}
 
-                {/* Modal Action: Single Prominent Download PDF Slip Button */}
-                <View style={{ marginTop: 12 }}>
+                {/* Modal Actions: Dual Download & Share Buttons */}
+                <View style={{ flexDirection: "row", gap: 10, marginTop: 8 }}>
                   <TouchableOpacity
                     style={{
-                      width: "100%",
+                      flex: 1.3,
                       flexDirection: "row",
                       alignItems: "center",
                       justifyContent: "center",
                       gap: 8,
-                      paddingVertical: 15,
+                      paddingVertical: 14,
                       borderRadius: 14,
                       backgroundColor: pdfSuccessMessage ? "#10B981" : pdfErrorMessage ? "#EF4444" : "#8B5CF6",
                       opacity: isGeneratingPdf || isSavingPdf ? 0.7 : 1,
@@ -733,19 +1003,40 @@ export default function PayrollScreen() {
                           ? "alert-circle"
                           : "download"
                       }
-                      size={18}
+                      size={17}
                       color="#FFFFFF"
                     />
-                    <Text style={{ color: "#FFFFFF", fontSize: 15, fontFamily: "Inter_700Bold" }}>
+                    <Text style={{ color: "#FFFFFF", fontSize: 14, fontFamily: "Inter_700Bold" }}>
                       {isGeneratingPdf
-                        ? "Generating PDF..."
+                        ? "Generating..."
                         : isSavingPdf
-                        ? "Saving to File Manager..."
+                        ? "Saving..."
                         : pdfSuccessMessage
-                        ? "Saved in File Manager ✅"
-                        : pdfErrorMessage
-                        ? "Try Again"
-                        : "Download Official Payslip (PDF)"}
+                        ? "Saved ✅"
+                        : "View & Download"}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={{
+                      flex: 1,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 6,
+                      paddingVertical: 14,
+                      borderRadius: 14,
+                      backgroundColor: colors.card,
+                      borderWidth: 1.5,
+                      borderColor: "#8B5CF6",
+                      opacity: isSharingPdf ? 0.7 : 1,
+                    }}
+                    disabled={isSharingPdf}
+                    onPress={() => handleShareSlip(slipModalEntry)}
+                  >
+                    {isSharingPdf ? <ActivityIndicator size="small" color="#8B5CF6" /> : <Feather name="share-2" size={16} color="#8B5CF6" />}
+                    <Text style={{ color: "#8B5CF6", fontSize: 14, fontFamily: "Inter_700Bold" }}>
+                      {isSharingPdf ? "Preparing PDF…" : "Share Slip"}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -755,6 +1046,9 @@ export default function PayrollScreen() {
         </View>
       </Modal>
 
+      {/* ─── Template-aware payslip viewer (individual or bulk) ─── */}
+      <PayslipViewerModal visible={viewerEntries.length > 0} entries={viewerEntries} onClose={() => setViewerEntries([])} />
+
       {/* ─── Add / Edit Employee Payroll Modal ─── */}
       <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => setModalVisible(false)}>
         <KeyboardAvoidingView
@@ -762,12 +1056,12 @@ export default function PayrollScreen() {
           behavior={Platform.OS === "ios" ? "padding" : undefined}
           keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
         >
-          <View style={[styles.sheet, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={[styles.sheet, { backgroundColor: colors.card, borderColor: colors.border, maxHeight: sheetMaxHeight }]}>
             <View style={styles.handle} />
             <Text style={[styles.modalTitle, { color: colors.foreground }]}>
               {editingEntry ? "Edit Employee Payroll" : "Add Employee Payroll"}
             </Text>
-            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 100 }}>
+            <ScrollView ref={sheetScrollRef} onTouchEnd={sheetOnTouchEnd} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 100 }}>
               <View key="EMPLOYEE NAME">
                 <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>EMPLOYEE NAME</Text>
                 <TextInput
@@ -780,7 +1074,7 @@ export default function PayrollScreen() {
                 />
                 {knownEmployees.length > 0 && !matchedStaff ? (
                   <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 8, marginTop: -2 }}>
-                    <Text style={{ fontSize: 10.5, color: colors.mutedForeground, alignSelf: "center" }}>Select Staff:</Text>
+                    <Text style={{ fontSize: 11, color: colors.mutedForeground, alignSelf: "center" }}>Select Staff:</Text>
                     {knownEmployees.slice(0, 4).map((emp) => (
                       <TouchableOpacity
                         key={emp.name}
@@ -799,25 +1093,108 @@ export default function PayrollScreen() {
                 ) : null}
               </View>
 
-              {[
-                { label: "EMPLOYEE ID", value: empId, onChange: setEmpId, placeholder: "EMP001", keyboard: "default" as const },
-                { label: `BASE SALARY (${settings.currency})`, value: salary, onChange: setSalary, placeholder: "0.00", keyboard: "decimal-pad" as const },
-                { label: `BONUS / INCENTIVES (${settings.currency})`, value: bonus, onChange: setBonus, placeholder: "0.00", keyboard: "decimal-pad" as const },
-                { label: `DEDUCTIONS / TAX (${settings.currency})`, value: deductions, onChange: setDeductions, placeholder: "0.00", keyboard: "decimal-pad" as const },
-                { label: "PAY MONTH", value: month, onChange: setMonth, placeholder: "YYYY-MM", keyboard: "default" as const },
-              ].map((f) => (
-                <View key={f.label}>
-                  <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>{f.label}</Text>
-                  <TextInput style={[styles.input, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground }]} placeholder={f.placeholder} placeholderTextColor={colors.mutedForeground} keyboardType={f.keyboard} value={f.value} onChangeText={f.onChange} />
+              <View>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>EMPLOYEE ID</Text>
+                <TextInput
+                  style={[styles.input, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground }]}
+                  placeholder="EMP001"
+                  placeholderTextColor={colors.mutedForeground}
+                  keyboardType="default"
+                  value={empId}
+                  onChangeText={setEmpId}
+                />
+              </View>
+
+              <View>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>DESIGNATION / ROLE</Text>
+                <TextInput
+                  style={[styles.input, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground }]}
+                  placeholder="e.g. Senior Software Engineer"
+                  placeholderTextColor={colors.mutedForeground}
+                  keyboardType="default"
+                  value={designation}
+                  onChangeText={setDesignation}
+                />
+              </View>
+
+              <View>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>DISBURSEMENT ACCOUNT / IBAN</Text>
+                <TextInput
+                  style={[styles.input, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground }]}
+                  placeholder="e.g. PK36MEZN000123456789"
+                  placeholderTextColor={colors.mutedForeground}
+                  keyboardType="default"
+                  value={bankAccountNumber}
+                  onChangeText={setBankAccountNumber}
+                />
+              </View>
+
+              <View>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>PAYMENT STATUS</Text>
+                <View style={{ flexDirection: "row", gap: 8, marginBottom: 8 }}>
+                  {(["paid", "pending", "processing"] as const).map((st) => {
+                    const isSel = paymentStatus === st;
+                    const stColor = st === "paid" ? colors.income : st === "pending" ? "#F59E0B" : "#8B5CF6";
+                    return (
+                      <TouchableOpacity
+                        key={st}
+                        style={{
+                          flex: 1,
+                          paddingVertical: 8,
+                          alignItems: "center",
+                          borderRadius: 8,
+                          borderWidth: 1.5,
+                          borderColor: isSel ? stColor : colors.border,
+                          backgroundColor: isSel ? stColor + "18" : colors.card,
+                        }}
+                        onPress={() => setPaymentStatus(st)}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontFamily: isSel ? "Inter_700Bold" : "Inter_500Medium",
+                            color: isSel ? stColor : colors.mutedForeground,
+                            textTransform: "capitalize",
+                          }}
+                        >
+                          {st}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
-              ))}
+              </View>
+
+              <View>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>BASE SALARY ({settings.currency})</Text>
+                <TextInput
+                  style={[styles.input, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground }]}
+                  placeholder="0.00"
+                  placeholderTextColor={colors.mutedForeground}
+                  keyboardType="decimal-pad"
+                  value={salary}
+                  onChangeText={setSalary}
+                />
+              </View>
+
+              <View>
+                <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>PAY MONTH</Text>
+                <TextInput
+                  style={[styles.input, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground }]}
+                  placeholder="YYYY-MM"
+                  placeholderTextColor={colors.mutedForeground}
+                  keyboardType="default"
+                  value={month}
+                  onChangeText={setMonth}
+                />
+              </View>
 
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
                 <Text style={[styles.fieldLabel, { color: colors.mutedForeground, marginBottom: 0 }]}>DEPARTMENT</Text>
                 {matchedStaff ? (
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "#8B5CF618", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: "#8B5CF630" }}>
                     <Feather name="lock" size={10} color="#8B5CF6" />
-                    <Text style={{ fontSize: 10, color: "#8B5CF6", fontFamily: "Inter_600SemiBold" }}>
+                    <Text style={{ fontSize: 11, color: "#8B5CF6", fontFamily: "Inter_600SemiBold" }}>
                       Auto-locked to {matchedStaff.name}&apos;s department
                     </Text>
                   </View>
@@ -826,7 +1203,7 @@ export default function PayrollScreen() {
 
               <View style={styles.chips}>
                 {availableDepts.length === 0 ? (
-                  <Text style={{ color: colors.mutedForeground, fontSize: 12.5, fontStyle: "italic", marginVertical: 4 }}>
+                  <Text style={{ color: colors.mutedForeground, fontSize: 13, fontStyle: "italic", marginVertical: 4 }}>
                     No departments created yet. Please register a department first.
                   </Text>
                 ) : (
@@ -852,6 +1229,207 @@ export default function PayrollScreen() {
                     );
                   })
                 )}
+              </View>
+
+              {/* ─── Custom Allowances & Additional Earnings Builder ─── */}
+              <View style={[styles.customSection, { borderColor: colors.border, backgroundColor: colors.cardAlt ?? colors.background }]}>
+                <View style={styles.customSectionHeader}>
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 6 }}>
+                    <Text style={[styles.sectionTitle, { color: colors.foreground }]}>ALLOWANCES & ADDITIONAL EARNINGS</Text>
+                    <View style={[styles.countBadge, { backgroundColor: colors.income + "20", borderColor: colors.income + "40" }]}>
+                      <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: colors.income }}>
+                        +{settings.currency} {totalAllowances.toLocaleString()}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: 11, color: colors.mutedForeground, marginTop: 2 }}>
+                    Add custom categories (e.g. House Rent, Medical, Conveyance, Fuel Allowance)
+                  </Text>
+                </View>
+
+                {/* Added Allowances List */}
+                {customAllowances.length > 0 ? (
+                  <View style={styles.itemList}>
+                    {customAllowances.map((item) => (
+                      <View key={item.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.itemName, { color: colors.foreground }]}>{item.name}</Text>
+                          <Text style={{ fontSize: 11, color: colors.mutedForeground }}>Custom Allowance</Text>
+                        </View>
+                        <Text style={[styles.itemAmount, { color: colors.income }]}>
+                          +{settings.currency} {Number(item.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </Text>
+                        <TouchableOpacity
+                          style={[styles.removeBtn, { borderColor: colors.border }]}
+                          onPress={() => handleRemoveAllowance(item.id)}
+                          hitSlop={6}
+                        >
+                          <Feather name="trash-2" size={13} color={colors.expense} />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <View style={[styles.emptyHint, { borderColor: colors.border }]}>
+                    <Text style={{ fontSize: 12, color: colors.mutedForeground, fontStyle: "italic" }}>
+                      No custom allowances added yet. You can create custom categories below.
+                    </Text>
+                  </View>
+                )}
+
+                {/* Quick preset chips for allowances */}
+                <View style={{ gap: 4 }}>
+                  <Text style={{ fontSize: 10, fontFamily: "Inter_700Bold", color: colors.mutedForeground, letterSpacing: 0.4 }}>
+                    QUICK PRESETS (TAP TO AUTO-FILL):
+                  </Text>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                    {ALLOWANCE_PRESETS.map((p) => (
+                      <TouchableOpacity
+                        key={p}
+                        style={[styles.presetChip, { borderColor: colors.border, backgroundColor: colors.card }]}
+                        onPress={() => setNewAllowanceName(p)}
+                      >
+                        <Text style={{ fontSize: 11, color: colors.foreground, fontFamily: "Inter_500Medium" }}>{p}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Add Custom Allowance Inputs */}
+                <View style={styles.addCustomRow}>
+                  <TextInput
+                    style={[styles.input, { flex: 1.5, marginBottom: 0, backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
+                    placeholder="Category Name (e.g. Fuel)"
+                    placeholderTextColor={colors.mutedForeground}
+                    value={newAllowanceName}
+                    onChangeText={setNewAllowanceName}
+                  />
+                  <TextInput
+                    style={[styles.input, { flex: 1, marginBottom: 0, backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
+                    placeholder="Amount"
+                    placeholderTextColor={colors.mutedForeground}
+                    keyboardType="decimal-pad"
+                    value={newAllowanceAmount}
+                    onChangeText={setNewAllowanceAmount}
+                  />
+                  <TouchableOpacity
+                    style={[styles.addItemBtn, { backgroundColor: "#8B5CF6" }]}
+                    onPress={() => handleAddAllowance()}
+                  >
+                    <Feather name="plus" size={14} color="#FFFFFF" />
+                    <Text style={{ color: "#FFFFFF", fontSize: 12, fontFamily: "Inter_700Bold" }}>Add</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* ─── Custom Deductions & Taxes Builder ─── */}
+              <View style={[styles.customSection, { borderColor: colors.border, backgroundColor: colors.cardAlt ?? colors.background }]}>
+                <View style={styles.customSectionHeader}>
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 6 }}>
+                    <Text style={[styles.sectionTitle, { color: colors.foreground }]}>DEDUCTIONS & TAX WITHHOLDINGS</Text>
+                    <View style={[styles.countBadge, { backgroundColor: colors.expense + "20", borderColor: colors.expense + "40" }]}>
+                      <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: colors.expense }}>
+                        -{settings.currency} {totalDeductions.toLocaleString()}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: 11, color: colors.mutedForeground, marginTop: 2 }}>
+                    Add custom categories (e.g. Income Tax, Provident Fund, Health Insurance, Fine)
+                  </Text>
+                </View>
+
+                {/* Added Deductions List */}
+                {customDeductions.length > 0 ? (
+                  <View style={styles.itemList}>
+                    {customDeductions.map((item) => (
+                      <View key={item.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.itemName, { color: colors.foreground }]}>{item.name}</Text>
+                          <Text style={{ fontSize: 11, color: colors.mutedForeground }}>Custom Deduction</Text>
+                        </View>
+                        <Text style={[styles.itemAmount, { color: colors.expense }]}>
+                          -{settings.currency} {Number(item.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        </Text>
+                        <TouchableOpacity
+                          style={[styles.removeBtn, { borderColor: colors.border }]}
+                          onPress={() => handleRemoveDeduction(item.id)}
+                          hitSlop={6}
+                        >
+                          <Feather name="trash-2" size={13} color={colors.expense} />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <View style={[styles.emptyHint, { borderColor: colors.border }]}>
+                    <Text style={{ fontSize: 12, color: colors.mutedForeground, fontStyle: "italic" }}>
+                      No custom deductions added yet. Enter a category name and amount below to add.
+                    </Text>
+                  </View>
+                )}
+
+                {/* Quick preset chips for deductions */}
+                <View style={{ gap: 4 }}>
+                  <Text style={{ fontSize: 10, fontFamily: "Inter_700Bold", color: colors.mutedForeground, letterSpacing: 0.4 }}>
+                    QUICK PRESETS (TAP TO AUTO-FILL):
+                  </Text>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                    {DEDUCTION_PRESETS.map((p) => (
+                      <TouchableOpacity
+                        key={p}
+                        style={[styles.presetChip, { borderColor: colors.border, backgroundColor: colors.card }]}
+                        onPress={() => setNewDeductionName(p)}
+                      >
+                        <Text style={{ fontSize: 11, color: colors.foreground, fontFamily: "Inter_500Medium" }}>{p}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Add Custom Deduction Inputs */}
+                <View style={styles.addCustomRow}>
+                  <TextInput
+                    style={[styles.input, { flex: 1.5, marginBottom: 0, backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
+                    placeholder="Category Name (e.g. Tax)"
+                    placeholderTextColor={colors.mutedForeground}
+                    value={newDeductionName}
+                    onChangeText={setNewDeductionName}
+                  />
+                  <TextInput
+                    style={[styles.input, { flex: 1, marginBottom: 0, backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
+                    placeholder="Amount"
+                    placeholderTextColor={colors.mutedForeground}
+                    keyboardType="decimal-pad"
+                    value={newDeductionAmount}
+                    onChangeText={setNewDeductionAmount}
+                  />
+                  <TouchableOpacity
+                    style={[styles.addItemBtn, { backgroundColor: "#8B5CF6" }]}
+                    onPress={() => handleAddDeduction()}
+                  >
+                    <Feather name="plus" size={14} color="#FFFFFF" />
+                    <Text style={{ color: "#FFFFFF", fontSize: 12, fontFamily: "Inter_700Bold" }}>Add</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* ─── Calculated Net Disbursal Card ─── */}
+              <View style={[styles.netPreviewBox, { backgroundColor: "#8B5CF618", borderColor: "#8B5CF650" }]}>
+                <View style={styles.netBreakdownRow}>
+                  <Text style={{ fontSize: 11, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
+                    Base: {settings.currency} {(parseFloat(salary) || 0).toLocaleString()}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: colors.income, fontFamily: "Inter_600SemiBold" }}>
+                    + Allowances ({customAllowances.length}): {settings.currency} {totalAllowances.toLocaleString()}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: colors.expense, fontFamily: "Inter_600SemiBold" }}>
+                    - Deductions ({customDeductions.length}): {settings.currency} {totalDeductions.toLocaleString()}
+                  </Text>
+                </View>
+                <Text style={[styles.netLabel, { color: colors.mutedForeground }]}>CALCULATED NET DISBURSAL (TAKE-HOME SALARY)</Text>
+                <Text style={[styles.netValue, { color: "#8B5CF6" }]}>
+                  {settings.currency} {currentNet.toLocaleString()}
+                </Text>
               </View>
 
               {/* ─── Real-Time Department Budget Deduction Indicator ─── */}
@@ -885,7 +1463,7 @@ export default function PayrollScreen() {
                   >
                     <Text
                       style={{
-                        fontSize: 10,
+                        fontSize: 11,
                         fontFamily: "Inter_700Bold",
                         color: isZeroBudget ? colors.expense : isOverBudget ? colors.expense : colors.income,
                       }}
@@ -897,26 +1475,26 @@ export default function PayrollScreen() {
 
                 <View style={{ flexDirection: "row", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
                   <View style={{ minWidth: "22%", gap: 2 }}>
-                    <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_700Bold" }}>ALLOCATED</Text>
-                    <Text style={{ fontSize: 12.5, fontFamily: "Inter_700Bold", color: colors.foreground }}>
+                    <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_700Bold" }}>ALLOCATED</Text>
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: colors.foreground }}>
                       {settings.currency} {deptBudgetAllocated.toLocaleString()}
                     </Text>
                   </View>
                   <View style={{ minWidth: "22%", gap: 2 }}>
-                    <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_700Bold" }}>CURRENT SPENT</Text>
-                    <Text style={{ fontSize: 12.5, fontFamily: "Inter_700Bold", color: colors.mutedForeground }}>
+                    <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_700Bold" }}>CURRENT SPENT</Text>
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: colors.mutedForeground }}>
                       {settings.currency} {deptCurrentSpent.toLocaleString()}
                     </Text>
                   </View>
                   <View style={{ minWidth: "22%", gap: 2 }}>
-                    <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_700Bold" }}>REMAINING</Text>
-                    <Text style={{ fontSize: 12.5, fontFamily: "Inter_700Bold", color: deptRemainingBudget > 0 ? colors.income : colors.expense }}>
+                    <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_700Bold" }}>REMAINING</Text>
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: deptRemainingBudget > 0 ? colors.income : colors.expense }}>
                       {settings.currency} {deptRemainingBudget.toLocaleString()}
                     </Text>
                   </View>
                   <View style={{ minWidth: "22%", gap: 2 }}>
-                    <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_700Bold" }}>PAYROLL CHARGE</Text>
-                    <Text style={{ fontSize: 12.5, fontFamily: "Inter_700Bold", color: "#8B5CF6" }}>
+                    <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_700Bold" }}>PAYROLL CHARGE</Text>
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: "#8B5CF6" }}>
                       -{settings.currency} {currentNet.toLocaleString()}
                     </Text>
                   </View>
@@ -925,19 +1503,19 @@ export default function PayrollScreen() {
                 {/* Status Notice */}
                 {isZeroBudget ? (
                   <View style={{ backgroundColor: colors.expense + "15", borderColor: colors.expense + "35", borderWidth: 1, padding: 10, borderRadius: 8 }}>
-                    <Text style={{ fontSize: 11.5, color: colors.expense, fontFamily: "Inter_500Medium", lineHeight: 16 }}>
+                    <Text style={{ fontSize: 12, color: colors.expense, fontFamily: "Inter_500Medium", lineHeight: 16 }}>
                       🚫 Payroll cannot be processed because the <Text style={{ fontWeight: "700" }}>{dept}</Text> department has no allocated budget ({settings.currency} 0).
                     </Text>
                   </View>
                 ) : isOverBudget ? (
                   <View style={{ backgroundColor: colors.expense + "15", borderColor: colors.expense + "35", borderWidth: 1, padding: 10, borderRadius: 8 }}>
-                    <Text style={{ fontSize: 11.5, color: colors.expense, fontFamily: "Inter_500Medium", lineHeight: 16 }}>
+                    <Text style={{ fontSize: 12, color: colors.expense, fontFamily: "Inter_500Medium", lineHeight: 16 }}>
                       ⚠️ Insufficient {dept} department budget. Available: {settings.currency} {deptRemainingBudget.toLocaleString()}. Required: {settings.currency} {currentNet.toLocaleString()}.
                     </Text>
                   </View>
                 ) : (
                   <View style={{ backgroundColor: colors.income + "12", borderColor: colors.income + "30", borderWidth: 1, padding: 10, borderRadius: 8 }}>
-                    <Text style={{ fontSize: 11.5, color: colors.income, fontFamily: "Inter_600SemiBold", lineHeight: 16 }}>
+                    <Text style={{ fontSize: 12, color: colors.income, fontFamily: "Inter_600SemiBold", lineHeight: 16 }}>
                       ✓ Sufficient department budget. Projected remaining after payroll: {settings.currency} {projectedRemaining.toLocaleString()}.
                     </Text>
                   </View>
@@ -1020,14 +1598,14 @@ const styles = StyleSheet.create({
   payAvatarText: { fontSize: 16, fontFamily: "Inter_700Bold" },
   payInfo: { flex: 1, gap: 1.5 },
   payName: { fontSize: 14, fontFamily: "Inter_700Bold" },
-  payMeta: { fontSize: 11.5, fontFamily: "Inter_400Regular" },
-  payMonth: { fontSize: 10.5, fontFamily: "Inter_400Regular" },
+  payMeta: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  payMonth: { fontSize: 11, fontFamily: "Inter_400Regular" },
   payRight: { alignItems: "flex-end", gap: 4 },
   payNet: { fontSize: 15, fontFamily: "Inter_800ExtraBold" },
   payBreakdown: { flexDirection: "row", borderTopWidth: 1, paddingVertical: 8, paddingHorizontal: 12 },
   payBreakdownItem: { flex: 1, alignItems: "center", gap: 1 },
-  bLabel: { fontSize: 9.5, fontFamily: "Inter_400Regular" },
-  bValue: { fontSize: 11.5, fontFamily: "Inter_700Bold" },
+  bLabel: { fontSize: 10, fontFamily: "Inter_400Regular" },
+  bValue: { fontSize: 12, fontFamily: "Inter_700Bold" },
   empty: { alignItems: "center", gap: 8, paddingVertical: 60 },
   emptyText: { fontSize: 15, fontFamily: "Inter_500Medium" },
   overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "#00000088" },
@@ -1050,5 +1628,24 @@ const styles = StyleSheet.create({
   slipOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "#00000088" },
   slipSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, padding: 20, maxHeight: "88%", gap: 12 },
   slipHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 },
-  slipTitle: { fontSize: 17, fontFamily: "Inter_700Bold" },
+  slipTitle: { fontSize: 18, fontFamily: "Inter_700Bold" },
+
+  // Custom Categories Builder Styles
+  customSection: { borderWidth: 1, borderRadius: 14, padding: 14, marginVertical: 8, gap: 10 },
+  customSectionHeader: { gap: 2 },
+  sectionTitle: { fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.6 },
+  countBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1 },
+  itemList: { gap: 6, marginTop: 4 },
+  itemCard: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 10, borderRadius: 10, borderWidth: 1 },
+  itemName: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  itemAmount: { fontSize: 13, fontFamily: "Inter_700Bold", marginRight: 8 },
+  removeBtn: { width: 28, height: 28, borderRadius: 6, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  emptyHint: { padding: 10, borderRadius: 8, borderWidth: 1, borderStyle: "dashed", alignItems: "center" },
+  presetChip: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1 },
+  addCustomRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 6 },
+  addItemBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 10, justifyContent: "center" },
+  netPreviewBox: { padding: 14, borderRadius: 14, borderWidth: 1.5, alignItems: "center", gap: 4, marginVertical: 10 },
+  netBreakdownRow: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 10, marginBottom: 4 },
+  netLabel: { fontSize: 11, fontFamily: "Inter_600SemiBold", letterSpacing: 0.8 },
+  netValue: { fontSize: 24, fontFamily: "Inter_800ExtraBold" },
 });

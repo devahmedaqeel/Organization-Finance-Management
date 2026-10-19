@@ -48,8 +48,8 @@ export function OpenInAppBanner() {
       <View style={styles.brandGroup}>
         <OFMBrandLogo size={34} />
         <View style={styles.textGroup}>
-          <Text style={styles.appName} numberOfLines={1}>{OFM_BRAND.shortName} App</Text>
-          <Text style={styles.tagline} numberOfLines={1}>{OFM_BRAND.fullName}</Text>
+          <Text style={styles.appName}>{OFM_BRAND.shortName} App</Text>
+          <Text style={styles.tagline}>{OFM_BRAND.fullName}</Text>
         </View>
       </View>
 

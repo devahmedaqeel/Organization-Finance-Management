@@ -149,6 +149,19 @@ export function DonutChart({
   const catFontSize = Math.max(9.5, Math.min(11.5, Math.round(size * 0.075)));
   const pctFontSize = Math.max(8.5, Math.min(10, Math.round(size * 0.065)));
 
+  // Usable text width inside the hole (a little narrower than the diameter since it's a circle)
+  const centerTextWidth = (outerRadius - strokeWidth) * 2 * 0.78;
+  // Shrink a single-line string until it fits the hole width (works on web, where adjustsFontSizeToFit is ignored)
+  const fitFontSize = (text: string, base: number, charWidth = 0.6, min = 9) =>
+    Math.max(min, Math.min(base, centerTextWidth / Math.max(1, text.length * charWidth)));
+  // Split "PKR 12,345" into a small currency caption + a large amount so the number stays readable
+  const splitAmount = (text: string) => {
+    const prefix = `${currency} `;
+    return text.startsWith(prefix)
+      ? { unit: currency, amount: text.slice(prefix.length) }
+      : { unit: "", amount: text };
+  };
+
   // Compute exact arc sectors with clean gaps
   const computedSlices = useRef<
     {
@@ -215,9 +228,9 @@ export function DonutChart({
     const midA = (startA + endA) / 2;
 
     const isSelected = effectiveIndex === i;
-    // Keep outer and inner radius uniform so the selected slice never protrudes outside the circle track
-    const sliceOuterRadius = outerRadius;
-    const sliceInnerRadius = innerRadius;
+    // Selected slice grows slightly into the 4px outer margin (stays inside the SVG bounds) for clear emphasis
+    const sliceOuterRadius = isSelected ? outerRadius + 3 : outerRadius;
+    const sliceInnerRadius = isSelected ? innerRadius - 1 : innerRadius;
 
     const path = describeArcSector(
       center,
@@ -304,7 +317,7 @@ export function DonutChart({
               fill="none"
               stroke={colors.border}
               strokeWidth={strokeWidth}
-              opacity={0.25}
+              opacity={0.35}
             />
 
             {/* Clean Concentric SVG Arc Sectors with Selected Slice on Top */}
@@ -320,16 +333,19 @@ export function DonutChart({
                       key={`slice-${slice.index}`}
                       d={slice.path}
                       fill={slice.color}
-                      opacity={isAnySelected ? (isSelected ? 1.0 : 0.35) : 1.0}
-                      stroke={isSelected ? "#FFFFFF" : "transparent"}
+                      opacity={isAnySelected ? (isSelected ? 1.0 : 0.3) : 1.0}
+                      stroke={isSelected ? colors.card : "transparent"}
                       strokeWidth={isSelected ? 1.5 : 0}
                       strokeLinejoin="round"
-                      onPress={() => {
-                        setEffectiveIndex(
-                          effectiveIndex === slice.index ? null : slice.index
-                        );
-                        if (Platform.OS !== "web")
-                          Haptics.selectionAsync().catch(() => {});
+                      // Web: plain onClick (svg onPress leaks RN responder props onto the DOM <path>)
+                      {...{
+                        [Platform.OS === "web" ? "onClick" : "onPress"]: () => {
+                          setEffectiveIndex(
+                            effectiveIndex === slice.index ? null : slice.index
+                          );
+                          if (Platform.OS !== "web")
+                            Haptics.selectionAsync().catch(() => {});
+                        },
                       }}
                     />
                   );
@@ -359,25 +375,39 @@ export function DonutChart({
           >
             {activeSegment ? (
               <Animated.View style={{ transform: [{ scale: scaleAnim }], opacity: opacityAnim, alignItems: "center", justifyContent: "center", width: "100%", gap: 2 }}>
+                <Text style={[styles.centerUnit, { color: colors.mutedForeground, fontSize: pctFontSize }]}>
+                  {currency}
+                </Text>
                 <Text
                   style={[
                     styles.centerAmount,
-                    { color: activeSegment.color, fontSize: amountFontSize },
+                    {
+                      color: activeSegment.color,
+                      fontSize: fitFontSize(Number(activeSegment.value || 0).toLocaleString(), amountFontSize),
+                    },
                   ]}
-                  numberOfLines={1}
+                  numberOfLines={Platform.OS === "web" ? undefined : 1}
                   adjustsFontSizeToFit
                   minimumFontScale={0.7}
                 >
-                  {`${currency} ${Number(activeSegment.value || 0).toLocaleString()}`}
+                  {Number(activeSegment.value || 0).toLocaleString()}
                 </Text>
                 <Text
                   style={[
                     styles.centerCategoryTitle,
-                    { color: colors.foreground, fontSize: catFontSize },
+                    {
+                      color: colors.foreground,
+                      fontSize: fitFontSize(
+                        activeSegment.label.split(/\s+/).reduce((a, w) => (w.length > a.length ? w : a), ""),
+                        catFontSize,
+                        0.58,
+                        8
+                      ),
+                    },
                   ]}
-                  numberOfLines={2}
+                  numberOfLines={Platform.OS === "web" ? undefined : 2}
                   adjustsFontSizeToFit
-                  minimumFontScale={0.75}
+                  minimumFontScale={0.7}
                 >
                   {activeSegment.label}
                 </Text>
@@ -398,7 +428,6 @@ export function DonutChart({
                       styles.centerPctText,
                       { color: activeSegment.color, fontSize: pctFontSize },
                     ]}
-                    numberOfLines={1}
                   >
                     {total > 0
                       ? (activeSegment.value / safeTotal) * 100 < 0.1 && activeSegment.value > 0
@@ -410,23 +439,34 @@ export function DonutChart({
               </Animated.View>
             ) : (
               <Animated.View style={{ transform: [{ scale: scaleAnim }], opacity: opacityAnim, alignItems: "center", justifyContent: "center", width: "100%", gap: 2 }}>
-                <Text
-                  style={[
-                    styles.centerAmount,
-                    { color: colors.foreground, fontSize: amountFontSize },
-                  ]}
-                  numberOfLines={2}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.65}
-                >
-                  {centerLabel || `${currency} ${Number(total || 0).toLocaleString()}`}
-                </Text>
+                {(() => {
+                  const { unit, amount } = splitAmount(centerLabel || `${currency} ${Number(total || 0).toLocaleString()}`);
+                  return (
+                    <>
+                      {unit ? (
+                        <Text style={[styles.centerUnit, { color: colors.mutedForeground, fontSize: pctFontSize }]}>
+                          {unit}
+                        </Text>
+                      ) : null}
+                      <Text
+                        style={[
+                          styles.centerAmount,
+                          { color: colors.foreground, fontSize: fitFontSize(amount, amountFontSize) },
+                        ]}
+                        numberOfLines={Platform.OS === "web" ? undefined : 2}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.7}
+                      >
+                        {amount}
+                      </Text>
+                    </>
+                  );
+                })()}
                 <Text
                   style={[
                     styles.centerSubText,
                     { color: colors.mutedForeground, fontSize: catFontSize - 1 },
                   ]}
-                  numberOfLines={2}
                 >
                   {centerSub}
                 </Text>
@@ -485,7 +525,7 @@ export function DonutChart({
                       </Text>
                       <Text
                         style={{
-                          fontSize: 10.5,
+                          fontSize: 12,
                           fontFamily: "Inter_500Medium",
                           color: isSelected ? seg.color : colors.mutedForeground,
                         }}
@@ -592,6 +632,12 @@ const styles = StyleSheet.create({
     textAlign: "center",
     letterSpacing: -0.3,
   },
+  centerUnit: {
+    fontFamily: "Inter_700Bold",
+    textAlign: "center",
+    letterSpacing: 0.6,
+    marginBottom: -2,
+  },
   centerCategoryTitle: {
     fontFamily: "Inter_600SemiBold",
     textAlign: "center",
@@ -642,11 +688,11 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   legendLabel: {
-    fontSize: 11.5,
+    fontSize: 12,
     flexShrink: 1,
   },
   legendValue: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontVariant: ["tabular-nums"],
   },
   chipsRow: {
@@ -670,7 +716,7 @@ const styles = StyleSheet.create({
     borderRadius: 2.5,
   },
   chipText: {
-    fontSize: 10.5,
+    fontSize: 12,
     fontFamily: "Inter_600SemiBold",
   },
 });

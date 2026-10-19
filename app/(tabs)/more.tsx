@@ -225,7 +225,7 @@ export default function MoreScreen() {
         styles.container,
         {
           paddingTop: topSafePad,
-          paddingBottom: Math.max(insets.bottom, 16) + 100,
+          paddingBottom: 24, // tab bar is docked and already reserves the bottom inset
         },
       ]}
       showsVerticalScrollIndicator={false}
@@ -255,19 +255,19 @@ export default function MoreScreen() {
         </View>
         <View style={styles.profileInfo}>
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-            <Text style={[styles.profileName, { color: colors.foreground, flex: 1, minWidth: 0, marginRight: 8 }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
+            <Text style={[styles.profileName, { color: colors.foreground, flex: 1, minWidth: 0, marginRight: 8 }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
               {user?.name || "Administrator"}
             </Text>
             <View style={[styles.rolePill, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "35", flexShrink: 0 }]}>
               <Text style={[styles.roleText, { color: colors.primary }]}>{user?.role?.toUpperCase() || "ADMIN"}</Text>
             </View>
           </View>
-          <Text style={[styles.profileEmail, { color: colors.mutedForeground }]} numberOfLines={2}>
+          <Text style={[styles.profileEmail, { color: colors.mutedForeground }]}>
             {user?.email || ""}
           </Text>
           <View style={styles.orgRow}>
             <Text style={{ fontSize: 13 }}>{selectedCurrency?.flag ?? "🌐"}</Text>
-            <Text style={[styles.profileOrg, { color: colors.mutedForeground, flex: 1 }]} numberOfLines={2}>
+            <Text style={[styles.profileOrg, { color: colors.mutedForeground, flex: 1 }]}>
               {settings.organizationName || "Organization"}
             </Text>
           </View>
@@ -309,12 +309,12 @@ export default function MoreScreen() {
                   </View>
                   <View style={styles.cardFullTextWrap}>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                      <Text style={[styles.featureLabel, { color: colors.foreground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.85}>{f.label}</Text>
+                      <Text style={[styles.featureLabel, { color: colors.foreground }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>{f.label}</Text>
                       <View style={[styles.cardTagPill, { backgroundColor: f.color + "16", borderColor: f.color + "32" }]}>
                         <Text style={[styles.cardTagText, { color: f.color }]}>{f.tag}</Text>
                       </View>
                     </View>
-                    <Text style={[styles.featureDesc, { color: colors.mutedForeground, marginTop: 2 }]} numberOfLines={2}>
+                    <Text style={[styles.featureDesc, { color: colors.mutedForeground, marginTop: 2 }]}>
                       {f.id === "settings" ? "Organization configuration, currency & security preferences" : f.desc}
                     </Text>
                   </View>
@@ -350,13 +350,13 @@ export default function MoreScreen() {
               </View>
 
               {/* Title */}
-              <Text style={[styles.featureLabel, { color: colors.foreground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.85}>
+              <Text style={[styles.featureLabel, { color: colors.foreground }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
                 {f.label}
               </Text>
 
               {/* Bottom Row: Description + Arrow */}
               <View style={styles.cardBottomRow}>
-                <Text style={[styles.featureDesc, { color: colors.mutedForeground, flex: 1 }]} numberOfLines={2}>
+                <Text style={[styles.featureDesc, { color: colors.mutedForeground, flex: 1 }]}>
                   {f.desc}
                 </Text>
                 <View style={[styles.cardArrowWrap, { backgroundColor: f.color + "12" }]}>
@@ -399,15 +399,15 @@ export default function MoreScreen() {
                   <Feather name={stat.icon} size={16} color={stat.color} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.summaryLabel, { color: colors.foreground }]} numberOfLines={2}>{stat.label}</Text>
-                  <Text style={[styles.summarySub, { color: colors.mutedForeground }]} numberOfLines={2}>
+                  <Text style={[styles.summaryLabel, { color: colors.foreground }]}>{stat.label}</Text>
+                  <Text style={[styles.summarySub, { color: colors.mutedForeground }]}>
                     {stat.sub}
                   </Text>
                 </View>
                 <View style={{ alignItems: "flex-end", gap: 3 }}>
                   <Text style={[styles.summaryValue, { color: stat.color }]}>{stat.value}</Text>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
-                    <Text style={{ fontSize: 10, color: colors.mutedForeground }}>View</Text>
+                    <Text style={{ fontSize: 11, color: colors.mutedForeground }}>View</Text>
                     <Feather name="chevron-right" size={12} color={colors.mutedForeground} />
                   </View>
                 </View>
@@ -554,10 +554,15 @@ const styles = StyleSheet.create({
   profileCard: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 14,
-    borderRadius: 16,
+    padding: 16,
+    borderRadius: 22,
     borderWidth: 1,
-    gap: 12,
+    gap: 14,
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 2,
   },
   avatar: {
     width: 52,
@@ -579,7 +584,7 @@ const styles = StyleSheet.create({
   },
   profileInfo: { flex: 1, gap: 2 },
   profileName: { fontSize: 15, fontFamily: "Inter_700Bold" },
-  profileEmail: { fontSize: 11.5, fontFamily: "Inter_400Regular" },
+  profileEmail: { fontSize: 12, fontFamily: "Inter_400Regular" },
   orgRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 2 },
   profileOrg: { fontSize: 11, fontFamily: "Inter_500Medium" },
   rolePill: {
@@ -588,7 +593,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
   },
-  roleText: { fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 0.3 },
+  roleText: { fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.3 },
   sectionHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -608,7 +613,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   sectionLabel: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.7,
   },
@@ -619,28 +624,38 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   sectionCountBadge: {
-    fontSize: 10.5,
+    fontSize: 11,
     fontFamily: "Inter_600SemiBold",
   },
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-    rowGap: 10,
+    rowGap: 12,
   },
   featureCard: {
     width: "48.2%",
-    padding: 13,
-    borderRadius: 16,
-    borderWidth: 1.2,
-    minHeight: 126,
+    padding: 15,
+    borderRadius: 20,
+    borderWidth: 1,
+    minHeight: 138,
     justifyContent: "space-between",
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 2,
   },
   featureCardFull: {
     width: "100%",
-    padding: 13,
-    borderRadius: 16,
-    borderWidth: 1.2,
+    padding: 15,
+    borderRadius: 20,
+    borderWidth: 1,
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 2,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -652,29 +667,29 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   featureIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 11,
+    width: 42,
+    height: 42,
+    borderRadius: 14,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
   },
   featureIconFull: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
+    width: 46,
+    height: 46,
+    borderRadius: 15,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
   },
   cardTagPill: {
-    paddingHorizontal: 6.5,
-    paddingVertical: 2.5,
-    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 20,
     borderWidth: 1,
   },
   cardTagText: {
-    fontSize: 9,
+    fontSize: 10,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.4,
     textTransform: "uppercase",
@@ -697,9 +712,9 @@ const styles = StyleSheet.create({
     lineHeight: 15,
   },
   cardArrowWrap: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -722,7 +737,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   summaryCard: {
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 1,
     overflow: "hidden",
   },
@@ -740,8 +755,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  summaryLabel: { fontSize: 13.5, fontFamily: "Inter_600SemiBold" },
-  summarySub: { fontSize: 10.5, fontFamily: "Inter_400Regular", marginTop: 1 },
+  summaryLabel: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  summarySub: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 1 },
   summaryValue: { fontSize: 13, fontFamily: "Inter_700Bold" },
   logoutBtn: {
     flexDirection: "row",
@@ -795,14 +810,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   logoutModalTitle: {
-    fontSize: 19,
+    fontSize: 18,
     fontFamily: "Inter_800ExtraBold",
     marginBottom: 6,
     textAlign: "center",
     letterSpacing: -0.3,
   },
   logoutModalMsg: {
-    fontSize: 13.5,
+    fontSize: 14,
     fontFamily: "Inter_400Regular",
     textAlign: "center",
     lineHeight: 19,
@@ -825,7 +840,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.2,
   },
   logoutCancelText: {
-    fontSize: 13.5,
+    fontSize: 14,
     fontFamily: "Inter_600SemiBold",
   },
   logoutConfirmBtn: {
@@ -838,7 +853,7 @@ const styles = StyleSheet.create({
   },
   logoutConfirmText: {
     color: "#FFFFFF",
-    fontSize: 13.5,
+    fontSize: 14,
     fontFamily: "Inter_700Bold",
   },
 });

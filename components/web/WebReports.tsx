@@ -350,7 +350,7 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
             activeOpacity={0.8}
           >
             <SvgLayers size={14} color={colors.foreground} />
-            <Text style={[styles.outlineBtnText, { color: colors.foreground, fontSize: isMobile ? 11.5 : 13 }]} numberOfLines={1}>Export Custom</Text>
+            <Text style={[styles.outlineBtnText, { color: colors.foreground, fontSize: isMobile ? 11.5 : 13 }]}>Export Custom</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -359,7 +359,7 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
             activeOpacity={0.8}
           >
             <SvgFileText size={14} color="#FFFFFF" />
-            <Text style={[styles.primaryBtnText, { fontSize: isMobile ? 11.5 : 13 }]} numberOfLines={1}>
+            <Text style={[styles.primaryBtnText, { fontSize: isMobile ? 11.5 : 13 }]}>
               {activeTab === "payroll"
                 ? "Payroll Dossier"
                 : activeTab === "departments"
@@ -448,7 +448,7 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
       <View style={styles.metricsGrid}>
         <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 180 }]}>
           <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>PERIOD REVENUE (INFLOWS)</Text>
-          <Text style={[styles.metricValue, { color: colors.income }]} numberOfLines={1}>
+          <Text style={[styles.metricValue, { color: colors.income }]}>
             +{settings.currency} {fmt(metrics.totalIncome)}
           </Text>
           <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
@@ -458,7 +458,7 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
 
         <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 180 }]}>
           <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>PERIOD EXPENDITURE (OUTFLOWS)</Text>
-          <Text style={[styles.metricValue, { color: colors.expense }]} numberOfLines={1}>
+          <Text style={[styles.metricValue, { color: colors.expense }]}>
             -{settings.currency} {fmt(metrics.totalExpense)}
           </Text>
           <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
@@ -472,7 +472,7 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
           <>
             <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 180 }]}>
               <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>DEPARTMENT BUDGET</Text>
-              <Text style={[styles.metricValue, { color: colors.primary }]} numberOfLines={1}>
+              <Text style={[styles.metricValue, { color: colors.primary }]}>
                 {settings.currency} {fmt(totalBudgetAllocated)}
               </Text>
               <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
@@ -482,7 +482,7 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
 
             <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 180 }]}>
               <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>NET CASH POSITION</Text>
-              <Text style={[styles.metricValue, { color: netCapitalSurplus >= 0 ? colors.income : colors.expense }]} numberOfLines={1}>
+              <Text style={[styles.metricValue, { color: netCapitalSurplus >= 0 ? colors.income : colors.expense }]}>
                 {netCapitalSurplus >= 0 ? "+" : "-"}
                 {settings.currency} {fmt(Math.abs(netCapitalSurplus))}
               </Text>
@@ -494,7 +494,7 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
         ) : (
           <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 180 }]}>
             <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>NET OPERATING SURPLUS</Text>
-            <Text style={[styles.metricValue, { color: metrics.netBalance >= 0 ? colors.income : colors.expense }]} numberOfLines={1}>
+            <Text style={[styles.metricValue, { color: metrics.netBalance >= 0 ? colors.income : colors.expense }]}>
               {metrics.netBalance >= 0 ? "+" : "-"}
               {settings.currency} {fmt(Math.abs(metrics.netBalance))}
             </Text>
@@ -1123,10 +1123,10 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
                   <Feather name="file-text" size={18} color="#38BDF8" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 15, fontWeight: "800", color: "#F8FAFC" }} numberOfLines={1}>
+                  <Text style={{ fontSize: 15, fontWeight: "800", color: "#F8FAFC" }}>
                     {activeEnterpriseData?.reportTitle || "Official Financial Dossier"}
                   </Text>
-                  <Text style={{ fontSize: 11.5, color: "#94A3B8" }} numberOfLines={1}>
+                  <Text style={{ fontSize: 11.5, color: "#94A3B8" }}>
                     {settings.organizationName || user?.organization || "Organization Finance Management"} · Certified Statement · {activePeriod.label}
                   </Text>
                 </View>

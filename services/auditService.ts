@@ -6,8 +6,8 @@ export interface AuditLogEntry {
   actorUid: string;
   actorName: string;
   actorRole: string;
-  action: "create" | "update" | "delete" | "invite" | "role_change";
-  entity: "transaction" | "budget" | "payroll" | "department" | "member" | "settings";
+  action: "create" | "update" | "delete" | "invite" | "role_change" | "approve" | "finalize" | "reversal" | "set_default" | "restore";
+  entity: "transaction" | "budget" | "payroll" | "department" | "member" | "settings" | "salary_component" | "employee_salary_profile" | "loan" | "loan_repayment" | "payroll_period" | "payslip_template";
   entityId: string;
   metadata?: Record<string, any>;
 }

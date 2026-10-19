@@ -16,7 +16,7 @@ import { Transaction, TransactionType, useFinance } from "@/context/FinanceConte
 import { calculateEffectiveDepartmentBudget } from "@/services/FinancialCalculationEngine";
 import { useColors } from "@/hooks/useColors";
 import { useSettings } from "@/context/SettingsContext";
-import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
+import { useBottomSheetLayout } from "@/hooks/useBottomSheetLayout";
 import { formatYMD } from "@/services/DatePeriodService";
 import { getUnifiedCategories, getDepartmentCategories } from "@/constants/categories";
 
@@ -43,7 +43,7 @@ export function AddTransactionModal({
   const colors = useColors();
   const { settings, addCustomCategory } = useSettings();
   const { departments, addDepartment, updateDepartment, budgets, transactions } = useFinance();
-  const keyboardHeight = useKeyboardHeight();
+  const { maxHeight: sheetMaxHeight, keyboardHeight, scrollRef: sheetScrollRef, onTouchEnd: sheetOnTouchEnd } = useBottomSheetLayout();
 
   const isEditMode = !!editItem;
 
@@ -191,7 +191,7 @@ export function AddTransactionModal({
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
       >
-        <View style={[styles.sheet, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={[styles.sheet, { backgroundColor: colors.card, borderColor: colors.border, maxHeight: sheetMaxHeight }]}>
           <View style={styles.handle} />
 
           {/* Header */}
@@ -205,7 +205,7 @@ export function AddTransactionModal({
                 />
               </View>
               <Text style={[styles.title, { color: colors.foreground }]}>
-                {isEditMode ? `Edit ${isIncome ? "Income" : "Expense"}` : `Add ${isIncome ? "Income" : "Expense"}`}
+                {isEditMode ? `Edit ${isIncome ? "Inflow" : "Expense"}` : `Add ${isIncome ? "Inflow" : "Expense"}`}
               </Text>
             </View>
             <TouchableOpacity onPress={onClose} hitSlop={8}>
@@ -214,6 +214,8 @@ export function AddTransactionModal({
           </View>
 
           <ScrollView
+            ref={sheetScrollRef}
+            onTouchEnd={sheetOnTouchEnd}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={{ paddingBottom: 100 }}
@@ -343,7 +345,7 @@ export function AddTransactionModal({
                 <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>DEPARTMENT</Text>
                 <View style={styles.chips}>
                   {resolvedDepts.length === 0 ? (
-                    <Text style={{ color: colors.mutedForeground, fontSize: 12.5, fontStyle: "italic", marginVertical: 4 }}>
+                    <Text style={{ color: colors.mutedForeground, fontSize: 13, fontStyle: "italic", marginVertical: 4 }}>
                       No departments created yet. Tap "+ Add Department" below to register one.
                     </Text>
                   ) : (
@@ -482,7 +484,7 @@ export function AddTransactionModal({
                 {selectedDeptMetric?.hasBudget ? (
                   <View>
                     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-                      <Text style={{ fontSize: 10, fontWeight: "700", color: colors.mutedForeground, letterSpacing: 0.5 }}>
+                      <Text style={{ fontSize: 11, fontWeight: "700", color: colors.mutedForeground, letterSpacing: 0.5 }}>
                         DEPARTMENT BUDGET
                       </Text>
                       <Text
@@ -499,19 +501,19 @@ export function AddTransactionModal({
                     </View>
                     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                       <View>
-                        <Text style={{ fontSize: 9, color: colors.mutedForeground }}>Allocated</Text>
+                        <Text style={{ fontSize: 10, color: colors.mutedForeground }}>Allocated</Text>
                         <Text style={{ fontSize: 12, fontWeight: "600", color: colors.foreground }}>
                           {settings.currency} {selectedDeptMetric.allocated.toLocaleString()}
                         </Text>
                       </View>
                       <View>
-                        <Text style={{ fontSize: 9, color: colors.mutedForeground }}>Spent</Text>
+                        <Text style={{ fontSize: 10, color: colors.mutedForeground }}>Spent</Text>
                         <Text style={{ fontSize: 12, fontWeight: "600", color: colors.foreground }}>
                           {settings.currency} {selectedDeptMetric.spent.toLocaleString()}
                         </Text>
                       </View>
                       <View>
-                        <Text style={{ fontSize: 9, color: colors.mutedForeground }}>Remaining</Text>
+                        <Text style={{ fontSize: 10, color: colors.mutedForeground }}>Remaining</Text>
                         <Text
                           style={{
                             fontSize: 12,
@@ -676,7 +678,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   title: {
-    fontSize: 17,
+    fontSize: 18,
     fontFamily: "Inter_700Bold",
   },
   sectionLabel: {

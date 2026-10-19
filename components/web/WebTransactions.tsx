@@ -334,7 +334,7 @@ export function WebTransactions() {
         </View>
       ) : (
         <View style={[styles.tableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <ScrollView horizontal contentContainerStyle={{ minWidth: "100%" }} showsHorizontalScrollIndicator={true}>
+          <ScrollView horizontal contentContainerStyle={{ width: "100%" }} showsHorizontalScrollIndicator={true}>
             <View style={{ minWidth: 700, width: "100%" }}>
               {/* Table Header */}
               <View style={[styles.tableHeader, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
@@ -402,7 +402,7 @@ export function WebTransactions() {
                 filteredTransactions.map((tx) => (
                   <View key={tx.id} style={[styles.tableRow, { borderBottomColor: colors.border }]}>
                     <View style={[styles.tdCol, { width: 92, paddingLeft: 14, paddingRight: 4 }]}>
-                      <Text style={[styles.dateText, { color: colors.foreground }]} numberOfLines={1}>{tx.date}</Text>
+                      <Text style={[styles.dateText, { color: colors.foreground }]}>{tx.date}</Text>
                     </View>
 
                     <View style={[styles.tdCol, { width: 80, paddingHorizontal: 4, alignItems: "flex-start", justifyContent: "center" }]}>
@@ -427,7 +427,7 @@ export function WebTransactions() {
                     </View>
 
                     <View style={[styles.tdCol, { width: 105, paddingHorizontal: 4 }]}>
-                      <Text style={[styles.deptText, { color: colors.foreground }]} numberOfLines={1}>
+                      <Text style={[styles.deptText, { color: colors.foreground }]}>
                         {tx.category}
                       </Text>
                     </View>
@@ -436,13 +436,13 @@ export function WebTransactions() {
                       <Text style={[styles.descText, { color: colors.foreground }]}>
                         {tx.description || "No description provided"}
                       </Text>
-                      <Text style={[styles.refText, { color: colors.mutedForeground }]} numberOfLines={1}>
+                      <Text style={[styles.refText, { color: colors.mutedForeground }]}>
                         {tx.referenceNumber || `TXN-${tx.id.slice(-6).toUpperCase()}`}
                       </Text>
                     </View>
 
                     <View style={[styles.tdCol, { width: 130, paddingHorizontal: 4 }]}>
-                      <Text style={[styles.deptText, { color: colors.foreground }]} numberOfLines={1}>
+                      <Text style={[styles.deptText, { color: colors.foreground }]}>
                         {tx.department}
                       </Text>
                     </View>
@@ -453,7 +453,6 @@ export function WebTransactions() {
                           styles.amountText,
                           { color: tx.type === "income" ? "#10B981" : "#F43F5E", textAlign: "right" },
                         ]}
-                        numberOfLines={1}
                       >
                         {tx.type === "income" ? "+" : "-"}
                         {settings.currency} {tx.amount.toLocaleString()}

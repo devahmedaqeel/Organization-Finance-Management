@@ -76,6 +76,16 @@ const testSuites = [
     cmd: "npx",
     args: ["-y", "tsx", "-r", "./services/__tests__/mockReactNative.js", "services/__tests__/offlineFirstSync.test.ts"],
   },
+  {
+    name: "14. Authoritative Payroll Calculation Engine & Payslip Suite",
+    cmd: "npx",
+    args: ["-y", "tsx", "services/__tests__/payrollCalculationEngine.test.ts"],
+  },
+  {
+    name: "15. Payslip Template Management, Logo & Rendering Suite",
+    cmd: "npx",
+    args: ["-y", "tsx", "--test", "services/__tests__/payslipTemplates.test.ts"],
+  },
 ];
 
 console.log("\n=======================================================");

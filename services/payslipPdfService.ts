@@ -1,7 +1,7 @@
 import { Platform, Share } from "react-native";
 import * as FileSystem from "expo-file-system/legacy";
 import { PayrollEntry } from "@/context/FinanceContext";
-import { safeBinaryToBase64 } from "./pdfDownloadService";
+import { safeBinaryToBase64 } from "@/utils/base64";
 
 export interface OrganizationInfo {
   name: string;
@@ -156,149 +156,239 @@ export function buildPayslipPdfBinary(
     "/F1 10 Tf 0.20 0.25 0.35 rg",
     `0 -12 Td (${escapePdfText(payslip.month || "2026-08")} · ${escapePdfText(dateStr)}) Tj`,
     "ET",
+  ];
 
-    // ─── 3. EARNINGS & ALLOWANCES TABLE ───
+  // Prepare allowances and deductions lists
+  const allowancesList: { name: string; category: string; amount: number }[] = [];
+  const srcAllowances = payslip.customAllowances || payslip.itemizedEarnings || [];
+  if (Array.isArray(srcAllowances) && srcAllowances.length > 0) {
+    srcAllowances.forEach((a: any) => {
+      if (/^(basic|0001|bp)$/i.test(a.code || "") || /basic/i.test(a.name || "")) return;
+      allowancesList.push({
+        name: a.name || a.label || "Allowance",
+        category: a.category || "Custom Allowance",
+        amount: Number(a.amount ?? a.calculatedAmount ?? 0),
+      });
+    });
+  } else if (bonus > 0) {
+    allowancesList.push({
+      name: "Performance Bonus & Incentives",
+      category: "Variable Allowance",
+      amount: bonus,
+    });
+  }
+
+  const deductionsList: { name: string; category: string; amount: number }[] = [];
+  const srcDeductions = payslip.customDeductions || payslip.itemizedDeductions || [];
+  if (Array.isArray(srcDeductions) && srcDeductions.length > 0) {
+    srcDeductions.forEach((d: any) => {
+      deductionsList.push({
+        name: d.name || d.label || "Deduction",
+        category: d.category || "Custom Deduction",
+        amount: Number(d.amount ?? d.calculatedAmount ?? 0),
+      });
+    });
+  } else if (deductions > 0) {
+    deductionsList.push({
+      name: "Income Tax, Provident Fund & Deductions",
+      category: "Statutory Withholding",
+      amount: deductions,
+    });
+  }
+
+  // ─── 3. EARNINGS & ALLOWANCES TABLE ───
+  let currentY = 584;
+  streamLines.push(
     "BT",
     "/F2 10.5 Tf 0.48 0.23 0.88 rg",
-    "40 584 Td (EARNINGS & ALLOWANCES) Tj",
-    "ET",
+    `40 ${currentY} Td (EARNINGS & ALLOWANCES) Tj`,
+    "ET"
+  );
+  currentY -= 26;
 
-    // Header row
+  // Header row
+  streamLines.push(
     "0.93 0.95 0.98 rg",
-    "40 556 515.28 20 re f",
+    `40 ${currentY} 515.28 20 re f`,
     "BT",
     "/F2 8.5 Tf 0.25 0.30 0.40 rg",
-    "52 562 Td (DESCRIPTION / ITEM) Tj",
+    `52 ${currentY + 6} Td (DESCRIPTION / ITEM) Tj`,
     "268 0 Td (CATEGORY) Tj",
     "125 0 Td (AMOUNT (" + escapePdfText(currency) + ")) Tj",
-    "ET",
+    "ET"
+  );
+  currentY -= 22;
 
-    // Row 1: Basic
+  // Row 1: Basic
+  streamLines.push(
     "0.90 0.92 0.95 RG",
-    "40 534 515.28 0.5 re S",
+    `40 ${currentY + 14} 515.28 0.5 re S`,
     "BT",
     "/F1 9.5 Tf 0.10 0.15 0.25 rg",
-    "52 540 Td (Basic Remuneration / Salary) Tj",
+    `52 ${currentY + 6} Td (Basic Remuneration / Salary) Tj`,
     "/F1 9 Tf 0.45 0.50 0.60 rg",
     "268 0 Td (Fixed Compensation) Tj",
     "/F2 10 Tf 0.10 0.15 0.25 rg",
     `125 0 Td (+${escapePdfText(formatCurrency(baseSalary, currency))}) Tj`,
-    "ET",
+    "ET"
+  );
+  currentY -= 22;
 
-    // Row 2: Bonus
-    "0.90 0.92 0.95 RG",
-    "40 512 515.28 0.5 re S",
-    "BT",
-    "/F1 9.5 Tf 0.10 0.15 0.25 rg",
-    "52 518 Td (Performance Bonus & Incentives) Tj",
-    "/F1 9 Tf 0.45 0.50 0.60 rg",
-    "268 0 Td (Variable Allowance) Tj",
-    "/F2 10 Tf 0.06 0.72 0.50 rg",
-    `125 0 Td (+${escapePdfText(formatCurrency(bonus, currency))}) Tj`,
-    "ET",
+  // Dynamic allowance rows
+  for (const alw of allowancesList) {
+    streamLines.push(
+      "0.90 0.92 0.95 RG",
+      `40 ${currentY + 14} 515.28 0.5 re S`,
+      "BT",
+      "/F1 9.5 Tf 0.10 0.15 0.25 rg",
+      `52 ${currentY + 6} Td (${escapePdfText(alw.name)}) Tj`,
+      "/F1 9 Tf 0.45 0.50 0.60 rg",
+      `268 0 Td (${escapePdfText(alw.category)}) Tj`,
+      "/F2 10 Tf 0.06 0.72 0.50 rg",
+      `125 0 Td (+${escapePdfText(formatCurrency(alw.amount, currency))}) Tj`,
+      "ET"
+    );
+    currentY -= 22;
+  }
 
-    // Total Gross Row
+  const calculatedGross = baseSalary + allowancesList.reduce((s, a) => s + a.amount, 0);
+
+  // Total Gross Row
+  streamLines.push(
     "0.96 0.97 0.99 rg",
-    "40 490 515.28 20 re f",
+    `40 ${currentY} 515.28 20 re f`,
     "BT",
     "/F2 9.5 Tf 0.10 0.15 0.25 rg",
-    "52 496 Td (Total Gross Remuneration) Tj",
+    `52 ${currentY + 6} Td (Total Gross Remuneration) Tj`,
     "/F2 10.5 Tf 0.06 0.72 0.50 rg",
-    `393 0 Td (+${escapePdfText(formatCurrency(baseSalary + bonus, currency))}) Tj`,
-    "ET",
+    `393 0 Td (+${escapePdfText(formatCurrency(calculatedGross, currency))}) Tj`,
+    "ET"
+  );
+  currentY -= 26;
 
-    // ─── 4. DEDUCTIONS & STATUTORY WITHHOLDINGS TABLE ───
+  // ─── 4. DEDUCTIONS & STATUTORY WITHHOLDINGS TABLE ───
+  streamLines.push(
     "BT",
     "/F2 10.5 Tf 0.95 0.24 0.37 rg",
-    "40 464 Td (DEDUCTIONS & STATUTORY WITHHOLDINGS) Tj",
-    "ET",
+    `40 ${currentY} Td (DEDUCTIONS & STATUTORY WITHHOLDINGS) Tj`,
+    "ET"
+  );
+  currentY -= 26;
 
-    // Header row
+  // Header row
+  streamLines.push(
     "0.93 0.95 0.98 rg",
-    "40 436 515.28 20 re f",
+    `40 ${currentY} 515.28 20 re f`,
     "BT",
     "/F2 8.5 Tf 0.25 0.30 0.40 rg",
-    "52 442 Td (DEDUCTION ITEM) Tj",
+    `52 ${currentY + 6} Td (DEDUCTION ITEM) Tj`,
     "268 0 Td (TYPE) Tj",
     "125 0 Td (AMOUNT (" + escapePdfText(currency) + ")) Tj",
-    "ET",
+    "ET"
+  );
+  currentY -= 22;
 
-    // Row 1: Tax / Deductions
-    "0.90 0.92 0.95 RG",
-    "40 414 515.28 0.5 re S",
-    "BT",
-    "/F1 9.5 Tf 0.10 0.15 0.25 rg",
-    "52 420 Td (Income Tax, Provident Fund & Deductions) Tj",
-    "/F1 9 Tf 0.45 0.50 0.60 rg",
-    "268 0 Td (Statutory Withholding) Tj",
-    "/F2 10 Tf 0.95 0.24 0.37 rg",
-    `125 0 Td (-${escapePdfText(formatCurrency(deductions, currency))}) Tj`,
-    "ET",
+  if (deductionsList.length === 0) {
+    streamLines.push(
+      "0.90 0.92 0.95 RG",
+      `40 ${currentY + 14} 515.28 0.5 re S`,
+      "BT",
+      "/F1 9 Tf 0.55 0.60 0.70 rg",
+      `52 ${currentY + 6} Td (No deductions or tax withholdings applied) Tj`,
+      "/F1 9 Tf 0.55 0.60 0.70 rg",
+      "268 0 Td (None) Tj",
+      "/F2 10 Tf 0.55 0.60 0.70 rg",
+      `125 0 Td (${escapePdfText(formatCurrency(0, currency))}) Tj`,
+      "ET"
+    );
+    currentY -= 22;
+  } else {
+    for (const ded of deductionsList) {
+      streamLines.push(
+        "0.90 0.92 0.95 RG",
+        `40 ${currentY + 14} 515.28 0.5 re S`,
+        "BT",
+        "/F1 9.5 Tf 0.10 0.15 0.25 rg",
+        `52 ${currentY + 6} Td (${escapePdfText(ded.name)}) Tj`,
+        "/F1 9 Tf 0.45 0.50 0.60 rg",
+        `268 0 Td (${escapePdfText(ded.category)}) Tj`,
+        "/F2 10 Tf 0.95 0.24 0.37 rg",
+        `125 0 Td (-${escapePdfText(formatCurrency(ded.amount, currency))}) Tj`,
+        "ET"
+      );
+      currentY -= 22;
+    }
+  }
 
-    // Total Deductions Row
+  const calculatedDeductions = deductionsList.reduce((s, d) => s + d.amount, 0);
+
+  // Total Deductions Row
+  streamLines.push(
     "0.96 0.97 0.99 rg",
-    "40 392 515.28 20 re f",
+    `40 ${currentY} 515.28 20 re f`,
     "BT",
     "/F2 9.5 Tf 0.10 0.15 0.25 rg",
-    "52 398 Td (Total Deductions & Withholdings) Tj",
+    `52 ${currentY + 6} Td (Total Deductions & Withholdings) Tj`,
     "/F2 10.5 Tf 0.95 0.24 0.37 rg",
-    `393 0 Td (-${escapePdfText(formatCurrency(deductions, currency))}) Tj`,
-    "ET",
+    `393 0 Td (-${escapePdfText(formatCurrency(calculatedDeductions, currency))}) Tj`,
+    "ET"
+  );
+  currentY -= 26;
 
-    // ─── 5. NET SALARY PAYABLE CARD ───
+  // ─── 5. NET SALARY PAYABLE CARD ───
+  streamLines.push(
     "0.48 0.23 0.88 rg",
-    "40 315 515.28 64 re f",
+    `40 ${currentY - 44} 515.28 64 re f`,
     "BT",
     "/F2 9.5 Tf 0.92 0.88 1.0 rg",
-    "56 357 Td (NET SALARY PAYABLE (TAKE-HOME DISBURSAL)) Tj",
+    `56 ${currentY - 2} Td (NET SALARY PAYABLE (TAKE-HOME DISBURSAL)) Tj`,
     "/F1 8.5 Tf 0.85 0.80 0.98 rg",
     "0 -13 Td (Direct institutional bank deposit verified and credited to employee account.) Tj",
     "/F1 8 Tf 0.75 0.70 0.95 rg",
     "0 -12 Td (Official digital payroll record generated securely via OFM Cloud Portal.) Tj",
     "ET",
-
-    // Net Amount in large bold text
     "BT",
     "/F2 18 Tf 1 1 1 rg",
-    `345 342 Td (${escapePdfText(formatCurrency(netSalary, currency))}) Tj`,
-    "ET",
+    `345 ${currentY - 17} Td (${escapePdfText(formatCurrency(netSalary, currency))}) Tj`,
+    "ET"
+  );
+  currentY -= 68;
 
-    // ─── 6. SIGNATURES & VERIFICATION ───
+  // ─── 6. SIGNATURES & VERIFICATION ───
+  streamLines.push(
     "0.82 0.85 0.90 RG",
-    "40 278 515.28 0.8 re S",
-
-    // Employee Signature Box
+    `40 ${currentY} 515.28 0.8 re S`,
     "0.25 0.30 0.40 RG",
-    "60 215 150 1 re S",
+    `60 ${currentY - 45} 150 1 re S`,
     "BT",
     "/F2 9 Tf 0.15 0.20 0.30 rg",
-    `60 200 Td (${escapePdfText(payslip.employeeName)}) Tj`,
+    `60 ${currentY - 60} Td (${escapePdfText(payslip.employeeName)}) Tj`,
     "/F1 8 Tf 0.50 0.55 0.65 rg",
     "0 -12 Td (Employee Acknowledgment) Tj",
     "ET",
-
-    // Officer Signature Box
     "0.25 0.30 0.40 RG",
-    "380 215 150 1 re S",
+    `380 ${currentY - 45} 150 1 re S`,
     "BT",
     "/F2 9 Tf 0.15 0.20 0.30 rg",
-    "380 200 Td (Chief Financial Officer) Tj",
+    `380 ${currentY - 60} Td (Chief Financial Officer) Tj`,
     "/F1 8 Tf 0.50 0.55 0.65 rg",
     `0 -12 Td (Authorized Signatory · ${escapePdfText(orgName)}) Tj`,
-    "ET",
+    "ET"
+  );
+  currentY -= 90;
 
-    // ─── 7. FOOTER ───
+  // ─── 7. FOOTER ───
+  streamLines.push(
     "0.88 0.90 0.94 RG",
-    "40 145 515.28 0.5 re S",
+    `40 ${currentY} 515.28 0.5 re S`,
     "BT",
     "/F1 8 Tf 0.55 0.60 0.70 rg",
-    `50 130 Td (Confidential Document · Generated by Organization Finance Management on ${escapePdfText(`${dateStr} at ${timeStr}`)}) Tj`,
+    `50 ${currentY - 15} Td (Confidential Document · Generated by Organization Finance Management on ${escapePdfText(`${dateStr} at ${timeStr}`)}) Tj`,
     "/F2 7.5 Tf 0.06 0.72 0.50 rg",
-    `50 116 Td (${escapePdfText(verificationCode)}) Tj`,
+    `50 ${currentY - 29} Td (${escapePdfText(verificationCode)}) Tj`,
     "ET",
-
-    "Q",
-  ];
+    "Q"
+  );
 
   const streamContent = streamLines.join("\n");
   const streamLength = typeof TextEncoder !== "undefined" ? new TextEncoder().encode(streamContent).length : streamContent.length;

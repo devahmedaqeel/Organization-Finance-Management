@@ -2,6 +2,8 @@
 import React from "react";
 import {
   SvgSun,
+  SvgSunrise,
+  SvgSunset,
   SvgMoon,
   SvgMail,
   SvgLock,
@@ -197,6 +199,10 @@ export function UniversalFeather({ name, size = 16, color = "#94A3B8" }: Univers
       return <SvgSun size={size} color={color} />;
     case "moon":
       return <SvgMoon size={size} color={color} />;
+    case "sunrise":
+      return <SvgSunrise size={size} color={color} />;
+    case "sunset":
+      return <SvgSunset size={size} color={color} />;
     case "lock":
       return <SvgLock size={size} color={color} />;
     case "mail":

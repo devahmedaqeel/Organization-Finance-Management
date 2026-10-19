@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   StyleSheet,
   Text,
@@ -27,7 +27,33 @@ import {
   SvgGrid,
   SvgEye,
   SvgEyeOff,
+  SvgTrendingUp,
+  SvgPieChart,
+  SvgUsers,
 } from "./SvgIcons";
+import { AuthIllustration } from "./AuthIllustration";
+import { injectWebMicroAnimations } from "./animations/webStyles";
+
+// RN-Web maps `dataSet` to data-* attributes; webStyles.ts styles these (glass, glow, motion)
+const ofm = (key: string) => ({ dataSet: { [key]: "" } } as any);
+
+// Fixed dark "glass" palette for the sign-in screen (independent of the in-app light/dark theme)
+const AUTH_GLASS = {
+  background: "#060D1F",
+  foreground: "#F8FAFC",
+  mutedForeground: "rgba(203, 213, 225, 0.78)",
+  border: "rgba(255, 255, 255, 0.14)",
+  card: "rgba(15, 23, 42, 0.55)",
+  cardAlt: "rgba(255, 255, 255, 0.05)",
+  muted: "rgba(255, 255, 255, 0.05)",
+  input: "rgba(255, 255, 255, 0.06)",
+};
+
+const AUTH_FEATURES = [
+  { title: "Real-time ledger", desc: "Income, expenses and budgets synced across web and mobile.", color: "#38BDF8", icon: "trend" },
+  { title: "Budget control", desc: "Department ceilings with live utilisation alerts.", color: "#A78BFA", icon: "pie" },
+  { title: "Payroll & payslips", desc: "Salary runs, deductions and verified payslips.", color: "#34D399", icon: "users" },
+] as const;
 
 const ROLE_OPTIONS: { role: UserRole; title: string; desc: string; badge: string; color: string }[] = [
   {
@@ -62,9 +88,14 @@ const ROLE_OPTIONS: { role: UserRole; title: string; desc: string; badge: string
 
 
 export function WebAuth() {
-  const colors = useColors();
+  const colors = { ...useColors(), ...AUTH_GLASS };
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
+  const showHero = width >= 1024;
+
+  useEffect(() => {
+    injectWebMicroAnimations();
+  }, []);
 
   const { login, signUp, loginWithGoogle, forgotPassword } = useAuth();
 
@@ -208,10 +239,63 @@ export function WebAuth() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+    <View style={[styles.container, { backgroundColor: colors.background }]} {...ofm("ofmAuth")}>
+      {/* Ambient gradient backdrop with soft moving glows */}
+      <View style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]} {...ofm("ofmAuthBg")}>
+        <View {...ofm("ofmOrbA")} />
+        <View {...ofm("ofmOrbB")} />
+        <View {...ofm("ofmOrbC")} />
+        <View {...ofm("ofmAuthGrid")} />
+      </View>
+
+      <ScrollView contentContainerStyle={[styles.scrollContent, isMobile && { padding: 16 }]} showsVerticalScrollIndicator={false}>
+        <View style={[styles.splitRow, !showHero && { justifyContent: "center" }]}>
+        {/* Showcase panel (desktop) */}
+        {showHero && (
+          <View style={styles.heroPanel} {...ofm("ofmAuthHero")}>
+            <View style={[styles.heroPill, { borderColor: colors.border }]} {...ofm("ofmGlass")}>
+              <View style={styles.heroPillDot} {...ofm("ofmLiveDot")} />
+              <Text style={styles.heroPillText}>Live cloud sync · Web & Mobile</Text>
+            </View>
+            <Text style={styles.heroTitle}>
+              Finance operations,{"\n"}
+              <Text style={styles.heroTitleAccent}>clear and in control.</Text>
+            </Text>
+            <Text style={styles.heroSubtitle}>
+              One secure workspace for your organization's ledger, budgets, payroll and audit-ready reports.
+            </Text>
+
+            <View {...ofm("ofmFloat")} style={{ marginVertical: 8 }}>
+              <AuthIllustration width={Math.min(480, width * 0.36)} />
+            </View>
+
+            <View style={styles.featureList}>
+              {AUTH_FEATURES.map((f) => (
+                <View key={f.title} style={[styles.featureRow, { borderColor: colors.border }]} {...ofm("ofmGlass")}>
+                  <View style={[styles.featureIcon, { backgroundColor: f.color + "22", borderColor: f.color + "55" }]}>
+                    {f.icon === "trend" ? (
+                      <SvgTrendingUp size={16} color={f.color} />
+                    ) : f.icon === "pie" ? (
+                      <SvgPieChart size={16} color={f.color} />
+                    ) : (
+                      <SvgUsers size={16} color={f.color} />
+                    )}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.featureTitle}>{f.title}</Text>
+                    <Text style={styles.featureDesc}>{f.desc}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
         {/* Main Auth Card */}
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, isMobile && { padding: 18, width: "100%" }]}>
+        <View
+          {...ofm("ofmAuthCard")}
+          style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, isMobile && { padding: 20, width: "100%" }]}
+        >
           {/* Header Brand */}
           <View style={styles.brandRow}>
             <View style={[styles.logoWrap, { backgroundColor: "transparent", borderWidth: 0, padding: 0 }]}>
@@ -238,6 +322,7 @@ export function WebAuth() {
           <View style={[styles.modeTabs, { backgroundColor: colors.cardAlt ?? colors.muted, borderColor: colors.border }]}>
             <TouchableOpacity
               style={[styles.modeTabBtn, mode === "login" && [styles.modeTabBtnActive, { backgroundColor: colors.primary }]]}
+              {...(mode === "login" ? ofm("ofmGradientBtn") : {})}
               onPress={() => {
                 setMode("login");
                 setError("");
@@ -252,6 +337,7 @@ export function WebAuth() {
 
             <TouchableOpacity
               style={[styles.modeTabBtn, mode === "signup" && [styles.modeTabBtnActive, { backgroundColor: colors.primary }]]}
+              {...(mode === "signup" ? ofm("ofmGradientBtn") : {})}
               onPress={() => {
                 setMode("signup");
                 setError("");
@@ -429,6 +515,7 @@ export function WebAuth() {
 
             {/* Primary Action Button */}
             <TouchableOpacity
+              {...ofm("ofmGradientBtn")}
               style={[styles.submitBtn, { backgroundColor: colors.primary }]}
               onPress={mode === "login" ? () => handleLogin() : handleSignUp}
               disabled={loading}
@@ -451,22 +538,29 @@ export function WebAuth() {
             </View>
 
             <TouchableOpacity
-              style={[styles.googleBtn, { backgroundColor: colors.cardAlt ?? colors.muted, borderColor: colors.border }]}
+              style={[styles.googleBtn, { backgroundColor: "#FFFFFF", borderColor: "#FFFFFF" }]}
               onPress={handleGoogleAuth}
               disabled={loading}
               activeOpacity={0.8}
             >
               <SvgGoogle size={18} />
-              <Text style={[styles.googleBtnText, { color: colors.foreground }]}>Sign in with Google</Text>
+              <Text style={[styles.googleBtnText, { color: "#0F172A" }]}>Sign in with Google</Text>
             </TouchableOpacity>
           </View>
+          <View style={styles.cardFooter}>
+            <SvgShield size={12} color={colors.mutedForeground} />
+            <Text style={[styles.cardFooterText, { color: colors.mutedForeground }]}>
+              Encrypted sign-in · Role-based access
+            </Text>
+          </View>
+        </View>
         </View>
       </ScrollView>
 
       {/* Forgot Password Modal */}
       <Modal visible={forgotModal} transparent animationType="fade" onRequestClose={() => setForgotModal(false)}>
-        <View style={styles.modalBackdrop}>
-          <View style={[styles.forgotCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={styles.modalBackdrop} {...ofm("ofmAuth")}>
+          <View {...ofm("ofmGlass")} style={[styles.forgotCard, { backgroundColor: "rgba(15, 23, 42, 0.82)", borderColor: colors.border }]}>
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
               <Text style={[styles.forgotTitle, { color: colors.foreground }]}>Reset Password</Text>
               <TouchableOpacity onPress={() => setForgotModal(false)}>
@@ -506,6 +600,7 @@ export function WebAuth() {
             </View>
 
             <TouchableOpacity
+              {...ofm("ofmGradientBtn")}
               style={[styles.submitBtn, { backgroundColor: colors.primary, marginTop: 12 }]}
               onPress={handleForgotSubmit}
               disabled={forgotLoading}
@@ -528,8 +623,23 @@ export function WebAuth() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, minHeight: "100%" },
-  scrollContent: { flexGrow: 1, alignItems: "center", justifyContent: "center", padding: 24 },
-  card: { width: "100%", maxWidth: 520, borderRadius: 24, borderWidth: 1, padding: 32, gap: 18, elevation: 8, shadowColor: "#000", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.12, shadowRadius: 24 },
+  scrollContent: { flexGrow: 1, alignItems: "center", justifyContent: "center", padding: 32 },
+  splitRow: { width: "100%", maxWidth: 1180, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 56 },
+  heroPanel: { flex: 1, maxWidth: 560, gap: 18 },
+  heroPill: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, borderWidth: 1, backgroundColor: "rgba(255, 255, 255, 0.06)" },
+  heroPillDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#34D399" },
+  heroPillText: { color: "rgba(226, 232, 240, 0.9)", fontSize: 12, fontFamily: "Inter_600SemiBold", letterSpacing: 0.2 },
+  heroTitle: { color: "#F8FAFC", fontSize: 40, lineHeight: 48, fontFamily: "Inter_800ExtraBold", letterSpacing: -1 },
+  heroTitleAccent: { color: "#7DD3FC" },
+  heroSubtitle: { color: "rgba(203, 213, 225, 0.82)", fontSize: 15.5, lineHeight: 24, fontFamily: "Inter_400Regular", maxWidth: 500 },
+  featureList: { gap: 10 },
+  featureRow: { flexDirection: "row", alignItems: "center", gap: 14, padding: 14, borderRadius: 16, borderWidth: 1, backgroundColor: "rgba(255, 255, 255, 0.05)" },
+  featureIcon: { width: 36, height: 36, borderRadius: 11, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  featureTitle: { color: "#F8FAFC", fontSize: 13.5, fontFamily: "Inter_700Bold" },
+  featureDesc: { color: "rgba(203, 213, 225, 0.75)", fontSize: 12, lineHeight: 17, marginTop: 1 },
+  card: { width: "100%", maxWidth: 480, borderRadius: 26, borderWidth: 1, padding: 32, gap: 18 },
+  cardFooter: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: -2 },
+  cardFooterText: { fontSize: 11, fontFamily: "Inter_500Medium", letterSpacing: 0.2 },
   brandRow: { flexDirection: "row", alignItems: "center", gap: 14 },
   logoWrap: { width: 48, height: 48, borderRadius: 14, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   brandTitle: { fontSize: 22, fontFamily: "Inter_800ExtraBold", letterSpacing: 0.2 },
@@ -538,7 +648,7 @@ const styles = StyleSheet.create({
   brandSubtitle: { fontSize: 12.5, fontFamily: "Inter_500Medium", marginTop: 2 },
   modeTabs: { flexDirection: "row", padding: 4, borderRadius: 14, borderWidth: 1, gap: 4 },
   modeTabBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, borderRadius: 10 },
-  modeTabBtnActive: { elevation: 2, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 4 },
+  modeTabBtnActive: {},
   modeTabText: { fontSize: 13, fontFamily: "Inter_700Bold" },
   alertBanner: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: 12, borderWidth: 1 },
   alertText: { fontSize: 12.5, fontFamily: "Inter_500Medium", flex: 1 },
@@ -554,14 +664,14 @@ const styles = StyleSheet.create({
   inputLabel: { fontSize: 12.5, fontFamily: "Inter_600SemiBold" },
   inputBox: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, height: 46, borderRadius: 12, borderWidth: 1 },
   inputField: { flex: 1, fontSize: 13.5, fontFamily: "Inter_500Medium" },
-  submitBtn: { height: 46, borderRadius: 12, alignItems: "center", justifyContent: "center", elevation: 2, shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 4 },
+  submitBtn: { height: 48, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   submitBtnText: { color: "#FFFFFF", fontSize: 14, fontFamily: "Inter_700Bold" },
   dividerRow: { flexDirection: "row", alignItems: "center", gap: 10, marginVertical: 6 },
   dividerLine: { flex: 1, height: 1 },
   dividerText: { fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 0.7 },
   googleBtn: { height: 46, borderRadius: 12, borderWidth: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10 },
   googleBtnText: { fontSize: 13.5, fontFamily: "Inter_600SemiBold" },
-  modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.65)", alignItems: "center", justifyContent: "center", padding: 20 },
+  modalBackdrop: { flex: 1, backgroundColor: "rgba(2, 6, 23, 0.6)", alignItems: "center", justifyContent: "center", padding: 20 },
   forgotCard: { width: "100%", maxWidth: 440, borderRadius: 20, borderWidth: 1, padding: 26, gap: 10, elevation: 8 },
   forgotTitle: { fontSize: 18, fontFamily: "Inter_700Bold" },
 });

@@ -34,6 +34,31 @@ export default function RootHtml({ children }: PropsWithChildren) {
           onLoad="this.media='all'"
         />
 
+        {/* Firestore's webchannel transport calls AbortController.abort() with no reason when it recycles
+            its stream; the cancelled fetch then surfaces as an uncaught "signal is aborted without reason"
+            error (Firestore reconnects on its own). Swallow only that Firebase-originated case so the dev
+            overlay / console stay clean — must run before the app bundle registers its own handlers. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function () {
+  function isFirebaseAbort(err) {
+    if (!err) return false;
+    var msg = String(err.message || err);
+    // Exact browser message for abort() called with no reason — only Firebase's webchannel leaves this
+    // unhandled (the app's own aborts are caught). Raw stacks only show "entry.bundle", so don't rely on them.
+    if (/signal is aborted without reason/i.test(msg)) return true;
+    return err.name === "AbortError" && /webchannel|firestore|@firebase/i.test(String(err.stack || ""));
+  }
+  window.addEventListener("unhandledrejection", function (e) {
+    if (isFirebaseAbort(e.reason)) { e.preventDefault(); e.stopImmediatePropagation(); }
+  }, true);
+  window.addEventListener("error", function (e) {
+    if (isFirebaseAbort(e.error || { message: e.message })) { e.preventDefault(); e.stopImmediatePropagation(); }
+  }, true);
+})();`,
+          }}
+        />
+
         <ScrollViewStyleReset />
         <style dangerouslySetInnerHTML={{ __html: `
           /* Universal Global Typography & Sans-Serif Reset */

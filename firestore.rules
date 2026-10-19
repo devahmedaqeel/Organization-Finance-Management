@@ -41,6 +41,70 @@ service cloud.firestore {
       allow write: if isAuthenticated();
     }
 
+    // 5a. Salary Components
+    match /salaryComponents/{componentId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // 5b. Employee Salary Profiles
+    match /employeeSalaryProfiles/{profileId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // 5c. Employee Loans & Repayments
+    match /employeeLoans/{loanId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    match /loanRepayments/{repaymentId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // 5d. Payroll Periods & Processing
+    match /payrollPeriods/{periodId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // 5e. Payslip Templates (presentation only — never contain payroll amounts or logo images)
+    function callerProfile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    function isOrgMember(orgId) {
+      return isAuthenticated() && callerProfile().organizationId == orgId;
+    }
+    function hasRole(roles) {
+      return callerProfile().role in roles;
+    }
+
+    match /payslipTemplates/{templateId} {
+      allow read: if isOrgMember(resource.data.organizationId);
+      allow create: if isOrgMember(request.resource.data.organizationId)
+        && hasRole(['admin', 'accountant'])
+        // Custom templates use their own id; built-in customizations use the org-prefixed override id.
+        && (request.resource.data.isBuiltInOverride == true
+              ? (request.resource.data.builtInKey in ['government', 'corporate']
+                 && templateId.matches('.*__builtin_' + request.resource.data.builtInKey))
+              : (templateId == request.resource.data.id && templateId.matches('tpl_.*')));
+      allow update: if isOrgMember(resource.data.organizationId)
+        && hasRole(['admin', 'accountant'])
+        && request.resource.data.organizationId == resource.data.organizationId
+        && request.resource.data.isBuiltInOverride == resource.data.isBuiltInOverride;
+      allow delete: if isOrgMember(resource.data.organizationId) && hasRole(['admin', 'accountant']);
+    }
+
+    // 5f. Organization-wide payslip template settings (default template) — admins only
+    match /payslipTemplateSettings/{orgId} {
+      allow read: if isOrgMember(orgId);
+      allow create, update: if isOrgMember(orgId) && hasRole(['admin'])
+        && request.resource.data.organizationId == orgId;
+      allow delete: if false;
+    }
+
     // 6. Departments & Cost Centers
     match /departments/{departmentId} {
       allow read: if true;

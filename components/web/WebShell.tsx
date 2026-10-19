@@ -118,6 +118,9 @@ import { injectWebMicroAnimations } from "./animations/webStyles";
 import { useEdgeSwipeBack } from "./navigation/useEdgeSwipeBack";
 import { EdgeSwipeVisualIndicator } from "./navigation/EdgeSwipeVisualIndicator";
 
+// RN-Web maps `dataSet` to data-* attributes; webStyles.ts targets these for hover/transition polish
+const ofm = (key: string) => ({ dataSet: { [key]: "" } } as any);
+
 export type WebTabKey =
   | "dashboard"
   | "income"
@@ -137,6 +140,7 @@ interface NavItem {
   icon: string;
   badge?: number | string;
   badgeColor?: string;
+  section: string;
   roleRestriction?: ("admin" | "accountant" | "manager" | "employee")[];
 }
 
@@ -329,17 +333,17 @@ export function WebShell() {
   const expenseCount = transactions.filter((t) => t.type === "expense").length;
 
   const NAV_ITEMS: NavItem[] = [
-    { id: "dashboard", label: user?.role === "employee" ? "Employee Portal" : "Dashboard", icon: "grid" },
-    { id: "income", label: "Income & Grants", icon: "arrow-up-right", badge: incomeCount, badgeColor: colors.income, roleRestriction: ["admin", "accountant"] },
-    { id: "expenses", label: "Expenses", icon: "arrow-down-left", badge: expenseCount, badgeColor: colors.expense, roleRestriction: ["admin", "accountant", "manager"] },
-    { id: "transactions", label: "Transactions", icon: "list", roleRestriction: ["admin", "accountant", "manager"] },
-    { id: "budgets", label: "Budget Allocations", icon: "pie-chart", badge: budgets.length, roleRestriction: ["admin", "accountant", "manager"] },
-    { id: "departments", label: "Departments", icon: "layers", badge: departments.length, roleRestriction: ["admin", "accountant", "manager"] },
-    { id: "payroll", label: user?.role === "employee" ? "My Salary Slip" : "Staff Payroll", icon: "users", badge: user?.role === "employee" ? undefined : payroll.length, roleRestriction: ["admin", "accountant", "manager", "employee"] },
-    { id: "team", label: "Team & Permissions", icon: "shield", roleRestriction: ["admin"] },
-    { id: "reports", label: "Financial Reports", icon: "file-text", roleRestriction: ["admin", "accountant", "manager"] },
-    { id: "ai-insights", label: "AI Insights", icon: "cpu", roleRestriction: ["admin", "manager"] },
-    { id: "settings", label: "Settings", icon: "settings", roleRestriction: ["admin"] },
+    { id: "dashboard", section: "Overview", label: user?.role === "employee" ? "Employee Portal" : "Dashboard", icon: "grid" },
+    { id: "income", section: "Finance", label: "Income & Grants", icon: "arrow-up-right", badge: incomeCount, roleRestriction: ["admin", "accountant"] },
+    { id: "expenses", section: "Finance", label: "Expenses", icon: "arrow-down-left", badge: expenseCount, roleRestriction: ["admin", "accountant", "manager"] },
+    { id: "transactions", section: "Finance", label: "Transactions", icon: "list", roleRestriction: ["admin", "accountant", "manager"] },
+    { id: "budgets", section: "Finance", label: "Budget Allocations", icon: "pie-chart", badge: budgets.length, roleRestriction: ["admin", "accountant", "manager"] },
+    { id: "departments", section: "Organization", label: "Departments", icon: "layers", badge: departments.length, roleRestriction: ["admin", "accountant", "manager"] },
+    { id: "payroll", section: "Organization", label: user?.role === "employee" ? "My Salary Slip" : "Staff Payroll", icon: "users", badge: user?.role === "employee" ? undefined : payroll.length, roleRestriction: ["admin", "accountant", "manager", "employee"] },
+    { id: "team", section: "Organization", label: "Team & Permissions", icon: "shield", roleRestriction: ["admin"] },
+    { id: "reports", section: "Insights", label: "Financial Reports", icon: "file-text", roleRestriction: ["admin", "accountant", "manager"] },
+    { id: "ai-insights", section: "Insights", label: "AI Insights", icon: "cpu", roleRestriction: ["admin", "manager"] },
+    { id: "settings", section: "System", label: "Settings", icon: "settings", roleRestriction: ["admin"] },
   ];
 
   const handleOpenTx = (type: "income" | "expense") => {
@@ -371,15 +375,25 @@ export function WebShell() {
 
   const renderNavLinks = (isDrawer = false) => (
     <ScrollView style={styles.navScroll} contentContainerStyle={styles.navContent} showsVerticalScrollIndicator={false}>
-      <View style={{ gap: 4 }}>
-        {NAV_ITEMS.map((item) => {
+      <View style={{ gap: 2 }}>
+        {NAV_ITEMS.filter((item) => !item.roleRestriction || (user && item.roleRestriction.includes(user.role))).map((item, idx, visible) => {
           const isActive = activeTab === item.id;
-          const isAllowed = !item.roleRestriction || (user && item.roleRestriction.includes(user.role));
-          if (!isAllowed) return null;
+          const isCollapsed = !isDrawer && sidebarCollapsed;
+          const startsSection = idx === 0 || visible[idx - 1].section !== item.section;
 
           return (
+            <React.Fragment key={item.id}>
+            {startsSection && (
+              isCollapsed ? (
+                idx > 0 && <View style={[styles.navSectionDivider, { backgroundColor: colors.border }]} />
+              ) : (
+                <Text style={[styles.navSectionLabel, { color: colors.mutedForeground }, idx === 0 && { marginTop: 2 }]}>
+                  {item.section}
+                </Text>
+              )
+            )}
             <TouchableOpacity
-              key={item.id}
+              {...ofm("ofmNav")}
               style={[
                 styles.navItem,
                 (!isDrawer && sidebarCollapsed) && {
@@ -418,11 +432,12 @@ export function WebShell() {
               )}
 
               {Boolean(item.badge) && (!isDrawer && sidebarCollapsed ? null : (
-                <View style={[styles.navBadge, { backgroundColor: item.badgeColor || colors.muted }]}>
-                  <Text style={styles.navBadgeText}>{item.badge}</Text>
+                <View style={[styles.navBadge, { backgroundColor: isActive ? colors.primary + "1F" : colors.muted }]}>
+                  <Text style={[styles.navBadgeText, { color: isActive ? colors.primary : colors.mutedForeground }]}>{item.badge}</Text>
                 </View>
               ))}
             </TouchableOpacity>
+            </React.Fragment>
           );
         })}
       </View>
@@ -430,13 +445,14 @@ export function WebShell() {
   );
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}>
+    <View style={[styles.root, { backgroundColor: colors.background }]} {...({ dataSet: { ofmAppBg: colors.isDark ? "dark" : "light" } } as any)}>
       {/* Mobile Edge Swipe Back Visual Indicator */}
       <EdgeSwipeVisualIndicator isSwiping={isSwiping} progress={swipeProgress} />
 
       {/* ─── DESKTOP / TABLET SIDEBAR ─── */}
       {!isMobile && (
         <View
+          {...ofm("ofmSidebar")}
           style={[
             styles.sidebar,
             {
@@ -488,10 +504,10 @@ export function WebShell() {
 
               {!sidebarCollapsed && (
                 <View style={{ flex: 1, minWidth: 0, paddingRight: 6 }}>
-                  <Text style={[styles.brandTitle, { color: colors.foreground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8}>
+                  <Text style={[styles.brandTitle, { color: colors.foreground }]}>
                     OFM Cloud
                   </Text>
-                  <Text style={[styles.brandSubtitle, { color: colors.mutedForeground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  <Text style={[styles.brandSubtitle, { color: colors.mutedForeground }]}>
                     {settings.organizationName || "Financial Management"}
                   </Text>
                 </View>
@@ -500,7 +516,7 @@ export function WebShell() {
 
             {!isTablet && (
               <TouchableOpacity
-                style={[styles.collapseBtn, { borderColor: colors.border }]}
+                {...ofm("ofmIconbtn")} style={[styles.collapseBtn, { borderColor: colors.border }]}
                 onPress={() => setSidebarCollapsed(!sidebarCollapsed)}
                 accessibilityLabel={sidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
                 activeOpacity={0.7}
@@ -536,7 +552,7 @@ export function WebShell() {
                   </Text>
                 </View>
                 <TouchableOpacity
-                  style={[styles.logoutBtn, { borderColor: colors.border, padding: 8, borderRadius: 8 }]}
+                  {...ofm("ofmIconbtn")} style={[styles.logoutBtn, { borderColor: colors.border, padding: 8, borderRadius: 8 }]}
                   onPress={logout}
                   accessibilityLabel="Log Out"
                   activeOpacity={0.75}
@@ -553,10 +569,10 @@ export function WebShell() {
                     </Text>
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={[styles.userName, { color: colors.foreground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8}>
+                    <Text style={[styles.userName, { color: colors.foreground }]}>
                       {user?.name || "User"}
                     </Text>
-                    <Text style={[styles.userEmail, { color: colors.primary }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
+                    <Text style={[styles.userEmail, { color: colors.primary }]}>
                       {user?.email || ""}
                     </Text>
                     <Text style={[styles.userRole, { color: colors.mutedForeground }]}>
@@ -566,7 +582,7 @@ export function WebShell() {
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.logoutBtn, { borderColor: colors.border }]}
+                  {...ofm("ofmIconbtn")} style={[styles.logoutBtn, { borderColor: colors.border }]}
                   onPress={logout}
                   accessibilityLabel="Log Out"
                   activeOpacity={0.75}
@@ -582,8 +598,8 @@ export function WebShell() {
       {/* ─── MOBILE DRAWER MODAL (<768px) ─── */}
       {isMobile && (
         <Modal visible={mobileDrawerOpen} transparent animationType="fade" onRequestClose={() => setMobileDrawerOpen(false)}>
-          <View style={styles.drawerBackdrop}>
-            <View style={[styles.drawerContent, { backgroundColor: colors.card, borderRightColor: colors.border }]}>
+          <View style={styles.drawerBackdrop} {...ofm("ofmDrawerBackdrop")}>
+            <View {...ofm("ofmDrawer")} style={[styles.drawerContent, { backgroundColor: colors.card, borderRightColor: colors.border }]}>
               {/* Drawer Brand Header */}
               <View style={[styles.brandHeader, { borderBottomColor: colors.border }]}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1 }}>
@@ -626,7 +642,7 @@ export function WebShell() {
                     </Text>
                   </View>
                 </View>
-                <TouchableOpacity style={[styles.collapseBtn, { borderColor: colors.border }]} onPress={() => setMobileDrawerOpen(false)}>
+                <TouchableOpacity {...ofm("ofmIconbtn")} style={[styles.collapseBtn, { borderColor: colors.border }]} onPress={() => setMobileDrawerOpen(false)}>
                   <SvgX size={16} color={colors.foreground} />
                 </TouchableOpacity>
               </View>
@@ -643,10 +659,10 @@ export function WebShell() {
                     </Text>
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={[styles.userName, { color: colors.foreground }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8}>
+                    <Text style={[styles.userName, { color: colors.foreground }]}>
                       {user?.name || "User"}
                     </Text>
-                    <Text style={[styles.userEmail, { color: colors.primary }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
+                    <Text style={[styles.userEmail, { color: colors.primary }]}>
                       {user?.email || ""}
                     </Text>
                     <Text style={[styles.userRole, { color: colors.mutedForeground }]}>
@@ -654,11 +670,17 @@ export function WebShell() {
                     </Text>
                   </View>
                 </View>
-                <TouchableOpacity style={[styles.logoutBtn, { borderColor: colors.border }]} onPress={logout}>
+                <TouchableOpacity {...ofm("ofmIconbtn")} style={[styles.logoutBtn, { borderColor: colors.border }]} onPress={logout}>
                   <SvgLogOut size={15} color={colors.expense} />
                 </TouchableOpacity>
               </View>
             </View>
+            <TouchableOpacity
+              style={{ flex: 1 }}
+              activeOpacity={1}
+              onPress={() => setMobileDrawerOpen(false)}
+              accessibilityLabel="Close Menu"
+            />
           </View>
         </Modal>
       )}
@@ -669,7 +691,7 @@ export function WebShell() {
         <OpenInAppBanner />
 
         {/* Top Header Bar */}
-        <View style={[styles.topBar, { backgroundColor: colors.card, borderBottomColor: colors.border }, isMobile && { paddingHorizontal: 12, height: 56 }]}>
+        <View {...ofm("ofmTopbar")} style={[styles.topBar, { backgroundColor: colors.card, borderBottomColor: colors.border }, isMobile && { paddingHorizontal: 12, height: 56 }]}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
             {/* Mobile Brand / Current Tab Title */}
             {isMobile ? (
@@ -722,10 +744,10 @@ export function WebShell() {
                   )}
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={[styles.breadcrumbCurrent, { color: colors.foreground, fontSize: 13.5 }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8}>
+                  <Text style={[styles.breadcrumbCurrent, { color: colors.foreground, fontSize: 13.5 }]}>
                     {NAV_ITEMS.find((n) => n.id === activeTab)?.label || "Overview"}
                   </Text>
-                  <Text style={{ color: colors.mutedForeground, fontSize: 9.5, fontFamily: "Inter_500Medium" }} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.75}>
+                  <Text style={{ color: colors.mutedForeground, fontSize: 9.5, fontFamily: "Inter_500Medium" }}>
                     {settings.organizationName || "OFM Cloud"}
                   </Text>
                 </View>
@@ -733,11 +755,11 @@ export function WebShell() {
             ) : (
               /* Desktop Breadcrumb Info */
               <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
-                <Text style={[styles.breadcrumbRoot, { color: colors.mutedForeground }]} numberOfLines={1}>
+                <Text style={[styles.breadcrumbRoot, { color: colors.mutedForeground }]}>
                   {settings.organizationName || "OFM"}
                 </Text>
                 <Text style={[styles.breadcrumbSep, { color: colors.mutedForeground }]}>/</Text>
-                <Text style={[styles.breadcrumbCurrent, { color: colors.foreground, flexShrink: 1 }]} numberOfLines={1}>
+                <Text style={[styles.breadcrumbCurrent, { color: colors.foreground, flexShrink: 1 }]}>
                   {NAV_ITEMS.find((n) => n.id === activeTab)?.label || "Overview"}
                 </Text>
               </View>
@@ -763,6 +785,7 @@ export function WebShell() {
               }}
             >
               <View
+                {...ofm("ofmLiveDot")}
                 style={{
                   width: 6,
                   height: 6,
@@ -779,7 +802,6 @@ export function WebShell() {
                     color: "#10B981",
                     letterSpacing: 0.2,
                   }}
-                  numberOfLines={1}
                 >
                   Cloud Sync
                 </Text>
@@ -810,7 +832,6 @@ export function WebShell() {
                     letterSpacing: 0.3,
                     textAlign: "center",
                   }}
-                  numberOfLines={1}
                 >
                   {(user?.role || "admin").toUpperCase()}
                 </Text>
@@ -821,6 +842,7 @@ export function WebShell() {
 
             {/* Real-Time Notification Center Bell */}
             <TouchableOpacity
+              {...ofm("ofmIconbtn")}
               style={[styles.topIconBtn, { borderColor: colors.border, position: "relative" }]}
               onPress={() => setNotificationModalVisible(true)}
               accessibilityLabel="Notifications & System Alerts"
@@ -851,6 +873,7 @@ export function WebShell() {
 
             {/* Theme Toggle */}
             <TouchableOpacity
+              {...ofm("ofmIconbtn")}
               style={[styles.topIconBtn, { borderColor: colors.border }]}
               onPress={toggleTheme}
               accessibilityLabel="Toggle Theme"
@@ -919,6 +942,7 @@ export function WebShell() {
         {/* ─── NATIVE-APP-STYLE MOBILE BOTTOM NAVIGATION (<768px) ─── */}
         {isMobile && (
           <View
+            {...ofm("ofmBottomnav")}
             style={[
               styles.mobileBottomNav,
               {
@@ -929,11 +953,12 @@ export function WebShell() {
           >
             {/* 1. Home / Dashboard */}
             <TouchableOpacity
+              {...ofm("ofmBottomnavItem")}
               style={styles.mobileBottomNavItem}
               onPress={() => navigateToTab("dashboard")}
               activeOpacity={0.7}
             >
-              <View style={[styles.bottomNavIconWrap, activeTab === "dashboard" && { backgroundColor: colors.primary + "18" }]}>
+              <View {...ofm("ofmBottomnavIcon")} style={[styles.bottomNavIconWrap, activeTab === "dashboard" && { backgroundColor: colors.primary + "18" }]}>
                 <SvgGrid size={19} color={activeTab === "dashboard" ? colors.primary : colors.mutedForeground} />
               </View>
               <Text
@@ -951,11 +976,12 @@ export function WebShell() {
 
             {/* 2. Ledger / Transactions */}
             <TouchableOpacity
+              {...ofm("ofmBottomnavItem")}
               style={styles.mobileBottomNavItem}
               onPress={() => navigateToTab("transactions")}
               activeOpacity={0.7}
             >
-              <View style={[styles.bottomNavIconWrap, (activeTab === "transactions" || activeTab === "income" || activeTab === "expenses") && { backgroundColor: colors.primary + "18" }]}>
+              <View {...ofm("ofmBottomnavIcon")} style={[styles.bottomNavIconWrap, (activeTab === "transactions" || activeTab === "income" || activeTab === "expenses") && { backgroundColor: colors.primary + "18" }]}>
                 <SvgList size={19} color={(activeTab === "transactions" || activeTab === "income" || activeTab === "expenses") ? colors.primary : colors.mutedForeground} />
               </View>
               <Text
@@ -973,11 +999,12 @@ export function WebShell() {
 
             {/* 3. Reports */}
             <TouchableOpacity
+              {...ofm("ofmBottomnavItem")}
               style={styles.mobileBottomNavItem}
               onPress={() => navigateToTab("reports")}
               activeOpacity={0.7}
             >
-              <View style={[styles.bottomNavIconWrap, activeTab === "reports" && { backgroundColor: colors.primary + "18" }]}>
+              <View {...ofm("ofmBottomnavIcon")} style={[styles.bottomNavIconWrap, activeTab === "reports" && { backgroundColor: colors.primary + "18" }]}>
                 <SvgFileText size={19} color={activeTab === "reports" ? colors.primary : colors.mutedForeground} />
               </View>
               <Text
@@ -995,11 +1022,12 @@ export function WebShell() {
 
             {/* 4. Payroll */}
             <TouchableOpacity
+              {...ofm("ofmBottomnavItem")}
               style={styles.mobileBottomNavItem}
               onPress={() => navigateToTab("payroll")}
               activeOpacity={0.7}
             >
-              <View style={[styles.bottomNavIconWrap, activeTab === "payroll" && { backgroundColor: colors.primary + "18" }]}>
+              <View {...ofm("ofmBottomnavIcon")} style={[styles.bottomNavIconWrap, activeTab === "payroll" && { backgroundColor: colors.primary + "18" }]}>
                 <SvgUsers size={19} color={activeTab === "payroll" ? colors.primary : colors.mutedForeground} />
               </View>
               <Text
@@ -1017,11 +1045,12 @@ export function WebShell() {
 
             {/* 5. More (Opens Mobile Drawer with Budgets, Departments, Team, AI Insights, Settings) */}
             <TouchableOpacity
+              {...ofm("ofmBottomnavItem")}
               style={styles.mobileBottomNavItem}
               onPress={() => setMobileDrawerOpen(true)}
               activeOpacity={0.7}
             >
-              <View style={[styles.bottomNavIconWrap, (activeTab !== "dashboard" && activeTab !== "transactions" && activeTab !== "income" && activeTab !== "expenses" && activeTab !== "reports" && activeTab !== "payroll") && { backgroundColor: colors.primary + "18" }]}>
+              <View {...ofm("ofmBottomnavIcon")} style={[styles.bottomNavIconWrap, (activeTab !== "dashboard" && activeTab !== "transactions" && activeTab !== "income" && activeTab !== "expenses" && activeTab !== "reports" && activeTab !== "payroll") && { backgroundColor: colors.primary + "18" }]}>
                 <SvgLayers size={19} color={(activeTab !== "dashboard" && activeTab !== "transactions" && activeTab !== "income" && activeTab !== "expenses" && activeTab !== "reports" && activeTab !== "payroll") ? colors.primary : colors.mutedForeground} />
               </View>
               <Text
@@ -1150,11 +1179,26 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    paddingVertical: 10,
+    paddingVertical: 9,
     paddingHorizontal: 12,
     borderRadius: 10,
     borderLeftWidth: 3,
     borderLeftColor: "transparent",
+  },
+  navSectionLabel: {
+    fontSize: 10.5,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+    paddingHorizontal: 14,
+    marginTop: 14,
+    marginBottom: 4,
+    opacity: 0.8,
+  },
+  navSectionDivider: {
+    height: 1,
+    marginHorizontal: 14,
+    marginVertical: 8,
   },
   navLabel: {
     flex: 1,
@@ -1291,11 +1335,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     paddingBottom: 2,
     zIndex: 999,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 16,
   },
   mobileBottomNavItem: {
     flex: 1,

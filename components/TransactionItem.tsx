@@ -68,29 +68,49 @@ export function TransactionItem(props: TransactionItemProps) {
   };
 
   return (
-    <View style={[styles.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
+    <View
+      style={[
+        styles.row,
+        {
+          backgroundColor: colors.card,
+          borderColor: colors.border,
+          shadowOpacity: colors.isDark ? 0.25 : 0.06,
+        },
+      ]}
+    >
+      {/* Coloured edge: green for inflow, red for expense */}
+      <View style={[styles.edge, { backgroundColor: amountColor }]} pointerEvents="none" />
+
       {/* Icon */}
-      <View style={[styles.iconWrap, { backgroundColor: amountColor + "18", borderColor: amountColor + "33" }]}>
-        <Feather name={icon} size={16} color={amountColor} />
+      <View style={[styles.iconWrap, { backgroundColor: amountColor + (colors.isDark ? "26" : "14") }]}>
+        <Feather name={icon} size={17} color={amountColor} />
       </View>
 
       {/* Info */}
       <View style={styles.info}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-          <Text style={[styles.category, { color: colors.foreground, flexShrink: 1 }]} numberOfLines={2}>
+          <Text style={[styles.category, { color: colors.foreground, flexShrink: 1 }]}>
             {tx.title || tx.category}
           </Text>
           {(tx.expenseSource === "payroll" || tx.payrollId) && (
             <View style={{ backgroundColor: "#8B5CF618", borderColor: "#8B5CF630", borderWidth: 1, paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4 }}>
-              <Text style={{ fontSize: 9.5, color: "#8B5CF6", fontFamily: "Inter_700Bold" }}>
+              <Text style={{ fontSize: 11, color: "#8B5CF6", fontFamily: "Inter_600SemiBold" }}>
                 💼 Payroll{tx.employeeName ? ` · ${tx.employeeName}` : ""}
               </Text>
             </View>
           )}
         </View>
-        <Text style={[styles.dept, { color: colors.mutedForeground }]}>
-          {tx.department || "General"} · {formatDate(tx.date)}
-        </Text>
+        <View style={styles.metaRow}>
+          <View style={[styles.metaChip, { backgroundColor: colors.muted }]}>
+            <Text style={[styles.dept, { color: colors.mutedForeground }]} numberOfLines={1}>
+              {tx.department || "General"}
+            </Text>
+          </View>
+          <View style={styles.dateWrap}>
+            <Feather name="calendar" size={10} color={colors.mutedForeground} />
+            <Text style={[styles.dept, { color: colors.mutedForeground }]}>{formatDate(tx.date)}</Text>
+          </View>
+        </View>
         {tx.description ? (
           <Text style={[styles.desc, { color: colors.mutedForeground }]} numberOfLines={2}>
             {tx.description}
@@ -100,7 +120,7 @@ export function TransactionItem(props: TransactionItemProps) {
 
       {/* Amount + Actions */}
       <View style={styles.right}>
-        <Text style={[styles.amount, { color: amountColor }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
+        <Text style={[styles.amount, { color: amountColor }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
           {isIncome ? "+" : "-"}{settings.currency} {formatAmountVal(tx.amount)}
         </Text>
 
@@ -136,8 +156,8 @@ export function TransactionItem(props: TransactionItemProps) {
       {/* Ultra-Premium Custom Delete Confirmation Modal */}
       <ConfirmDeleteModal
         visible={showDeleteModal}
-        title={`Delete ${isIncome ? "Income" : "Expense"}`}
-        subtitle={`Are you sure you want to permanently delete this ${isIncome ? "income credit" : "expense debit"} transaction?`}
+        title={`Delete ${isIncome ? "Inflow" : "Expense"}`}
+        subtitle={`Are you sure you want to permanently delete this ${isIncome ? "inflow credit" : "expense debit"} transaction?`}
         itemName={tx.title || tx.category}
         itemDetails={`${tx.department || "General"} · ${formatDate(tx.date)}`}
         itemAmount={`${isIncome ? "+" : "-"}${settings.currency} ${formatAmountVal(tx.amount)}`}
@@ -157,35 +177,69 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     padding: 14,
-    borderRadius: 14,
+    paddingLeft: 16,
+    borderRadius: 18,
     borderWidth: 1,
     gap: 12,
-    marginBottom: 8,
+    marginBottom: 10,
+    overflow: "hidden",
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 3 },
+    shadowRadius: 8,
+    elevation: 1.5,
+  },
+  edge: {
+    position: "absolute",
+    left: 0,
+    top: 14,
+    bottom: 14,
+    width: 3.5,
+    borderTopRightRadius: 3,
+    borderBottomRightRadius: 3,
   },
   iconWrap: {
     width: 40,
     height: 40,
-    borderRadius: 12,
+    borderRadius: 13,
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
   },
   info: {
     flex: 1,
-    gap: 3,
+    gap: 5,
     minWidth: 0,
   },
   category: {
     fontSize: 14,
     fontFamily: "Inter_600SemiBold",
+    letterSpacing: -0.1,
+  },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flexWrap: "wrap",
+  },
+  metaChip: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    maxWidth: "100%",
+  },
+  dateWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   dept: {
     fontSize: 11,
-    fontFamily: "Inter_400Regular",
+    fontFamily: "Inter_500Medium",
   },
   desc: {
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: "Inter_400Regular",
+    lineHeight: 16,
   },
   right: {
     alignItems: "flex-end",
@@ -197,6 +251,7 @@ const styles = StyleSheet.create({
   amount: {
     fontSize: 14,
     fontFamily: "Inter_700Bold",
+    letterSpacing: -0.2,
   },
   actions: {
     flexDirection: "row",

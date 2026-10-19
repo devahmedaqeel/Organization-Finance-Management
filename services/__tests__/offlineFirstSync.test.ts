@@ -685,8 +685,46 @@ async function runTests() {
     console.log("  ✔ Web -> Mobile sync and tombstone protection test passed: zero resurrection guaranteed.");
   }
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  // TEST 15: Deleting the LAST item on one device propagates to the other
+  // ─────────────────────────────────────────────────────────────────────────────
+  console.log("▶ TEST 15: Last-item deletion propagates across devices...");
+  {
+    const syncOrg = "org-last-item-66";
+    const mobLocal = [
+      { id: "bdg-only", name: "Ops Budget", amount: 10000, date: "2026-04-01", organizationId: syncOrg },
+    ];
+
+    // Web deleted the only budget; server-confirmed (not cached) snapshot is empty
+    const afterServerEmpty = reconcileEntities<any>([], mobLocal, [], new Set<string>(), true);
+    assert.strictEqual(afterServerEmpty.length, 0, "Last budget deleted on Web must disappear on Mobile");
+
+    // A cached / offline empty snapshot must still keep local data (safety net unchanged)
+    const afterCachedEmpty = reconcileEntities<any>([], mobLocal, [], new Set<string>(), false);
+    assert.strictEqual(afterCachedEmpty.length, 1, "Cached empty snapshot must not wipe local data");
+
+    // Items created on this device but not yet uploaded survive a server-confirmed empty snapshot
+    const pendingCreate: PendingOperation = {
+      operationId: "op-pending-1",
+      entityType: "budget",
+      entityId: "bdg-new",
+      operationType: "CREATE",
+      organizationId: syncOrg,
+      userId: "u1",
+      payload: { id: "bdg-new", name: "New Budget", amount: 500, date: "2026-04-02", organizationId: syncOrg },
+      createdAt: "2026-04-02T00:00:00.000Z",
+      updatedAt: "2026-04-02T00:00:00.000Z",
+      retryCount: 0,
+      syncStatus: "pending",
+    };
+    const withPending = reconcileEntities<any>([], [...mobLocal, pendingCreate.payload], [pendingCreate], new Set<string>(), true);
+    assert.deepStrictEqual(withPending.map((b) => b.id), ["bdg-new"], "Unsynced local creates must survive; deleted item must not");
+
+    console.log("  ✔ Last-item deletion test passed: server-confirmed empty lists propagate, offline data stays safe.");
+  }
+
   console.log("\n=======================================================");
-  console.log("ALL 14 OFFLINE-FIRST SYNCHRONIZATION TESTS PASSED 100%! ✅");
+  console.log("ALL 15 OFFLINE-FIRST SYNCHRONIZATION TESTS PASSED 100%! ✅");
   console.log("=======================================================\n");
   process.exit(0);
 }

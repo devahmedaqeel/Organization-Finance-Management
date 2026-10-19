@@ -77,8 +77,8 @@ class NetworkService {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 2500);
 
-      // Probe Firebase firestore endpoint
-      const response = await fetch("https://firestore.googleapis.com", {
+      // Probe Firebase firestore endpoint (generate_204 answers 204; the bare host logs a 404 in the console)
+      const response = await fetch("https://firestore.googleapis.com/generate_204", {
         method: "HEAD",
         mode: "no-cors",
         signal: controller.signal,

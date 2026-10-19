@@ -237,12 +237,12 @@ export function WebDepartmentStaffModal({
                 )}
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.modalTitle, { color: colors.foreground }]} numberOfLines={2}>
+                <Text style={[styles.modalTitle, { color: colors.foreground }]}>
                   {isAllSelected
                     ? "All Cost Centers — Staff & Roster"
                     : `${activeDept?.name || "Department"} — Staff & Roster`}
                 </Text>
-                <Text style={[styles.modalSubtitle, { color: colors.mutedForeground }]} numberOfLines={3}>
+                <Text style={[styles.modalSubtitle, { color: colors.mutedForeground }]}>
                   {isAllSelected
                     ? `${totalHeadcount} Total Personnel Assigned • ${payroll.length} Payroll Profiles (All Units)`
                     : `${totalHeadcount} Total Personnel Assigned • ${registeredCount} Payroll Profiles`}
@@ -254,7 +254,14 @@ export function WebDepartmentStaffModal({
             </TouchableOpacity>
           </View>
 
-          {/* Department Filter Selector Bar */}
+          {/* Scrollable Modal Content Body */}
+          <ScrollView
+            style={styles.modalBody}
+            contentContainerStyle={styles.modalBodyContent}
+            showsVerticalScrollIndicator={true}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Department Filter Selector Bar */}
           <View
             style={[
               styles.filterBar,
@@ -414,17 +421,11 @@ export function WebDepartmentStaffModal({
             >
               <Text
                 style={[styles.statLabel, { color: colors.mutedForeground }]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.8}
               >
                 ALLOCATED BUDGET
               </Text>
               <Text
                 style={[styles.statValue, { color: colors.foreground }]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.72}
               >
                 {activeDeptFinances.allocated > 0
                   ? `${settings.currency} ${activeDeptFinances.allocated.toLocaleString()}`
@@ -432,9 +433,6 @@ export function WebDepartmentStaffModal({
               </Text>
               <Text
                 style={[styles.statSub, { color: colors.mutedForeground }]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.8}
               >
                 Approved ceiling
               </Text>
@@ -449,9 +447,6 @@ export function WebDepartmentStaffModal({
             >
               <Text
                 style={[styles.statLabel, { color: colors.mutedForeground }]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.8}
               >
                 TOTAL USED
               </Text>
@@ -460,9 +455,6 @@ export function WebDepartmentStaffModal({
                   styles.statValue,
                   { color: activeDeptFinances.isOver ? colors.expense : "#F59E0B" },
                 ]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.72}
               >
                 {settings.currency} {activeDeptFinances.spent.toLocaleString()}
               </Text>
@@ -471,9 +463,6 @@ export function WebDepartmentStaffModal({
                   styles.statSub,
                   { color: activeDeptFinances.isOver ? colors.expense : colors.mutedForeground },
                 ]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.8}
               >
                 {activeDeptFinances.otherSpending > 0
                   ? `Pay: ${settings.currency} ${activeDeptFinances.payrollSpending.toLocaleString()} + Other: ${settings.currency} ${activeDeptFinances.otherSpending.toLocaleString()}`
@@ -492,9 +481,6 @@ export function WebDepartmentStaffModal({
             >
               <Text
                 style={[styles.statLabel, { color: colors.mutedForeground }]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.8}
               >
                 {activeDeptFinances.isOver ? "DEFICIT / OVER" : "REMAINING FUNDS"}
               </Text>
@@ -509,9 +495,6 @@ export function WebDepartmentStaffModal({
                       : colors.mutedForeground,
                   },
                 ]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.72}
               >
                 {activeDeptFinances.allocated > 0
                   ? `${settings.currency} ${activeDeptFinances.remaining.toLocaleString()}`
@@ -522,9 +505,6 @@ export function WebDepartmentStaffModal({
                   styles.statSub,
                   { color: activeDeptFinances.isOver ? colors.expense : colors.mutedForeground },
                 ]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.8}
               >
                 {activeDeptFinances.allocated > 0
                   ? activeDeptFinances.isOver
@@ -543,25 +523,16 @@ export function WebDepartmentStaffModal({
             >
               <Text
                 style={[styles.statLabel, { color: colors.mutedForeground }]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.8}
               >
                 MONTHLY PAYROLL
               </Text>
               <Text
                 style={[styles.statValue, { color: "#8B5CF6" }]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.72}
               >
                 {settings.currency} {totalMonthlyPayroll.toLocaleString()}
               </Text>
               <Text
                 style={[styles.statSub, { color: colors.mutedForeground }]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.8}
               >
                 Direct compensation
               </Text>
@@ -576,25 +547,16 @@ export function WebDepartmentStaffModal({
             >
               <Text
                 style={[styles.statLabel, { color: colors.mutedForeground }]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.8}
               >
                 OTHER EXPENSES
               </Text>
               <Text
                 style={[styles.statValue, { color: "#06B6D4" }]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.72}
               >
                 {settings.currency} {activeDeptFinances.otherSpending.toLocaleString()}
               </Text>
               <Text
                 style={[styles.statSub, { color: colors.mutedForeground }]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.8}
               >
                 {activeDeptFinances.otherSpending > 0
                   ? activeDeptFinances.otherCategorySummary
@@ -611,25 +573,16 @@ export function WebDepartmentStaffModal({
             >
               <Text
                 style={[styles.statLabel, { color: colors.mutedForeground }]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.8}
               >
                 {isAllSelected ? "TOTAL HEADCOUNT" : "UNIT HEADCOUNT"}
               </Text>
               <Text
                 style={[styles.statValue, { color: "#0EA5E9" }]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.72}
               >
                 {totalHeadcount}
               </Text>
               <Text
                 style={[styles.statSub, { color: colors.mutedForeground }]}
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.8}
               >
                 {registeredCount} {registeredCount === 1 ? "profile" : "profiles"} active
               </Text>
@@ -653,9 +606,6 @@ export function WebDepartmentStaffModal({
                     styles.budgetBarRatio,
                     { color: activeDeptFinances.isOver ? colors.expense : "#10B981" },
                   ]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.8}
                 >
                   {activeDeptFinances.ratio.toFixed(1)}% Used • {activeDeptFinances.remainingRatio.toFixed(1)}% Remaining
                 </Text>
@@ -723,10 +673,7 @@ export function WebDepartmentStaffModal({
           )}
 
           {/* Personnel List */}
-          <ScrollView
-            style={styles.listContainer}
-            contentContainerStyle={{ gap: 10, paddingVertical: 6 }}
-          >
+          <View style={styles.listContainer}>
             <View
               style={{
                 flexDirection: "row",
@@ -799,13 +746,11 @@ export function WebDepartmentStaffModal({
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text
                       style={[styles.staffName, { color: colors.foreground }]}
-                      numberOfLines={1}
                     >
                       {staff.employeeName}
                     </Text>
                     <Text
                       style={[styles.staffMeta, { color: colors.mutedForeground }]}
-                      numberOfLines={2}
                     >
                       {staff.employeeId} • {staff.designation || "Staff Member"}
                     </Text>
@@ -838,7 +783,8 @@ export function WebDepartmentStaffModal({
                 </Text>
               </View>
             )}
-          </ScrollView>
+          </View>
+        </ScrollView>
 
           {/* Footer Actions */}
           <View style={[styles.modalFooter, { borderTopColor: colors.border }]}>
@@ -879,10 +825,12 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   modalCard: {
-    maxHeight: "92%",
+    maxHeight: "90%",
     borderRadius: 16,
     borderWidth: 1,
     overflow: "hidden",
+    display: "flex",
+    flexDirection: "column",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.35,
@@ -893,8 +841,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 14,
     borderBottomWidth: 1,
+    flexShrink: 0,
+  },
+  modalBody: {
+    flex: 1,
+  },
+  modalBodyContent: {
+    paddingBottom: 24,
   },
   headerIconWrap: {
     width: 38,
@@ -1068,7 +1023,8 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     paddingHorizontal: 20,
-    maxHeight: 280,
+    paddingTop: 8,
+    gap: 10,
   },
   sectionHeading: {
     fontSize: 11,
@@ -1080,29 +1036,29 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    padding: 12,
+    padding: 14,
     borderRadius: 12,
     borderWidth: 1,
   },
   staffAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: "#0EA5E920",
     alignItems: "center",
     justifyContent: "center",
   },
   staffAvatarText: {
     color: "#0EA5E9",
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: "Inter_700Bold",
   },
   staffName: {
-    fontSize: 13,
-    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
   },
   staffMeta: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontFamily: "Inter_400Regular",
     marginTop: 2,
   },
@@ -1120,7 +1076,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
   },
   staffSalary: {
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: "Inter_700Bold",
   },
   paidBadge: {
@@ -1174,6 +1130,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 14,
     borderTopWidth: 1,
+    flexShrink: 0,
   },
   secondaryBtn: {
     paddingHorizontal: 16,

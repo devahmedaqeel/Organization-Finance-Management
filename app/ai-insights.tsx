@@ -1,4 +1,5 @@
 import { Feather } from "@/components/UniversalIcon";
+import { screenTopPadding } from "@/utils/layout";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
@@ -13,6 +14,7 @@ import { useFinance } from "@/context/FinanceContext";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
 import { useColors } from "@/hooks/useColors";
+import { useRequirePermission } from "@/hooks/useRequirePermission";
 import { useResponsive } from "@/hooks/useResponsive";
 import {
   NormalizedPeriod,
@@ -20,6 +22,7 @@ import {
   getPresetPeriod,
   getPreviousPeriod,
   filterTransactionsByPeriod,
+  filterTransactionsForPoint,
 } from "@/services/DatePeriodService";
 import {
   calculateTotalIncome,
@@ -50,6 +53,8 @@ const SEV_CONFIG = {
 
 export default function AIInsightsScreen() {
   const colors = useColors();
+  // Role guard: leave if this role can't use this screen (e.g. opened via deep link)
+  useRequirePermission("view_insights");
   const insets = useSafeAreaInsets();
   const { chartW, hPad } = useResponsive();
   const {
@@ -169,22 +174,11 @@ export default function AIInsightsScreen() {
   }, [transactions, activePeriod]);
 
   // If a specific point/month on the chart is touched, isolate transactions to that point
+  // Same transaction set the chart aggregated for that point, so totals below match the point
   const displayedTxs = useMemo(() => {
-    if (selectedPoint) {
-      const key = selectedPoint.key;
-      if (key) {
-        return transactions.filter((t) => (t.date || "").startsWith(key));
-      }
-      if (selectedPoint.fullDate) {
-        return periodTxs.filter((t) => {
-          const tDate = new Date(t.date);
-          const tMonthStr = tDate.toLocaleDateString("en-US", { month: "short" });
-          return selectedPoint.label === tMonthStr;
-        });
-      }
-    }
+    if (selectedPoint) return filterTransactionsForPoint(periodTxs, selectedPoint);
     return periodTxs;
-  }, [selectedPoint, transactions, periodTxs]);
+  }, [selectedPoint, periodTxs]);
 
   // ─── Authoritative Institutional Budget & Cash Metrics (Single Source of Truth) ───
   const institutionalTotalBudget = useMemo(() => {
@@ -249,7 +243,8 @@ export default function AIInsightsScreen() {
     : (displayedExpense > 0 ? 100 : 0);
 
   const displayedSurplusPct = profitMargin;
-  const displayedOutflowPct = Math.min(Math.round(expenseRatio), 100);
+  // Real ratio (can exceed 100% when spending outpaces inflow); the ring itself is clamped at render
+  const displayedOutflowPct = Math.round(expenseRatio);
 
   // Consolidated unique budgets (aggregating line-item budgets and active department-level allocations)
   const consolidatedBudgets = useMemo(() => {
@@ -329,7 +324,8 @@ export default function AIInsightsScreen() {
   }, [selectedPoint, institutionalTotalBudget, displayedBudgetSpent, institutionalBudgetRemaining]);
 
   const displayedBudgetUtil = institutionalTotalBudget > 0 ? (displayedBudgetSpent / institutionalTotalBudget) * 100 : 0;
-  const authoritativeNetBalance = selectedPoint ? displayedNet : institutionalNetCash;
+  // Net result for the same scope as the Operating ring (period, or the inspected point)
+  const authoritativeNetBalance = displayedNet;
   const unallocatedFunds = institutionalUnallocated;
 
   // Transaction Metrics computed strictly from displayed transactions
@@ -512,8 +508,8 @@ export default function AIInsightsScreen() {
   }, [transactions]);
 
   // Payroll
-  const totalPayroll = payroll.reduce((s, p) => s + p.baseSalary + p.bonus - p.deductions, 0);
-  const avgSalary = payroll.length > 0 ? payroll.reduce((s, p) => s + p.baseSalary, 0) / payroll.length : 0;
+  const totalPayroll = payroll.reduce((s, p) => s + (p.baseSalary || 0) + (p.bonus || 0) - (p.deductions || 0), 0);
+  const avgSalary = payroll.length > 0 ? payroll.reduce((s, p) => s + (p.baseSalary || 0), 0) / payroll.length : 0;
 
   const positiveCount = useMemo(
     () => actionableInsights.filter(i => i.severity === "SUCCESS").length,
@@ -557,6 +553,155 @@ export default function AIInsightsScreen() {
     }
   };
 
+  // ─── Presentation helpers (colours/labels only; no data logic) ───
+  const isIdle = displayedIncome === 0 && displayedExpense === 0;
+  const surplusTone = isIdle ? "#64748B" : displayedSurplusPct >= 20 ? "#10B981" : displayedSurplusPct >= 0 ? "#0EA5E9" : "#F43F5E";
+  const budgetTone = displayedBudgetUtil === 0 ? "#64748B" : displayedBudgetUtil <= 75 ? "#3B82F6" : displayedBudgetUtil <= 95 ? "#F59E0B" : "#F43F5E";
+  const outflowTone = displayedOutflowPct === 0 ? "#64748B" : displayedOutflowPct <= 40 ? "#8B5CF6" : displayedOutflowPct <= 75 ? "#F59E0B" : "#F43F5E";
+  const fmtPct = (v: number) => `${v < 10 && v > 0 ? v.toFixed(1) : v.toFixed(0)}%`;
+  const scopeLabel = selectedPoint ? (selectedPoint.fullDate || selectedPoint.label) : activePeriod.label;
+  const SEV_LABEL: Record<string, string> = { SUCCESS: "Positive", WARNING: "Warning", INFO: "Info", CRITICAL: "Critical" };
+
+  const healthStats = [
+    { label: "Allocated budget", value: `${settings.currency} ${fmt(institutionalTotalBudget)}`, color: "#0EA5E9" },
+    { label: "Budget spent", value: `${settings.currency} ${fmt(institutionalBudgetSpent)}`, color: "#F43F5E" },
+    {
+      label: "Remaining budget",
+      value: `${settings.currency} ${fmt(institutionalBudgetRemaining)}`,
+      color: institutionalBudgetRemaining > 0 ? "#10B981" : "#F43F5E",
+    },
+    {
+      label: "Budget used",
+      value: institutionalTotalBudget > 0 ? fmtPct(institutionalBudgetUtil) : "0%",
+      color: institutionalTotalBudget > 0
+        ? (institutionalBudgetUtil <= 75 ? "#10B981" : institutionalBudgetUtil <= 100 ? "#F59E0B" : "#F43F5E")
+        : "#94A3B8",
+    },
+    {
+      label: "Net cash (all time)",
+      value: `${institutionalNetCash >= 0 ? "+" : "-"}${settings.currency} ${fmt(Math.abs(institutionalNetCash))}`,
+      color: institutionalNetCash >= 0 ? "#10B981" : "#F43F5E",
+    },
+    {
+      label: "Unallocated",
+      value: `${settings.currency} ${fmt(institutionalUnallocated)}`,
+      color: institutionalUnallocated > 0 ? "#10B981" : "#F59E0B",
+    },
+  ];
+
+  const insightFilters = [
+    { key: "all" as const, label: "All", count: actionableInsights.length, color: "#3B82F6", icon: "layers" },
+    { key: "critical" as const, label: "Critical", count: criticalCount, color: "#F43F5E", icon: "alert-octagon" },
+    { key: "advisories" as const, label: "Advisories", count: advisoryCount, color: "#F59E0B", icon: "alert-triangle" },
+    { key: "positive" as const, label: "Positive", count: positiveCount, color: "#10B981", icon: "check-circle" },
+  ];
+  const activeFilterLabel = insightFilters.find((f) => f.key === insightFilter)?.label ?? "All";
+
+  const keyMetrics = [
+    {
+      key: "operating",
+      tone: surplusTone,
+      percentage: isIdle ? 0 : Math.min(Math.abs(displayedSurplusPct), 100),
+      center: `${displayedSurplusPct >= 0 ? "+" : "-"}${Math.abs(displayedSurplusPct).toFixed(0)}%`,
+      ringLabel: "Operating",
+      ringSub: displayedSurplusPct >= 0 ? "SURPLUS" : "DEFICIT",
+      status: isIdle
+        ? "No activity"
+        : displayedSurplusPct >= 25
+        ? "Healthy surplus"
+        : displayedSurplusPct > 0
+        ? "Surplus margin"
+        : displayedSurplusPct === 0
+        ? "Balanced"
+        : "Operating deficit",
+      value: `${authoritativeNetBalance >= 0 ? "+" : "-"}${settings.currency} ${fmt(Math.abs(authoritativeNetBalance))}`,
+      caption: "Net result",
+    },
+    {
+      key: "budget",
+      tone: budgetTone,
+      percentage: Math.min(displayedBudgetUtil, 100),
+      center: fmtPct(displayedBudgetUtil),
+      ringLabel: "Budget",
+      ringSub: "UTILIZED",
+      status: displayedBudgetUtil === 0
+        ? "Unspent"
+        : displayedBudgetUtil <= 75
+        ? "On track"
+        : displayedBudgetUtil <= 95
+        ? "Near limit"
+        : "Over budget",
+      value: `${settings.currency} ${fmt(displayedBudgetSpent)} of ${fmt(totalAllocatedBudget)}`,
+      caption: `${settings.currency} ${fmt(displayedBudgetRemaining)} left`,
+    },
+    {
+      key: "outflow",
+      tone: outflowTone,
+      percentage: Math.min(displayedOutflowPct, 100),
+      center: `${displayedOutflowPct}%`,
+      ringLabel: "Outflow",
+      ringSub: "BURN RATE",
+      status: displayedOutflowPct === 0
+        ? "Zero outflow"
+        : displayedOutflowPct <= 25
+        ? "Low burn (safe)"
+        : displayedOutflowPct <= 60
+        ? "Optimal burn"
+        : displayedOutflowPct <= 85
+        ? "Moderate outflow"
+        : displayedOutflowPct <= 100
+        ? "High burn alert"
+        : "Exceeds inflow",
+      value: `${settings.currency} ${fmt(displayedExpense)} of ${fmt(displayedIncome)}`,
+      caption: "Spent of inflow",
+    },
+  ];
+
+  const txTiles = [
+    {
+      key: "in",
+      icon: "arrow-down-left",
+      color: colors.income,
+      action: "View",
+      label: `Inflows (${txStats.inflowCount})`,
+      value: `+${settings.currency} ${fmt(txStats.inflowTotal)}`,
+      caption: txStats.inflowCount > 0 ? `Avg ${settings.currency} ${fmt(Math.round(txStats.avgInflow))}` : "No inflows",
+      onPress: () => { setTxModalFilter("income"); setAllTxModal(true); },
+    },
+    {
+      key: "out",
+      icon: "arrow-up-right",
+      color: colors.expense,
+      action: "View",
+      label: `Outflows (${txStats.outflowCount})`,
+      value: `-${settings.currency} ${fmt(txStats.outflowTotal)}`,
+      caption: txStats.outflowCount > 0 ? `Avg ${settings.currency} ${fmt(Math.round(txStats.avgOutflow))}` : "No outflows",
+      onPress: () => { setTxModalFilter("expense"); setAllTxModal(true); },
+    },
+    {
+      key: "net",
+      icon: "activity",
+      color: txStats.netFlow >= 0 ? colors.income : colors.expense,
+      action: txStats.netFlow >= 0 ? "Surplus" : "Deficit",
+      label: "Net cash flow",
+      value: `${txStats.netFlow >= 0 ? "+" : "-"}${settings.currency} ${fmt(Math.abs(txStats.netFlow))}`,
+      caption: `Avg ticket ${settings.currency} ${fmt(Math.round(txStats.avgTx))}`,
+      onPress: () => { setTxModalFilter("all"); setAllTxModal(true); },
+    },
+    {
+      key: "max",
+      icon: "award",
+      color: "#F59E0B",
+      action: txStats.maxTx ? (txStats.maxTx.type === "expense" ? "Outflow" : "Inflow") : "",
+      label: "Largest transaction",
+      value: txStats.maxTx ? `${settings.currency} ${fmt(txStats.maxTx.amount)}` : "None",
+      caption: txStats.maxTx ? `${txStats.maxTx.category || txStats.maxTx.title || "Transaction"}` : "No records",
+      onPress: () => { setTxModalFilter(txStats.maxTx?.type === "expense" ? "expense" : "income"); setAllTxModal(true); },
+    },
+  ];
+
+  const tint = (c: string) => c + (colors.isDark ? "26" : "14");
+
   return (
     <View style={[styles.flex, { backgroundColor: colors.background }]}>
       {/* Fixed Header */}
@@ -564,7 +709,7 @@ export default function AIInsightsScreen() {
         style={[
           styles.header,
           {
-            paddingTop: webTop + insets.top + (Platform.OS === "android" ? 20 : 12),
+            paddingTop: webTop + screenTopPadding(insets.top),
             backgroundColor: colors.background,
             borderBottomColor: colors.border,
           },
@@ -573,781 +718,503 @@ export default function AIInsightsScreen() {
         <View style={styles.headerRow}>
           <TouchableOpacity
             onPress={handleGoBack}
-            style={[styles.backBtn, { borderColor: colors.border }]}
+            style={[styles.backBtn, { borderColor: colors.border, backgroundColor: colors.card }]}
+            accessibilityLabel="Go back"
           >
             <Feather name="arrow-left" size={18} color={colors.foreground} />
           </TouchableOpacity>
           <View style={styles.titleRow}>
-            <View style={[styles.aiIcon, { backgroundColor: "#10B98122" }]}>
-              <Feather name="zap" size={16} color="#10B981" />
+            <View style={[styles.aiIcon, { backgroundColor: tint("#10B981") }]}>
+              <Feather name="zap" size={17} color="#10B981" />
             </View>
-            <View>
+            <View style={{ flexShrink: 1 }}>
               <Text style={[styles.title, { color: colors.foreground }]}>AI Insights</Text>
-              <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
+              <Text style={[styles.subtitle, { color: colors.mutedForeground }]} numberOfLines={1}>
                 {settings.organizationName || "Smart Financial Intelligence"}
               </Text>
             </View>
           </View>
-          <View style={{ width: 38 }} />
+          <View style={{ width: 40 }} />
         </View>
       </View>
 
       <ScrollView
         contentContainerStyle={[
           styles.container,
-          { paddingTop: 14, paddingBottom: Math.max(insets.bottom, 16) + 60, paddingHorizontal: hPad },
+          { paddingTop: 16, paddingBottom: Math.max(insets.bottom, 16) + 60, paddingHorizontal: hPad },
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Health Score Card */}
+        {/* ─── Health Score ─── */}
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.cardTitle, { color: colors.foreground }]}>Financial Health Score</Text>
           <View style={styles.healthRow}>
             <RingProgress
               percentage={healthScore ?? 0}
               centerLabel={healthScore !== null ? `${healthScore}%` : "N/A"}
-              size={120}
-              strokeWidth={11}
+              size={112}
+              strokeWidth={10}
               color={healthColor}
               label={hasData ? healthLabel : "NO DATA"}
-              sublabel={
-                !hasData
-                  ? "INACTIVE"
-                  : healthScore! >= 80
-                  ? "Optimal"
-                  : healthScore! >= 60
-                  ? "Stable"
-                  : "Watch"
-              }
+              sublabel={!hasData ? "INACTIVE" : healthScore! >= 80 ? "Optimal" : healthScore! >= 60 ? "Stable" : "Watch"}
             />
             <View style={styles.healthRight}>
+              <Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>FINANCIAL HEALTH</Text>
               <Text style={[styles.healthScore, { color: healthColor }]}>
                 {healthScore !== null ? (
                   <>
-                    {healthScore}<Text style={styles.healthScoreMax}>/100</Text>
+                    {healthScore}
+                    <Text style={[styles.healthScoreMax, { color: colors.mutedForeground }]}> / 100</Text>
                   </>
                 ) : (
                   "N/A"
                 )}
               </Text>
-              <Text style={[styles.healthLabel, { color: healthColor }]}>
-                {hasData ? healthLabel : "No Financial Data"}
-              </Text>
-            <View style={styles.healthStats}>
-              {[
-                {
-                  label: "Allocated Budget",
-                  value: `${settings.currency} ${fmt(institutionalTotalBudget)}`,
-                  color: "#38BDF8",
-                },
-                {
-                  label: "Budget Spent",
-                  value: `${settings.currency} ${fmt(institutionalBudgetSpent)}`,
-                  color: "#F43F5E",
-                },
-                {
-                  label: "Remaining Budget",
-                  value: `${settings.currency} ${fmt(institutionalBudgetRemaining)}`,
-                  color: institutionalBudgetRemaining > 0 ? "#10B981" : "#F43F5E",
-                },
-                {
-                  label: "Budget Used",
-                  value: institutionalTotalBudget > 0
-                    ? `${institutionalBudgetUtil < 10 && institutionalBudgetUtil > 0 ? institutionalBudgetUtil.toFixed(1) : institutionalBudgetUtil.toFixed(0)}%`
-                    : "0%",
-                  color: institutionalTotalBudget > 0
-                    ? (institutionalBudgetUtil <= 75 ? "#10B981" : institutionalBudgetUtil <= 100 ? "#F59E0B" : "#F43F5E")
-                    : "#94A3B8",
-                },
-                {
-                  label: "Net Cash",
-                  value: `${institutionalNetCash >= 0 ? "+" : "-"}${settings.currency} ${fmt(Math.abs(institutionalNetCash))}`,
-                  color: institutionalNetCash >= 0 ? "#10B981" : "#F43F5E",
-                },
-                {
-                  label: "Unallocated",
-                  value: `${settings.currency} ${fmt(institutionalUnallocated)}`,
-                  color: institutionalUnallocated > 0 ? "#10B981" : "#F59E0B",
-                },
-              ].map((s, i) => (
-                <View key={i} style={[styles.healthStat, { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 7, flexGrow: 1, minWidth: 95 }]}>
-                  <Text style={[styles.healthStatValue, { color: s.color }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>{s.value}</Text>
-                  <Text style={[styles.healthStatLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        </View>
-
-        {/* Insight summary badges */}
-        <View style={styles.badgeRow}>
-          <TouchableOpacity
-            style={[
-              styles.badge,
-              {
-                backgroundColor: "#10B98122",
-                borderColor: insightFilter === "positive" ? "#10B981" : "#10B98144",
-                borderWidth: insightFilter === "positive" ? 1.5 : 1,
-              },
-            ]}
-            onPress={() => setInsightFilter(f => f === "positive" ? "all" : "positive")}
-            activeOpacity={0.7}
-          >
-            <Feather name="check-circle" size={12} color="#10B981" />
-            <Text style={[styles.badgeText, { color: "#10B981", fontFamily: insightFilter === "positive" ? "Inter_700Bold" : "Inter_600SemiBold" }]}>
-              {positiveCount} Positive
-            </Text>
-          </TouchableOpacity>
-
-          {criticalCount > 0 && (
-            <TouchableOpacity
-              style={[
-                styles.badge,
-                {
-                  backgroundColor: "#F43F5E22",
-                  borderColor: insightFilter === "critical" ? "#F43F5E" : "#F43F5E44",
-                  borderWidth: insightFilter === "critical" ? 1.5 : 1,
-                },
-              ]}
-              onPress={() => setInsightFilter(f => f === "critical" ? "all" : "critical")}
-              activeOpacity={0.7}
-            >
-              <Feather name="alert-triangle" size={12} color="#F43F5E" />
-              <Text style={[styles.badgeText, { color: "#F43F5E", fontFamily: insightFilter === "critical" ? "Inter_700Bold" : "Inter_600SemiBold" }]}>
-                {criticalCount} Critical
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          <TouchableOpacity
-            style={[
-              styles.badge,
-              {
-                backgroundColor: "#F59E0B22",
-                borderColor: insightFilter === "advisories" ? "#F59E0B" : "#F59E0B44",
-                borderWidth: insightFilter === "advisories" ? 1.5 : 1,
-              },
-            ]}
-            onPress={() => setInsightFilter(f => f === "advisories" ? "all" : "advisories")}
-            activeOpacity={0.7}
-          >
-            <Feather name="zap" size={12} color="#F59E0B" />
-            <Text style={[styles.badgeText, { color: "#F59E0B", fontFamily: insightFilter === "advisories" ? "Inter_700Bold" : "Inter_600SemiBold" }]}>
-              {advisoryCount} Advisories
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.badge,
-              {
-                backgroundColor: "#3B82F622",
-                borderColor: insightFilter === "all" ? "#3B82F6" : "#3B82F644",
-                borderWidth: insightFilter === "all" ? 1.5 : 1,
-              },
-            ]}
-            onPress={() => setInsightFilter("all")}
-            activeOpacity={0.7}
-          >
-            <Feather name="info" size={12} color="#3B82F6" />
-            <Text style={[styles.badgeText, { color: "#3B82F6", fontFamily: insightFilter === "all" ? "Inter_700Bold" : "Inter_600SemiBold" }]}>
-              {actionableInsights.length} Total
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Financial Trend Card */}
-      <View
-        style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
-        onLayout={(e) => {
-          const w = e.nativeEvent.layout.width;
-          if (w > 40 && Math.abs(w - chartContainerWidth) > 2) {
-            setChartContainerWidth(w);
-          }
-        }}
-      >
-        <View style={styles.cardHeaderRow}>
-          <View style={{ flex: 1, paddingRight: 6 }}>
-            <Text style={[styles.cardTitle, { color: colors.foreground }]}>Financial Trend</Text>
-            <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={2}>
-              Income vs Expenses · {activePeriod.label}
-            </Text>
-          </View>
-          <View style={[styles.growthBadge, { backgroundColor: periodGrowth >= 0 ? "#10B98122" : "#F43F5E22", borderColor: periodGrowth >= 0 ? "#10B98144" : "#F43F5E44" }]}>
-            <Feather name={periodGrowth >= 0 ? "trending-up" : "trending-down"} size={12} color={periodGrowth >= 0 ? "#10B981" : "#F43F5E"} />
-            <Text style={[styles.growthText, { color: periodGrowth >= 0 ? "#10B981" : "#F43F5E" }]}>
-              {periodGrowthLabel}
-            </Text>
-          </View>
-        </View>
-
-        {/* Prominent Point Inspection Banner with 1-click Reset */}
-        {selectedPoint && (
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              backgroundColor: colors.primary + "15",
-              borderColor: colors.primary + "44",
-              borderWidth: 1,
-              borderRadius: 10,
-              paddingHorizontal: 10,
-              paddingVertical: 7,
-              marginBottom: 8,
-              gap: 8,
-              flexWrap: "wrap",
-            }}
-          >
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 5, flex: 1, minWidth: 160 }}>
-              <Text style={{ fontSize: 11.5, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>
-                Inspecting <Text style={{ fontFamily: "Inter_700Bold", color: colors.primary }}>{selectedPoint.fullDate || selectedPoint.label}</Text>:
-              </Text>
-              <Text style={{ fontSize: 10.5, color: colors.mutedForeground }}>
-                Inc {settings.currency} {fmt(displayedIncome)} · Exp {settings.currency} {fmt(displayedExpense)}
+              <View style={[styles.statusPill, { backgroundColor: tint(healthColor) }]}>
+                <View style={[styles.statusDot, { backgroundColor: healthColor }]} />
+                <Text style={[styles.statusPillText, { color: healthColor }]} numberOfLines={1}>
+                  {hasData ? healthLabel : "No financial data"}
+                </Text>
+              </View>
+              <Text style={[styles.healthPeriod, { color: colors.mutedForeground }]} numberOfLines={1}>
+                {activePeriod.label}
               </Text>
             </View>
-            <TouchableOpacity
-              onPress={() => setSelectedPoint(null)}
-              style={{
-                backgroundColor: colors.primary,
-                paddingHorizontal: 10,
-                paddingVertical: 4,
-                borderRadius: 12,
-              }}
-              activeOpacity={0.7}
-            >
-              <Text style={{ color: "#FFFFFF", fontSize: 10.5, fontFamily: "Inter_700Bold" }}>Clear Filter ✕</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        <AreaLineChart
-          data={chartPoints}
-          width={chartContainerWidth > 40 ? chartContainerWidth - 28 : chartWidth - 28}
-          height={165}
-          currency={settings.currency}
-          activeRange={customSelection ? undefined : trendRange}
-          activePeriod={activePeriod}
-          onPointSelect={handlePointSelect}
-          onPeriodSelect={(p) => {
-            setActivePeriod(p);
-            setCustomPeriodName(p.label);
-            setSelectedPoint(null);
-          }}
-          onGranularityChange={(g) => {
-            setActivePeriod((prev) => ({
-              ...prev,
-              userGranularityOverride: g,
-            }));
-          }}
-          onRangeSelect={(range) => {
-            setTrendRange(range);
-            setCustomPeriodName(null);
-            setCustomSelection(null);
-            setSelectedPoint(null);
-          }}
-          onCustomDateSelect={(selection) => {
-            setCustomSelection(selection);
-            if (selection.presetName) setCustomPeriodName(selection.presetName);
-            setSelectedPoint(null);
-          }}
-          ranges={["1W", "2W", "1M", "3M", "6M", "1Y", "ALL"]}
-          transactions={transactions}
-          userId={user?.id || "default"}
-        />
-      </View>
-
-      {/* 3 Key Rings */}
-      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <View style={styles.cardHeaderRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.cardTitle, { color: colors.foreground }]}>Key Metrics</Text>
-            <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
-              {selectedPoint ? `Inspecting ${selectedPoint.fullDate || selectedPoint.label}` : `Financial performance indicators · ${activePeriod.label}`}
-            </Text>
-          </View>
-          {selectedPoint && (
-            <TouchableOpacity
-              style={[styles.smBtn, { borderColor: colors.primary + "44", backgroundColor: colors.primary + "15" }]}
-              onPress={() => setSelectedPoint(null)}
-            >
-              <Text style={[styles.smBtnText, { color: colors.primary }]}>Reset Focus ✕</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-        <View style={styles.ringsRow}>
-          {/* Ring 1: Operating Surplus / Margin */}
-          <View style={styles.ringItem}>
-            <RingProgress
-              percentage={displayedIncome === 0 && displayedExpense === 0 ? 0 : Math.min(Math.max(displayedSurplusPct >= 0 ? displayedSurplusPct : Math.abs(displayedSurplusPct), 0), 100)}
-              centerLabel={`${displayedSurplusPct >= 0 ? "+" : "-"}${Math.abs(displayedSurplusPct).toFixed(0)}%`}
-              size={98}
-              strokeWidth={9}
-              color={displayedIncome === 0 && displayedExpense === 0 ? "#64748B" : displayedSurplusPct >= 20 ? "#10B981" : displayedSurplusPct >= 0 ? "#0EA5E9" : "#F43F5E"}
-              label="Operating"
-              sublabel={displayedSurplusPct >= 0 ? "SURPLUS" : "DEFICIT"}
-            />
-            <View
-              style={[
-                styles.ringStatusPill,
-                {
-                  backgroundColor: (displayedIncome === 0 && displayedExpense === 0 ? "#64748B" : displayedSurplusPct >= 20 ? "#10B981" : displayedSurplusPct >= 0 ? "#0EA5E9" : "#F43F5E") + "18",
-                  borderColor: (displayedIncome === 0 && displayedExpense === 0 ? "#64748B" : displayedSurplusPct >= 20 ? "#10B981" : displayedSurplusPct >= 0 ? "#0EA5E9" : "#F43F5E") + "44",
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.ringStatusText,
-                  { color: displayedIncome === 0 && displayedExpense === 0 ? "#64748B" : displayedSurplusPct >= 20 ? "#10B981" : displayedSurplusPct >= 0 ? "#0EA5E9" : "#F43F5E" },
-                ]}
-              >
-                {displayedIncome === 0 && displayedExpense === 0
-                  ? "No Activity"
-                  : displayedSurplusPct >= 25
-                  ? "Healthy Surplus"
-                  : displayedSurplusPct > 0
-                  ? "Surplus Margin"
-                  : displayedSurplusPct === 0
-                  ? "Balanced"
-                  : "Operating Deficit"}
-              </Text>
-            </View>
-            <Text style={styles.ringValueSub} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
-              {authoritativeNetBalance >= 0 ? "+" : "-"}{settings.currency} {fmt(Math.abs(authoritativeNetBalance))}
-            </Text>
-            <Text style={{ fontSize: 10, color: colors.mutedForeground, marginTop: 1, fontFamily: "Inter_500Medium" }} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
-              Net Cash Balance
-            </Text>
           </View>
 
-          {/* Ring 2: Budget Execution / Utilization */}
-          <View style={styles.ringItem}>
-            <RingProgress
-              percentage={Math.min(displayedBudgetUtil, 100)}
-              centerLabel={`${displayedBudgetUtil < 10 && displayedBudgetUtil > 0 ? displayedBudgetUtil.toFixed(1) : displayedBudgetUtil.toFixed(0)}%`}
-              size={98}
-              strokeWidth={9}
-              color={displayedBudgetUtil === 0 ? "#64748B" : displayedBudgetUtil <= 75 ? "#3B82F6" : displayedBudgetUtil <= 95 ? "#F59E0B" : "#F43F5E"}
-              label="Budget"
-              sublabel="UTILIZED"
-            />
-            <View
-              style={[
-                styles.ringStatusPill,
-                {
-                  backgroundColor: (displayedBudgetUtil === 0 ? "#64748B" : displayedBudgetUtil <= 75 ? "#3B82F6" : displayedBudgetUtil <= 95 ? "#F59E0B" : "#F43F5E") + "18",
-                  borderColor: (displayedBudgetUtil === 0 ? "#64748B" : displayedBudgetUtil <= 75 ? "#3B82F6" : displayedBudgetUtil <= 95 ? "#F59E0B" : "#F43F5E") + "44",
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.ringStatusText,
-                  { color: displayedBudgetUtil === 0 ? "#64748B" : displayedBudgetUtil <= 75 ? "#3B82F6" : displayedBudgetUtil <= 95 ? "#F59E0B" : "#F43F5E" },
-                ]}
-              >
-                {displayedBudgetUtil === 0
-                  ? "Unspent"
-                  : displayedBudgetUtil <= 75
-                  ? "On Track"
-                  : displayedBudgetUtil <= 95
-                  ? "Near Limit"
-                  : "Over Budget"}
-              </Text>
-            </View>
-            <Text style={styles.ringValueSub} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
-              {settings.currency} {fmt(displayedBudgetSpent)} of {fmt(totalAllocatedBudget)}
-            </Text>
-            <Text style={{ fontSize: 10, color: colors.mutedForeground, marginTop: 1, fontFamily: "Inter_500Medium" }} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
-              {settings.currency} {fmt(displayedBudgetRemaining)} Remaining
-            </Text>
-          </View>
-
-          {/* Ring 3: Operational Expense Burn Rate */}
-          <View style={styles.ringItem}>
-            <RingProgress
-              percentage={Math.min(displayedOutflowPct, 100)}
-              centerLabel={`${displayedOutflowPct.toFixed(0)}%`}
-              size={98}
-              strokeWidth={9}
-              color={displayedOutflowPct === 0 ? "#64748B" : displayedOutflowPct <= 40 ? "#8B5CF6" : displayedOutflowPct <= 75 ? "#F59E0B" : "#F43F5E"}
-              label="Outflow"
-              sublabel="BURN RATE"
-            />
-            <View
-              style={[
-                styles.ringStatusPill,
-                {
-                  backgroundColor: (displayedOutflowPct === 0 ? "#64748B" : displayedOutflowPct <= 40 ? "#8B5CF6" : displayedOutflowPct <= 75 ? "#F59E0B" : "#F43F5E") + "18",
-                  borderColor: (displayedOutflowPct === 0 ? "#64748B" : displayedOutflowPct <= 40 ? "#8B5CF6" : displayedOutflowPct <= 75 ? "#F59E0B" : "#F43F5E") + "44",
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.ringStatusText,
-                  { color: displayedOutflowPct === 0 ? "#64748B" : displayedOutflowPct <= 40 ? "#8B5CF6" : displayedOutflowPct <= 75 ? "#F59E0B" : "#F43F5E" },
-                ]}
-              >
-                {displayedOutflowPct === 0
-                  ? "Zero Outflow"
-                  : displayedOutflowPct <= 25
-                  ? "Low Burn (Safe)"
-                  : displayedOutflowPct <= 60
-                  ? "Optimal Burn"
-                  : displayedOutflowPct <= 85
-                  ? "Moderate Outflow"
-                  : "High Burn Alert"}
-              </Text>
-            </View>
-            <Text style={styles.ringValueSub} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>
-              {settings.currency} {fmt(displayedExpense)} of {fmt(displayedIncome)}
-            </Text>
-            <Text style={{ fontSize: 10, color: colors.mutedForeground, marginTop: 1, fontFamily: "Inter_500Medium" }} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
-              Outflows of Inflow
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Expense Category Donut */}
-      {displayedExpense > 0 && expenseByCategory.length > 0 ? (
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.cardTitle, { color: colors.foreground }]}>Expense Breakdown</Text>
-          <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
-            {selectedPoint ? `Disbursements in ${selectedPoint.fullDate || selectedPoint.label}` : `Where your money is going · ${activePeriod.label}`}
-          </Text>
-          <DonutChart
-            segments={expenseByCategory}
-            size={134}
-            strokeWidth={11}
-            currency={settings.currency}
-            centerLabel={`${settings.currency} ${fmt(displayedExpense)}`}
-            centerSub="total spent"
-          />
-        </View>
-      ) : selectedPoint ? (
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.cardTitle, { color: colors.foreground }]}>Expense Breakdown</Text>
-          <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
-            Disbursements in {selectedPoint.fullDate || selectedPoint.label}
-          </Text>
-          <View style={{ paddingVertical: 18, alignItems: "center" }}>
-            <Feather name="check-circle" size={24} color="#10B981" />
-            <Text style={{ color: colors.mutedForeground, fontSize: 12, marginTop: 6 }}>
-              Zero expenditures recorded for this specific period.
-            </Text>
-          </View>
-        </View>
-      ) : null}
-
-      {/* Department Spending Bars */}
-      {deptSpend.length > 0 && (
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={styles.cardHeaderRow}>
-            <View>
-              <Text style={[styles.cardTitle, { color: colors.foreground }]}>Department Spending</Text>
-              <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
-                {selectedPoint ? `Allocations in ${selectedPoint.fullDate || selectedPoint.label}` : "Expense allocation by unit"}
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={[styles.smBtn, { borderColor: colors.border }]}
-              onPress={() => router.push("/departments")}
-            >
-              <Text style={[styles.smBtnText, { color: colors.primary }]}>Details</Text>
-            </TouchableOpacity>
-          </View>
-          <HBarChart items={deptSpend} formatValue={v => `${settings.currency} ${fmt(v)}`} />
-        </View>
-      )}
-
-      {/* Budget Utilization Bars */}
-      {budgetItems.length > 0 && (
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={styles.cardHeaderRow}>
-            <View>
-              <Text style={[styles.cardTitle, { color: colors.foreground }]}>Budget vs Actual</Text>
-              <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
-                {selectedPoint ? `Spending during ${selectedPoint.fullDate || selectedPoint.label}` : "Spending per budget category"}
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={[styles.smBtn, { borderColor: colors.border }]}
-              onPress={() => router.push("/budget")}
-            >
-              <Text style={[styles.smBtnText, { color: colors.primary }]}>Manage</Text>
-            </TouchableOpacity>
-          </View>
-          <HBarChart items={budgetItems} formatValue={v => `${settings.currency} ${fmt(v)}`} />
-          {/* Budget progress summary */}
-          <View style={styles.budgetSummaryRow}>
-            {[
-              { label: "Total Allocated", value: `${settings.currency} ${fmt(institutionalTotalBudget)}`, color: colors.primary },
-              { label: selectedPoint ? `${selectedPoint.label} Spent` : "Total Spent", value: `${settings.currency} ${fmt(displayedBudgetSpent)}`, color: colors.expense },
-              { label: "Remaining", value: `${settings.currency} ${fmt(displayedBudgetRemaining)}`, color: colors.income },
-            ].map((s, i) => (
-              <View key={i} style={[styles.budgetSumCard, { backgroundColor: s.color + "15", borderColor: s.color + "33" }]}>
-                <Text style={[styles.budgetSumValue, { color: s.color }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.65}>{s.value}</Text>
-                <Text style={[styles.budgetSumLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
+          <View style={styles.statGrid}>
+            {healthStats.map((s) => (
+              <View key={s.label} style={[styles.statTile, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                <Text style={[styles.statTileLabel, { color: colors.mutedForeground }]} numberOfLines={1}>{s.label}</Text>
+                <Text
+                  style={[styles.statTileValue, { color: s.color }]}
+                  numberOfLines={Platform.OS === "web" ? undefined : 1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.7}
+                >
+                  {s.value}
+                </Text>
               </View>
             ))}
           </View>
         </View>
-      )}
 
-      {/* Total Transactions Analytics & Ledger Overview Card */}
-      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <View style={styles.cardHeaderRow}>
-          <View>
-            <Text style={[styles.cardTitle, { color: colors.foreground }]}>Total Transactions</Text>
+        {/* ─── Financial Trend ─── */}
+        <View
+          style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
+          onLayout={(e) => {
+            const w = e.nativeEvent.layout.width;
+            if (w > 40 && Math.abs(w - chartContainerWidth) > 2) {
+              setChartContainerWidth(w);
+            }
+          }}
+        >
+          <View style={styles.cardHeaderRow}>
+            <View style={styles.cardHeaderText}>
+              <Text style={[styles.cardTitle, { color: colors.foreground }]}>Financial Trend</Text>
+              <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>
+                Income vs expenses · {activePeriod.label}
+              </Text>
+            </View>
+            <View style={[styles.growthBadge, { backgroundColor: tint(periodGrowth >= 0 ? "#10B981" : "#F43F5E") }]}>
+              <Feather name={periodGrowth >= 0 ? "trending-up" : "trending-down"} size={13} color={periodGrowth >= 0 ? "#10B981" : "#F43F5E"} />
+              <Text style={[styles.growthText, { color: periodGrowth >= 0 ? "#10B981" : "#F43F5E" }]}>{periodGrowthLabel}</Text>
+            </View>
+          </View>
+
+          {selectedPoint && (
+            <View style={[styles.inspectBanner, { backgroundColor: tint(colors.primary), borderColor: colors.primary + "40" }]}>
+              <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                <Text style={[styles.inspectTitle, { color: colors.foreground }]} numberOfLines={1}>
+                  Inspecting <Text style={{ color: colors.primary }}>{selectedPoint.fullDate || selectedPoint.label}</Text>
+                </Text>
+                <Text style={[styles.inspectSub, { color: colors.mutedForeground }]} numberOfLines={1}>
+                  In {settings.currency} {fmt(displayedIncome)} · Out {settings.currency} {fmt(displayedExpense)}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setSelectedPoint(null)}
+                style={[styles.inspectClear, { backgroundColor: colors.primary }]}
+                activeOpacity={0.8}
+              >
+                <Feather name="x" size={13} color="#FFFFFF" />
+                <Text style={styles.inspectClearText}>Clear</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <AreaLineChart
+            data={chartPoints}
+            width={chartContainerWidth > 40 ? chartContainerWidth - 34 : chartWidth - 34}
+            height={170}
+            currency={settings.currency}
+            activeRange={customSelection ? undefined : trendRange}
+            activePeriod={activePeriod}
+            onPointSelect={handlePointSelect}
+            onPeriodSelect={(p) => {
+              setActivePeriod(p);
+              setCustomPeriodName(p.label);
+              setSelectedPoint(null);
+            }}
+            onGranularityChange={(g) => {
+              setActivePeriod((prev) => ({
+                ...prev,
+                userGranularityOverride: g,
+              }));
+            }}
+            onRangeSelect={(range) => {
+              setTrendRange(range);
+              setCustomPeriodName(null);
+              setCustomSelection(null);
+              setSelectedPoint(null);
+            }}
+            onCustomDateSelect={(selection) => {
+              setCustomSelection(selection);
+              if (selection.presetName) setCustomPeriodName(selection.presetName);
+              setSelectedPoint(null);
+            }}
+            ranges={["1W", "2W", "1M", "3M", "6M", "1Y", "ALL"]}
+            transactions={transactions}
+            userId={user?.id || "default"}
+          />
+        </View>
+
+        {/* ─── Key Metrics (3 rings) ─── */}
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.cardHeaderRow}>
+            <View style={styles.cardHeaderText}>
+              <Text style={[styles.cardTitle, { color: colors.foreground }]}>Key Metrics</Text>
+              <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>
+                {selectedPoint ? `Inspecting ${scopeLabel}` : `Performance indicators · ${activePeriod.label}`}
+              </Text>
+            </View>
+            {selectedPoint && (
+              <TouchableOpacity
+                style={[styles.smBtn, { borderColor: colors.primary + "40", backgroundColor: tint(colors.primary) }]}
+                onPress={() => setSelectedPoint(null)}
+              >
+                <Text style={[styles.smBtnText, { color: colors.primary }]}>Reset</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          <View style={styles.ringsRow}>
+            {keyMetrics.map((m) => (
+              <View key={m.key} style={styles.ringItem}>
+                <RingProgress
+                  percentage={m.percentage}
+                  centerLabel={m.center}
+                  size={94}
+                  strokeWidth={9}
+                  color={m.tone}
+                  label={m.ringLabel}
+                  sublabel={m.ringSub}
+                />
+                <View style={[styles.ringStatusPill, { backgroundColor: tint(m.tone) }]}>
+                  <Text style={[styles.ringStatusText, { color: m.tone }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                    {m.status}
+                  </Text>
+                </View>
+                <Text
+                  style={[styles.ringValue, { color: colors.foreground }]}
+                  numberOfLines={Platform.OS === "web" ? undefined : 2}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.75}
+                >
+                  {m.value}
+                </Text>
+                <Text style={[styles.ringCaption, { color: colors.mutedForeground }]} numberOfLines={1}>
+                  {m.caption}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* ─── Expense Breakdown ─── */}
+        {displayedExpense > 0 && expenseByCategory.length > 0 ? (
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.cardHeaderText}>
+              <Text style={[styles.cardTitle, { color: colors.foreground }]}>Expense Breakdown</Text>
+              <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>
+                {selectedPoint ? `Spending in ${scopeLabel}` : `Where your money goes · ${activePeriod.label}`}
+              </Text>
+            </View>
+            <DonutChart
+              segments={expenseByCategory}
+              size={140}
+              strokeWidth={12}
+              currency={settings.currency}
+              centerLabel={`${settings.currency} ${fmt(displayedExpense)}`}
+              centerSub="total spent"
+            />
+          </View>
+        ) : selectedPoint ? (
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.cardHeaderText}>
+              <Text style={[styles.cardTitle, { color: colors.foreground }]}>Expense Breakdown</Text>
+              <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>Spending in {scopeLabel}</Text>
+            </View>
+            <View style={styles.emptyInline}>
+              <View style={[styles.emptyIcon, { backgroundColor: tint("#10B981") }]}>
+                <Feather name="check-circle" size={20} color="#10B981" />
+              </View>
+              <Text style={[styles.emptyInlineText, { color: colors.mutedForeground }]}>
+                No expenses recorded in this period.
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
+        {/* ─── Department Spending ─── */}
+        {deptSpend.length > 0 && (
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.cardHeaderRow}>
+              <View style={styles.cardHeaderText}>
+                <Text style={[styles.cardTitle, { color: colors.foreground }]}>Department Spending</Text>
+                <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>
+                  {selectedPoint ? `Spending in ${scopeLabel}` : "Expenses by department"}
+                </Text>
+              </View>
+              <TouchableOpacity style={[styles.smBtn, { borderColor: colors.border }]} onPress={() => router.push("/departments")}>
+                <Text style={[styles.smBtnText, { color: colors.primary }]}>Details</Text>
+                <Feather name="chevron-right" size={14} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
+            <HBarChart items={deptSpend} formatValue={(v) => `${settings.currency} ${fmt(v)}`} />
+          </View>
+        )}
+
+        {/* ─── Budget vs Actual ─── */}
+        {budgetItems.length > 0 && (
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.cardHeaderRow}>
+              <View style={styles.cardHeaderText}>
+                <Text style={[styles.cardTitle, { color: colors.foreground }]}>Budget vs Actual</Text>
+                <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>
+                  {selectedPoint ? `Spending during ${scopeLabel}` : "Spending per budget line"}
+                </Text>
+              </View>
+              <TouchableOpacity style={[styles.smBtn, { borderColor: colors.border }]} onPress={() => router.push("/budget")}>
+                <Text style={[styles.smBtnText, { color: colors.primary }]}>Manage</Text>
+                <Feather name="chevron-right" size={14} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
+            <HBarChart items={budgetItems} formatValue={(v) => `${settings.currency} ${fmt(v)}`} />
+            <View style={styles.budgetSummaryRow}>
+              {[
+                { label: "Allocated", value: `${settings.currency} ${fmt(institutionalTotalBudget)}`, color: colors.primary },
+                { label: selectedPoint ? `Spent (${selectedPoint.label})` : "Spent", value: `${settings.currency} ${fmt(displayedBudgetSpent)}`, color: colors.expense },
+                { label: "Remaining", value: `${settings.currency} ${fmt(displayedBudgetRemaining)}`, color: colors.income },
+              ].map((s) => (
+                <View key={s.label} style={[styles.budgetSumCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                  <Text style={[styles.budgetSumLabel, { color: colors.mutedForeground }]} numberOfLines={1}>{s.label}</Text>
+                  <Text
+                    style={[styles.budgetSumValue, { color: s.color }]}
+                    numberOfLines={Platform.OS === "web" ? undefined : 1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.7}
+                  >
+                    {s.value}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* ─── Transactions overview ─── */}
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.cardHeaderRow}>
+            <View style={styles.cardHeaderText}>
+              <Text style={[styles.cardTitle, { color: colors.foreground }]}>Transactions</Text>
+              <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={2}>
+                {txStats.totalCount} records · {txStats.inflowCount} in · {txStats.outflowCount} out
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.smBtn, { borderColor: colors.primary + "40", backgroundColor: tint(colors.primary) }]}
+              onPress={() => {
+                setTxModalFilter("all");
+                setAllTxModal(true);
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.smBtnText, { color: colors.primary }]}>View all</Text>
+              <Feather name="chevron-right" size={14} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.txStatsGrid}>
+            {txTiles.map((tile) => (
+              <TouchableOpacity
+                key={tile.key}
+                style={[styles.txStatBox, { backgroundColor: colors.background, borderColor: colors.border }]}
+                onPress={tile.onPress}
+                activeOpacity={0.75}
+              >
+                <View style={styles.txStatTop}>
+                  <View style={[styles.txStatIcon, { backgroundColor: tint(tile.color) }]}>
+                    <Feather name={tile.icon as any} size={15} color={tile.color} />
+                  </View>
+                  {tile.action ? (
+                    <Text style={[styles.txStatAction, { color: tile.color }]} numberOfLines={1}>{tile.action}</Text>
+                  ) : null}
+                </View>
+                <Text style={[styles.txStatLabel, { color: colors.mutedForeground }]} numberOfLines={1}>{tile.label}</Text>
+                <Text
+                  style={[styles.txStatVal, { color: tile.color }]}
+                  numberOfLines={Platform.OS === "web" ? undefined : 1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.7}
+                >
+                  {tile.value}
+                </Text>
+                <Text style={[styles.txStatCaption, { color: colors.mutedForeground }]} numberOfLines={1}>{tile.caption}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* ─── AI Insight Cards ─── */}
+        <View style={styles.sectionHeader}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Actionable Insights</Text>
             <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
-              {txStats.totalCount} Records · {txStats.inflowCount} Inflows · {txStats.outflowCount} Outflows · Net: {txStats.netFlow >= 0 ? "+" : "-"}{settings.currency} {fmt(Math.abs(txStats.netFlow))}
+              {displayedInsights.length} {displayedInsights.length === 1 ? "insight" : "insights"}
+              {insightFilter !== "all" ? ` · ${activeFilterLabel} only` : ""}
             </Text>
           </View>
-          <TouchableOpacity
-            style={[styles.smBtn, { borderColor: colors.primary + "44", backgroundColor: colors.primary + "15" }]}
-            onPress={() => {
-              setTxModalFilter("all");
-              setAllTxModal(true);
-            }}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.smBtnText, { color: colors.primary }]}>View All ({txStats.totalCount})</Text>
-          </TouchableOpacity>
         </View>
 
-        <View style={styles.txStatsGrid}>
-          {/* Box 1: Inflows */}
-          <TouchableOpacity
-            style={[styles.txStatBox, { backgroundColor: colors.background, borderColor: colors.border }]}
-            onPress={() => {
-              setTxModalFilter("income");
-              setAllTxModal(true);
-            }}
-            activeOpacity={0.7}
-          >
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-              <View style={[styles.txStatIcon, { backgroundColor: colors.income + "18" }]}>
-                <Feather name="arrow-down-left" size={13} color={colors.income} />
-              </View>
-              <Text style={{ fontSize: 9.5, color: colors.income, fontFamily: "Inter_600SemiBold" }}>View Inflows →</Text>
-            </View>
-            <Text style={[styles.txStatLabel, { color: colors.mutedForeground }]}>Inflows ({txStats.inflowCount})</Text>
-            <Text style={[styles.txStatVal, { color: colors.income }]}>+{settings.currency} {fmt(txStats.inflowTotal)}</Text>
-            <Text style={{ fontSize: 9.5, color: colors.mutedForeground }}>
-              {txStats.inflowCount > 0 ? `${settings.currency} ${fmt(txStats.avgInflow)} avg` : "No inflows"}
-            </Text>
-          </TouchableOpacity>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+          {insightFilters.map((f) => {
+            const active = insightFilter === f.key;
+            return (
+              <TouchableOpacity
+                key={f.key}
+                style={[
+                  styles.filterChip,
+                  {
+                    backgroundColor: active ? f.color : colors.card,
+                    borderColor: active ? f.color : colors.border,
+                  },
+                ]}
+                onPress={() => {
+                  if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
+                  setInsightFilter((cur) => (cur === f.key && f.key !== "all" ? "all" : f.key));
+                }}
+                activeOpacity={0.8}
+              >
+                <Feather name={f.icon as any} size={13} color={active ? "#FFFFFF" : f.color} />
+                <Text style={[styles.filterChipText, { color: active ? "#FFFFFF" : colors.foreground }]}>{f.label}</Text>
+                <View style={[styles.filterCount, { backgroundColor: active ? "rgba(255,255,255,0.25)" : tint(f.color) }]}>
+                  <Text style={[styles.filterCountText, { color: active ? "#FFFFFF" : f.color }]}>{f.count}</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
 
-          {/* Box 2: Outflows */}
-          <TouchableOpacity
-            style={[styles.txStatBox, { backgroundColor: colors.background, borderColor: colors.border }]}
-            onPress={() => {
-              setTxModalFilter("expense");
-              setAllTxModal(true);
-            }}
-            activeOpacity={0.7}
-          >
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-              <View style={[styles.txStatIcon, { backgroundColor: colors.expense + "18" }]}>
-                <Feather name="arrow-up-right" size={13} color={colors.expense} />
-              </View>
-              <Text style={{ fontSize: 9.5, color: colors.expense, fontFamily: "Inter_600SemiBold" }}>View Outflows →</Text>
+        {displayedInsights.length === 0 ? (
+          <View style={[styles.card, styles.emptyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.emptyIcon, { backgroundColor: tint(hasData ? "#10B981" : "#94A3B8") }]}>
+              <Feather name={hasData ? "check-circle" : "info"} size={22} color={hasData ? "#10B981" : "#94A3B8"} />
             </View>
-            <Text style={[styles.txStatLabel, { color: colors.mutedForeground }]}>Outflows ({txStats.outflowCount})</Text>
-            <Text style={[styles.txStatVal, { color: colors.expense }]}>-{settings.currency} {fmt(txStats.outflowTotal)}</Text>
-            <Text style={{ fontSize: 9.5, color: colors.mutedForeground }}>
-              {txStats.outflowCount > 0 ? `${settings.currency} ${fmt(txStats.avgOutflow)} avg` : "No outflows"}
+            <Text style={[styles.emptyCardText, { color: colors.foreground }]}>
+              {!hasData
+                ? "More financial data is required to generate meaningful insights. Add income, expenses, or budgets to activate real-time intelligence."
+                : insightFilter === "critical"
+                ? "No critical alerts found in this period."
+                : insightFilter === "advisories"
+                ? "No warnings or advisories found in this period."
+                : insightFilter === "positive"
+                ? "No positive insights recorded in this period."
+                : "No anomalies or critical alerts detected. All financial metrics are within standard operational limits."}
             </Text>
-          </TouchableOpacity>
+          </View>
+        ) : (
+          displayedInsights.map((insight) => {
+            const conf = SEV_CONFIG[insight.severity] || SEV_CONFIG.INFO;
+            return (
+              <TouchableOpacity
+                key={insight.id}
+                style={[styles.insightCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={() => {
+                  if (insight.actionRoute) router.push(insight.actionRoute as any);
+                }}
+                activeOpacity={insight.actionRoute ? 0.85 : 1}
+              >
+                <View style={[styles.insightAccent, { backgroundColor: conf.color }]} pointerEvents="none" />
 
-          {/* Box 3: Net Cash Flow & Average Ticket */}
-          <TouchableOpacity
-            style={[styles.txStatBox, { backgroundColor: colors.background, borderColor: colors.border }]}
-            onPress={() => {
-              setTxModalFilter("all");
-              setAllTxModal(true);
-            }}
-            activeOpacity={0.7}
-          >
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-              <View style={[styles.txStatIcon, { backgroundColor: (txStats.netFlow >= 0 ? colors.income : colors.expense) + "18" }]}>
-                <Feather name="activity" size={13} color={txStats.netFlow >= 0 ? colors.income : colors.expense} />
-              </View>
-              <Text style={{ fontSize: 9.5, color: txStats.netFlow >= 0 ? colors.income : colors.expense, fontFamily: "Inter_600SemiBold" }}>
-                {txStats.netFlow >= 0 ? "Surplus" : "Deficit"}
-              </Text>
-            </View>
-            <Text style={[styles.txStatLabel, { color: colors.mutedForeground }]}>Net Cash Flow</Text>
-            <Text style={[styles.txStatVal, { color: txStats.netFlow >= 0 ? colors.income : colors.expense }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
-              {txStats.netFlow >= 0 ? "+" : "-"}{settings.currency} {fmt(Math.abs(txStats.netFlow))}
-            </Text>
-            <Text style={{ fontSize: 9.5, color: colors.mutedForeground }}>
-              Avg Ticket: {settings.currency} {fmt(txStats.avgTx)}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Box 4: Max Transaction */}
-          <TouchableOpacity
-            style={[styles.txStatBox, { backgroundColor: colors.background, borderColor: colors.border }]}
-            onPress={() => {
-              setTxModalFilter(txStats.maxTx?.type === "expense" ? "expense" : "income");
-              setAllTxModal(true);
-            }}
-            activeOpacity={0.7}
-          >
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-              <View style={[styles.txStatIcon, { backgroundColor: "#F59E0B18" }]}>
-                <Feather name="award" size={13} color="#F59E0B" />
-              </View>
-              <Text style={{ fontSize: 9.5, color: "#F59E0B", fontFamily: "Inter_600SemiBold" }}>
-                {txStats.maxTx?.type === "expense" ? "Outflow" : "Inflow"}
-              </Text>
-            </View>
-            <Text style={[styles.txStatLabel, { color: colors.mutedForeground }]}>Max Transaction</Text>
-            <Text style={[styles.txStatVal, { color: "#F59E0B" }]} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.7}>
-              {txStats.maxTx ? `${settings.currency} ${fmt(txStats.maxTx.amount)}` : "None"}
-            </Text>
-            <Text style={{ fontSize: 9.5, color: colors.mutedForeground }} numberOfLines={2}>
-              {txStats.maxTx ? `${txStats.maxTx.category || txStats.maxTx.title || "Transaction"}` : "No records"}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* AI Insight Cards */}
-      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-        {displayedInsights.length} Actionable Intelligence Insights {insightFilter !== "all" ? `(${insightFilter === "positive" ? "Positive Only" : "Alerts Only"})` : ""}
-      </Text>
-      {displayedInsights.length === 0 ? (
-        <View style={[styles.disclaimerBox, { backgroundColor: colors.card, borderColor: colors.border, paddingVertical: 20 }]}>
-          <Feather name={hasData ? "check-circle" : "info"} size={24} color={hasData ? "#10B981" : "#94A3B8"} />
-          <Text style={[styles.disclaimerText, { color: colors.foreground, fontSize: 13, marginTop: 6 }]}>
-            {!hasData
-              ? "More financial data is required to generate meaningful insights. Add income, expenses, or budgets to activate real-time intelligence."
-              : insightFilter === "critical" || insightFilter === "advisories"
-              ? "No critical alerts or warnings found in this period."
-              : insightFilter === "positive"
-              ? "No positive insights recorded in this period."
-              : "No anomalies or critical alerts detected. All financial metrics are within standard operational limits."}
-          </Text>
-        </View>
-      ) : (
-        displayedInsights.map((insight) => {
-          const conf = SEV_CONFIG[insight.severity] || SEV_CONFIG.INFO;
-          return (
-            <TouchableOpacity
-              key={insight.id}
-              style={[
-                styles.insightCard,
-                {
-                  backgroundColor: colors.card,
-                  borderColor: conf.border,
-                  borderLeftColor: conf.color,
-                  borderLeftWidth: 4,
-                  flexDirection: "column",
-                  alignItems: "stretch",
-                  gap: 8,
-                },
-              ]}
-              onPress={() => {
-                if (insight.actionRoute) router.push(insight.actionRoute as any);
-              }}
-              activeOpacity={insight.actionRoute ? 0.85 : 1}
-            >
-              <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
-                <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 8, flex: 1 }}>
-                  <View style={[styles.insightIcon, { backgroundColor: conf.bg, marginTop: 1 }]}>
-                    <Feather name={conf.icon} size={15} color={conf.color} />
+                <View style={styles.insightHeader}>
+                  <View style={[styles.insightIcon, { backgroundColor: tint(conf.color) }]}>
+                    <Feather name={conf.icon} size={17} color={conf.color} />
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.insightTitle, { color: colors.foreground }]} numberOfLines={2}>
-                      {insight.title}
-                    </Text>
+                  <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
+                    <View style={styles.insightTitleRow}>
+                      <Text style={[styles.insightTitle, { color: colors.foreground }]}>{insight.title}</Text>
+                      <View style={[styles.typeBadge, { backgroundColor: tint(conf.color) }]}>
+                        <Text style={[styles.typeBadgeText, { color: conf.color }]}>{SEV_LABEL[insight.severity] ?? insight.severity}</Text>
+                      </View>
+                    </View>
                     {insight.metric ? (
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 3, flexWrap: "wrap" }}>
-                        <View style={{ backgroundColor: conf.color + "18", borderColor: conf.color + "44", borderWidth: 1, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 }}>
-                          <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: conf.color }}>
-                            {insight.metric}
-                          </Text>
+                      <View style={styles.metricRow}>
+                        <View style={[styles.metricChip, { backgroundColor: tint(conf.color) }]}>
+                          <Text style={[styles.metricChipText, { color: conf.color }]}>{insight.metric}</Text>
                         </View>
-                        <Text style={{ fontSize: 10.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
-                          {insight.sourceReference}
-                        </Text>
+                        {insight.sourceReference ? (
+                          <Text style={[styles.metricSource, { color: colors.mutedForeground }]} numberOfLines={1}>
+                            {insight.sourceReference}
+                          </Text>
+                        ) : null}
                       </View>
                     ) : null}
                   </View>
                 </View>
-                <View style={[styles.typeBadge, { backgroundColor: conf.bg, flexShrink: 0 }]}>
-                  <Text style={[styles.typeBadgeText, { color: conf.color }]}>{insight.severity}</Text>
-                </View>
-              </View>
 
-              {/* WHAT */}
-              <Text style={[styles.insightDetail, { color: colors.foreground, lineHeight: 18 }]}>
-                {insight.summary || (insight as any).description}
-              </Text>
-
-              {/* WHY IT MATTERS */}
-              <View style={{ backgroundColor: colors.background, padding: 8, borderRadius: 8, borderLeftWidth: 2, borderLeftColor: conf.color }}>
-                <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: colors.mutedForeground, marginBottom: 2 }}>
-                  WHY THIS MATTERS
+                <Text style={[styles.insightDetail, { color: colors.foreground }]}>
+                  {insight.summary || (insight as any).description}
                 </Text>
-                <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground, lineHeight: 16 }}>
-                  {insight.whyItMatters}
-                </Text>
-              </View>
 
-              {/* ACTION */}
-              {insight.isActionable && (
-                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 4, flexWrap: "wrap", gap: 6 }}>
-                  <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: conf.color, flex: 1, minWidth: 160 }} numberOfLines={3}>
-                    👉 {insight.recommendedAction}
-                  </Text>
-                  {insight.actionRoute && (
-                    <View
-                      style={{
-                        backgroundColor: colors.primary + "18",
-                        borderColor: colors.primary + "44",
-                        borderWidth: 1,
-                        paddingVertical: 4,
-                        paddingHorizontal: 10,
-                        borderRadius: 6,
-                        flexShrink: 0,
-                      }}
-                    >
-                      <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: colors.primary }}>
-                        Resolve →
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              )}
-            </TouchableOpacity>
-          );
-        })
-      )}
+                {insight.whyItMatters ? (
+                  <View style={[styles.whyBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                    <Text style={[styles.whyTitle, { color: colors.mutedForeground }]}>WHY THIS MATTERS</Text>
+                    <Text style={[styles.whyText, { color: colors.foreground }]}>{insight.whyItMatters}</Text>
+                  </View>
+                ) : null}
 
-      {/* Disclaimer */}
-      <View style={[styles.disclaimerBox, { backgroundColor: colors.muted, borderColor: colors.border }]}>
-        <Feather name="cpu" size={14} color={colors.mutedForeground} />
-        <Text style={[styles.disclaimerText, { color: colors.mutedForeground }]}>
-          Insights are generated from your financial data using rule-based analytics. Data refreshes as you add records.
-        </Text>
-      </View>
+                {insight.isActionable && (
+                  <View style={[styles.actionRow, { borderTopColor: colors.border }]}>
+                    <Feather name="corner-down-right" size={15} color={conf.color} style={{ marginTop: 1 }} />
+                    <Text style={[styles.actionText, { color: colors.foreground }]}>{insight.recommendedAction}</Text>
+                    {insight.actionRoute && (
+                      <View style={[styles.resolveBtn, { backgroundColor: colors.primary }]}>
+                        <Text style={styles.resolveText}>Resolve</Text>
+                        <Feather name="arrow-right" size={13} color="#FFFFFF" />
+                      </View>
+                    )}
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })
+        )}
 
-      <AllTransactionsModal
-        visible={allTxModal}
-        onClose={() => setAllTxModal(false)}
-        transactions={displayedTxs}
-        initialFilter={txModalFilter}
-        title={selectedPoint ? `Transactions in ${selectedPoint.label}` : `Transactions · ${activePeriod.label}`}
-        subtitle={`${displayedTxs.length} Records (${txStats.inflowCount} Inflows, ${txStats.outflowCount} Outflows) · Net: ${txStats.netFlow >= 0 ? "+" : "-"}${settings.currency} ${fmt(Math.abs(txStats.netFlow))}`}
-      />
+        {/* Disclaimer */}
+        <View style={[styles.disclaimerBox, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+          <Feather name="cpu" size={15} color={colors.mutedForeground} />
+          <Text style={[styles.disclaimerText, { color: colors.mutedForeground }]}>
+            Insights are generated from your financial data using rule-based analytics. Data refreshes as you add records.
+          </Text>
+        </View>
+
+        <AllTransactionsModal
+          visible={allTxModal}
+          onClose={() => setAllTxModal(false)}
+          transactions={displayedTxs}
+          initialFilter={txModalFilter}
+          title={selectedPoint ? `Transactions in ${selectedPoint.label}` : `Transactions · ${activePeriod.label}`}
+          subtitle={`${displayedTxs.length} Records (${txStats.inflowCount} Inflows, ${txStats.outflowCount} Outflows) · Net: ${txStats.netFlow >= 0 ? "+" : "-"}${settings.currency} ${fmt(Math.abs(txStats.netFlow))}`}
+        />
       </ScrollView>
     </View>
   );
@@ -1356,112 +1223,129 @@ export default function AIInsightsScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   header: { paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1 },
-  container: { paddingHorizontal: 16, gap: 12 },
+  container: { paddingHorizontal: 16, gap: 16 },
 
-  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  backBtn: { width: 38, height: 38, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  titleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  aiIcon: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-  title: { fontSize: 18, fontFamily: "Inter_700Bold" },
-  subtitle: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 1 },
+  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
+  backBtn: { width: 40, height: 40, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  titleRow: { flexDirection: "row", alignItems: "center", gap: 10, flexShrink: 1 },
+  aiIcon: { width: 36, height: 36, borderRadius: 11, alignItems: "center", justifyContent: "center" },
+  title: { fontSize: 18, fontFamily: "Inter_700Bold", letterSpacing: -0.2 },
+  subtitle: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 1 },
 
-  card: { borderRadius: 16, borderWidth: 1, padding: 16, gap: 12 },
-  cardTitle: { fontSize: 15.5, fontFamily: "Inter_700Bold" },
-  cardSub: { fontSize: 11.5, fontFamily: "Inter_400Regular", marginTop: -2 },
-  cardHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
-
-  healthRow: { flexDirection: "row", alignItems: "center", gap: 16 },
-  healthRight: { flex: 1, gap: 5 },
-  healthScore: { fontSize: 34, fontFamily: "Inter_800ExtraBold" },
-  healthScoreMax: { fontSize: 16, fontFamily: "Inter_500Medium" },
-  healthLabel: { fontSize: 13, fontFamily: "Inter_700Bold", letterSpacing: 0.8 },
-  healthStats: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 4 },
-  healthStat: { gap: 2 },
-  healthStatValue: { fontSize: 12.5, fontFamily: "Inter_700Bold" },
-  healthStatLabel: { fontSize: 10, fontFamily: "Inter_400Regular" },
-
-  badgeRow: { flexDirection: "row", gap: 8, flexWrap: "wrap", marginTop: 2 },
-  badge: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 4.5, borderRadius: 20, borderWidth: 1 },
-  badgeText: { fontSize: 11.5, fontFamily: "Inter_600SemiBold" },
-
-  growthBadge: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 9, paddingVertical: 4.5, borderRadius: 20, borderWidth: 1 },
-  growthText: { fontSize: 11.5, fontFamily: "Inter_700Bold" },
-
-  ringsRow: { flexDirection: "row", justifyContent: "space-around", paddingVertical: 4 },
-  ringItem: { alignItems: "center", gap: 6 },
-  ringStatusPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
+  card: {
+    borderRadius: 20,
     borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 2,
+    padding: 16,
+    gap: 16,
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 2,
   },
-  ringStatusText: {
-    fontSize: 10,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: 0.2,
-  },
-  ringValueSub: {
-    fontSize: 10,
-    fontFamily: "Inter_600SemiBold",
-    color: "#64748B",
-    textAlign: "center",
-    marginTop: 1,
-  },
+  cardTitle: { fontSize: 16, fontFamily: "Inter_700Bold", letterSpacing: -0.2 },
+  cardSub: { fontSize: 13, fontFamily: "Inter_400Regular", marginTop: 3 },
+  cardHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12 },
+  cardHeaderText: { flex: 1, minWidth: 0 },
 
-  smBtn: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 16, borderWidth: 1 },
-  smBtnText: { fontSize: 11.5, fontFamily: "Inter_600SemiBold" },
+  // Health score
+  healthRow: { flexDirection: "row", alignItems: "center", gap: 18 },
+  healthRight: { flex: 1, minWidth: 0, gap: 6, alignItems: "flex-start" },
+  eyebrow: { fontSize: 11, fontFamily: "Inter_600SemiBold", letterSpacing: 0.8 },
+  healthScore: { fontSize: 36, fontFamily: "Inter_800ExtraBold", letterSpacing: -1, lineHeight: 44 },
+  healthScoreMax: { fontSize: 16, fontFamily: "Inter_500Medium", letterSpacing: 0 },
+  statusPill: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, maxWidth: "100%" },
+  statusDot: { width: 7, height: 7, borderRadius: 3.5 },
+  statusPillText: { fontSize: 13, fontFamily: "Inter_600SemiBold", flexShrink: 1 },
+  healthPeriod: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  statGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", rowGap: 10 },
+  statTile: { width: "48.5%", borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, gap: 4 },
+  statTileLabel: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  statTileValue: { fontSize: 15, fontFamily: "Inter_700Bold" },
 
-  budgetSummaryRow: { flexDirection: "row", gap: 8, marginTop: 2 },
-  budgetSumCard: { flex: 1, borderRadius: 10, borderWidth: 1, padding: 9, alignItems: "center", gap: 2 },
-  budgetSumValue: { fontSize: 12.5, fontFamily: "Inter_800ExtraBold", textAlign: "center" },
-  budgetSumLabel: { fontSize: 9.5, fontFamily: "Inter_500Medium", textAlign: "center" },
+  // Trend
+  growthBadge: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, height: 28, borderRadius: 14, flexShrink: 0 },
+  growthText: { fontSize: 12, fontFamily: "Inter_700Bold" },
+  inspectBanner: { flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 },
+  inspectTitle: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  inspectSub: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  inspectClear: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, height: 30, borderRadius: 15, flexShrink: 0 },
+  inspectClearText: { color: "#FFFFFF", fontSize: 13, fontFamily: "Inter_600SemiBold" },
 
-  sectionTitle: { fontSize: 16.5, fontFamily: "Inter_700Bold", marginTop: 4 },
-  insightCard: { borderRadius: 14, borderWidth: 1, borderLeftWidth: 4, padding: 13, flexDirection: "row", gap: 12 },
-  insightIcon: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  insightContent: { flex: 1, gap: 5 },
-  insightHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 },
-  insightTitle: { fontSize: 14, fontFamily: "Inter_600SemiBold", flex: 1 },
-  insightValue: { fontSize: 12.5, fontFamily: "Inter_700Bold", flexShrink: 0 },
-  typeBadge: { alignSelf: "flex-start", paddingHorizontal: 8, paddingVertical: 2.5, borderRadius: 20, marginTop: 2 },
-  typeBadgeText: { fontSize: 9, fontFamily: "Inter_700Bold", letterSpacing: 0.5 },
-  insightDetail: { fontSize: 11.5, fontFamily: "Inter_400Regular", lineHeight: 16.5 },
+  // Key metric rings
+  ringsRow: { flexDirection: "row", justifyContent: "space-between", gap: 8 },
+  ringItem: { flex: 1, minWidth: 0, alignItems: "center", gap: 8 },
+  ringStatusPill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, maxWidth: "100%" },
+  ringStatusText: { fontSize: 11, fontFamily: "Inter_600SemiBold", textAlign: "center" },
+  ringValue: { fontSize: 13, fontFamily: "Inter_700Bold", textAlign: "center", lineHeight: 17 },
+  ringCaption: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "center", marginTop: -4 },
 
-  disclaimerBox: { flexDirection: "row", alignItems: "flex-start", gap: 8, padding: 12, borderRadius: 10, borderWidth: 1, marginBottom: 8 },
-  disclaimerText: { flex: 1, fontSize: 10.5, fontFamily: "Inter_400Regular", lineHeight: 15 },
+  smBtn: { flexDirection: "row", alignItems: "center", gap: 3, paddingLeft: 12, paddingRight: 9, height: 30, borderRadius: 15, borderWidth: 1, flexShrink: 0 },
+  smBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
 
-  /* Transaction Statistics Grid */
-  txStatsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    rowGap: 8,
-    marginTop: 2,
-  },
-  txStatBox: {
-    width: "48.5%",
-    padding: 10,
-    borderRadius: 12,
+  emptyInline: { alignItems: "center", gap: 10, paddingVertical: 12 },
+  emptyIcon: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
+  emptyInlineText: { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center" },
+
+  budgetSummaryRow: { flexDirection: "row", gap: 8 },
+  budgetSumCard: { flex: 1, minWidth: 0, borderRadius: 12, borderWidth: 1, paddingVertical: 10, paddingHorizontal: 8, alignItems: "center", gap: 4 },
+  budgetSumValue: { fontSize: 14, fontFamily: "Inter_700Bold", textAlign: "center" },
+  budgetSumLabel: { fontSize: 12, fontFamily: "Inter_500Medium", textAlign: "center" },
+
+  // Transactions tiles
+  txStatsGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", rowGap: 10 },
+  txStatBox: { width: "48.5%", padding: 12, borderRadius: 14, borderWidth: 1, gap: 4 },
+  txStatTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6, gap: 6 },
+  txStatIcon: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  txStatAction: { fontSize: 12, fontFamily: "Inter_600SemiBold", flexShrink: 1 },
+  txStatLabel: { fontSize: 12, fontFamily: "Inter_500Medium" },
+  txStatVal: { fontSize: 16, fontFamily: "Inter_700Bold", letterSpacing: -0.3 },
+  txStatCaption: { fontSize: 12, fontFamily: "Inter_400Regular" },
+
+  // Insights
+  sectionHeader: { flexDirection: "row", alignItems: "flex-end", marginTop: 4, marginBottom: -6 },
+  sectionTitle: { fontSize: 18, fontFamily: "Inter_700Bold", letterSpacing: -0.3 },
+  filterRow: { gap: 8, paddingVertical: 2 },
+  filterChip: { flexDirection: "row", alignItems: "center", gap: 6, paddingLeft: 12, paddingRight: 6, height: 36, borderRadius: 18, borderWidth: 1 },
+  filterChipText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  filterCount: { minWidth: 24, height: 24, borderRadius: 12, paddingHorizontal: 6, alignItems: "center", justifyContent: "center" },
+  filterCountText: { fontSize: 12, fontFamily: "Inter_700Bold" },
+  emptyCard: { alignItems: "center", paddingVertical: 24 },
+  emptyCardText: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 20, textAlign: "center" },
+
+  insightCard: {
+    borderRadius: 18,
     borderWidth: 1,
-    gap: 3,
+    padding: 16,
+    paddingLeft: 20,
+    gap: 12,
+    overflow: "hidden",
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 1.5,
   },
-  txStatIcon: {
-    width: 26,
-    height: 26,
-    borderRadius: 7,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 2,
-  },
-  txStatLabel: {
-    fontSize: 10,
-    fontFamily: "Inter_500Medium",
-  },
-  txStatVal: {
-    fontSize: 13,
-    fontFamily: "Inter_800ExtraBold",
-  },
+  insightAccent: { position: "absolute", left: 0, top: 0, bottom: 0, width: 4 },
+  insightHeader: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  insightIcon: { width: 38, height: 38, borderRadius: 11, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+  insightTitleRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  insightTitle: { flex: 1, fontSize: 15, fontFamily: "Inter_700Bold", lineHeight: 20, letterSpacing: -0.1 },
+  typeBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, flexShrink: 0, marginTop: 1 },
+  typeBadgeText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  metricRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
+  metricChip: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  metricChipText: { fontSize: 13, fontFamily: "Inter_700Bold" },
+  metricSource: { fontSize: 12, fontFamily: "Inter_400Regular", flexShrink: 1 },
+  insightDetail: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 20 },
+  whyBox: { borderRadius: 12, borderWidth: 1, padding: 12, gap: 4 },
+  whyTitle: { fontSize: 11, fontFamily: "Inter_600SemiBold", letterSpacing: 0.6 },
+  whyText: { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 19, opacity: 0.85 },
+  actionRow: { flexDirection: "row", alignItems: "flex-start", gap: 8, borderTopWidth: 1, paddingTop: 12 },
+  actionText: { flex: 1, fontSize: 13, fontFamily: "Inter_600SemiBold", lineHeight: 19 },
+  resolveBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, height: 30, borderRadius: 15, flexShrink: 0 },
+  resolveText: { color: "#FFFFFF", fontSize: 13, fontFamily: "Inter_600SemiBold" },
+
+  disclaimerBox: { flexDirection: "row", alignItems: "flex-start", gap: 10, padding: 14, borderRadius: 14, borderWidth: 1, marginBottom: 8 },
+  disclaimerText: { flex: 1, fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 17 },
 });
