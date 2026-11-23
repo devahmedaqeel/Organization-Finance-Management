@@ -40,48 +40,50 @@ const ofm = (key: string) => ({ dataSet: { [key]: "" } } as any);
 
 // Fixed dark "glass" palette for the sign-in screen (independent of the in-app light/dark theme)
 const AUTH_GLASS = {
-  background: "#060D1F",
-  foreground: "#F8FAFC",
-  mutedForeground: "rgba(203, 213, 225, 0.78)",
-  border: "rgba(255, 255, 255, 0.14)",
-  card: "rgba(15, 23, 42, 0.55)",
-  cardAlt: "rgba(255, 255, 255, 0.05)",
-  muted: "rgba(255, 255, 255, 0.05)",
-  input: "rgba(255, 255, 255, 0.06)",
+  background: "#F4F5F8",
+  foreground: "#1F2328",
+  mutedForeground: "#5F6670",
+  border: "#DCDFE4",
+  card: "#FFFFFF",
+  cardAlt: "#F1F2F4",
+  muted: "#F1F2F4",
+  input: "#FFFFFF",
+  primary: "#2CA01C",
+  expense: "#D52B1E",
 };
 
 const AUTH_FEATURES = [
-  { title: "Real-time ledger", desc: "Income, expenses and budgets synced across web and mobile.", color: "#38BDF8", icon: "trend" },
-  { title: "Budget control", desc: "Department ceilings with live utilisation alerts.", color: "#A78BFA", icon: "pie" },
-  { title: "Payroll & payslips", desc: "Salary runs, deductions and verified payslips.", color: "#34D399", icon: "users" },
+  { title: "Income & expenses", desc: "Every transaction in one ledger, always up to date.", color: "#86EFAC", icon: "trend" },
+  { title: "Department budgets", desc: "Set limits and get alerted before they're reached.", color: "#86EFAC", icon: "pie" },
+  { title: "Payroll & payslips", desc: "Run salaries and send professional payslips.", color: "#86EFAC", icon: "users" },
 ] as const;
 
 const ROLE_OPTIONS: { role: UserRole; title: string; desc: string; badge: string; color: string }[] = [
   {
     role: "admin",
-    title: "Organization Admin",
-    desc: "Full system authority: Budgets, Ledger, Payroll, Team & Roles, System Config.",
+    title: "Admin",
+    desc: "Set up a new organization. Full access to everything.",
     badge: "FULL ACCESS",
     color: "#6366F1",
   },
   {
     role: "accountant",
-    title: "Financial Accountant",
-    desc: "Ledger operations: Record Inflows & Grants, Expenses, Budgets & Financial Reports.",
+    title: "Accountant",
+    desc: "Record income, expenses, budgets and payroll.",
     badge: "FINANCE OPS",
     color: "#F59E0B",
   },
   {
     role: "manager",
-    title: "Department Manager",
-    desc: "Cost center intelligence: Monitor Department Budgets, Expenses & AI Insights.",
+    title: "Manager",
+    desc: "View reports, budgets and department spending.",
     badge: "MANAGEMENT",
     color: "#8B5CF6",
   },
   {
     role: "employee",
-    title: "Staff Employee",
-    desc: "Self-service staff portal: Submit Expense Claims & Inspect Salary Slips.",
+    title: "Employee",
+    desc: "See your own payslips.",
     badge: "SELF-SERVICE",
     color: "#10B981",
   },
@@ -239,327 +241,265 @@ export function WebAuth() {
     }
   };
 
+  const isSignup = mode === "signup";
+  const switchMode = (m: "login" | "signup") => {
+    setMode(m);
+    setError("");
+    setSuccessMsg("");
+  };
+
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]} {...ofm("ofmAuth")}>
-      {/* Ambient gradient backdrop with soft moving glows */}
-      <View style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]} {...ofm("ofmAuthBg")}>
-        <View {...ofm("ofmOrbA")} />
-        <View {...ofm("ofmOrbB")} />
-        <View {...ofm("ofmOrbC")} />
-        <View {...ofm("ofmAuthGrid")} />
-      </View>
-
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={[styles.scrollContent, isMobile && { padding: 16 }]} showsVerticalScrollIndicator={false}>
-        <View style={[styles.splitRow, !showHero && { justifyContent: "center" }]}>
-        {/* Showcase panel (desktop) */}
-        {showHero && (
-          <View style={styles.heroPanel} {...ofm("ofmAuthHero")}>
-            <View style={[styles.heroPill, { borderColor: colors.border }]} {...ofm("ofmGlass")}>
-              <View style={styles.heroPillDot} {...ofm("ofmLiveDot")} />
-              <Text style={styles.heroPillText}>Live cloud sync · Web & Mobile</Text>
-            </View>
-            <Text style={styles.heroTitle}>
-              Finance operations,{"\n"}
-              <Text style={styles.heroTitleAccent}>clear and in control.</Text>
-            </Text>
-            <Text style={styles.heroSubtitle}>
-              One secure workspace for your organization's ledger, budgets, payroll and audit-ready reports.
-            </Text>
-
-            <View {...ofm("ofmFloat")} style={{ marginVertical: 8 }}>
-              <AuthIllustration width={Math.min(480, width * 0.36)} />
-            </View>
-
-            <View style={styles.featureList}>
-              {AUTH_FEATURES.map((f) => (
-                <View key={f.title} style={[styles.featureRow, { borderColor: colors.border }]} {...ofm("ofmGlass")}>
-                  <View style={[styles.featureIcon, { backgroundColor: f.color + "22", borderColor: f.color + "55" }]}>
-                    {f.icon === "trend" ? (
-                      <SvgTrendingUp size={16} color={f.color} />
-                    ) : f.icon === "pie" ? (
-                      <SvgPieChart size={16} color={f.color} />
-                    ) : (
-                      <SvgUsers size={16} color={f.color} />
-                    )}
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.featureTitle}>{f.title}</Text>
-                    <Text style={styles.featureDesc}>{f.desc}</Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* Main Auth Card */}
-        <View
-          {...ofm("ofmAuthCard")}
-          style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }, isMobile && { padding: 20, width: "100%" }]}
-        >
-          {/* Header Brand */}
-          <View style={styles.brandRow}>
-            <View style={[styles.logoWrap, { backgroundColor: "transparent", borderWidth: 0, padding: 0 }]}>
-              <BrandMark size={44} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                <Text style={[styles.brandTitle, { color: colors.foreground }]}>OFM</Text>
-                <View style={[styles.cloudBadge, { backgroundColor: colors.primary + "18" }]}>
-                  <Text style={[styles.cloudBadgeText, { color: colors.primary }]}>Cloud</Text>
+        <View style={[styles.shell, { borderColor: colors.border, backgroundColor: colors.card }, !showHero && { maxWidth: 520 }]}>
+          {/* ── Brand panel (desktop) ── */}
+          {showHero && (
+            <View style={styles.brandPanel}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                <BrandMark size={38} />
+                <View>
+                  <Text style={styles.bpBrand}>OFM</Text>
+                  <Text style={styles.bpBrandSub}>Organization Finance Management</Text>
                 </View>
               </View>
-              <Text style={[styles.brandSubtitle, { color: colors.mutedForeground }]}>
-                Organization Finance Management
-              </Text>
-            </View>
-          </View>
 
-          {/* Mode Switcher Tabs */}
-          <View style={[styles.modeTabs, { backgroundColor: colors.cardAlt ?? colors.muted, borderColor: colors.border }]}>
-            <TouchableOpacity
-              style={[styles.modeTabBtn, mode === "login" && [styles.modeTabBtnActive, { backgroundColor: colors.primary }]]}
-              {...(mode === "login" ? ofm("ofmGradientBtn") : {})}
-              onPress={() => {
-                setMode("login");
-                setError("");
-              }}
-              activeOpacity={0.8}
-            >
-              <SvgLogIn size={15} color={mode === "login" ? "#FFFFFF" : colors.mutedForeground} />
-              <Text style={[styles.modeTabText, { color: mode === "login" ? "#FFFFFF" : colors.mutedForeground }]}>
-                Sign In
-              </Text>
-            </TouchableOpacity>
+              <View style={{ gap: 12 }}>
+                <Text style={styles.bpTitle}>Your organization's finances, in one place.</Text>
+                <Text style={styles.bpText}>
+                  Record income and expenses, set department budgets, run payroll and share reports — on the web and on your phone.
+                </Text>
+              </View>
 
-            <TouchableOpacity
-              style={[styles.modeTabBtn, mode === "signup" && [styles.modeTabBtnActive, { backgroundColor: colors.primary }]]}
-              {...(mode === "signup" ? ofm("ofmGradientBtn") : {})}
-              onPress={() => {
-                setMode("signup");
-                setError("");
-              }}
-              activeOpacity={0.8}
-            >
-              <SvgUserPlus size={15} color={mode === "signup" ? "#FFFFFF" : colors.mutedForeground} />
-              <Text style={[styles.modeTabText, { color: mode === "signup" ? "#FFFFFF" : colors.mutedForeground }]}>
-                Create Account
-              </Text>
-            </TouchableOpacity>
-          </View>
+              <View style={{ gap: 14 }}>
+                {AUTH_FEATURES.map((f) => (
+                  <View key={f.title} style={styles.bpFeature}>
+                    <View style={styles.bpFeatureIcon}>
+                      {f.icon === "trend" ? (
+                        <SvgTrendingUp size={16} color="#86EFAC" />
+                      ) : f.icon === "pie" ? (
+                        <SvgPieChart size={16} color="#86EFAC" />
+                      ) : (
+                        <SvgUsers size={16} color="#86EFAC" />
+                      )}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.bpFeatureTitle}>{f.title}</Text>
+                      <Text style={styles.bpFeatureText}>{f.desc}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
 
-          {/* Error Banner */}
-          {error ? (
-            <View style={[styles.alertBanner, { backgroundColor: "#EF444418", borderColor: "#EF444440" }]}>
-              <SvgAlertCircle size={16} color="#EF4444" />
-              <Text style={[styles.alertText, { color: "#EF4444" }]}>{error}</Text>
-            </View>
-          ) : null}
-
-
-          {/* Role Selection for Sign Up */}
-          {mode === "signup" && (
-            <View style={{ gap: 8, marginTop: 4 }}>
-              <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>SELECT YOUR INSTITUTIONAL ROLE</Text>
-              <View style={styles.roleGrid}>
-                {ROLE_OPTIONS.map((r) => {
-                  const isSelected = selectedRole === r.role;
-                  return (
-                    <TouchableOpacity
-                      key={r.role}
-                      style={[
-                        styles.roleCard,
-                        {
-                          backgroundColor: isSelected ? r.color + "18" : (colors.cardAlt ?? colors.muted),
-                          borderColor: isSelected ? r.color : colors.border,
-                        },
-                      ]}
-                      onPress={() => setSelectedRole(r.role)}
-                      activeOpacity={0.75}
-                    >
-                      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                        <Text style={[styles.roleCardTitle, { color: isSelected ? r.color : colors.foreground }]}>
-                          {r.title}
-                        </Text>
-                        <View style={[styles.roleBadge, { backgroundColor: r.color + "25" }]}>
-                          <Text style={[styles.roleBadgeText, { color: r.color }]}>{r.badge}</Text>
-                        </View>
-                      </View>
-                      <Text style={[styles.roleCardDesc, { color: colors.mutedForeground }]}>{r.desc}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
+              <View style={styles.bpFoot}>
+                <SvgShield size={13} color="rgba(255,255,255,0.6)" />
+                <Text style={styles.bpFootText}>Secure sign-in · Role-based access · Synced web & mobile</Text>
               </View>
             </View>
           )}
 
-          {/* Form Inputs */}
-          <View style={styles.formWrap}>
-            {mode === "signup" && (
-              <View style={styles.inputGroup}>
-                <Text style={[styles.inputLabel, { color: colors.foreground }]}>Full Name</Text>
-                <View style={[styles.inputBox, { backgroundColor: colors.input, borderColor: colors.border }]}>
-                  <SvgUser size={16} color={colors.mutedForeground} />
-                  <TextInput
-                    style={[styles.inputField, { color: colors.foreground }]}
-                    placeholder="Dr. Ahmed Aqeel"
-                    placeholderTextColor={colors.mutedForeground}
-                    value={name}
-                    onChangeText={setName}
-                    autoCapitalize="words"
-                  />
+          {/* ── Form panel ── */}
+          <View style={[styles.formPanel, isMobile && { padding: 22 }]}>
+            {!showHero && (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 4 }}>
+                <BrandMark size={36} />
+                <View>
+                  <Text style={[styles.brandTitle, { color: colors.foreground }]}>OFM</Text>
+                  <Text style={[styles.brandSubtitle, { color: colors.mutedForeground }]}>Organization Finance Management</Text>
                 </View>
               </View>
             )}
 
-            {mode === "signup" && (
-              <View style={styles.inputGroup}>
-                <Text style={[styles.inputLabel, { color: colors.foreground }]}>
-                  {selectedRole === "admin" ? "Organization Name" : "Admin Email (Invite Code)"}
-                </Text>
-                <View style={[styles.inputBox, { backgroundColor: colors.input, borderColor: colors.border }]}>
-                  <SvgGrid size={16} color={colors.mutedForeground} />
+            <View style={{ gap: 4 }}>
+              <Text style={[styles.formTitle, { color: colors.foreground }]}>{isSignup ? "Create your account" : "Sign in"}</Text>
+              <Text style={[styles.formSub, { color: colors.mutedForeground }]}>
+                {isSignup ? "Set up your organization, or join one with an invite." : "Welcome back. Sign in to continue to your dashboard."}
+              </Text>
+            </View>
+
+            {/* Tabs */}
+            <View style={[styles.tabs, { borderBottomColor: colors.border }]}>
+              {([["login", "Sign in"], ["signup", "Create account"]] as const).map(([k, label]) => {
+                const on = mode === k;
+                return (
+                  <TouchableOpacity key={k} onPress={() => switchMode(k)} style={[styles.tab, { borderBottomColor: on ? colors.primary : "transparent" }]} accessibilityRole="tab" accessibilityState={{ selected: on }}>
+                    <Text style={[styles.tabText, { color: on ? colors.foreground : colors.mutedForeground, fontFamily: on ? "Inter_600SemiBold" : "Inter_500Medium" }]}>{label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {error ? (
+              <View style={[styles.alertBanner, { backgroundColor: colors.expense + "10", borderColor: colors.expense + "40" }]} accessibilityLiveRegion="polite">
+                <SvgAlertCircle size={16} color={colors.expense} />
+                <Text style={[styles.alertText, { color: colors.expense }]}>{error}</Text>
+              </View>
+            ) : null}
+
+            {/* Role (sign up) */}
+            {isSignup && (
+              <View style={{ gap: 8 }}>
+                <Text style={[styles.inputLabel, { color: colors.foreground }]}>I'm joining as</Text>
+                <View style={styles.roleGrid}>
+                  {ROLE_OPTIONS.map((r) => {
+                    const on = selectedRole === r.role;
+                    return (
+                      <TouchableOpacity
+                        key={r.role}
+                        onPress={() => setSelectedRole(r.role)}
+                        activeOpacity={0.8}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected: on }}
+                        style={[styles.roleCard, { borderColor: on ? colors.primary : colors.border, backgroundColor: on ? colors.primary + "0D" : colors.card }]}
+                      >
+                        <View style={[styles.radio, { borderColor: on ? colors.primary : colors.border }]}>
+                          {on ? <View style={[styles.radioDot, { backgroundColor: colors.primary }]} /> : null}
+                        </View>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={[styles.roleCardTitle, { color: colors.foreground }]}>{r.title}</Text>
+                          <Text style={[styles.roleCardDesc, { color: colors.mutedForeground }]}>{r.desc}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+
+            {/* Fields */}
+            <View style={styles.formWrap}>
+              {isSignup && (
+                <Field label="Full name" icon={<SvgUser size={16} color={colors.mutedForeground} />} colors={colors}>
+                  <TextInput style={[styles.inputField, { color: colors.foreground }]} placeholder="e.g. Ahmed Aqeel" placeholderTextColor={colors.mutedForeground} value={name} onChangeText={setName} autoCapitalize="words" />
+                </Field>
+              )}
+
+              {isSignup && (
+                <Field
+                  label={selectedRole === "admin" ? "Organization name" : "Invite code (your admin's email)"}
+                  hint={selectedRole === "admin" ? "You'll be the admin of this new organization." : "Ask your admin for the email they invited you from."}
+                  icon={<SvgGrid size={16} color={colors.mutedForeground} />}
+                  colors={colors}
+                >
                   <TextInput
                     style={[styles.inputField, { color: colors.foreground }]}
-                    placeholder={selectedRole === "admin" ? "Organization Finance Management" : "admin@ofm.com"}
+                    placeholder={selectedRole === "admin" ? "e.g. Dev Orbit Tech" : "admin@company.com"}
                     placeholderTextColor={colors.mutedForeground}
                     value={orgNameOrInvite}
                     onChangeText={setOrgNameOrInvite}
-                    autoCapitalize="none"
+                    autoCapitalize={selectedRole === "admin" ? "words" : "none"}
                   />
-                </View>
-              </View>
-            )}
+                </Field>
+              )}
 
-            <View style={styles.inputGroup}>
-              <Text style={[styles.inputLabel, { color: colors.foreground }]}>Work Email</Text>
-              <View style={[styles.inputBox, { backgroundColor: colors.input, borderColor: colors.border }]}>
-                <SvgMail size={16} color={colors.mutedForeground} />
+              <Field label="Email" icon={<SvgMail size={16} color={colors.mutedForeground} />} colors={colors}>
                 <TextInput
                   style={[styles.inputField, { color: colors.foreground }]}
-                  placeholder="name@organization.com"
+                  placeholder="name@company.com"
                   placeholderTextColor={colors.mutedForeground}
                   value={email}
                   onChangeText={setEmail}
                   autoCapitalize="none"
                   keyboardType="email-address"
+                  autoComplete="email"
                 />
-              </View>
-            </View>
+              </Field>
 
-            <View style={styles.inputGroup}>
-              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                <Text style={[styles.inputLabel, { color: colors.foreground }]}>Password</Text>
-                {mode === "login" && (
-                  <TouchableOpacity onPress={() => setForgotModal(true)}>
-                    <Text style={{ fontSize: 11.5, color: colors.primary, fontFamily: "Inter_600SemiBold" }}>
-                      Forgot Password?
-                    </Text>
+              <Field
+                label="Password"
+                right={!isSignup ? (
+                  <TouchableOpacity onPress={() => { setForgotEmail(email); setForgotModal(true); }}>
+                    <Text style={[styles.linkText, { color: colors.primary }]}>Forgot password?</Text>
                   </TouchableOpacity>
-                )}
-              </View>
-              <View style={[styles.inputBox, { backgroundColor: colors.input, borderColor: colors.border }]}>
-                <SvgLock size={16} color={colors.mutedForeground} />
+                ) : undefined}
+                hint={isSignup ? "At least 6 characters." : undefined}
+                icon={<SvgLock size={16} color={colors.mutedForeground} />}
+                colors={colors}
+              >
                 <TextInput
                   style={[styles.inputField, { color: colors.foreground }]}
-                  placeholder="••••••••"
+                  placeholder={isSignup ? "Create a password" : "Your password"}
                   placeholderTextColor={colors.mutedForeground}
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
+                  autoComplete={isSignup ? "new-password" : "current-password"}
+                  onSubmitEditing={!isSignup ? () => handleLogin() : undefined}
                 />
-                <TouchableOpacity
-                  onPress={() => setShowPassword((p) => !p)}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  style={{ padding: 4 }}
-                >
-                  {showPassword ? (
-                    <SvgEyeOff size={16} color={colors.mutedForeground} />
-                  ) : (
-                    <SvgEye size={16} color={colors.mutedForeground} />
-                  )}
+                <TouchableOpacity onPress={() => setShowPassword((p) => !p)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ padding: 4 }} accessibilityLabel={showPassword ? "Hide password" : "Show password"}>
+                  {showPassword ? <SvgEyeOff size={16} color={colors.mutedForeground} /> : <SvgEye size={16} color={colors.mutedForeground} />}
                 </TouchableOpacity>
-              </View>
-            </View>
+              </Field>
 
-            {mode === "signup" && (
-              <View style={styles.inputGroup}>
-                <Text style={[styles.inputLabel, { color: colors.foreground }]}>Confirm Password</Text>
-                <View style={[styles.inputBox, { backgroundColor: colors.input, borderColor: colors.border }]}>
-                  <SvgLock size={16} color={colors.mutedForeground} />
+              {isSignup && (
+                <Field label="Confirm password" icon={<SvgLock size={16} color={colors.mutedForeground} />} colors={colors}>
                   <TextInput
                     style={[styles.inputField, { color: colors.foreground }]}
-                    placeholder="••••••••"
+                    placeholder="Type the password again"
                     placeholderTextColor={colors.mutedForeground}
                     value={confirmPassword}
                     onChangeText={setConfirmPassword}
                     secureTextEntry={!showConfirmPassword}
+                    autoComplete="new-password"
+                    onSubmitEditing={handleSignUp}
                   />
-                  <TouchableOpacity
-                    onPress={() => setShowConfirmPassword((p) => !p)}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    style={{ padding: 4 }}
-                  >
-                    {showConfirmPassword ? (
-                      <SvgEyeOff size={16} color={colors.mutedForeground} />
-                    ) : (
-                      <SvgEye size={16} color={colors.mutedForeground} />
-                    )}
+                  <TouchableOpacity onPress={() => setShowConfirmPassword((p) => !p)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ padding: 4 }} accessibilityLabel={showConfirmPassword ? "Hide password" : "Show password"}>
+                    {showConfirmPassword ? <SvgEyeOff size={16} color={colors.mutedForeground} /> : <SvgEye size={16} color={colors.mutedForeground} />}
                   </TouchableOpacity>
-                </View>
-              </View>
-            )}
-
-            {/* Primary Action Button */}
-            <TouchableOpacity
-              {...ofm("ofmGradientBtn")}
-              style={[styles.submitBtn, { backgroundColor: colors.primary }]}
-              onPress={mode === "login" ? () => handleLogin() : handleSignUp}
-              disabled={loading}
-              activeOpacity={0.85}
-            >
-              {loading ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
-              ) : (
-                <Text style={styles.submitBtnText}>
-                  {mode === "login" ? "Sign In to Dashboard" : `Create ${selectedRole.toUpperCase()} Account`}
-                </Text>
+                </Field>
               )}
-            </TouchableOpacity>
 
-            {/* Google OAuth Button */}
-            <View style={styles.dividerRow}>
-              <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
-              <Text style={[styles.dividerText, { color: colors.mutedForeground }]}>OR CONTINUE WITH</Text>
-              <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+              <TouchableOpacity
+                style={[styles.submitBtn, { backgroundColor: colors.primary, opacity: loading ? 0.8 : 1 }]}
+                onPress={isSignup ? handleSignUp : () => handleLogin()}
+                disabled={loading}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+              >
+                {loading ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.submitBtnText}>
+                    {isSignup ? `Create ${ROLE_OPTIONS.find((r) => r.role === selectedRole)?.title.toLowerCase() || ""} account` : "Sign in"}
+                  </Text>
+                )}
+              </TouchableOpacity>
+
+              <View style={styles.dividerRow}>
+                <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+                <Text style={[styles.dividerText, { color: colors.mutedForeground }]}>or</Text>
+                <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+              </View>
+
+              <TouchableOpacity
+                style={[styles.googleBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={handleGoogleAuth}
+                disabled={loading}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+              >
+                <SvgGoogle size={18} />
+                <Text style={[styles.googleBtnText, { color: colors.foreground }]}>Continue with Google</Text>
+              </TouchableOpacity>
             </View>
 
-            <TouchableOpacity
-              style={[styles.googleBtn, { backgroundColor: "#FFFFFF", borderColor: "#FFFFFF" }]}
-              onPress={handleGoogleAuth}
-              disabled={loading}
-              activeOpacity={0.8}
-            >
-              <SvgGoogle size={18} />
-              <Text style={[styles.googleBtnText, { color: "#0F172A" }]}>Sign in with Google</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.cardFooter}>
-            <SvgShield size={12} color={colors.mutedForeground} />
-            <Text style={[styles.cardFooterText, { color: colors.mutedForeground }]}>
-              Encrypted sign-in · Role-based access
+            <Text style={[styles.switchText, { color: colors.mutedForeground }]}>
+              {isSignup ? "Already have an account? " : "New to OFM? "}
+              <Text style={[styles.linkText, { color: colors.primary }]} onPress={() => switchMode(isSignup ? "login" : "signup")}>
+                {isSignup ? "Sign in" : "Create an account"}
+              </Text>
             </Text>
           </View>
         </View>
-        </View>
+
+        <Text style={[styles.legal, { color: colors.mutedForeground }]}>© {new Date().getFullYear()} OFM · Organization Finance Management</Text>
       </ScrollView>
 
       {/* Forgot Password Modal */}
       <Modal visible={forgotModal} transparent animationType="fade" onRequestClose={() => setForgotModal(false)}>
-        <View style={styles.modalBackdrop} {...ofm("ofmAuth")}>
-          <View {...ofm("ofmGlass")} style={[styles.forgotCard, { backgroundColor: "rgba(15, 23, 42, 0.82)", borderColor: colors.border }]}>
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.forgotCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-              <Text style={[styles.forgotTitle, { color: colors.foreground }]}>Reset Password</Text>
+              <Text style={[styles.forgotTitle, { color: colors.foreground }]}>Reset your password</Text>
               <TouchableOpacity onPress={() => setForgotModal(false)}>
                 <SvgX size={18} color={colors.foreground} />
               </TouchableOpacity>
@@ -578,7 +518,7 @@ export function WebAuth() {
                   },
                 ]}
               >
-                <Text style={{ color: forgotMsg.type === "success" ? "#10B981" : "#EF4444", fontSize: 12 }}>
+                <Text style={{ color: forgotMsg.type === "success" ? "#108000" : colors.expense, fontSize: 12 }}>
                   {forgotMsg.text}
                 </Text>
               </View>
@@ -605,10 +545,10 @@ export function WebAuth() {
               {forgotLoading ? (
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                   <ActivityIndicator color="#fff" size="small" />
-                  <Text style={styles.submitBtnText}>Sending...</Text>
+                  <Text style={styles.submitBtnText}>Sending…</Text>
                 </View>
               ) : (
-                <Text style={styles.submitBtnText}>Send Reset Link</Text>
+                <Text style={styles.submitBtnText}>Send reset link</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -618,9 +558,50 @@ export function WebAuth() {
   );
 }
 
+/** Labelled input row used by every field on the form. */
+function Field({ label, hint, right, icon, colors, children }: { label: string; hint?: string; right?: React.ReactNode; icon: React.ReactNode; colors: any; children: React.ReactNode }) {
+  return (
+    <View style={styles.inputGroup}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+        <Text style={[styles.inputLabel, { color: colors.foreground }]}>{label}</Text>
+        {right}
+      </View>
+      <View style={[styles.inputBox, { backgroundColor: colors.input, borderColor: colors.border }]}>
+        {icon}
+        {children}
+      </View>
+      {hint ? <Text style={[styles.hint, { color: colors.mutedForeground }]}>{hint}</Text> : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  shell: { width: "100%", maxWidth: 1040, flexDirection: "row", borderWidth: 1, borderRadius: 14, overflow: "hidden", shadowColor: "#000", shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 28, elevation: 6 },
+  brandPanel: { width: 420, padding: 36, gap: 32, justifyContent: "space-between", backgroundColor: "#1A1C20", backgroundImage: "linear-gradient(160deg, #1A1C20 0%, #1D2A21 55%, #1B4D22 100%)" as any },
+  bpBrand: { color: "#FFFFFF", fontSize: 18, fontFamily: "Inter_600SemiBold" },
+  bpBrandSub: { color: "rgba(255,255,255,0.65)", fontSize: 12, fontFamily: "Inter_400Regular" },
+  bpTitle: { color: "#FFFFFF", fontSize: 28, lineHeight: 36, fontFamily: "Inter_600SemiBold", letterSpacing: -0.5 },
+  bpText: { color: "rgba(255,255,255,0.75)", fontSize: 14.5, lineHeight: 22, fontFamily: "Inter_400Regular" },
+  bpFeature: { flexDirection: "row", gap: 12, alignItems: "flex-start" },
+  bpFeatureIcon: { width: 32, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(134,239,172,0.12)" },
+  bpFeatureTitle: { color: "#FFFFFF", fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  bpFeatureText: { color: "rgba(255,255,255,0.68)", fontSize: 13, lineHeight: 19, fontFamily: "Inter_400Regular", marginTop: 2 },
+  bpFoot: { flexDirection: "row", alignItems: "center", gap: 8 },
+  bpFootText: { color: "rgba(255,255,255,0.6)", fontSize: 12, fontFamily: "Inter_400Regular" },
+  formPanel: { flex: 1, padding: 40, gap: 20, minWidth: 0 },
+  formTitle: { fontSize: 24, fontFamily: "Inter_600SemiBold", letterSpacing: -0.4 },
+  formSub: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 20 },
+  tabs: { flexDirection: "row", gap: 4, borderBottomWidth: 1 },
+  tab: { paddingHorizontal: 4, paddingVertical: 10, marginRight: 16, borderBottomWidth: 2, marginBottom: -1, cursor: "pointer" as any },
+  tabText: { fontSize: 14 },
+  radio: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, alignItems: "center", justifyContent: "center", marginTop: 1 },
+  radioDot: { width: 8, height: 8, borderRadius: 4 },
+  hint: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 17 },
+  linkText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  switchText: { fontSize: 13.5, fontFamily: "Inter_400Regular", textAlign: "center" },
+  legal: { fontSize: 12, fontFamily: "Inter_400Regular" },
   container: { flex: 1, minHeight: "100%" },
-  scrollContent: { flexGrow: 1, alignItems: "center", justifyContent: "center", padding: 32 },
+  scrollContent: { flexGrow: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 16 },
   splitRow: { width: "100%", maxWidth: 1180, flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 56 },
   heroPanel: { flex: 1, maxWidth: 560, gap: 18 },
   heroPill: { alignSelf: "flex-start", flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, borderWidth: 1, backgroundColor: "rgba(255, 255, 255, 0.06)" },
@@ -639,36 +620,36 @@ const styles = StyleSheet.create({
   cardFooterText: { fontSize: 11, fontFamily: "Inter_500Medium", letterSpacing: 0.2 },
   brandRow: { flexDirection: "row", alignItems: "center", gap: 14 },
   logoWrap: { width: 48, height: 48, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
-  brandTitle: { fontSize: 22, fontFamily: "Inter_800ExtraBold", letterSpacing: 0.2 },
+  brandTitle: { fontSize: 18, fontFamily: "Inter_600SemiBold" },
   cloudBadge: { paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 6 },
   cloudBadgeText: { fontSize: 11, fontFamily: "Inter_800ExtraBold", letterSpacing: 0.7 },
-  brandSubtitle: { fontSize: 12.5, fontFamily: "Inter_500Medium", marginTop: 2 },
+  brandSubtitle: { fontSize: 12.5, fontFamily: "Inter_400Regular", marginTop: 1 },
   modeTabs: { flexDirection: "row", padding: 4, borderRadius: 8, borderWidth: 1, gap: 4 },
   modeTabBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, borderRadius: 10 },
   modeTabBtnActive: {},
   modeTabText: { fontSize: 13, fontFamily: "Inter_700Bold" },
-  alertBanner: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: 12, borderWidth: 1 },
+  alertBanner: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: 8, borderWidth: 1 },
   alertText: { fontSize: 12.5, fontFamily: "Inter_500Medium", flex: 1 },
   fieldLabel: { fontSize: 11.5, fontFamily: "Inter_700Bold", letterSpacing: 0.6 },
-  roleGrid: { gap: 8 },
-  roleCard: { padding: 12, borderRadius: 8, borderWidth: 1.2, gap: 4 },
-  roleCardTitle: { fontSize: 13.5, fontFamily: "Inter_700Bold" },
+  roleGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  roleCard: { flexGrow: 1, flexBasis: 200, flexDirection: "row", alignItems: "flex-start", gap: 10, padding: 12, borderRadius: 8, borderWidth: 1.5 },
+  roleCardTitle: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
   roleBadge: { paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 6 },
   roleBadgeText: { fontSize: 11, fontFamily: "Inter_800ExtraBold" },
-  roleCardDesc: { fontSize: 11.5, lineHeight: 15 },
-  formWrap: { gap: 14 },
-  inputGroup: { gap: 5 },
-  inputLabel: { fontSize: 12.5, fontFamily: "Inter_600SemiBold" },
-  inputBox: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, height: 46, borderRadius: 12, borderWidth: 1 },
-  inputField: { flex: 1, fontSize: 13.5, fontFamily: "Inter_500Medium" },
-  submitBtn: { height: 48, borderRadius: 12, alignItems: "center", justifyContent: "center" },
-  submitBtnText: { color: "#FFFFFF", fontSize: 14, fontFamily: "Inter_700Bold" },
-  dividerRow: { flexDirection: "row", alignItems: "center", gap: 10, marginVertical: 6 },
+  roleCardDesc: { fontSize: 12.5, lineHeight: 17, marginTop: 2 },
+  formWrap: { gap: 16 },
+  inputGroup: { gap: 6 },
+  inputLabel: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  inputBox: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, height: 44, borderRadius: 8, borderWidth: 1 },
+  inputField: { flex: 1, fontSize: 14, fontFamily: "Inter_400Regular", outlineStyle: "none" as any },
+  submitBtn: { height: 46, borderRadius: 8, alignItems: "center", justifyContent: "center", marginTop: 4, cursor: "pointer" as any },
+  submitBtnText: { color: "#FFFFFF", fontSize: 14.5, fontFamily: "Inter_600SemiBold" },
+  dividerRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   dividerLine: { flex: 1, height: 1 },
-  dividerText: { fontSize: 11.5, fontFamily: "Inter_700Bold", letterSpacing: 0.7 },
-  googleBtn: { height: 46, borderRadius: 12, borderWidth: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10 },
-  googleBtnText: { fontSize: 13.5, fontFamily: "Inter_600SemiBold" },
-  modalBackdrop: { flex: 1, backgroundColor: "rgba(2, 6, 23, 0.6)", alignItems: "center", justifyContent: "center", padding: 20 },
+  dividerText: { fontSize: 12.5, fontFamily: "Inter_500Medium" },
+  googleBtn: { height: 44, borderRadius: 8, borderWidth: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, cursor: "pointer" as any },
+  googleBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  modalBackdrop: { flex: 1, backgroundColor: "rgba(15, 23, 42, 0.45)", alignItems: "center", justifyContent: "center", padding: 20 },
   forgotCard: { width: "100%", maxWidth: 440, borderRadius: 10, borderWidth: 1, padding: 26, gap: 10, elevation: 8 },
-  forgotTitle: { fontSize: 18, fontFamily: "Inter_700Bold" },
+  forgotTitle: { fontSize: 18, fontFamily: "Inter_600SemiBold" },
 });

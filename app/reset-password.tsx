@@ -355,8 +355,8 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   brandTitle: {
-    fontSize: 18,
-    fontFamily: "Inter_700Bold",
+    fontSize: 17,
+    fontFamily: "Inter_600SemiBold",
     color: "#F8FAFC",
     textAlign: "center",
   },
@@ -400,8 +400,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   cardTitle: {
-    fontSize: 18,
-    fontFamily: "Inter_700Bold",
+    fontSize: 17,
+    fontFamily: "Inter_600SemiBold",
     color: "#F8FAFC",
   },
   cardSubtitle: {
@@ -449,7 +449,7 @@ const styles = StyleSheet.create({
   },
   inputLabel: {
     fontSize: 11,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
     color: "#94A3B8",
     letterSpacing: 0.6,
   },
@@ -492,7 +492,7 @@ const styles = StyleSheet.create({
   },
   primaryBtnText: {
     fontSize: 15,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
     color: "#FFFFFF",
   },
   backBtn: {
@@ -521,8 +521,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   stateTitle: {
-    fontSize: 18,
-    fontFamily: "Inter_700Bold",
+    fontSize: 17,
+    fontFamily: "Inter_600SemiBold",
     color: "#F8FAFC",
     textAlign: "center",
   },

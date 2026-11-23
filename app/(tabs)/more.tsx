@@ -24,72 +24,18 @@ import { AllTransactionsModal } from "@/components/AllTransactionsModal";
 import { NetBalanceBreakdownModal } from "@/components/NetBalanceBreakdownModal";
 import { FinancialStatementViewerModal } from "@/components/FinancialStatementViewerModal";
 import { ReportOptions } from "@/services/ReportExportService";
+import {
+  SvgList, SvgPieChart, SvgLayers, SvgUsers, SvgShield, SvgCpu, SvgActivity, SvgSettings, SvgLogOut, SvgChevronRight,
+} from "@/components/web/SvgIcons";
+import type { UserRole } from "@/context/AuthContext";
 
-const FEATURES = [
-  {
-    id: "txs",
-    label: "All Transactions",
-    icon: "list" as const,
-    route: "modal:txs",
-    color: "#3B82F6",
-    desc: "Master general ledger",
-    tag: "Ledger",
-  },
-  {
-    id: "budget",
-    label: "Budget",
-    icon: "pie-chart" as const,
-    route: "/budget",
-    color: "#F59E0B",
-    desc: "Track allocations",
-    tag: "Allocations",
-  },
-  {
-    id: "payroll",
-    label: "Payroll",
-    icon: "dollar-sign" as const,
-    route: "/payroll",
-    color: "#8B5CF6",
-    desc: "Salary management",
-    tag: "Salaries",
-  },
-  {
-    id: "departments",
-    label: "Departments",
-    icon: "layers" as const,
-    route: "/departments",
-    color: "#0EA5E9",
-    desc: "Org structure",
-    tag: "Structure",
-  },
-  {
-    id: "team",
-    label: "Team Members",
-    icon: "users" as const,
-    route: "/team",
-    color: "#EC4899",
-    desc: "Manage staff & roles",
-    tag: "Staff",
-  },
-  {
-    id: "ai",
-    label: "AI Insights",
-    icon: "zap" as const,
-    route: "/ai-insights",
-    color: "#10B981",
-    desc: "Smart analytics",
-    tag: "AI Smart",
-  },
-  {
-    id: "settings",
-    label: "Settings",
-    icon: "settings" as const,
-    route: "/settings",
-    color: "#64748B",
-    desc: "Org configuration",
-    tag: "Config",
-  },
-];
+type MenuItem = {
+  id: string; section: string; label: string; desc: string; route: string;
+  Icon: (p: { size?: number; color?: string }) => React.ReactElement | null;
+  color: string; roles: UserRole[]; value?: string; valueColor?: string;
+};
+const MENU_SECTIONS = ["Finance", "Organization", "Insights", "System"];
+const ROLE_LABELS: Record<string, string> = { admin: "Admin", accountant: "Accountant", manager: "Manager", employee: "Employee" };
 
 export default function MoreScreen() {
   const colors = useColors();
@@ -107,18 +53,29 @@ export default function MoreScreen() {
     [settings.currency]
   );
 
-  const visibleFeatures = React.useMemo(() => {
-    return FEATURES.filter((f) => {
-      if ((f.id === "team" || f.id === "settings") && user?.role !== "admin") return false;
-      if ((f.id === "txs" || f.id === "budget" || f.id === "departments" || f.id === "ai") && user?.role === "employee") return false;
-      return true;
-    });
-  }, [user?.role]);
+
 
   const webTop = Platform.OS === "web" ? 67 : 0;
   const topSafePad = webTop + insets.top + (Platform.OS === "android" ? 22 : 12);
 
   const payrollTotal = payroll.reduce((s, p) => s + (p.baseSalary || 0) + (p.bonus || 0) - (p.deductions || 0), 0);
+  const roleLabel = ROLE_LABELS[user?.role || ""] || "Member";
+  const initials = (user?.name || "U").split(" ").filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join("") || "U";
+  const money = (n: number) => `${settings.currency} ${Math.round(Number(n) || 0).toLocaleString()}`;
+  const isEmployee = user?.role === "employee";
+
+  // Same sections, names and role rules as the web sidebar (components/web/WebShell.tsx NAV_ITEMS)
+  const menu: MenuItem[] = [
+    { id: "txs", section: "Finance", label: "Transactions", desc: `${transactions.filter((t) => t.type === "income").length} income · ${transactions.filter((t) => t.type === "expense").length} expenses`, route: "modal:txs", Icon: SvgList, color: colors.info, roles: ["admin", "accountant", "manager"], value: `${transactions.length}` },
+    { id: "budgets", section: "Finance", label: "Budgets", desc: "Department limits and spending", route: "/budget", Icon: SvgPieChart, color: colors.warning, roles: ["admin", "accountant", "manager"], value: `${budgets.length}` },
+    { id: "departments", section: "Organization", label: "Departments", desc: `${departments.reduce((n, d) => n + (d.headCount || 0), 0)} staff in total`, route: "/departments", Icon: SvgLayers, color: "#0EA5E9", roles: ["admin", "accountant", "manager"], value: `${departments.length}` },
+    { id: "payroll", section: "Organization", label: isEmployee ? "My payslips" : "Payroll", desc: isEmployee ? "View and download your payslips" : `${payroll.length} ${payroll.length === 1 ? "payment" : "payments"} · payslips`, route: "/payroll", Icon: SvgUsers, color: "#7C3AED", roles: ["admin", "accountant", "manager", "employee"], value: isEmployee ? undefined : money(payrollTotal) },
+    { id: "team", section: "Organization", label: "Team", desc: "Members, roles and invites", route: "/team", Icon: SvgShield, color: colors.primary, roles: ["admin"] },
+    { id: "balance", section: "Insights", label: "Net operating balance", desc: `Income ${money(totalIncome)} · Expenses ${money(totalExpenses)}`, route: "modal:balance", Icon: SvgActivity, color: netBalance >= 0 ? colors.income : colors.expense, roles: ["admin", "accountant", "manager"], value: `${netBalance >= 0 ? "+" : "−"}${money(Math.abs(netBalance))}`, valueColor: netBalance >= 0 ? colors.income : colors.expense },
+    { id: "ai", section: "Insights", label: "AI Insights", desc: "Smart analysis of your data", route: "/ai-insights", Icon: SvgCpu, color: "#10B981", roles: ["admin", "manager"] },
+    { id: "settings", section: "System", label: "Settings", desc: "Company, currency, fiscal year, theme", route: "/settings", Icon: SvgSettings, color: colors.mutedForeground, roles: ["admin"] },
+  ];
+  const allowed = (m: MenuItem) => !!user && m.roles.includes(user.role);
 
   const reportOpts: ReportOptions = React.useMemo(() => ({
     organizationName: settings.organizationName || user?.organization || "Organization Finance Management",
@@ -160,12 +117,9 @@ export default function MoreScreen() {
 
   const handleNavigate = (route: string) => {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if ((route === "/team" || route === "/settings") && user?.role !== "admin") {
-      Alert.alert("Access Restricted", "Only Organization Administrators have permission to access this module.");
-      return;
-    }
-    if ((route === "/budget" || route === "/departments" || route === "/ai-insights") && user?.role === "employee") {
-      Alert.alert("Access Restricted", "Your account clearance level does not include this module.");
+    const item = menu.find((m) => m.route === route);
+    if (item && !allowed(item)) {
+      Alert.alert("No access", `Your role (${roleLabel}) can't open ${item.label}. Ask an admin if you need access.`);
       return;
     }
     if (route === "modal:txs") {
@@ -179,44 +133,6 @@ export default function MoreScreen() {
     router.push(route as any);
   };
 
-  const summaryStats = [
-    {
-      id: "txs",
-      label: "Total Transactions",
-      sub: `${transactions.filter(t => t.type === 'income').length} Inflows · ${transactions.filter(t => t.type === 'expense').length} Outflows`,
-      value: `${transactions.length} Records`,
-      icon: "list" as const,
-      color: colors.primary,
-      route: "modal:txs",
-    },
-    {
-      id: "payroll",
-      label: "Payroll (This Month)",
-      sub: `${payroll.length} Staff members active`,
-      value: `${settings.currency} ${Number(payrollTotal || 0).toLocaleString()}`,
-      icon: "dollar-sign" as const,
-      color: "#8B5CF6",
-      route: "/payroll",
-    },
-    {
-      id: "departments",
-      label: "Monitored Departments",
-      sub: `${departments.reduce((s, d) => s + (d.headCount || 0), 0)} Total employees registered`,
-      value: `${departments.length} Depts`,
-      icon: "layers" as const,
-      color: "#0EA5E9",
-      route: "/departments",
-    },
-    {
-      id: "balance",
-      label: "Net Operating Balance",
-      sub: `Revenue: ${settings.currency} ${Number(totalIncome || 0).toLocaleString()} · Expense: ${settings.currency} ${Number(totalExpenses || 0).toLocaleString()}`,
-      value: netBalance >= 0 ? `+${settings.currency} ${Number(netBalance).toLocaleString()}` : `-${settings.currency} ${Number(Math.abs(netBalance)).toLocaleString()}`,
-      icon: "trending-up" as const,
-      color: netBalance >= 0 ? colors.income : colors.expense,
-      route: "modal:balance",
-    },
-  ];
 
   return (
     <ScrollView
@@ -230,208 +146,77 @@ export default function MoreScreen() {
       ]}
       showsVerticalScrollIndicator={false}
     >
-      {/* User Institutional Profile Header Card */}
-      <View style={[styles.profileCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <View
-          style={[
-            styles.avatar,
-            {
-              backgroundColor: settings.organizationLogo ? "#FFFFFF" : colors.primary,
-              borderWidth: settings.organizationLogo ? 1.5 : 0,
-              borderColor: colors.border,
-              padding: settings.organizationLogo ? 2 : 0,
-            },
-          ]}
-        >
+      {/* ─── Account ─── */}
+      <View style={[styles.mAccount, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={[styles.mAvatar, { backgroundColor: settings.organizationLogo ? "#FFFFFF" : colors.primary, borderColor: colors.border, borderWidth: settings.organizationLogo ? 1 : 0 }]}>
           {settings.organizationLogo ? (
-            <Image
-              source={{ uri: settings.organizationLogo }}
-              style={styles.logoImg}
-              contentFit="contain"
-            />
+            <Image source={{ uri: settings.organizationLogo }} style={styles.mAvatarImg} contentFit="contain" />
           ) : (
-            <Text style={styles.avatarText}>{user?.name?.charAt(0)?.toUpperCase() ?? "U"}</Text>
+            <Text style={styles.mAvatarText}>{initials}</Text>
           )}
         </View>
-        <View style={styles.profileInfo}>
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-            <Text style={[styles.profileName, { color: colors.foreground, flex: 1, minWidth: 0, marginRight: 8 }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
-              {user?.name || "Administrator"}
-            </Text>
-            <View style={[styles.rolePill, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "35", flexShrink: 0 }]}>
-              <Text style={[styles.roleText, { color: colors.primary }]}>{user?.role?.toUpperCase() || "ADMIN"}</Text>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={[styles.mName, { color: colors.foreground }]} numberOfLines={1}>{user?.name || "Your account"}</Text>
+          <Text style={[styles.mEmail, { color: colors.mutedForeground }]} numberOfLines={1}>{user?.email || ""}</Text>
+          <View style={styles.mOrgRow}>
+            <View style={[styles.mRole, { backgroundColor: colors.primary + "14" }]}>
+              <Text style={[styles.mRoleText, { color: colors.primary }]}>{roleLabel}</Text>
             </View>
-          </View>
-          <Text style={[styles.profileEmail, { color: colors.mutedForeground }]}>
-            {user?.email || ""}
-          </Text>
-          <View style={styles.orgRow}>
-            <Text style={{ fontSize: 13 }}>{selectedCurrency?.flag ?? "🌐"}</Text>
-            <Text style={[styles.profileOrg, { color: colors.mutedForeground, flex: 1 }]}>
-              {settings.organizationName || "Organization"}
+            <Text style={[styles.mOrg, { color: colors.mutedForeground }]} numberOfLines={2}>
+              {settings.organizationName || user?.organization || "Organization"}
             </Text>
           </View>
         </View>
       </View>
 
-      {/* Feature Modules Grid */}
-      <View style={styles.sectionHeaderRow}>
-        <View style={styles.sectionHeaderTitleWrap}>
-          <View style={[styles.sectionAccentDot, { backgroundColor: colors.primary }]} />
-          <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>MANAGEMENT FEATURES</Text>
-        </View>
-        <View style={[styles.countBadgePill, { backgroundColor: colors.primary + "16", borderColor: colors.primary + "30" }]}>
-          <Text style={[styles.sectionCountBadge, { color: colors.primary }]}>{visibleFeatures.length} Active Modules</Text>
-        </View>
-      </View>
-
-      <View style={styles.grid}>
-        {visibleFeatures.map((f, index) => {
-          const isLastOdd = index === visibleFeatures.length - 1 && visibleFeatures.length % 2 === 1;
-
-          if (isLastOdd) {
-            return (
-              <TouchableOpacity
-                key={f.id}
-                style={[
-                  styles.featureCardFull,
-                  {
-                    backgroundColor: colors.card,
-                    borderColor: colors.border,
-                  },
-                ]}
-                onPress={() => handleNavigate(f.route)}
-                activeOpacity={0.75}
-              >
-                <View style={styles.cardFullLeft}>
-                  <View style={[styles.featureIconFull, { backgroundColor: f.color + "18", borderColor: f.color + "32" }]}>
-                    <Feather name={f.icon} size={20} color={f.color} />
-                  </View>
-                  <View style={styles.cardFullTextWrap}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                      <Text style={[styles.featureLabel, { color: colors.foreground }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>{f.label}</Text>
-                      <View style={[styles.cardTagPill, { backgroundColor: f.color + "16", borderColor: f.color + "32" }]}>
-                        <Text style={[styles.cardTagText, { color: f.color }]}>{f.tag}</Text>
-                      </View>
+      {/* ─── Menu groups (same names, order and role rules as the web sidebar) ─── */}
+      {MENU_SECTIONS.map((section) => {
+        const items = menu.filter((m) => m.section === section && allowed(m));
+        if (!items.length) return null;
+        return (
+          <View key={section} style={{ gap: 6 }}>
+            <Text style={[styles.mSection, { color: colors.mutedForeground }]}>{section}</Text>
+            <View style={[styles.mGroup, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              {items.map((m, i) => {
+                const Icon = m.Icon;
+                return (
+                  <TouchableOpacity
+                    key={m.id}
+                    onPress={() => handleNavigate(m.route)}
+                    activeOpacity={0.6}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${m.label}. ${m.desc}${m.value ? `. ${m.value}` : ""}`}
+                    style={[styles.mRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}
+                  >
+                    <View style={[styles.mIcon, { backgroundColor: m.color + "14" }]}>
+                      <Icon size={18} color={m.color} />
                     </View>
-                    <Text style={[styles.featureDesc, { color: colors.mutedForeground, marginTop: 2 }]}>
-                      {f.id === "settings" ? "Organization configuration, currency & security preferences" : f.desc}
-                    </Text>
-                  </View>
-                </View>
-                <View style={[styles.cardFullActionCircle, { backgroundColor: colors.muted + "25" }]}>
-                  <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
-                </View>
-              </TouchableOpacity>
-            );
-          }
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={[styles.mLabel, { color: colors.foreground }]} numberOfLines={2}>{m.label}</Text>
+                      <Text style={[styles.mDesc, { color: colors.mutedForeground }]} numberOfLines={2}>{m.desc}</Text>
+                    </View>
+                    {m.value ? (
+                      <Text style={[styles.mValue, { color: m.valueColor || colors.mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{m.value}</Text>
+                    ) : null}
+                    <SvgChevronRight size={16} color={colors.mutedForeground} />
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        );
+      })}
 
-          return (
-            <TouchableOpacity
-              key={f.id}
-              style={[
-                styles.featureCard,
-                {
-                  backgroundColor: colors.card,
-                  borderColor: colors.border,
-                },
-              ]}
-              onPress={() => handleNavigate(f.route)}
-              activeOpacity={0.75}
-            >
-              {/* Top Row: Squircle Icon + Tag Pill */}
-              <View style={styles.cardTopRow}>
-                <View style={[styles.featureIcon, { backgroundColor: f.color + "18", borderColor: f.color + "30" }]}>
-                  <Feather name={f.icon} size={18} color={f.color} />
-                </View>
-                <View style={[styles.cardTagPill, { backgroundColor: f.color + "16", borderColor: f.color + "30" }]}>
-                  <Text style={[styles.cardTagText, { color: f.color }]}>{f.tag}</Text>
-                </View>
-              </View>
-
-              {/* Title */}
-              <Text style={[styles.featureLabel, { color: colors.foreground }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
-                {f.label}
-              </Text>
-
-              {/* Bottom Row: Description + Arrow */}
-              <View style={styles.cardBottomRow}>
-                <Text style={[styles.featureDesc, { color: colors.mutedForeground, flex: 1 }]}>
-                  {f.desc}
-                </Text>
-                <View style={[styles.cardArrowWrap, { backgroundColor: f.color + "12" }]}>
-                  <Feather name="arrow-up-right" size={12} color={f.color} />
-                </View>
-              </View>
-            </TouchableOpacity>
-          );
-        })}
+      {/* ─── Sign out ─── */}
+      <View style={[styles.mGroup, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 6 }]}>
+        <TouchableOpacity onPress={handleLogout} activeOpacity={0.6} accessibilityRole="button" style={styles.mRow}>
+          <View style={[styles.mIcon, { backgroundColor: colors.expense + "12" }]}>
+            <SvgLogOut size={18} color={colors.expense} />
+          </View>
+          <Text style={[styles.mLabel, { color: colors.expense, flex: 1 }]}>Sign out</Text>
+        </TouchableOpacity>
       </View>
-
-      {/* Interactive Quick Summary Actions (Hidden for Employee) */}
-      {user?.role !== "employee" && (
-        <>
-          <View style={styles.sectionHeaderRow}>
-            <View style={styles.sectionHeaderTitleWrap}>
-              <View style={[styles.sectionAccentDot, { backgroundColor: "#8B5CF6" }]} />
-              <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>FINANCIAL SUMMARY & LEDGERS</Text>
-            </View>
-            <View style={[styles.countBadgePill, { backgroundColor: colors.muted + "20", borderColor: colors.border }]}>
-              <Text style={[styles.sectionCountBadge, { color: colors.mutedForeground }]}>Tap row to open</Text>
-            </View>
-          </View>
-
-          <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            {summaryStats.map((stat, idx) => (
-              <TouchableOpacity
-                key={stat.id}
-                style={[
-                  styles.summaryRow,
-                  {
-                    borderBottomColor: colors.border,
-                    borderBottomWidth: idx === summaryStats.length - 1 ? 0 : 1,
-                  },
-                ]}
-                onPress={() => handleNavigate(stat.route)}
-                activeOpacity={0.72}
-              >
-                <View style={[styles.summaryIcon, { backgroundColor: stat.color + "18", borderColor: stat.color + "30" }]}>
-                  <Feather name={stat.icon} size={16} color={stat.color} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.summaryLabel, { color: colors.foreground }]}>{stat.label}</Text>
-                  <Text style={[styles.summarySub, { color: colors.mutedForeground }]}>
-                    {stat.sub}
-                  </Text>
-                </View>
-                <View style={{ alignItems: "flex-end", gap: 3 }}>
-                  <Text style={[styles.summaryValue, { color: stat.color }]}>{stat.value}</Text>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
-                    <Text style={{ fontSize: 11, color: colors.mutedForeground }}>View</Text>
-                    <Feather name="chevron-right" size={12} color={colors.mutedForeground} />
-                  </View>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </>
-      )}
-
-      {/* Logout Action Button */}
-      <TouchableOpacity
-        style={[
-          styles.logoutBtn,
-          {
-            borderColor: colors.expense + "40",
-            backgroundColor: colors.expense + "12",
-          },
-        ]}
-        onPress={handleLogout}
-        activeOpacity={0.8}
-      >
-        <Feather name="log-out" size={17} color={colors.expense} />
-        <Text style={[styles.logoutText, { color: colors.expense }]}>Sign Out Organization Account</Text>
-      </TouchableOpacity>
+      <Text style={[styles.mFoot, { color: colors.mutedForeground }]}>OFM · Organization Finance Management</Text>
 
       <AllTransactionsModal
         visible={allTxModal}
@@ -496,7 +281,7 @@ export default function MoreScreen() {
             </Text>
             <Text style={[styles.logoutModalMsg, { color: colors.mutedForeground }]}>
               Are you sure you want to sign out of{"\n"}
-              <Text style={{ fontFamily: "Inter_700Bold", color: colors.foreground }}>
+              <Text style={{ fontFamily: "Inter_600SemiBold", color: colors.foreground }}>
                 {settings.organizationName || user?.organization || "OFM"}
               </Text>?
             </Text>
@@ -549,6 +334,24 @@ export default function MoreScreen() {
 }
 
 const styles = StyleSheet.create({
+  mAccount: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: 12, borderWidth: 1 },
+  mAvatar: { width: 48, height: 48, borderRadius: 24, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  mAvatarImg: { width: "100%", height: "100%" },
+  mAvatarText: { color: "#FFFFFF", fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  mName: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  mEmail: { fontSize: 12.5, fontFamily: "Inter_400Regular", marginTop: 1 },
+  mOrgRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 6 },
+  mRole: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 },
+  mRoleText: { fontSize: 11.5, fontFamily: "Inter_600SemiBold" },
+  mOrg: { flex: 1, fontSize: 12.5, fontFamily: "Inter_500Medium" },
+  mSection: { fontSize: 12, fontFamily: "Inter_600SemiBold", letterSpacing: 0.4, textTransform: "uppercase", marginLeft: 4, marginTop: 8 },
+  mGroup: { borderRadius: 12, borderWidth: 1, overflow: "hidden" },
+  mRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, minHeight: 60, paddingVertical: 10 },
+  mIcon: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  mLabel: { fontSize: 14.5, fontFamily: "Inter_500Medium" },
+  mDesc: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
+  mValue: { fontSize: 13, fontFamily: "Inter_600SemiBold", maxWidth: 130 },
+  mFoot: { fontSize: 11.5, fontFamily: "Inter_400Regular", textAlign: "center", marginTop: 4 },
   flex: { flex: 1 },
   container: { paddingHorizontal: 16, gap: 12 },
   profileCard: {
@@ -579,11 +382,11 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     color: "#fff",
-    fontSize: 20,
-    fontFamily: "Inter_700Bold",
+    fontSize: 17,
+    fontFamily: "Inter_600SemiBold",
   },
   profileInfo: { flex: 1, gap: 2 },
-  profileName: { fontSize: 15, fontFamily: "Inter_700Bold" },
+  profileName: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
   profileEmail: { fontSize: 12, fontFamily: "Inter_400Regular" },
   orgRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 2 },
   profileOrg: { fontSize: 11, fontFamily: "Inter_500Medium" },
@@ -593,7 +396,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
   },
-  roleText: { fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.3 },
+  roleText: { fontSize: 11, fontFamily: "Inter_600SemiBold", letterSpacing: 0.3 },
   sectionHeaderRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -614,7 +417,7 @@ const styles = StyleSheet.create({
   },
   sectionLabel: {
     fontSize: 12,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
     letterSpacing: 0.7,
   },
   countBadgePill: {
@@ -690,13 +493,13 @@ const styles = StyleSheet.create({
   },
   cardTagText: {
     fontSize: 10,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
     letterSpacing: 0.4,
     textTransform: "uppercase",
   },
   featureLabel: {
     fontSize: 14,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
     letterSpacing: -0.2,
   },
   cardBottomRow: {
@@ -757,7 +560,7 @@ const styles = StyleSheet.create({
   },
   summaryLabel: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
   summarySub: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 1 },
-  summaryValue: { fontSize: 13, fontFamily: "Inter_700Bold" },
+  summaryValue: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   logoutBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -810,8 +613,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   logoutModalTitle: {
-    fontSize: 18,
-    fontFamily: "Inter_800ExtraBold",
+    fontSize: 17,
+    fontFamily: "Inter_700Bold",
     marginBottom: 6,
     textAlign: "center",
     letterSpacing: -0.3,
@@ -854,6 +657,6 @@ const styles = StyleSheet.create({
   logoutConfirmText: {
     color: "#FFFFFF",
     fontSize: 14,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
 });

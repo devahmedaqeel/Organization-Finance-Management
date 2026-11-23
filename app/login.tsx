@@ -19,16 +19,17 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { UserRole, useAuth } from "@/context/AuthContext";
-import { OFMBrandLogo } from "@/components/OFMBrandLogo";
+import { BrandMark } from "@/components/web/BrandMark";
+import { StatusBar } from "expo-status-bar";
 import { GoogleIcon } from "@/components/GoogleIcon";
 
 type ScreenMode = "signin" | "signup";
 
 const SIGNUP_ROLES: { id: UserRole; label: string; desc: string; icon: string }[] = [
-  { id: "admin", label: "Admin", desc: "Create Org", icon: "shield" },
-  { id: "accountant", label: "Accountant", desc: "Ledgers & Cash", icon: "dollar-sign" },
-  { id: "manager", label: "Manager", desc: "Reports & Approvals", icon: "bar-chart-2" },
-  { id: "employee", label: "Staff", desc: "Expense Claims", icon: "user" },
+  { id: "admin", label: "Admin", desc: "New organization · full access", icon: "shield" },
+  { id: "accountant", label: "Accountant", desc: "Income, expenses, payroll", icon: "dollar-sign" },
+  { id: "manager", label: "Manager", desc: "Reports and budgets", icon: "bar-chart-2" },
+  { id: "employee", label: "Employee", desc: "Own payslips", icon: "user" },
 ];
 
 export default function LoginScreen() {
@@ -50,7 +51,7 @@ export default function LoginScreen() {
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
   // Keyboard avoidance, layout measurement, and auto-scroll handling
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const activeFieldRef = useRef<"name" | "org" | "email" | "password" | "confirm" | null>(null);
   const cardY = useRef(150);
@@ -319,10 +320,11 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={[styles.flex, { backgroundColor: "#07101F" }]}
+      style={[styles.flex, { backgroundColor: "#F4F5F8" }]}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
     >
+      <StatusBar style="dark" />
       <ScrollView
         ref={scrollViewRef}
         contentContainerStyle={[
@@ -343,22 +345,21 @@ export default function LoginScreen() {
         keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
       >
-        {/* ─── Header & Enterprise Branding ─── */}
+        {/* ─── Brand (same logo as web) ─── */}
         <View style={styles.headerBox}>
-          <View style={styles.logoBadgeContainer}>
-            <OFMBrandLogo size={66} />
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <BrandMark size={40} />
+            <View>
+              <Text style={styles.appName}>OFM</Text>
+              <Text style={styles.subtitle}>Organization Finance Management</Text>
+            </View>
           </View>
-          <Text
-            style={styles.appName}
-            adjustsFontSizeToFit
-            numberOfLines={Platform.OS === "web" ? undefined : 1}
-            minimumFontScale={0.7}
-          >
-            Organization Finance Management
-          </Text>
-          <Text style={styles.subtitle}>
-            Secure financial management for your organization
-          </Text>
+          <View style={{ gap: 4, marginTop: 22 }}>
+            <Text style={styles.formTitle}>{mode === "signup" ? "Create your account" : "Sign in"}</Text>
+            <Text style={styles.formSub}>
+              {mode === "signup" ? "Set up your organization, or join one with an invite." : "Welcome back. Sign in to continue to your dashboard."}
+            </Text>
+          </View>
         </View>
 
         {/* ─── Authentication Card ─── */}
@@ -379,7 +380,7 @@ export default function LoginScreen() {
               accessibilityLabel="Sign In"
             >
               <Text style={[styles.modeBtnText, mode === "signin" ? styles.textActive : styles.textInactive]}>
-                Sign In
+                Sign in
               </Text>
             </TouchableOpacity>
 
@@ -392,7 +393,7 @@ export default function LoginScreen() {
               accessibilityLabel="Create Account"
             >
               <Text style={[styles.modeBtnText, mode === "signup" ? styles.textActive : styles.textInactive]}>
-                Create Account
+                Create account
               </Text>
             </TouchableOpacity>
           </View>
@@ -400,17 +401,17 @@ export default function LoginScreen() {
           {/* Role Picker (Sign Up Mode) */}
           {mode === "signup" && (
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>ASSIGNED ROLE & PERMISSIONS</Text>
+              <Text style={styles.fieldLabel}>I'm joining as</Text>
               <View style={styles.roleGrid}>
                 {SIGNUP_ROLES.map((r) => {
                   const isSelected = selectedRole === r.id;
-                  const activeColor = isSelected ? "#3B82F6" : "#94A3B8";
+                  const activeColor = isSelected ? "#2CA01C" : "#6B6C72";
                   return (
                     <TouchableOpacity
                       key={r.id}
                       style={[
                         styles.roleCard,
-                        isSelected && { borderColor: "#3B82F6", backgroundColor: "rgba(59, 130, 246, 0.15)" },
+                        isSelected && { borderColor: "#2CA01C", backgroundColor: "rgba(44, 160, 28, 0.06)" },
                       ]}
                       onPress={() => { setSelectedRole(r.id); safeHapticSelection(); }}
                       activeOpacity={0.75}
@@ -418,11 +419,13 @@ export default function LoginScreen() {
                       accessibilityState={{ checked: isSelected }}
                       accessibilityLabel={`${r.label} role`}
                     >
-                      <Feather name={r.icon} size={15} color={activeColor} />
-                      <Text style={[styles.roleLabel, { color: isSelected ? "#3B82F6" : "#F8FAFC" }]}>
-                        {r.label}
-                      </Text>
-                      <Text style={styles.roleDesc}>{r.desc}</Text>
+                      <View style={[styles.radio, { borderColor: isSelected ? "#2CA01C" : "#C5C9CF" }]}>
+                        {isSelected ? <View style={styles.radioDot} /> : null}
+                      </View>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={[styles.roleLabel, { color: "#1F2328" }]} numberOfLines={1}>{r.label}</Text>
+                        <Text style={styles.roleDesc} numberOfLines={2}>{r.desc}</Text>
+                      </View>
                     </TouchableOpacity>
                   );
                 })}
@@ -438,7 +441,7 @@ export default function LoginScreen() {
                 fieldPositions.current["name"] = e.nativeEvent.layout.y;
               }}
             >
-              <Text style={styles.fieldLabel}>FULL NAME</Text>
+              <Text style={styles.fieldLabel}>Full name</Text>
               <View
                 style={[
                   styles.inputBox,
@@ -448,12 +451,12 @@ export default function LoginScreen() {
                 <Feather
                   name="user"
                   size={17}
-                  color={focusedField === "name" ? "#60A5FA" : "#94A3B8"}
+                  color={focusedField === "name" ? "#2CA01C" : "#6B6C72"}
                 />
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Enter your full name"
-                  placeholderTextColor="#64748B"
+                  placeholder="e.g. Ahmed Aqeel"
+                  placeholderTextColor="#9A9CA3"
                   value={name}
                   onChangeText={(v) => { setName(v); setError(""); }}
                   onFocus={() => handleInputFocus("name")}
@@ -474,7 +477,7 @@ export default function LoginScreen() {
               }}
             >
               <Text style={styles.fieldLabel}>
-                {selectedRole === "admin" ? "ORGANIZATION NAME" : "INVITE CODE (ADMIN'S EMAIL)"}
+                {selectedRole === "admin" ? "Organization name" : "Invite code (your admin's email)"}
               </Text>
               <View
                 style={[
@@ -485,12 +488,12 @@ export default function LoginScreen() {
                 <Feather
                   name="briefcase"
                   size={17}
-                  color={focusedField === "org" ? "#60A5FA" : "#94A3B8"}
+                  color={focusedField === "org" ? "#2CA01C" : "#6B6C72"}
                 />
                 <TextInput
                   style={styles.textInput}
-                  placeholder={selectedRole === "admin" ? "Enter your organization name" : "admin@organization.com"}
-                  placeholderTextColor="#64748B"
+                  placeholder={selectedRole === "admin" ? "e.g. Dev Orbit Tech" : "admin@company.com"}
+                  placeholderTextColor="#9A9CA3"
                   value={orgNameOrInvite}
                   onChangeText={(v) => { setOrgNameOrInvite(v); setError(""); }}
                   onFocus={() => handleInputFocus("org")}
@@ -510,7 +513,7 @@ export default function LoginScreen() {
             }}
           >
             <Text style={styles.fieldLabel}>
-              {mode === "signup" ? "WORK EMAIL" : "EMAIL ADDRESS"}
+              Email
             </Text>
             <View
               style={[
@@ -521,12 +524,12 @@ export default function LoginScreen() {
               <Feather
                 name="mail"
                 size={17}
-                color={focusedField === "email" ? "#60A5FA" : "#94A3B8"}
+                color={focusedField === "email" ? "#2CA01C" : "#6B6C72"}
               />
               <TextInput
                 style={styles.textInput}
-                placeholder="Enter your email address"
-                placeholderTextColor="#64748B"
+                placeholder="name@company.com"
+                placeholderTextColor="#9A9CA3"
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -547,7 +550,7 @@ export default function LoginScreen() {
             }}
           >
             <View style={styles.labelRow}>
-              <Text style={styles.fieldLabel}>PASSWORD</Text>
+              <Text style={styles.fieldLabel}>Password</Text>
               {mode === "signin" && (
                 <TouchableOpacity
                   style={styles.forgotBtn}
@@ -561,7 +564,7 @@ export default function LoginScreen() {
                   accessibilityRole="button"
                   accessibilityLabel="Forgot Password?"
                 >
-                  <Text style={styles.forgotLink}>Forgot Password?</Text>
+                  <Text style={styles.forgotLink}>Forgot password?</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -574,12 +577,12 @@ export default function LoginScreen() {
               <Feather
                 name="lock"
                 size={17}
-                color={focusedField === "password" ? "#60A5FA" : "#94A3B8"}
+                color={focusedField === "password" ? "#2CA01C" : "#6B6C72"}
               />
               <TextInput
                 style={styles.textInput}
-                placeholder="Enter your password"
-                placeholderTextColor="#64748B"
+                placeholder={mode === "signup" ? "Create a password (6+ characters)" : "Your password"}
+                placeholderTextColor="#9A9CA3"
                 secureTextEntry={!showPassword}
                 value={password}
                 onChangeText={(v) => { setPassword(v); setError(""); }}
@@ -599,7 +602,7 @@ export default function LoginScreen() {
                 <Feather
                   name={showPassword ? "eye-off" : "eye"}
                   size={18}
-                  color={showPassword ? "#60A5FA" : "#94A3B8"}
+                  color={showPassword ? "#2CA01C" : "#6B6C72"}
                 />
               </TouchableOpacity>
             </View>
@@ -613,7 +616,7 @@ export default function LoginScreen() {
                 fieldPositions.current["confirm"] = e.nativeEvent.layout.y;
               }}
             >
-              <Text style={styles.fieldLabel}>CONFIRM PASSWORD</Text>
+              <Text style={styles.fieldLabel}>Confirm password</Text>
               <View
                 style={[
                   styles.inputBox,
@@ -623,12 +626,12 @@ export default function LoginScreen() {
                 <Feather
                   name="lock"
                   size={17}
-                  color={focusedField === "confirm" ? "#60A5FA" : "#94A3B8"}
+                  color={focusedField === "confirm" ? "#2CA01C" : "#6B6C72"}
                 />
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Confirm your password"
-                  placeholderTextColor="#64748B"
+                  placeholder="Type the password again"
+                  placeholderTextColor="#9A9CA3"
                   secureTextEntry={!showConfirmPassword}
                   value={confirmPassword}
                   onChangeText={(v) => { setConfirmPassword(v); setError(""); }}
@@ -648,7 +651,7 @@ export default function LoginScreen() {
                   <Feather
                     name={showConfirmPassword ? "eye-off" : "eye"}
                     size={18}
-                    color={showConfirmPassword ? "#60A5FA" : "#94A3B8"}
+                    color={showConfirmPassword ? "#2CA01C" : "#6B6C72"}
                   />
                 </TouchableOpacity>
               </View>
@@ -658,7 +661,7 @@ export default function LoginScreen() {
           {/* Error Banner */}
           {error ? (
             <View style={styles.errorCard}>
-              <Feather name="alert-circle" size={16} color="#EF4444" />
+              <Feather name="alert-circle" size={16} color="#D52B1E" />
               <Text style={styles.errorText}>{error}</Text>
             </View>
           ) : null}
@@ -676,12 +679,12 @@ export default function LoginScreen() {
               <View style={styles.btnLoadingRow}>
                 <ActivityIndicator color="#FFFFFF" size="small" />
                 <Text style={styles.primaryBtnText}>
-                  {mode === "signin" ? "Signing In..." : "Creating Account..."}
+                  {mode === "signin" ? "Signing in…" : "Creating account…"}
                 </Text>
               </View>
             ) : (
               <Text style={styles.primaryBtnText}>
-                {mode === "signin" ? "Sign In" : "Create Account"}
+                {mode === "signin" ? "Sign in" : `Create ${(SIGNUP_ROLES.find((r) => r.id === selectedRole)?.label || "").toLowerCase()} account`}
               </Text>
             )}
           </TouchableOpacity>
@@ -689,7 +692,7 @@ export default function LoginScreen() {
           {/* Clean Divider */}
           <View style={styles.dividerRow}>
             <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>OR</Text>
+            <Text style={styles.dividerText}>or</Text>
             <View style={styles.dividerLine} />
           </View>
 
@@ -709,9 +712,9 @@ export default function LoginScreen() {
 
         {/* ─── Security Footer Indicator ─── */}
         <View style={styles.securityIndicator}>
-          <Feather name="shield" size={13.5} color="#60A5FA" style={{ marginTop: 1.5 }} />
+          <Feather name="shield" size={13.5} color="#2CA01C" style={{ marginTop: 1.5 }} />
           <Text style={styles.securityText}>
-            Secure authentication · Role-based access · Protected organization data
+            Secure sign-in · Role-based access
           </Text>
         </View>
 
@@ -724,11 +727,11 @@ export default function LoginScreen() {
           accessibilityRole="link"
           accessibilityLabel="Open Web Cloud Portal"
         >
-          <Feather name="globe" size={13.5} color="#60A5FA" />
+          <Feather name="globe" size={13.5} color="#2CA01C" />
           <Text style={styles.webPortalText}>
-            Open Web Cloud Portal (ofmapp-main.web.app)
+            Open OFM on the web
           </Text>
-          <Feather name="arrow-up-right" size={12.5} color="#60A5FA" />
+          <Feather name="arrow-up-right" size={12.5} color="#2CA01C" />
         </TouchableOpacity>
       </ScrollView>
 
@@ -784,9 +787,9 @@ export default function LoginScreen() {
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
                 <View style={styles.iconPill}>
-                  <Feather name="lock" size={16} color="#3B82F6" />
+                  <Feather name="lock" size={16} color="#2CA01C" />
                 </View>
-                <Text style={styles.modalTitle}>Reset Password</Text>
+                <Text style={styles.modalTitle}>Reset your password</Text>
               </View>
               <TouchableOpacity
                 style={styles.modalCloseBtn}
@@ -799,7 +802,7 @@ export default function LoginScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Close reset password dialog"
               >
-                <Feather name="x" size={18} color="#94A3B8" />
+                <Feather name="x" size={18} color="#6B6C72" />
               </TouchableOpacity>
             </View>
 
@@ -814,13 +817,13 @@ export default function LoginScreen() {
               </Text>
 
               <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>EMAIL ADDRESS</Text>
+                <Text style={styles.fieldLabel}>Email</Text>
                 <View style={[styles.inputBox, focusedField === "forgot" && styles.inputBoxFocused]}>
-                  <Feather name="mail" size={17} color={focusedField === "forgot" ? "#60A5FA" : "#94A3B8"} />
+                  <Feather name="mail" size={17} color={focusedField === "forgot" ? "#2CA01C" : "#6B6C72"} />
                   <TextInput
                     style={styles.textInput}
                     placeholder="name@organization.com"
-                    placeholderTextColor="#64748B"
+                    placeholderTextColor="#9A9CA3"
                     keyboardType="email-address"
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -847,14 +850,14 @@ export default function LoginScreen() {
                           ? "rgba(34, 197, 94, 0.15)"
                           : "rgba(239, 68, 68, 0.15)",
                       borderColor:
-                        forgotMsg.type === "success" ? "#22C55E" : "#EF4444",
+                        forgotMsg.type === "success" ? "#108000" : "#EF4444",
                     },
                   ]}
                 >
                   <Text
                     style={{
                       color:
-                        forgotMsg.type === "success" ? "#22C55E" : "#EF4444",
+                        forgotMsg.type === "success" ? "#108000" : "#EF4444",
                       fontSize: 13,
                       fontFamily: "Inter_500Medium",
                       lineHeight: 19,
@@ -876,10 +879,10 @@ export default function LoginScreen() {
                 {forgotLoading ? (
                   <View style={styles.btnLoadingRow}>
                     <ActivityIndicator color="#FFFFFF" size="small" />
-                    <Text style={styles.primaryBtnText}>Sending...</Text>
+                    <Text style={styles.primaryBtnText}>Sending…</Text>
                   </View>
                 ) : (
-                  <Text style={styles.primaryBtnText}>Send Reset Link</Text>
+                  <Text style={styles.primaryBtnText}>Send reset link</Text>
                 )}
               </TouchableOpacity>
             </ScrollView>
@@ -891,213 +894,48 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
+  formTitle: { color: "#1F2328", fontSize: 22, fontFamily: "Inter_600SemiBold", letterSpacing: -0.3 },
+  formSub: { color: "#5F6670", fontSize: 13.5, fontFamily: "Inter_400Regular", lineHeight: 19 },
+  radio: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, alignItems: "center", justifyContent: "center" },
+  radioDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#2CA01C" },
   flex: { flex: 1 },
-  container: {
-    paddingHorizontal: 20,
-    alignItems: "center",
-  },
-  headerBox: {
-    alignItems: "center",
-    marginBottom: 20,
-    gap: 6,
-    width: "100%",
-    maxWidth: 420,
-  },
-  logoBadgeContainer: {
-    padding: 3,
-    borderRadius: 22,
-    backgroundColor: "rgba(59, 130, 246, 0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(59, 130, 246, 0.22)",
-    shadowColor: "#2563EB",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  appName: {
-    fontSize: 20,
-    fontFamily: "Inter_800ExtraBold",
-    color: "#F8FAFC",
-    letterSpacing: -0.3,
-    textAlign: "center",
-    marginTop: 6,
-  },
-  subtitle: {
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    color: "#94A3B8",
-    textAlign: "center",
-    lineHeight: 19,
-    maxWidth: 320,
-    alignSelf: "center",
-  },
-  card: {
-    width: "100%",
-    maxWidth: 420,
-    backgroundColor: "#111C2E",
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: "#233653",
-    padding: 22,
-    gap: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.4,
-    shadowRadius: 24,
-    elevation: 6,
-  },
-  modeToggle: {
-    flexDirection: "row",
-    backgroundColor: "#07101F",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#1E2F4D",
-    padding: 4,
-    gap: 4,
-  },
-  modeBtn: {
-    flex: 1,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 9,
-  },
-  modeBtnActive: {
-    backgroundColor: "#3B82F6",
-    shadowColor: "#3B82F6",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  modeBtnText: {
-    fontSize: 14,
-    fontFamily: "Inter_700Bold",
-  },
-  textActive: {
-    color: "#FFFFFF",
-  },
-  textInactive: {
-    color: "#94A3B8",
-  },
-  fieldGroup: {
-    gap: 7,
-  },
-  roleGrid: {
-    flexDirection: "row",
-    gap: 6,
-  },
-  roleCard: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 3,
-    paddingVertical: 8,
-    paddingHorizontal: 3,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#233653",
-    backgroundColor: "#152238",
-  },
-  roleLabel: {
-    fontSize: 11,
-    fontFamily: "Inter_700Bold",
-  },
-  roleDesc: {
-    fontSize: 10,
-    fontFamily: "Inter_400Regular",
-    color: "#64748B",
-  },
-  labelRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  fieldLabel: {
-    fontSize: 12,
-    fontFamily: "Inter_700Bold",
-    color: "#94A3B8",
-    letterSpacing: 0.6,
-  },
+  container: { paddingHorizontal: 20, gap: 16, flexGrow: 1 },
+  headerBox: { paddingHorizontal: 4, marginBottom: 2 },
+  logoBadgeContainer: { alignItems: "center" },
+  appName: { color: "#1F2328", fontSize: 17, fontFamily: "Inter_600SemiBold" },
+  subtitle: { color: "#5F6670", fontSize: 12.5, fontFamily: "Inter_400Regular", marginTop: 1 },
+  card: { backgroundColor: "#FFFFFF", borderRadius: 14, borderWidth: 1, borderColor: "#DCDFE4", padding: 18, gap: 16, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 14, elevation: 3 },
+  modeToggle: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: "#DCDFE4", gap: 18 },
+  modeBtn: { paddingVertical: 10, borderBottomWidth: 2, borderBottomColor: "transparent", marginBottom: -1 },
+  modeBtnActive: { borderBottomColor: "#2CA01C" },
+  modeBtnText: { fontSize: 14.5 },
+  textActive: { color: "#1F2328", fontFamily: "Inter_600SemiBold" },
+  textInactive: { color: "#5F6670", fontFamily: "Inter_500Medium" },
+  fieldGroup: { gap: 6 },
+  roleGrid: { gap: 8 },
+  roleCard: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, borderRadius: 10, borderWidth: 1.5, borderColor: "#DCDFE4", backgroundColor: "#FFFFFF" },
+  roleLabel: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  roleDesc: { color: "#5F6670", fontSize: 12.5, fontFamily: "Inter_400Regular", marginTop: 1 },
+  labelRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  fieldLabel: { color: "#1F2328", fontSize: 13, fontFamily: "Inter_600SemiBold" },
   forgotBtn: {
     paddingVertical: 2,
     paddingHorizontal: 2,
   },
-  forgotLink: {
-    fontSize: 13,
-    fontFamily: "Inter_600SemiBold",
-    color: "#60A5FA",
-  },
-  inputBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#152238",
-    borderWidth: 1.2,
-    borderColor: "#233653",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    height: 52,
-    gap: 11,
-  },
-  inputBoxFocused: {
-    borderColor: "#3B82F6",
-    backgroundColor: "#15243C",
-    shadowColor: "#3B82F6",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  textInput: {
-    flex: 1,
-    fontSize: 15,
-    fontFamily: "Inter_500Medium",
-    color: "#F8FAFC",
-    paddingVertical: 0,
-  },
+  forgotLink: { color: "#2CA01C", fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  inputBox: { flexDirection: "row", alignItems: "center", gap: 10, height: 48, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: "#DCDFE4", backgroundColor: "#FFFFFF" },
+  inputBoxFocused: { borderColor: "#2CA01C", borderWidth: 1.5 },
+  textInput: { flex: 1, color: "#1F2328", fontSize: 15, fontFamily: "Inter_400Regular", paddingVertical: 0 },
   eyeBtn: {
     minWidth: 40,
     minHeight: 44,
     alignItems: "center",
     justifyContent: "center",
   },
-  errorCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    backgroundColor: "rgba(239, 68, 68, 0.12)",
-    borderColor: "rgba(239, 68, 68, 0.35)",
-    borderWidth: 1,
-    borderRadius: 11,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
-  errorText: {
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
-    color: "#EF4444",
-    flex: 1,
-    lineHeight: 18,
-  },
-  primaryBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#2563EB",
-    height: 52,
-    borderRadius: 12,
-    shadowColor: "#2563EB",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  primaryBtnText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontFamily: "Inter_700Bold",
-  },
+  errorCard: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: 10, borderWidth: 1, borderColor: "#D52B1E40", backgroundColor: "#D52B1E10" },
+  errorText: { flex: 1, color: "#D52B1E", fontSize: 13, fontFamily: "Inter_500Medium", lineHeight: 18 },
+  primaryBtn: { height: 50, borderRadius: 10, backgroundColor: "#2CA01C", alignItems: "center", justifyContent: "center" },
+  primaryBtnText: { color: "#FFFFFF", fontSize: 15, fontFamily: "Inter_600SemiBold" },
   btnDisabled: {
     opacity: 0.75,
   },
@@ -1112,123 +950,30 @@ const styles = StyleSheet.create({
     gap: 12,
     marginVertical: 1,
   },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: "#1E2F4D",
-  },
-  dividerText: {
-    fontSize: 11,
-    fontFamily: "Inter_700Bold",
-    color: "#64748B",
-    letterSpacing: 1,
-  },
-  googleBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    backgroundColor: "#152238",
-    borderColor: "#233653",
-    borderWidth: 1,
-    height: 52,
-    borderRadius: 12,
-  },
-  googleBtnText: {
-    fontSize: 15,
-    fontFamily: "Inter_700Bold",
-    color: "#F8FAFC",
-  },
-  securityIndicator: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "center",
-    gap: 7,
-    marginTop: 22,
-    paddingHorizontal: 16,
-    maxWidth: 390,
-    alignSelf: "center",
-  },
-  securityText: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    color: "#64748B",
-    textAlign: "center",
-    lineHeight: 17,
-    flexShrink: 1,
-  },
-  webPortalBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    marginTop: 8,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    alignSelf: "center",
-  },
-  webPortalText: {
-    fontSize: 12,
-    fontFamily: "Inter_500Medium",
-    color: "#64748B",
-  },
+  dividerLine: { flex: 1, height: 1, backgroundColor: "#DCDFE4" },
+  dividerText: { color: "#5F6670", fontSize: 13, fontFamily: "Inter_500Medium" },
+  googleBtn: { height: 48, borderRadius: 10, borderWidth: 1, borderColor: "#DCDFE4", backgroundColor: "#FFFFFF", flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10 },
+  googleBtnText: { color: "#1F2328", fontSize: 14.5, fontFamily: "Inter_600SemiBold" },
+  securityIndicator: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 },
+  securityText: { color: "#5F6670", fontSize: 12, fontFamily: "Inter_400Regular" },
+  webPortalBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 6 },
+  webPortalText: { color: "#2CA01C", fontSize: 13, fontFamily: "Inter_600SemiBold" },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.78)",
     justifyContent: "flex-end",
   },
-  modalSheet: {
-    backgroundColor: "#111C2E",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderTopWidth: 1,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderColor: "#233653",
-    padding: 22,
-    paddingBottom: 36,
-    gap: 12,
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "rgba(255, 255, 255, 0.25)",
-    alignSelf: "center",
-    marginBottom: 6,
-  },
+  modalSheet: { backgroundColor: "#FFFFFF", borderTopLeftRadius: 18, borderTopRightRadius: 18, padding: 20, gap: 14 },
+  handle: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: "#DCDFE4" },
   modalHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  iconPill: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "rgba(59, 130, 246, 0.15)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontFamily: "Inter_700Bold",
-    color: "#F8FAFC",
-  },
-  modalCloseBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "rgba(255, 255, 255, 0.06)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  modalSubtitle: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    color: "#94A3B8",
-    lineHeight: 19,
-  },
+  iconPill: { width: 34, height: 34, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(44,160,28,0.1)" },
+  modalTitle: { color: "#1F2328", fontSize: 17, fontFamily: "Inter_600SemiBold" },
+  modalCloseBtn: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: "#F1F2F4" },
+  modalSubtitle: { color: "#5F6670", fontSize: 13.5, fontFamily: "Inter_400Regular", lineHeight: 20 },
   msgBanner: {
     padding: 12,
     borderRadius: 10,

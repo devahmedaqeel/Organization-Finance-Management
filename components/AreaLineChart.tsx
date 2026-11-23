@@ -131,7 +131,7 @@ export function AreaLineChart({
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const prevIndexRef = useRef<number | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const scrollOffsetRef = useRef(0);
   const [measuredContainerWidth, setMeasuredContainerWidth] = useState<number>(0);
 

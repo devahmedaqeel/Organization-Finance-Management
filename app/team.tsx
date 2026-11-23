@@ -34,10 +34,11 @@ import { enqueueOperation } from "@/services/offlineSyncService";
 
 // Role presentation: colour, icon, short title and what the role can do
 const ROLE_INFO: Record<UserRole, { color: string; label: string; title: string; icon: string; description: string }> = {
-  admin: { color: "#6366F1", label: "ADMIN", title: "Admin", icon: "shield", description: "Full control: finances, team, settings & reports" },
-  accountant: { color: "#10B981", label: "ACCOUNTANT", title: "Accountant", icon: "edit-3", description: "Records transactions, payroll and receipts" },
-  manager: { color: "#8B5CF6", label: "MANAGER", title: "Manager", icon: "briefcase", description: "Allocates budgets, approves expenses, views reports" },
-  employee: { color: "#0EA5E9", label: "EMPLOYEE", title: "Employee", icon: "user", description: "Own payslips, claims and staff portal only" },
+  // Same colors and wording as the web Team page
+  admin: { color: "#4F46E5", label: "ADMIN", title: "Admin", icon: "shield", description: "Full access, including team, settings and payroll" },
+  accountant: { color: "#B45309", label: "ACCOUNTANT", title: "Accountant", icon: "edit-3", description: "Records income, expenses, budgets and payroll" },
+  manager: { color: "#7C3AED", label: "MANAGER", title: "Manager", icon: "briefcase", description: "Views reports, budgets and department spending" },
+  employee: { color: "#047857", label: "EMPLOYEE", title: "Employee", icon: "user", description: "Sees only their own payslips" },
 };
 const ROLE_ORDER: UserRole[] = ["admin", "accountant", "manager", "employee"];
 
@@ -351,6 +352,11 @@ export default function TeamScreen() {
     }
 
     const email = inviteEmail.trim().toLowerCase();
+    // Same rule as the web: never invite someone who is already on the team
+    if (members.some((m) => (m.email || "").trim().toLowerCase() === email)) {
+      Alert.alert("Already on your team", "This person is already a member. Open them in the list to change their role instead.");
+      return;
+    }
     const role = inviteRole;
     const orgName = settings.organizationName || user?.organization || "Our Organization";
     const adminEmail = user?.email || "";
@@ -604,7 +610,7 @@ ${orgName}`;
             <Feather name="arrow-left" size={18} color={colors.foreground} />
           </TouchableOpacity>
           <View style={styles.headerTitleWrap}>
-            <Text style={[styles.headerTitle, { color: colors.foreground }]}>Team Members</Text>
+            <Text style={[styles.headerTitle, { color: colors.foreground }]}>Team</Text>
             <Text style={[styles.headerSub, { color: colors.mutedForeground }]} numberOfLines={1}>
               {settings.organizationName}
             </Text>
@@ -1009,7 +1015,7 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
   backBtn: { width: 40, height: 40, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   headerTitleWrap: { flex: 1, minWidth: 0, justifyContent: "center" },
-  headerTitle: { fontSize: 18, fontFamily: "Inter_700Bold" },
+  headerTitle: { fontSize: 17, fontFamily: "Inter_600SemiBold" },
   headerSub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 1 },
   headerInviteBtn: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
   scrollArea: { paddingHorizontal: 16, paddingTop: 14, gap: 10 },
@@ -1018,7 +1024,7 @@ const styles = StyleSheet.create({
   listHeader: { gap: 12, marginBottom: 2 },
   summaryCard: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: 16, borderWidth: 1 },
   summaryIcon: { width: 44, height: 44, borderRadius: 13, alignItems: "center", justifyContent: "center" },
-  summaryValue: { fontSize: 16, fontFamily: "Inter_700Bold" },
+  summaryValue: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
   summarySub: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 17, marginTop: 2 },
   pendingPill: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 10, flexShrink: 0 },
   pendingPillText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
@@ -1028,29 +1034,29 @@ const styles = StyleSheet.create({
   filterChip: { flexDirection: "row", alignItems: "center", gap: 6, paddingLeft: 12, paddingRight: 6, height: 36, borderRadius: 18, borderWidth: 1 },
   filterChipText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   filterCount: { minWidth: 24, height: 24, borderRadius: 12, paddingHorizontal: 6, alignItems: "center", justifyContent: "center" },
-  filterCountText: { fontSize: 12, fontFamily: "Inter_700Bold" },
+  filterCountText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   resultCount: { fontSize: 12, fontFamily: "Inter_400Regular" },
 
   // Member card
   memberCard: { flexDirection: "row", alignItems: "center", paddingVertical: 12, paddingHorizontal: 14, borderRadius: 16, borderWidth: 1, gap: 12 },
   avatar: { width: 46, height: 46, borderRadius: 14, alignItems: "center", justifyContent: "center", flexShrink: 0 },
-  avatarText: { color: "#fff", fontSize: 16, fontFamily: "Inter_700Bold", letterSpacing: 0.3 },
+  avatarText: { color: "#fff", fontSize: 15, fontFamily: "Inter_600SemiBold", letterSpacing: 0.3 },
   avatarLarge: { width: 60, height: 60, borderRadius: 18 },
-  avatarTextLarge: { color: "#fff", fontSize: 22, fontFamily: "Inter_700Bold", letterSpacing: 0.3 },
+  avatarTextLarge: { color: "#fff", fontSize: 19, fontFamily: "Inter_600SemiBold", letterSpacing: 0.3 },
   memberInfo: { flex: 1, minWidth: 0, gap: 3 },
   memberNameRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   memberName: { flexShrink: 1, fontSize: 15, fontFamily: "Inter_600SemiBold" },
   memberEmail: { fontSize: 12, fontFamily: "Inter_400Regular" },
   memberMetaRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap", marginTop: 3 },
   miniPill: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, flexShrink: 0 },
-  miniPillText: { fontSize: 11, fontFamily: "Inter_700Bold" },
+  miniPillText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
   roleBadge: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 7 },
   roleBadgeText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
 
   // Empty state
   emptyState: { paddingVertical: 48, alignItems: "center", gap: 10 },
   emptyIconWrap: { width: 64, height: 64, borderRadius: 32, alignItems: "center", justifyContent: "center" },
-  emptyTitle: { fontSize: 16, fontFamily: "Inter_700Bold" },
+  emptyTitle: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
   emptySub: { fontSize: 13, fontFamily: "Inter_400Regular", textAlign: "center", paddingHorizontal: 30, lineHeight: 19 },
   emptyBtn: { marginTop: 4, paddingHorizontal: 16, height: 38, borderRadius: 19, borderWidth: 1, justifyContent: "center" },
   emptyBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
@@ -1071,7 +1077,7 @@ const styles = StyleSheet.create({
     elevation: 8,
     zIndex: 100,
   },
-  floatingAddBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
+  floatingAddBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_600SemiBold" },
 
   // Sheets
   modalBg: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
@@ -1080,7 +1086,7 @@ const styles = StyleSheet.create({
   modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, paddingBottom: 14, borderBottomWidth: 1 },
   modalHeaderLeft: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 10 },
   modalHeaderIconWrap: { width: 38, height: 38, borderRadius: 11, alignItems: "center", justifyContent: "center" },
-  modalTitle: { fontSize: 16, fontFamily: "Inter_700Bold" },
+  modalTitle: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
   modalSub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
   modalCloseBtn: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", flexShrink: 0 },
   modalContent: { gap: 16, paddingVertical: 16 },
@@ -1094,19 +1100,19 @@ const styles = StyleSheet.create({
   roleGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", rowGap: 8 },
   roleOption: { width: "48.5%", padding: 12, borderRadius: 14, borderWidth: 1.2, gap: 6 },
   roleOptionTop: { flexDirection: "row", alignItems: "center", gap: 6 },
-  roleOptionTitle: { flex: 1, fontSize: 14, fontFamily: "Inter_700Bold" },
+  roleOptionTitle: { flex: 1, fontSize: 14, fontFamily: "Inter_600SemiBold" },
   roleOptionDesc: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 16 },
 
   profileRow: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
-  profileName: { flexShrink: 1, fontSize: 18, fontFamily: "Inter_700Bold" },
+  profileName: { flexShrink: 1, fontSize: 17, fontFamily: "Inter_600SemiBold" },
   profileEmail: { fontSize: 13, fontFamily: "Inter_400Regular", marginTop: 2 },
 
   modalInviteBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, height: 52, borderRadius: 14 },
-  modalInviteBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_700Bold" },
+  modalInviteBtnText: { color: "#fff", fontSize: 15, fontFamily: "Inter_600SemiBold" },
 
   actionRow: { flexDirection: "row", gap: 10 },
   actionBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, height: 48, borderRadius: 14, borderWidth: 1 },
-  actionBtnText: { fontSize: 14, fontFamily: "Inter_700Bold" },
+  actionBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
 
   infoBanner: { flexDirection: "row", alignItems: "flex-start", gap: 10, padding: 12, borderRadius: 12, borderWidth: 1 },
   infoBannerText: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 19 },

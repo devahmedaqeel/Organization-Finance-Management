@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ComponentRef } from "react";
 import { Dimensions, Keyboard, KeyboardEvent, Platform, ScrollView, TextInput } from "react-native";
 
 /**
@@ -15,7 +15,7 @@ import { Dimensions, Keyboard, KeyboardEvent, Platform, ScrollView, TextInput } 
  * `bottomSpacer` to its contentContainerStyle paddingBottom so the last fields can scroll up.
  */
 export function useKeyboardAwareScroll(gap = 24) {
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
   const keyboardTop = useRef<number | null>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 

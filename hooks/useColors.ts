@@ -2,9 +2,9 @@ import { Platform, useColorScheme } from "react-native";
 import colors from "@/constants/colors";
 import { useSettings } from "@/context/SettingsContext";
 
-// Web-only "accounting suite" palette: solid surfaces, neutral greys, green brand accent.
+// "Accounting suite" palette shared by web and the phone app: solid surfaces, neutral greys, green brand accent.
 // Every value is a 6-digit hex because screens append alpha suffixes (e.g. colors.border + "40").
-// Native (iOS/Android) keeps the original palette from constants/colors.ts.
+// Keys not listed here (e.g. chart colors) still come from constants/colors.ts.
 const webPalette = {
   light: {
     text: "#2B2C2F",
@@ -61,6 +61,6 @@ export function useColors() {
   const isDark = resolvedScheme === "dark";
 
   const palette = isDark ? colors.dark : colors.light;
-  const web = Platform.OS === "web" ? (isDark ? webPalette.dark : webPalette.light) : {};
-  return { ...palette, ...web, radius: Platform.OS === "web" ? 8 : colors.radius, isDark };
+  const shared = isDark ? webPalette.dark : webPalette.light;
+  return { ...palette, ...shared, radius: Platform.OS === "web" ? 8 : 10, isDark };
 }

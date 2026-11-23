@@ -24,8 +24,8 @@
       "package": "com.organization.financemanager",
       "versionCode": 7,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#2CA01C"
       },
       "intentFilters": [
         {
@@ -89,7 +89,10 @@
           "color": "#3B82F6",
           "defaultChannel": "default"
         }
-      ]
+      ],
+      "expo-image",
+      "expo-sharing",
+      "expo-status-bar"
     ],
     "experiments": {
       "typedRoutes": true

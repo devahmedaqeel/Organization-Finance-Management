@@ -206,7 +206,7 @@ export function WebShell() {
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [notificationModalVisible, setNotificationModalVisible] = useState(false);
   const [fyOpen, setFyOpen] = useState(false);
-  const fyAnchorRef = useRef<View>(null);
+  const fyAnchorRef = useRef<React.ComponentRef<typeof View>>(null);
   const [fyAnchor, setFyAnchor] = useState({ bottom: 68, right: 16 });
   const [fyViewYear, setFyViewYear] = useState<number | null>(null); // year being looked at in the picker
   const [fyDraftMonth, setFyDraftMonth] = useState<number | null>(null); // start month being tried out

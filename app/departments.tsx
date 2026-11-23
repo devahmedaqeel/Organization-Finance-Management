@@ -27,6 +27,7 @@ import {
   calculateTotalIncome,
   calculateTotalExpenses,
   calculateBudgetAllocation,
+  calculateBudgetUsed,
   validateBudgetAllocationAgainstNetCash,
 } from "@/services/FinancialCalculationEngine";
 import { useColors } from "@/hooks/useColors";
@@ -45,7 +46,9 @@ export default function DepartmentsScreen() {
   useRequirePermission("view_departments");
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { departments, transactions, addDepartment, updateDepartment, deleteDepartment, budgets } = useFinance();
+  const { departments, transactions, addDepartment, updateDepartment, deleteDepartment, budgets, payroll = [] } = useFinance();
+  const [settingUp, setSettingUp] = useState<string | null>(null);
+  const [setupMsg, setSetupMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const { settings } = useSettings();
   const { maxHeight: sheetMaxHeight, keyboardHeight, scrollRef: sheetScrollRef, onTouchEnd: sheetOnTouchEnd, sheetBottomInset } = useBottomSheetLayout();
 
@@ -139,13 +142,44 @@ export default function DepartmentsScreen() {
 
   // Overall Department Totals
   const totalAllocated = useMemo(
-    () => deptsWithMetrics.reduce((s, d) => s + (d.budgetAllocated || 0), 0),
-    [deptsWithMetrics]
+    () => calculateBudgetAllocation(budgets || [], departments || []),
+    [budgets, departments]
   );
   const totalSpent = useMemo(
-    () => deptsWithMetrics.reduce((s, d) => s + d.spent, 0),
-    [deptsWithMetrics]
+    () => calculateBudgetUsed(transactions || [], budgets || [], undefined, departments || []),
+    [transactions, budgets, departments]
   );
+
+  // Departments used by budgets, expenses or payroll that have no department card (same as web)
+  const unregisteredDepts = useMemo(() => {
+    const known = new Set((departments || []).map((d: any) => (d.name || "").trim().toLowerCase()));
+    const map = new Map<string, { name: string; budget: number; spent: number; staff: number }>();
+    const touch = (raw?: string) => {
+      const name = (raw || "").trim();
+      const key = name.toLowerCase();
+      if (!name || known.has(key) || ["all", "general", "institutional", "organization"].includes(key)) return null;
+      if (!map.has(key)) map.set(key, { name, budget: 0, spent: 0, staff: 0 });
+      return map.get(key)!;
+    };
+    (budgets || []).forEach((b: any) => { const e = touch(b.department); if (e) e.budget += Number(b.allocated) || 0; });
+    (transactions || []).forEach((t: any) => { if (t?.type !== "expense") return; const e = touch(t.department); if (e) e.spent += Number(t.amount) || 0; });
+    (payroll || []).forEach((p: any) => { const e = touch(p?.department); if (e) e.staff += 1; });
+    return Array.from(map.values()).sort((a, b) => b.budget + b.spent - (a.budget + a.spent));
+  }, [departments, budgets, transactions, payroll]);
+
+  const setUpDepartments = async (list: Array<{ name: string; staff: number }>) => {
+    if (!list.length || settingUp) return;
+    setSettingUp(list.length === 1 ? list[0].name : "all");
+    setSetupMsg(null);
+    const failed: string[] = [];
+    for (const u of list) {
+      try { await addDepartment({ name: u.name, headCount: u.staff || 0, budgetAllocated: 0 }); } catch { failed.push(u.name); }
+    }
+    setSettingUp(null);
+    setSetupMsg(failed.length === 0
+      ? { ok: true, text: list.length === 1 ? `${list[0].name} is set up.` : `${list.length} departments set up.` }
+      : { ok: false, text: `Couldn't set up: ${failed.join(", ")}. Try again.` });
+  };
   const totalEmployees = useMemo(
     () => departments.reduce((s, d) => s + (d.headCount || 0), 0),
     [departments]
@@ -360,6 +394,42 @@ export default function DepartmentsScreen() {
               </View>
             </View>
 
+            {/* Departments not set up yet (same as web) */}
+            {unregisteredDepts.length > 0 && (
+              <View style={[styles.unregCard, { backgroundColor: colors.warning + "12", borderColor: colors.warning + "55" }]}>
+                <Text style={[styles.unregTitle, { color: colors.foreground }]}>
+                  {unregisteredDepts.length === 1 ? "1 department is" : `${unregisteredDepts.length} departments are`} not set up yet
+                </Text>
+                <Text style={[styles.unregText, { color: colors.mutedForeground }]}>
+                  Budgets, expenses or payroll use these names but there's no department card. Their money is already in the totals above.
+                </Text>
+                {unregisteredDepts.map((u) => (
+                  <View key={u.name} style={[styles.unregRow, { borderTopColor: colors.border }]}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={[styles.unregName, { color: colors.foreground }]} numberOfLines={2}>{u.name}</Text>
+                      <Text style={[styles.unregText, { color: colors.mutedForeground }]} numberOfLines={2}>
+                        Budget {fmt(u.budget)} · spent {fmt(u.spent)}{u.staff ? ` · ${u.staff} on payroll` : ""}
+                      </Text>
+                    </View>
+                    {canEdit ? (
+                      <TouchableOpacity disabled={!!settingUp} onPress={() => setUpDepartments([u])} style={[styles.unregBtn, { borderColor: colors.primary, opacity: settingUp ? 0.6 : 1 }]}>
+                        <Text style={[styles.unregBtnText, { color: colors.primary }]}>{settingUp === u.name ? "Setting up…" : "Set up"}</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                ))}
+                {setupMsg ? (
+                  <Text style={[styles.unregText, { color: setupMsg.ok ? colors.income : colors.expense, fontFamily: "Inter_600SemiBold" }]}>{setupMsg.text}</Text>
+                ) : null}
+                {canEdit && unregisteredDepts.length > 1 ? (
+                  <TouchableOpacity disabled={!!settingUp} onPress={() => setUpDepartments(unregisteredDepts)} style={[styles.unregBtn, { backgroundColor: colors.primary, borderColor: colors.primary, alignSelf: "flex-start", opacity: settingUp ? 0.6 : 1 }]}>
+                    <Text style={[styles.unregBtnText, { color: "#FFFFFF" }]}>{settingUp === "all" ? "Setting up…" : `Set up all ${unregisteredDepts.length}`}</Text>
+                  </TouchableOpacity>
+                ) : null}
+                {!canEdit ? <Text style={[styles.unregText, { color: colors.mutedForeground }]}>Ask an admin to set these up.</Text> : null}
+              </View>
+            )}
+
             {/* Search Bar */}
             <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Feather name="search" size={15} color={colors.mutedForeground} />
@@ -518,7 +588,7 @@ export default function DepartmentsScreen() {
                   Staff Roster & Breakdown
                 </Text>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
-                  <Text style={{ fontSize: 11, color: accentColor, fontFamily: "Inter_700Bold" }}>
+                  <Text style={{ fontSize: 11, color: accentColor, fontFamily: "Inter_600SemiBold" }}>
                     View Roster
                   </Text>
                   <Feather name="chevron-right" size={13} color={accentColor} />
@@ -601,10 +671,10 @@ export default function DepartmentsScreen() {
                   {f.label.startsWith("BUDGET ALLOCATED") && (
                     <View style={{ marginTop: 5, padding: 8, borderRadius: 8, backgroundColor: maxAvailableForDept <= 0 ? "#EF444415" : "#10B98115", borderWidth: 1, borderColor: maxAvailableForDept <= 0 ? "#EF444433" : "#10B98133", gap: 3 }}>
                       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                        <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: maxAvailableForDept <= 0 ? "#EF4444" : "#10B981" }}>
+                        <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: maxAvailableForDept <= 0 ? "#EF4444" : "#10B981" }}>
                           {maxAvailableForDept <= 0 ? "⚠️ NO BUDGET AVAILABLE" : "✓ AVAILABLE TO ALLOCATE"}
                         </Text>
-                        <Text style={{ fontSize: 12, fontFamily: "Inter_800ExtraBold", color: maxAvailableForDept <= 0 ? "#EF4444" : "#10B981" }}>
+                        <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: maxAvailableForDept <= 0 ? "#EF4444" : "#10B981" }}>
                           {settings.currency} {maxAvailableForDept.toLocaleString()}
                         </Text>
                       </View>
@@ -677,12 +747,19 @@ export default function DepartmentsScreen() {
 }
 
 const styles = StyleSheet.create({
+  unregCard: { borderWidth: 1, borderRadius: 12, padding: 14, gap: 8, marginBottom: 12 },
+  unregTitle: { fontSize: 14.5, fontFamily: "Inter_600SemiBold" },
+  unregText: { fontSize: 12.5, fontFamily: "Inter_400Regular", lineHeight: 17 },
+  unregRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingTop: 8, borderTopWidth: 1 },
+  unregName: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  unregBtn: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 14, height: 34, alignItems: "center", justifyContent: "center" },
+  unregBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   flex: { flex: 1 },
   header: { paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1 },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
   backBtn: { width: 38, height: 38, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   headerTitleWrap: { flex: 1, justifyContent: "center" },
-  headerTitle: { fontSize: 18, fontFamily: "Inter_700Bold" },
+  headerTitle: { fontSize: 17, fontFamily: "Inter_600SemiBold" },
   headerSub: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 1 },
   list: { padding: 16, gap: 12 },
 
@@ -717,8 +794,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   statVal: {
-    fontSize: 16,
-    fontFamily: "Inter_800ExtraBold",
+    fontSize: 15,
+    fontFamily: "Inter_700Bold",
     lineHeight: 20,
   },
   statLabel: {
@@ -756,7 +833,7 @@ const styles = StyleSheet.create({
   },
   filterChipText: {
     fontSize: 11,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
     letterSpacing: 0.3,
   },
 
@@ -786,7 +863,7 @@ const styles = StyleSheet.create({
   },
   deptName: {
     fontSize: 15,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
   deptMeta: {
     fontSize: 11,
@@ -800,7 +877,7 @@ const styles = StyleSheet.create({
   },
   statusBadgeText: {
     fontSize: 10,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
     letterSpacing: 0.3,
   },
   trashBtn: {
@@ -823,7 +900,7 @@ const styles = StyleSheet.create({
   },
   deptFiscalVal: {
     fontSize: 12,
-    fontFamily: "Inter_800ExtraBold",
+    fontFamily: "Inter_700Bold",
   },
 
   // Empty State
@@ -842,7 +919,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 15,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
   emptyText: {
     fontSize: 12,
@@ -869,7 +946,7 @@ const styles = StyleSheet.create({
   floatingAddBtnText: {
     color: "#fff",
     fontSize: 14,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
 
   // Modal
@@ -895,8 +972,8 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   modalTitle: {
-    fontSize: 18,
-    fontFamily: "Inter_800ExtraBold",
+    fontSize: 17,
+    fontFamily: "Inter_700Bold",
   },
   modalSub: {
     fontSize: 11,
@@ -905,7 +982,7 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     fontSize: 11,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
     letterSpacing: 0.5,
     marginBottom: 5,
   },
@@ -947,6 +1024,6 @@ const styles = StyleSheet.create({
   addBtnText: {
     color: "#fff",
     fontSize: 14,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
 });

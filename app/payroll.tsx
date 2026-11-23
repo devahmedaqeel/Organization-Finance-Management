@@ -559,7 +559,7 @@ export default function PayrollScreen() {
               {isEmployee ? "My Salary Slip" : "Staff Payroll"}
             </Text>
             <Text style={{ fontSize: 11, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
-              Role: <Text style={{ color: colors.primary, fontFamily: "Inter_700Bold" }}>{user?.role?.toUpperCase() || "ADMIN"}</Text>
+              Role: <Text style={{ color: colors.primary, fontFamily: "Inter_600SemiBold" }}>{user?.role?.toUpperCase() || "ADMIN"}</Text>
             </Text>
           </View>
           <View style={{ flexDirection: "row", gap: 6 }}>
@@ -621,7 +621,7 @@ export default function PayrollScreen() {
             <Text style={[styles.empCount, { color: colors.mutedForeground }]}>
               {isEmployee ? "Confidential" : `${userPayroll.length} Staff Records`}
             </Text>
-            <Text style={{ fontSize: 11, color: "#10B981", fontFamily: "Inter_700Bold" }}>✓ Auto Synced</Text>
+            <Text style={{ fontSize: 11, color: "#10B981", fontFamily: "Inter_600SemiBold" }}>✓ Auto Synced</Text>
           </View>
         </View>
 
@@ -678,7 +678,7 @@ export default function PayrollScreen() {
                       <Text
                         style={{
                           fontSize: 10,
-                          fontFamily: "Inter_700Bold",
+                          fontFamily: "Inter_600SemiBold",
                           color: item.paymentStatus === "pending" ? "#F59E0B" : colors.income,
                           textTransform: "uppercase",
                         }}
@@ -713,7 +713,7 @@ export default function PayrollScreen() {
                       activeOpacity={0.8}
                     >
                       <Feather name="file-text" size={11} color="#8B5CF6" />
-                      <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: "#8B5CF6" }}>
+                      <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#8B5CF6" }}>
                         PDF Slip
                       </Text>
                     </TouchableOpacity>
@@ -815,7 +815,7 @@ export default function PayrollScreen() {
                 </View>
                 <View>
                   <Text style={[styles.slipTitle, { color: colors.foreground }]}>Official Payslip</Text>
-                  <Text style={{ fontSize: 12, color: colors.primary, fontFamily: "Inter_700Bold", marginTop: 1 }}>
+                  <Text style={{ fontSize: 12, color: colors.primary, fontFamily: "Inter_600SemiBold", marginTop: 1 }}>
                     {settings.organizationName || user?.organization || "Devorbit Tech kotli"}
                   </Text>
                 </View>
@@ -831,7 +831,7 @@ export default function PayrollScreen() {
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", backgroundColor: "#10B98115", padding: 10, borderRadius: 10, borderWidth: 1, borderColor: "#10B98135" }}>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                     <Feather name="check-circle" size={14} color="#10B981" />
-                    <Text style={{ color: "#10B981", fontSize: 11, fontFamily: "Inter_700Bold" }}>VERIFIED & DISBURSED</Text>
+                    <Text style={{ color: "#10B981", fontSize: 11, fontFamily: "Inter_600SemiBold" }}>VERIFIED & DISBURSED</Text>
                   </View>
                   <Text style={{ color: colors.mutedForeground, fontSize: 11, fontFamily: "Inter_500Medium" }}>
                     Period: {slipModalEntry.month}
@@ -842,7 +842,7 @@ export default function PayrollScreen() {
                 <View style={{ backgroundColor: colors.background, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.border, gap: 8 }}>
                   <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                     <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: "Inter_500Medium" }}>Employee Name</Text>
-                    <Text style={{ color: colors.foreground, fontSize: 13, fontFamily: "Inter_700Bold" }}>{slipModalEntry.employeeName}</Text>
+                    <Text style={{ color: colors.foreground, fontSize: 13, fontFamily: "Inter_600SemiBold" }}>{slipModalEntry.employeeName}</Text>
                   </View>
                   <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                     <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: "Inter_500Medium" }}>Employee ID & Scale</Text>
@@ -876,7 +876,7 @@ export default function PayrollScreen() {
 
                 {/* Earnings & Deductions Tables */}
                 <View style={{ backgroundColor: colors.background, padding: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.border, gap: 10 }}>
-                  <Text style={{ color: "#8B5CF6", fontSize: 12, fontFamily: "Inter_700Bold", letterSpacing: 0.5 }}>EARNINGS & ALLOWANCES</Text>
+                  <Text style={{ color: "#8B5CF6", fontSize: 12, fontFamily: "Inter_600SemiBold", letterSpacing: 0.5 }}>EARNINGS & ALLOWANCES</Text>
                   <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                     <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>Basic Salary</Text>
                     <Text style={{ color: colors.foreground, fontSize: 12, fontFamily: "Inter_600SemiBold" }}>{fmtExact(slipModalEntry.baseSalary)}</Text>
@@ -905,7 +905,7 @@ export default function PayrollScreen() {
                   ) : null}
 
                   <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 2 }} />
-                  <Text style={{ color: colors.expense, fontSize: 12, fontFamily: "Inter_700Bold", letterSpacing: 0.5 }}>DEDUCTIONS & WITHHOLDINGS</Text>
+                  <Text style={{ color: colors.expense, fontSize: 12, fontFamily: "Inter_600SemiBold", letterSpacing: 0.5 }}>DEDUCTIONS & WITHHOLDINGS</Text>
                   {Array.isArray(slipModalEntry.customDeductions) && slipModalEntry.customDeductions.length > 0 ? (
                     slipModalEntry.customDeductions.map((d: any, idx: number) => (
                       <View key={d.id || idx} style={{ flexDirection: "row", justifyContent: "space-between" }}>
@@ -942,7 +942,7 @@ export default function PayrollScreen() {
                 {/* Net Salary Payable Highlight Card */}
                 <View style={{ backgroundColor: "#8B5CF622", padding: 16, borderRadius: 14, borderWidth: 1.5, borderColor: "#8B5CF666", alignItems: "center", gap: 4 }}>
                   <Text style={{ color: colors.mutedForeground, fontSize: 11, fontFamily: "Inter_600SemiBold", letterSpacing: 0.8 }}>NET SALARY PAYABLE</Text>
-                  <Text style={{ color: "#8B5CF6", fontSize: 24, fontFamily: "Inter_800ExtraBold" }}>
+                  <Text style={{ color: "#8B5CF6", fontSize: 20, fontFamily: "Inter_700Bold" }}>
                     {fmtExact(slipModalEntry.netSalary !== undefined ? slipModalEntry.netSalary : (slipModalEntry.baseSalary || 0) + (slipModalEntry.bonus || 0) - (slipModalEntry.deductions || 0))}
                   </Text>
                   <Text style={{ color: colors.mutedForeground, fontSize: 11, textAlign: "center", marginTop: 2 }}>
@@ -954,7 +954,7 @@ export default function PayrollScreen() {
                 <View style={{ alignItems: "center", paddingVertical: 4 }}>
                   <Text style={{ fontSize: 11, color: colors.mutedForeground }}>
                     Verification Code:{" "}
-                    <Text style={{ color: "#10B981", fontFamily: "Inter_700Bold" }}>
+                    <Text style={{ color: "#10B981", fontFamily: "Inter_600SemiBold" }}>
                       {slipModalEntry.verificationCode || `OFM-PAY-${slipModalEntry.id.slice(-6).toUpperCase()}`}
                     </Text>
                   </Text>
@@ -965,7 +965,7 @@ export default function PayrollScreen() {
                 {pdfSuccessMessage && (
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#10B9811A", padding: 10, borderRadius: 10, borderWidth: 1, borderColor: "#10B98144", justifyContent: "center" }}>
                     <Feather name="check-circle" size={14} color="#10B981" />
-                    <Text style={{ color: "#10B981", fontSize: 12, fontFamily: "Inter_700Bold" }}>
+                    <Text style={{ color: "#10B981", fontSize: 12, fontFamily: "Inter_600SemiBold" }}>
                       {pdfSuccessMessage}
                     </Text>
                   </View>
@@ -1006,7 +1006,7 @@ export default function PayrollScreen() {
                       size={17}
                       color="#FFFFFF"
                     />
-                    <Text style={{ color: "#FFFFFF", fontSize: 14, fontFamily: "Inter_700Bold" }}>
+                    <Text style={{ color: "#FFFFFF", fontSize: 14, fontFamily: "Inter_600SemiBold" }}>
                       {isGeneratingPdf
                         ? "Generating..."
                         : isSavingPdf
@@ -1035,7 +1035,7 @@ export default function PayrollScreen() {
                     onPress={() => handleShareSlip(slipModalEntry)}
                   >
                     {isSharingPdf ? <ActivityIndicator size="small" color="#8B5CF6" /> : <Feather name="share-2" size={16} color="#8B5CF6" />}
-                    <Text style={{ color: "#8B5CF6", fontSize: 14, fontFamily: "Inter_700Bold" }}>
+                    <Text style={{ color: "#8B5CF6", fontSize: 14, fontFamily: "Inter_600SemiBold" }}>
                       {isSharingPdf ? "Preparing PDF…" : "Share Slip"}
                     </Text>
                   </TouchableOpacity>
@@ -1152,7 +1152,7 @@ export default function PayrollScreen() {
                         <Text
                           style={{
                             fontSize: 12,
-                            fontFamily: isSel ? "Inter_700Bold" : "Inter_500Medium",
+                            fontFamily: isSel ? "Inter_600SemiBold" : "Inter_500Medium",
                             color: isSel ? stColor : colors.mutedForeground,
                             textTransform: "capitalize",
                           }}
@@ -1237,7 +1237,7 @@ export default function PayrollScreen() {
                   <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 6 }}>
                     <Text style={[styles.sectionTitle, { color: colors.foreground }]}>ALLOWANCES & ADDITIONAL EARNINGS</Text>
                     <View style={[styles.countBadge, { backgroundColor: colors.income + "20", borderColor: colors.income + "40" }]}>
-                      <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: colors.income }}>
+                      <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: colors.income }}>
                         +{settings.currency} {totalAllowances.toLocaleString()}
                       </Text>
                     </View>
@@ -1279,7 +1279,7 @@ export default function PayrollScreen() {
 
                 {/* Quick preset chips for allowances */}
                 <View style={{ gap: 4 }}>
-                  <Text style={{ fontSize: 10, fontFamily: "Inter_700Bold", color: colors.mutedForeground, letterSpacing: 0.4 }}>
+                  <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground, letterSpacing: 0.4 }}>
                     QUICK PRESETS (TAP TO AUTO-FILL):
                   </Text>
                   <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
@@ -1317,7 +1317,7 @@ export default function PayrollScreen() {
                     onPress={() => handleAddAllowance()}
                   >
                     <Feather name="plus" size={14} color="#FFFFFF" />
-                    <Text style={{ color: "#FFFFFF", fontSize: 12, fontFamily: "Inter_700Bold" }}>Add</Text>
+                    <Text style={{ color: "#FFFFFF", fontSize: 12, fontFamily: "Inter_600SemiBold" }}>Add</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1328,7 +1328,7 @@ export default function PayrollScreen() {
                   <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 6 }}>
                     <Text style={[styles.sectionTitle, { color: colors.foreground }]}>DEDUCTIONS & TAX WITHHOLDINGS</Text>
                     <View style={[styles.countBadge, { backgroundColor: colors.expense + "20", borderColor: colors.expense + "40" }]}>
-                      <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: colors.expense }}>
+                      <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: colors.expense }}>
                         -{settings.currency} {totalDeductions.toLocaleString()}
                       </Text>
                     </View>
@@ -1370,7 +1370,7 @@ export default function PayrollScreen() {
 
                 {/* Quick preset chips for deductions */}
                 <View style={{ gap: 4 }}>
-                  <Text style={{ fontSize: 10, fontFamily: "Inter_700Bold", color: colors.mutedForeground, letterSpacing: 0.4 }}>
+                  <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground, letterSpacing: 0.4 }}>
                     QUICK PRESETS (TAP TO AUTO-FILL):
                   </Text>
                   <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
@@ -1408,7 +1408,7 @@ export default function PayrollScreen() {
                     onPress={() => handleAddDeduction()}
                   >
                     <Feather name="plus" size={14} color="#FFFFFF" />
-                    <Text style={{ color: "#FFFFFF", fontSize: 12, fontFamily: "Inter_700Bold" }}>Add</Text>
+                    <Text style={{ color: "#FFFFFF", fontSize: 12, fontFamily: "Inter_600SemiBold" }}>Add</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1447,7 +1447,7 @@ export default function PayrollScreen() {
                 <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 6 }}>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                     <Feather name="shield" size={13} color="#8B5CF6" />
-                    <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: colors.foreground }}>
+                    <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>
                       Department Budget: <Text style={{ color: "#8B5CF6" }}>{dept}</Text>
                     </Text>
                   </View>
@@ -1464,7 +1464,7 @@ export default function PayrollScreen() {
                     <Text
                       style={{
                         fontSize: 11,
-                        fontFamily: "Inter_700Bold",
+                        fontFamily: "Inter_600SemiBold",
                         color: isZeroBudget ? colors.expense : isOverBudget ? colors.expense : colors.income,
                       }}
                     >
@@ -1475,26 +1475,26 @@ export default function PayrollScreen() {
 
                 <View style={{ flexDirection: "row", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
                   <View style={{ minWidth: "22%", gap: 2 }}>
-                    <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_700Bold" }}>ALLOCATED</Text>
-                    <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: colors.foreground }}>
+                    <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_600SemiBold" }}>ALLOCATED</Text>
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>
                       {settings.currency} {deptBudgetAllocated.toLocaleString()}
                     </Text>
                   </View>
                   <View style={{ minWidth: "22%", gap: 2 }}>
-                    <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_700Bold" }}>CURRENT SPENT</Text>
-                    <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: colors.mutedForeground }}>
+                    <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_600SemiBold" }}>CURRENT SPENT</Text>
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: colors.mutedForeground }}>
                       {settings.currency} {deptCurrentSpent.toLocaleString()}
                     </Text>
                   </View>
                   <View style={{ minWidth: "22%", gap: 2 }}>
-                    <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_700Bold" }}>REMAINING</Text>
-                    <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: deptRemainingBudget > 0 ? colors.income : colors.expense }}>
+                    <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_600SemiBold" }}>REMAINING</Text>
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: deptRemainingBudget > 0 ? colors.income : colors.expense }}>
                       {settings.currency} {deptRemainingBudget.toLocaleString()}
                     </Text>
                   </View>
                   <View style={{ minWidth: "22%", gap: 2 }}>
-                    <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_700Bold" }}>PAYROLL CHARGE</Text>
-                    <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: "#8B5CF6" }}>
+                    <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_600SemiBold" }}>PAYROLL CHARGE</Text>
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#8B5CF6" }}>
                       -{settings.currency} {currentNet.toLocaleString()}
                     </Text>
                   </View>
@@ -1584,10 +1584,10 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   header: { paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1, gap: 10 },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  title: { fontSize: 18, fontFamily: "Inter_700Bold" },
+  title: { fontSize: 17, fontFamily: "Inter_600SemiBold" },
   totalCard: { flexDirection: "row", alignItems: "center", gap: 12, padding: 12, borderRadius: 14, borderWidth: 1 },
   totalLabel: { fontSize: 11, fontFamily: "Inter_400Regular" },
-  totalValue: { fontSize: 18, fontFamily: "Inter_800ExtraBold" },
+  totalValue: { fontSize: 17, fontFamily: "Inter_700Bold" },
   empCount: { fontSize: 11, fontFamily: "Inter_500Medium" },
   searchWrap: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },
   searchInput: { flex: 1, fontSize: 13, fontFamily: "Inter_400Regular" },
@@ -1595,23 +1595,23 @@ const styles = StyleSheet.create({
   payCard: { borderRadius: 14, borderWidth: 1, overflow: "hidden" },
   payTop: { flexDirection: "row", alignItems: "center", padding: 12, gap: 10 },
   payAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
-  payAvatarText: { fontSize: 16, fontFamily: "Inter_700Bold" },
+  payAvatarText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
   payInfo: { flex: 1, gap: 1.5 },
-  payName: { fontSize: 14, fontFamily: "Inter_700Bold" },
+  payName: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
   payMeta: { fontSize: 12, fontFamily: "Inter_400Regular" },
   payMonth: { fontSize: 11, fontFamily: "Inter_400Regular" },
   payRight: { alignItems: "flex-end", gap: 4 },
-  payNet: { fontSize: 15, fontFamily: "Inter_800ExtraBold" },
+  payNet: { fontSize: 15, fontFamily: "Inter_700Bold" },
   payBreakdown: { flexDirection: "row", borderTopWidth: 1, paddingVertical: 8, paddingHorizontal: 12 },
   payBreakdownItem: { flex: 1, alignItems: "center", gap: 1 },
   bLabel: { fontSize: 10, fontFamily: "Inter_400Regular" },
-  bValue: { fontSize: 12, fontFamily: "Inter_700Bold" },
+  bValue: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   empty: { alignItems: "center", gap: 8, paddingVertical: 60 },
   emptyText: { fontSize: 15, fontFamily: "Inter_500Medium" },
   overlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "#00000088" },
   sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, padding: 20, paddingBottom: 40, gap: 8 },
   handle: { width: 36, height: 4, borderRadius: 2, backgroundColor: "#555", alignSelf: "center", marginBottom: 8 },
-  modalTitle: { fontSize: 18, fontFamily: "Inter_700Bold", marginBottom: 4 },
+  modalTitle: { fontSize: 17, fontFamily: "Inter_600SemiBold", marginBottom: 4 },
   fieldLabel: { fontSize: 11, fontFamily: "Inter_600SemiBold", letterSpacing: 0.8, marginBottom: 6 },
   input: { padding: 12, borderRadius: 12, borderWidth: 1, fontSize: 14, fontFamily: "Inter_400Regular", marginBottom: 6 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8 },
@@ -1622,23 +1622,23 @@ const styles = StyleSheet.create({
   cancelBtn: { flex: 1, padding: 13, borderRadius: 12, borderWidth: 1, alignItems: "center" },
   cancelText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
   addBtn: { flex: 1, padding: 13, borderRadius: 12, alignItems: "center" },
-  addBtnText: { color: "#fff", fontSize: 14, fontFamily: "Inter_700Bold" },
+  addBtnText: { color: "#fff", fontSize: 14, fontFamily: "Inter_600SemiBold" },
 
   // Slip Modal Styles
   slipOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "#00000088" },
   slipSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, padding: 20, maxHeight: "88%", gap: 12 },
   slipHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 },
-  slipTitle: { fontSize: 18, fontFamily: "Inter_700Bold" },
+  slipTitle: { fontSize: 17, fontFamily: "Inter_600SemiBold" },
 
   // Custom Categories Builder Styles
   customSection: { borderWidth: 1, borderRadius: 14, padding: 14, marginVertical: 8, gap: 10 },
   customSectionHeader: { gap: 2 },
-  sectionTitle: { fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.6 },
+  sectionTitle: { fontSize: 11, fontFamily: "Inter_600SemiBold", letterSpacing: 0.6 },
   countBadge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, borderWidth: 1 },
   itemList: { gap: 6, marginTop: 4 },
   itemCard: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 10, borderRadius: 10, borderWidth: 1 },
   itemName: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
-  itemAmount: { fontSize: 13, fontFamily: "Inter_700Bold", marginRight: 8 },
+  itemAmount: { fontSize: 13, fontFamily: "Inter_600SemiBold", marginRight: 8 },
   removeBtn: { width: 28, height: 28, borderRadius: 6, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   emptyHint: { padding: 10, borderRadius: 8, borderWidth: 1, borderStyle: "dashed", alignItems: "center" },
   presetChip: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1 },
@@ -1647,5 +1647,5 @@ const styles = StyleSheet.create({
   netPreviewBox: { padding: 14, borderRadius: 14, borderWidth: 1.5, alignItems: "center", gap: 4, marginVertical: 10 },
   netBreakdownRow: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 10, marginBottom: 4 },
   netLabel: { fontSize: 11, fontFamily: "Inter_600SemiBold", letterSpacing: 0.8 },
-  netValue: { fontSize: 24, fontFamily: "Inter_800ExtraBold" },
+  netValue: { fontSize: 20, fontFamily: "Inter_700Bold" },
 });

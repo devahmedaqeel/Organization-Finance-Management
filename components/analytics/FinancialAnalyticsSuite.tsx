@@ -43,6 +43,8 @@ interface Props {
   budgets?: Budget[];
   transactions?: Transaction[];
   onOpenDepartmentStaff?: (dept: Department | { id: string; name: string }) => void;
+  /** Show just one of the three cards (phone dashboard tabs). Omit to show all three. */
+  only?: "budget" | "margin" | "spending";
 }
 
 export function FinancialAnalyticsSuite({
@@ -57,6 +59,7 @@ export function FinancialAnalyticsSuite({
   budgets: propBudgets,
   transactions: propTransactions,
   onOpenDepartmentStaff,
+  only,
 }: Props) {
   const colors = useColors();
   const { width } = useWindowDimensions();
@@ -546,6 +549,7 @@ export function FinancialAnalyticsSuite({
     <View style={styles.container}>
       <View style={[styles.grid, isMobile && styles.gridMobile]}>
         {/* ════════ CARD 1 · BUDGET ════════ */}
+        {(!only || only === "budget") && (
         <View style={cardStyle}>
           <CardHeader
             icon={<SvgTarget size={18} color={colors.primary} />}
@@ -628,8 +632,10 @@ export function FinancialAnalyticsSuite({
             ]}
           />
         </View>
+        )}
 
         {/* ════════ CARD 2 · NET MARGIN ════════ */}
+        {(!only || only === "margin") && (
         <View style={cardStyle}>
           <CardHeader
             icon={<SvgTrendingUp size={18} color={marginColor} />}
@@ -695,8 +701,10 @@ export function FinancialAnalyticsSuite({
             ]}
           />
         </View>
+        )}
 
         {/* ════════ CARD 3 · SPENDING ════════ */}
+        {(!only || only === "spending") && (
         <View style={cardStyle}>
           <CardHeader
             icon={<SvgPieChart size={18} color={colors.info} />}
@@ -779,6 +787,7 @@ export function FinancialAnalyticsSuite({
             }
           />
         </View>
+        )}
       </View>
     </View>
   );

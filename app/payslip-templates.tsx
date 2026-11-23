@@ -58,5 +58,5 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     borderBottomWidth: 1,
   },
-  title: { fontSize: 18, fontFamily: "Inter_700Bold" },
+  title: { fontSize: 17, fontFamily: "Inter_600SemiBold" },
 });

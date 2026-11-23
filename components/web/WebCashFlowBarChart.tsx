@@ -21,7 +21,7 @@ export function WebCashFlowBarChart({ transactions, period, currency = "PKR", hi
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
   const [scrollX, setScrollX] = useState(0);
   const [showAll, setShowAll] = useState(false);
-  const scroll = useRef<ScrollView>(null);
+  const scroll = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const data = useMemo(() => buildCashFlowBarData(transactions, period, group), [transactions, period.startDate, period.endDate, group]);
   const selected = data.buckets.find((bucket) => bucket.key === selectedKey);
   const hovered = data.buckets.find((bucket) => bucket.key === hoveredKey);

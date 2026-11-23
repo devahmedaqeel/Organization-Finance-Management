@@ -243,7 +243,7 @@ export default function OnboardingScreen() {
 
             {/* Content Text (English or Urdu dynamically) */}
             <View style={styles.textContainer}>
-              <Text style={[styles.slideTitle, { color: colors.foreground, fontFamily: "Inter_700Bold" }]}>
+              <Text style={[styles.slideTitle, { color: colors.foreground, fontFamily: "Inter_600SemiBold" }]}>
                 {language === "en" ? item.titleEn : item.titleUr}
               </Text>
               <Text style={[styles.slideDesc, { color: colors.mutedForeground, lineHeight: 22, fontSize: language === "en" ? 14 : 15 }]}>
@@ -331,7 +331,7 @@ const styles = StyleSheet.create({
   },
   langText: {
     fontSize: 11,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
   volumeBtn: {
     width: 34,
@@ -395,7 +395,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   slideTitle: {
-    fontSize: 22,
+    fontSize: 19,
     textAlign: "center",
   },
   slideDesc: {
@@ -432,7 +432,7 @@ const styles = StyleSheet.create({
   nextBtnText: {
     color: "#fff",
     fontSize: 15,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
   finishBtn: {
     flexDirection: "row",
@@ -449,6 +449,6 @@ const styles = StyleSheet.create({
   finishBtnText: {
     color: "#fff",
     fontSize: 15,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
 });

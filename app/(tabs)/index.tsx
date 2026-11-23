@@ -60,6 +60,7 @@ import {
   calculateUnallocatedFunds,
 } from "@/services/FinancialCalculationEngine";
 import { FinancialAnalyticsSuite } from "@/components/analytics/FinancialAnalyticsSuite";
+import { WebCashFlowBarChart } from "@/components/web/WebCashFlowBarChart";
 
 const SCREEN_W = Dimensions.get("window").width;
 const ROLE_COLORS: Record<string, string> = {
@@ -238,7 +239,7 @@ function Sparkline({
               key={`${l}-${i}`}
               style={[
                 styles.sparkLabel,
-                { color: i === n - 1 ? color : colors.mutedForeground, fontFamily: i === n - 1 ? "Inter_700Bold" : "Inter_500Medium" },
+                { color: i === n - 1 ? color : colors.mutedForeground, fontFamily: i === n - 1 ? "Inter_600SemiBold" : "Inter_500Medium" },
               ]}
             >
               {l}
@@ -446,6 +447,8 @@ export default function DashboardScreen() {
   const { settings } = useSettings();
   const keyboardHeight = useKeyboardHeight();
   const [hideBalance, setHideBalance] = useState<boolean>(false);
+  const [cashView, setCashView] = useState<"bars" | "trend">("bars");
+  const [insightView, setInsightView] = useState<"budget" | "margin" | "spending">("budget");
   const [growthMode, setGrowthMode] = useState<number>(0);
   const [txModalVisible, setTxModalVisible] = useState<boolean>(false);
   const [exportModalVisible, setExportModalVisible] = useState<boolean>(false);
@@ -865,8 +868,8 @@ export default function DashboardScreen() {
         <RefreshControl
           refreshing={syncStatus === "syncing"}
           onRefresh={refreshData}
-          tintColor="#3B82F6"
-          colors={["#3B82F6"]}
+          tintColor={colors.primary}
+          colors={[colors.primary]}
         />
       }
     >
@@ -934,21 +937,21 @@ export default function DashboardScreen() {
 
       {/* ─── Premium Hero Balance Card (Matching Web Exactly) ─── */}
       <LinearGradient
-        colors={["#081229", "#112D6F", "#1D4ED8"]}
+        colors={["#1A1C20", "#1D2722", "#183A1E", "#1B4D22"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[
           styles.heroBalanceCard,
           {
-            borderRadius: 22,
-            padding: 18,
-            gap: 16,
-            borderWidth: 1,
+            borderRadius: 10,
+            padding: 16,
+            gap: 14,
+            borderWidth: 1.2,
             borderColor: "rgba(255, 255, 255, 0.18)",
-            shadowColor: "#1d4ed8",
-            shadowOffset: { width: 0, height: 10 },
-            shadowOpacity: 0.35,
-            shadowRadius: 18,
+            shadowColor: "#000000",
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.12,
+            shadowRadius: 12,
             elevation: 10,
             overflow: "hidden",
             position: "relative",
@@ -957,17 +960,16 @@ export default function DashboardScreen() {
         ]}
       >
         {/* Ambient Decorative Background Glow */}
-        <View style={styles.ambientGlowTopRight} pointerEvents="none" />
-        <View style={styles.ambientGlowBottomLeft} pointerEvents="none" />
+
 
         {/* Top Row: Title + Privacy Eye + Fiscal Dossier Button */}
         <View style={styles.heroTopRow}>
           <View style={styles.heroLabelWrap}>
             <View style={styles.heroLabelIcon}>
-              <Feather name="shield" size={12} color="#7DD3FC" />
+              <Feather name="shield" size={12} color="#38BDF8" />
             </View>
             <Text style={styles.heroLabel} numberOfLines={1}>
-              {balanceViewMode === "cashflow" ? "Net Cash Available" : "Total Disbursements"}
+              {balanceViewMode === "cashflow" ? "Available cash" : "Total spending"}
             </Text>
             <TouchableOpacity
               onPress={() => {
@@ -992,8 +994,8 @@ export default function DashboardScreen() {
             }}
             activeOpacity={0.8}
           >
-            <Feather name="bar-chart-2" size={12} color="#7DD3FC" />
-            <Text style={styles.heroDossierText} numberOfLines={1}>Fiscal Dossier</Text>
+            <Feather name="bar-chart-2" size={12} color="#38BDF8" />
+            <Text style={styles.heroDossierText} numberOfLines={1}>Breakdown</Text>
             <Feather name="chevron-right" size={13} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
@@ -1043,7 +1045,7 @@ export default function DashboardScreen() {
                 styles.retentionFill,
                 {
                   width: `${barWidth(totalAllocatedBudget > 0 ? netBudgetUtilization : totalIncome > 0 ? (totalExpenses / totalIncome) * 100 : totalExpenses > 0 ? 100 : 0)}%`,
-                  backgroundColor: isEffectiveDeficit || (totalAllocatedBudget > 0 && budgetUsedPct > 100) ? "#FB7185" : "#38BDF8",
+                  backgroundColor: isEffectiveDeficit || (totalAllocatedBudget > 0 && budgetUsedPct > 100) ? "#F87171" : "#4ADE80",
                 },
               ]}
             />
@@ -1051,50 +1053,31 @@ export default function DashboardScreen() {
           <View style={styles.retentionLabels}>
             <Text style={[styles.retentionText, { flexShrink: 1 }]} numberOfLines={Platform.OS === "web" ? undefined : 1}>
               {totalAllocatedBudget > 0
-                ? `Available to allocate: ${settings.currency} ${fmt(availableToAllocate)}`
+                ? `Unallocated: ${settings.currency} ${fmt(availableToAllocate)}`
                 : totalExpenses === 0
                 ? "Nothing spent yet"
                 : totalIncome === 0
                 ? "No inflow recorded yet"
-                : `${expensePctOfIncome}% of inflow spent`}
+                : `${expensePctOfIncome}% of income spent`}
             </Text>
             <Text
-              style={[styles.retentionText, styles.retentionStatus, { color: isEffectiveDeficit ? "#FDA4AF" : "#6EE7B7" }]}
+              style={[styles.retentionText, styles.retentionStatus, { color: isEffectiveDeficit ? "#FCA5A5" : "#86EFAC" }]}
               numberOfLines={1}
             >
               {totalAllocatedBudget > 0
-                ? `${budgetUsedPct}% of budget used`
+                ? `${settings.currency} ${fmt(netBudgetRemaining)} left · ${budgetUsedPct}% used`
                 : isDeficit
                 ? `Deficit -${settings.currency} ${fmt(totalExpenses - totalIncome)}`
-                : `${incomeRetainedPct}% retained`}
+                : `${incomeRetainedPct}% saved`}
             </Text>
           </View>
         </View>
 
-        {/* Budget breakdown (only when department budgets exist) */}
-        {totalAllocatedBudget > 0 && (
-          <View style={styles.heroStatsRow}>
-            <View style={styles.heroStat}>
-              <Text style={styles.heroStatLabel}>Allocated</Text>
-              <Text style={styles.heroStatValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
-                {settings.currency} {fmt(totalAllocatedBudget)}
-              </Text>
-            </View>
-            <View style={styles.heroStatDivider} />
-            <View style={styles.heroStat}>
-              <Text style={styles.heroStatLabel}>Remaining</Text>
-              <Text style={styles.heroStatValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
-                {settings.currency} {fmt(netBudgetRemaining)}
-              </Text>
-            </View>
-          </View>
-        )}
-
         {/* View Mode Switcher (segmented control) */}
         <View style={styles.heroSegment}>
           {([
-            { key: "cashflow", label: "Net Cash", amount: `${netCash >= 0 ? "+" : "-"}${settings.currency} ${fmt(Math.abs(netCash))}`, dot: "#34D399" },
-            { key: "expenses", label: "Outflows", amount: `-${settings.currency} ${fmt(totalExpenses)}`, dot: "#FB7185" },
+            { key: "cashflow", label: "Net cash", amount: `${netCash >= 0 ? "+" : "-"}${settings.currency} ${fmt(Math.abs(netCash))}`, dot: "#34D399" },
+            { key: "expenses", label: "Spending", amount: `-${settings.currency} ${fmt(totalExpenses)}`, dot: "#FB7185" },
           ] as const).map((opt) => {
             const active = balanceViewMode === opt.key;
             return (
@@ -1112,203 +1095,128 @@ export default function DashboardScreen() {
                   <View style={[styles.heroStatusDot, { backgroundColor: opt.dot }]} />
                   <Text style={[styles.heroSegmentLabel, { color: active ? "#FFFFFF" : "rgba(255,255,255,0.7)" }]}>{opt.label}</Text>
                 </View>
-                <Text
-                  style={[styles.heroSegmentAmount, { color: active ? "#FFFFFF" : "rgba(255,255,255,0.75)" }]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.7}
-                >
-                  {hideBalance ? `${settings.currency} ••••` : opt.amount}
-                </Text>
               </TouchableOpacity>
             );
           })}
         </View>
       </LinearGradient>
 
-      {/* ─── KPI Overview Grid ─── */}
-      <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Overview</Text>
-        <Text style={[styles.sectionHint, { color: colors.mutedForeground }]}>Tap a card for details</Text>
-      </View>
-      <View style={styles.kpiGrid}>
-        <View style={styles.kpiRow}>
-          <KpiCard
-            layout="wide"
-            icon="arrow-down-left"
-            color={colors.income}
-            label="Total Inflow"
-            prefix={`+${settings.currency}`}
-            value={fmt(totalIncome)}
-            spark={{
-              data: sixMonths.income,
-              labels: sixMonths.labels,
-              caption: thisMonthIncome > 0 ? `This month: ${settings.currency} ${fmt(thisMonthIncome)}` : "Nothing received this month",
-              change: inflowChange?.text,
-              changeColor: inflowChange?.color,
+      {/* ─── Shortcuts (same actions as before, one slim row) ─── */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.qaRow} style={{ marginHorizontal: -hPad }}>
+        {([
+          { label: "Add income", icon: "plus", color: colors.income, go: () => router.push("/(tabs)/income") },
+          { label: "Add expense", icon: "minus", color: colors.expense, go: () => router.push("/(tabs)/expenses") },
+          { label: "Payroll", icon: "users", color: "#7C3AED", go: () => router.push("/payroll") },
+          { label: "Budgets", icon: "pie-chart", color: colors.info, go: () => router.push("/budget") },
+          { label: "Reports", icon: "bar-chart-2", color: colors.foreground, go: () => router.push("/(tabs)/reports") },
+          { label: "AI insights", icon: "zap", color: colors.warning, go: () => router.push("/ai-insights") },
+        ] as const).map((q) => (
+          <TouchableOpacity
+            key={q.label}
+            onPress={() => {
+              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              q.go();
             }}
-            segments={[{ pct: inflowKeptPct, color: isEffectiveDeficit ? colors.expense : colors.income }]}
-            footLeft={
-              totalIncome === 0
-                ? "No inflow recorded yet"
-                : totalAllocatedBudget > 0
-                ? `${settings.currency} ${fmt(availableToAllocate)} unallocated`
-                : isDeficit
-                ? "Deficit · nothing retained"
-                : "Retained after expenses"
-            }
-            footLeftColor={totalIncome === 0 ? undefined : isEffectiveDeficit ? colors.expense : undefined}
-            footRight={totalIncome > 0 ? fmtPct(inflowKeptPct) : null}
-            footRightColor={isEffectiveDeficit ? colors.expense : colors.income}
-            onPress={() => router.push("/(tabs)/income")}
-          />
-        </View>
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            style={[styles.qaChip, { backgroundColor: colors.card, borderColor: colors.border }]}
+          >
+            <View style={[styles.qaIcon, { backgroundColor: q.color + "14" }]}>
+              <Feather name={q.icon as any} size={14} color={q.color} />
+            </View>
+            <Text style={[styles.qaText, { color: colors.foreground }]} numberOfLines={1}>{q.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
 
-        <View style={styles.kpiRow}>
-          <KpiCard
-            layout="wide"
-            icon="arrow-up-right"
-            color={colors.expense}
-            label="Total Expenses"
-            prefix={`-${settings.currency}`}
-            value={fmt(totalExpenses)}
-            tag={expenseStatusText}
-            tagColor={expenseStatusColor}
-            spark={{
-              data: sixMonths.expense,
-              labels: sixMonths.labels,
-              caption: thisMonthExpense > 0 ? `This month: ${settings.currency} ${fmt(thisMonthExpense)}` : "Nothing spent this month",
-              change: expenseChange?.text,
-              changeColor: expenseChange?.color,
-            }}
-            segments={[{ pct: expenseBarPct, color: expenseBarColor }]}
-            footLeft={
-              totalExpenses === 0
-                ? "Nothing spent yet"
-                : totalIncome === 0
-                ? "No inflow recorded to cover this"
-                : expenseOfInflowPct > 100
-                ? "of total inflow · spending exceeds inflow"
-                : "of total inflow spent"
-            }
-            footLeftColor={totalExpenses > 0 && (totalIncome === 0 || expenseOfInflowPct > 100) ? colors.expense : undefined}
-            footRight={totalExpenses > 0 && totalIncome > 0 ? fmtPct(expenseOfInflowPct) : null}
-            footRightColor={expenseBarColor}
-            onPress={() => router.push("/(tabs)/expenses")}
-          />
-        </View>
+      {/* ─── Overview cards (same as web) ─── */}
+      {(() => {
+        const keptPct = totalIncome > 0 ? Math.max(0, Math.round(((totalIncome - totalExpenses) / totalIncome) * 100)) : 0;
+        const spentPct = totalIncome > 0 ? Math.round((totalExpenses / totalIncome) * 100) : totalExpenses > 0 ? 100 : 0;
+        const hasBudget = totalAllocatedBudget > 0;
+        const isOver = hasBudget && totalBudgetSpent > totalAllocatedBudget;
+        const usedPct = hasBudget ? Math.round((totalBudgetSpent / totalAllocatedBudget) * 100) : 0;
+        const budgetTone = !hasBudget ? colors.mutedForeground : isOver ? colors.expense : usedPct > 80 ? colors.warning : colors.info;
+        const inCount = transactions.filter((t) => t.type === "income").length;
+        const outCount = transactions.length - inCount;
+        const cards = [
+          { key: "income", label: "Income", icon: "trending-up", tone: colors.income, value: totalIncome, count: false,
+            status: totalIncome === 0 ? "No income yet" : isDeficit ? "Less than expenses" : `${keptPct}% kept after expenses`,
+            statusTone: totalIncome === 0 ? colors.mutedForeground : isDeficit ? colors.expense : colors.income,
+            bar: totalIncome === 0 || isDeficit ? 0 : keptPct, barTone: colors.income, barRest: undefined as string | undefined,
+            link: "View income", onPress: () => router.push("/(tabs)/income") },
+          { key: "expenses", label: "Expenses", icon: "trending-down", tone: colors.expense, value: totalExpenses, count: false,
+            status: totalExpenses === 0 ? "Nothing spent yet" : `${spentPct}% of income`,
+            statusTone: totalExpenses === 0 ? colors.mutedForeground : isDeficit ? colors.expense : colors.mutedForeground,
+            bar: totalExpenses === 0 ? 0 : Math.min(100, spentPct), barTone: isDeficit ? colors.expense : spentPct > 85 ? colors.warning : colors.expense, barRest: undefined,
+            link: "View expenses", onPress: () => router.push("/(tabs)/expenses") },
+          { key: "budget", label: "Budget", icon: "pie-chart", tone: budgetTone, value: totalAllocatedBudget, count: false,
+            status: !hasBudget ? "No budget set" : isOver ? `${settings.currency} ${fmt(totalBudgetSpent - totalAllocatedBudget)} over budget` : `${settings.currency} ${fmt(netBudgetRemaining)} left · ${usedPct}% used`,
+            statusTone: isOver ? colors.expense : colors.mutedForeground,
+            bar: hasBudget ? Math.min(100, usedPct) : 0, barTone: budgetTone, barRest: undefined,
+            link: "View budgets", onPress: () => router.push("/budget") },
+          { key: "tx", label: "Transactions", icon: "repeat", tone: colors.foreground, value: transactions.length, count: true,
+            status: transactions.length === 0 ? "No transactions yet" : `${inCount} income · ${outCount} expenses`,
+            statusTone: colors.mutedForeground,
+            bar: transactions.length > 0 ? (inCount / transactions.length) * 100 : 0, barTone: colors.income, barRest: transactions.length > 0 ? colors.expense : undefined,
+            link: "View all", onPress: () => setTxModalVisible(true) },
+          { key: "payroll", label: "Staff payroll", icon: "users", tone: "#7C3AED", value: payrollTotal, count: false,
+            status: activePayroll.length === 0 ? "No payroll yet" : `${activePayroll.length} ${activePayroll.length === 1 ? "payment" : "payments"} · ${totalExpenses > 0 ? Math.round((payrollTotal / totalExpenses) * 100) : 0}% of expenses`,
+            statusTone: colors.mutedForeground,
+            bar: totalExpenses > 0 ? Math.min(100, (payrollTotal / totalExpenses) * 100) : 0, barTone: "#7C3AED", barRest: undefined,
+            link: "View payroll", onPress: () => router.push("/payroll") },
+        ];
+        return (
+          <View style={styles.kpi2Grid}>
+            {cards.map((c) => (
+              <TouchableOpacity
+                key={c.key}
+                onPress={c.onPress}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel={`${c.label}: ${c.count ? c.value : settings.currency + " " + fmt(c.value)}. ${c.status}`}
+                style={[styles.kpi2Card, { backgroundColor: colors.card, borderColor: colors.border }, c.key === "payroll" && { flexBasis: "100%" }]}
+              >
+                <View style={styles.kpi2Head}>
+                  <View style={[styles.kpi2Icon, { backgroundColor: c.tone + "16" }]}>
+                    <Feather name={c.icon as any} size={14} color={c.tone} />
+                  </View>
+                  <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[styles.kpi2Label, { color: colors.mutedForeground }]}>{c.label}</Text>
+                  <Feather name="chevron-right" size={14} color={colors.mutedForeground} style={{ marginLeft: "auto" }} />
+                </View>
+                <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6} style={[styles.kpi2Value, { color: colors.foreground }]}>
+                  {c.count ? c.value.toLocaleString() : hideBalance ? `${settings.currency} ••••` : `${settings.currency} ${fmt(c.value)}`}
+                </Text>
+                <View style={{ gap: 6 }}>
+                  <Text numberOfLines={2} style={[styles.kpi2Status, { color: c.statusTone }]}>{c.status}</Text>
+                  <View style={[styles.kpi2Track, { backgroundColor: c.barRest && c.bar > 0 ? c.barRest : colors.muted }]}>
+                    <View style={{ width: `${Math.max(c.bar > 0 ? 2 : 0, Math.min(100, c.bar))}%`, height: "100%", backgroundColor: c.barTone }} />
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        );
+      })()}
 
-        <View style={styles.kpiRow}>
-          <KpiCard
-            icon="pie-chart"
-            color={budgetColor}
-            label="Department Budget"
-            prefix={settings.currency}
-            value={fmt(totalAllocatedBudget)}
-            tag={
-              totalAllocatedBudget === 0
-                ? "No budget"
-                : netBudgetUtilization > 100
-                ? "Over limit"
-                : netBudgetUtilization > 80
-                ? "Near limit"
-                : "On track"
-            }
-            segments={[{ pct: totalAllocatedBudget === 0 ? 0 : netBudgetUtilization, color: budgetColor }]}
-            subValue={budgetScopeLabel ? `Across ${budgetScopeLabel}` : undefined}
-            footLeft={totalAllocatedBudget > 0 ? "" : "No budget set yet"}
-            footStats={
-              totalAllocatedBudget > 0
-                ? [
-                    // Same number-led style as the Total Payroll box
-                    { value: fmtPct(netBudgetUtilization), label: "of budget used", color: budgetColor },
-                    overBudget
-                      ? {
-                          value: `${settings.currency} ${fmt(totalBudgetSpent - totalAllocatedBudget)}`,
-                          label: "over budget",
-                          color: colors.expense,
-                        }
-                      : { value: `${settings.currency} ${fmt(netBudgetRemaining)}`, label: "left to spend" },
-                  ]
-                : undefined
-            }
-            onPress={() => router.push("/budget")}
-          />
-          <KpiCard
-            icon="users"
-            color="#8B5CF6"
-            label="Total Payroll"
-            prefix={settings.currency}
-            value={fmt(payrollTotal)}
-            subValue={activePayroll.length > 0 ? `Avg salary ${settings.currency} ${fmt(Math.round(avgNetSalary))}` : undefined}
-            tag={`${staffCount} Staff`}
-            tagColor={staffCount > 0 ? "#8B5CF6" : colors.mutedForeground}
-            segments={[
-              {
-                pct: payrollOfInflowPct ?? 0,
-                color: (payrollOfInflowPct ?? 0) > 100 ? colors.expense : "#8B5CF6",
-              },
-            ]}
-            footLeft={payrollTotal > 0 ? "" : "No payroll yet"}
-            footStats={
-              payrollTotal > 0
-                ? [
-                    // Short, number-led lines: "16% of total income", "Oct 2026 last payroll run"
-                    payrollOfInflowPct === null
-                      ? { value: "", label: "No income recorded yet" }
-                      : {
-                          value: exactPctText(payrollOfInflowPct),
-                          label: "of total income",
-                          color: payrollOfInflowPct > 100 ? colors.expense : "#8B5CF6",
-                        },
-                    ...(lastPayrollLabel ? [{ value: lastPayrollLabel, label: "last payroll run" }] : []),
-                  ]
-                : undefined
-            }
-            onPress={() => router.push("/payroll")}
-          />
-        </View>
-
-        <View style={styles.kpiRow}>
-          <KpiCard
-            layout="wide"
-            icon="list"
-            color={colors.primary}
-            label="Transactions"
-            value={`${transactions.length} ${transactions.length === 1 ? "record" : "records"}`}
-            tag={transactions.length > 0 ? "Active" : "Empty"}
-            tagColor={transactions.length > 0 ? colors.primary : colors.mutedForeground}
-            spark={{
-              data: sixMonths.count,
-              labels: sixMonths.labels,
-              caption: thisMonthCount > 0 ? `This month: ${thisMonthCount} ${thisMonthCount === 1 ? "record" : "records"}` : "No records this month",
-              change: txChange?.text,
-              changeColor: txChange?.color,
-            }}
-            segments={
-              transactions.length > 0
-                ? [
-                    { pct: (incomeCount / transactions.length) * 100, color: colors.income },
-                    { pct: (expenseCount / transactions.length) * 100, color: colors.expense },
-                  ]
-                : []
-            }
-            footLeft={transactions.length > 0 ? `${incomeCount} inflow · ${expenseCount} expense records` : "No transactions yet"}
-            footRight={
-              transactions.length > 0
-                ? `${Math.round((incomeCount / transactions.length) * 100)}% in · ${Math.round((expenseCount / transactions.length) * 100)}% out`
-                : null
-            }
-            onPress={() => setTxModalVisible(true)}
-          />
+      {/* ─── Cash flow: Bars | Trend ─── */}
+      <View style={styles.sectionRow}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Cash flow</Text>
+        <View style={[styles.segWrap, { backgroundColor: colors.muted }]}>
+          {([["bars", "Bars"], ["trend", "Trend"]] as const).map(([k, label]) => (
+            <TouchableOpacity key={k} onPress={() => setCashView(k)} accessibilityRole="tab" accessibilityState={{ selected: cashView === k }}
+              style={[styles.segBtn, cashView === k && { backgroundColor: colors.card }]}>
+              <Text style={[styles.segText, { color: cashView === k ? colors.foreground : colors.mutedForeground }]}>{label}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
       </View>
 
-      {/* Monthly Trend Chart */}
+      {cashView === "trend" && (
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.cardHeader}>
           <View>
-            <Text style={[styles.cardTitle, { color: colors.foreground }]}>Financial Trend</Text>
+            <Text style={[styles.cardTitle, { color: colors.foreground }]}>Trend</Text>
             <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>{trendRangeSub}</Text>
           </View>
           <TouchableOpacity
@@ -1350,9 +1258,26 @@ export default function DashboardScreen() {
           userId={user?.id || "default"}
         />
       </View>
+      )}
 
-      {/* ─── Authoritative 3-Card Financial Analytics Suite (Budget, NOM, Distribution) ─── */}
+      {cashView === "bars" && (
+        <WebCashFlowBarChart transactions={transactions} period={activePeriod} currency={settings.currency} hideAmounts={hideBalance} />
+      )}
+
+      {/* ─── Analytics: one card at a time (Budget | Margin | Spending) ─── */}
+      <View style={styles.sectionRow}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Analytics</Text>
+        <View style={[styles.segWrap, { backgroundColor: colors.muted }]}>
+          {([["budget", "Budget"], ["margin", "Margin"], ["spending", "Spending"]] as const).map(([k, label]) => (
+            <TouchableOpacity key={k} onPress={() => setInsightView(k)} accessibilityRole="tab" accessibilityState={{ selected: insightView === k }}
+              style={[styles.segBtn, { paddingHorizontal: 10 }, insightView === k && { backgroundColor: colors.card }]}>
+              <Text style={[styles.segText, { color: insightView === k ? colors.foreground : colors.mutedForeground }]}>{label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
       <FinancialAnalyticsSuite
+        only={insightView}
         budget={authFinancialModel.budget}
         margin={authFinancialModel.margin}
         distribution={authFinancialModel.distribution}
@@ -1384,7 +1309,7 @@ export default function DashboardScreen() {
             <View>
               <Text style={[styles.cardTitle, { color: colors.foreground }]}>Departments</Text>
               <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
-                {expenseByDept.length} Active Cost Centers
+                Top spending · {expenseByDept.length} active
               </Text>
             </View>
             <TouchableOpacity
@@ -1395,7 +1320,7 @@ export default function DashboardScreen() {
               }}
               activeOpacity={0.75}
             >
-              <Text style={[styles.miniViewPillText, { color: colors.primary }]}>View All</Text>
+              <Text style={[styles.miniViewPillText, { color: colors.primary }]}>View all</Text>
             </TouchableOpacity>
           </View>
 
@@ -1432,7 +1357,7 @@ export default function DashboardScreen() {
                         </Text>
                       </View>
                     </View>
-                    <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: colors.foreground }}>
+                    <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>
                       {settings.currency} {fmt(dept.total)}
                     </Text>
                   </View>
@@ -1455,82 +1380,11 @@ export default function DashboardScreen() {
         </View>
       )}
 
-      {/* Quick Actions Section */}
-      <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <View style={styles.cardHeader}>
-          <View style={{ flex: 1, minWidth: 0, marginRight: 8 }}>
-            <Text style={[styles.cardTitle, { color: colors.foreground }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>
-              Quick Actions
-            </Text>
-            <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>
-              Instant financial shortcuts
-            </Text>
-          </View>
-          <View style={[styles.actionSectionPill, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "30", flexShrink: 0, paddingHorizontal: 9, paddingVertical: 3.5 }]}>
-            <Feather name="zap" size={12} color={colors.primary} />
-            <Text style={[styles.actionSectionPillText, { color: colors.primary, includeFontPadding: false }]}>
-              Active
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.actionsGrid}>
-          <AnimatedQuickAction
-            label="Add Inflow"
-            sub="Deposit & grant"
-            badge={`${incomeCount} ${incomeCount === 1 ? "Record" : "Records"}`}
-            icon="plus-circle"
-            color={colors.income}
-            onPress={() => router.push("/(tabs)/income")}
-          />
-          <AnimatedQuickAction
-            label="Add Expense"
-            sub="Bills & supplies"
-            badge={`${expenseCount} ${expenseCount === 1 ? "Record" : "Records"}`}
-            icon="minus-circle"
-            color={colors.expense}
-            onPress={() => router.push("/(tabs)/expenses")}
-          />
-          <AnimatedQuickAction
-            label="Reports"
-            sub="Charts & Export"
-            badge="PDF Export"
-            icon="bar-chart-2"
-            color={colors.primary}
-            onPress={() => router.push("/(tabs)/reports")}
-          />
-          <AnimatedQuickAction
-            label="AI Insights"
-            sub="Smart burn audit"
-            badge="AI Active"
-            icon="zap"
-            color="#10B981"
-            onPress={() => router.push("/ai-insights")}
-          />
-          <AnimatedQuickAction
-            label="Staff Payroll"
-            sub="Salaries & bonus"
-            badge={`${staffCount} Staff`}
-            icon="users"
-            color="#8B5CF6"
-            onPress={() => router.push("/payroll")}
-          />
-          <AnimatedQuickAction
-            label="Budget Plan"
-            sub="Dept allocations"
-            badge={`${budgetPlanCount} ${budgetPlanCount === 1 ? "Plan" : "Plans"}`}
-            icon="pie-chart"
-            color={colors.warning}
-            onPress={() => router.push("/budget")}
-          />
-        </View>
-      </View>
-
       {/* Recent Transactions */}
       <View style={[styles.cardHeader, { marginTop: 4, marginBottom: -4 }]}>
         <View style={{ flex: 1, minWidth: 0, marginRight: 8 }}>
           <Text style={[styles.cardTitle, { color: colors.foreground }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>
-            Recent Transactions
+            Recent transactions
           </Text>
         </View>
         <TouchableOpacity
@@ -1541,7 +1395,7 @@ export default function DashboardScreen() {
           }}
         >
           <Text style={[styles.seeAllText, { color: colors.primary }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>
-            See All
+            See all
           </Text>
           <Feather name="arrow-right" size={12} color={colors.primary} />
         </TouchableOpacity>
@@ -1668,7 +1522,7 @@ export default function DashboardScreen() {
                       style={[
                         styles.txFilterText,
                         { color: isSelected ? "#FFFFFF" : colors.mutedForeground },
-                        isSelected && { fontFamily: "Inter_700Bold" },
+                        isSelected && { fontFamily: "Inter_600SemiBold" },
                       ]}
                     >
                       {f.label}
@@ -1826,7 +1680,7 @@ export default function DashboardScreen() {
             </Text>
             <Text style={[styles.logoutModalMsg, { color: colors.mutedForeground }]}>
               Are you sure you want to log out of{"\n"}
-              <Text style={{ fontFamily: "Inter_700Bold", color: colors.foreground }}>
+              <Text style={{ fontFamily: "Inter_600SemiBold", color: colors.foreground }}>
                 {settings.organizationName || user?.organization || "OFM"}
               </Text>?
             </Text>
@@ -1879,6 +1733,24 @@ export default function DashboardScreen() {
 }
 
 const styles = StyleSheet.create({
+  kpi2Grid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  qaRow: { gap: 8, paddingHorizontal: 16 },
+  qaChip: { flexDirection: "row", alignItems: "center", gap: 8, height: 40, paddingLeft: 6, paddingRight: 14, borderRadius: 20, borderWidth: 1 },
+  qaIcon: { width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  qaText: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  sectionRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: -4 },
+  segWrap: { flexDirection: "row", padding: 3, borderRadius: 8, gap: 2 },
+  segBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 6 },
+  segText: { fontSize: 12.5, fontFamily: "Inter_600SemiBold" },
+  kpi2Card: { flexGrow: 1, flexBasis: "46%", minWidth: 0, borderWidth: 1, borderRadius: 10, padding: 12, gap: 8 },
+  kpi2Head: { flexDirection: "row", alignItems: "center", gap: 8 },
+  kpi2Icon: { width: 26, height: 26, borderRadius: 13, alignItems: "center", justifyContent: "center" },
+  kpi2Label: { fontSize: 13, fontFamily: "Inter_500Medium", flexShrink: 1 },
+  kpi2Value: { fontSize: 18, fontFamily: "Inter_600SemiBold", letterSpacing: -0.3 },
+  kpi2Status: { fontSize: 12, fontFamily: "Inter_500Medium", lineHeight: 16 },
+  kpi2Track: { height: 5, borderRadius: 3, overflow: "hidden", flexDirection: "row" },
+  kpi2Foot: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderTopWidth: 1, paddingTop: 9 },
+  kpi2Link: { fontSize: 12.5, fontFamily: "Inter_600SemiBold" },
   flex: { flex: 1 },
   container: { paddingHorizontal: 16, gap: 16 },
 
@@ -1923,28 +1795,14 @@ const styles = StyleSheet.create({
   },
   greetingRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   syncDot: { width: 7, height: 7, borderRadius: 3.5, flexShrink: 0 },
-  roleChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    height: 42,
-    paddingHorizontal: 12,
-    borderRadius: 13,
-    borderWidth: 1,
-    flexShrink: 0,
-  },
-  roleChipText: {
-    fontSize: 13,
-    lineHeight: 16,
-    fontFamily: "Inter_700Bold",
-    includeFontPadding: false,
-  },
+  roleChip: { flexDirection: "row", alignItems: "center", gap: 6, height: 38, paddingHorizontal: 10, borderRadius: 10, borderWidth: 1, flexShrink: 0 },
+  roleChipText: { fontSize: 12.5, lineHeight: 16, fontFamily: "Inter_600SemiBold", includeFontPadding: false },
   greeting: { fontSize: 13, lineHeight: 17, fontFamily: "Inter_500Medium", includeFontPadding: false },
   name: {
     marginTop: 2,
-    fontSize: 18,
+    fontSize: 17,
     lineHeight: 24,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
     letterSpacing: -0.3,
     includeFontPadding: false,
   },
@@ -1974,7 +1832,7 @@ const styles = StyleSheet.create({
   roleText: {
     fontSize: 10,
     lineHeight: 12,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
     letterSpacing: 0.6,
     includeFontPadding: false,
   },
@@ -1984,14 +1842,7 @@ const styles = StyleSheet.create({
     gap: 8,
     flexShrink: 0,
   },
-  iconBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 13,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  iconBtn: { width: 38, height: 38, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   logoutIconBtn: {
     borderColor: "rgba(239, 68, 68, 0.28)",
     backgroundColor: "rgba(239, 68, 68, 0.08)",
@@ -2012,7 +1863,7 @@ const styles = StyleSheet.create({
   notifBadgeText: {
     fontSize: 10,
     lineHeight: 12,
-    fontFamily: "Inter_800ExtraBold",
+    fontFamily: "Inter_700Bold",
     color: "#FFFFFF",
     includeFontPadding: false,
   },
@@ -2057,8 +1908,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   logoutModalTitle: {
-    fontSize: 18,
-    fontFamily: "Inter_800ExtraBold",
+    fontSize: 17,
+    fontFamily: "Inter_700Bold",
     marginBottom: 6,
     textAlign: "center",
     letterSpacing: -0.3,
@@ -2101,7 +1952,7 @@ const styles = StyleSheet.create({
   logoutConfirmText: {
     color: "#FFFFFF",
     fontSize: 14,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
 
   // Hero Net Balance Card (Senior UI Design)
@@ -2197,8 +2048,8 @@ const styles = StyleSheet.create({
   },
   heroAmountText: {
     color: "#FFFFFF",
-    fontSize: 32,
-    fontFamily: "Inter_800ExtraBold",
+    fontSize: 24,
+    fontFamily: "Inter_700Bold",
     letterSpacing: -0.8,
   },
   heroGrowthPill: {
@@ -2213,7 +2064,7 @@ const styles = StyleSheet.create({
   },
   heroGrowthText: {
     fontSize: 12,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
   heroStatusDot: {
     width: 7,
@@ -2237,7 +2088,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
   },
   retentionStatus: {
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
     textAlign: "right",
     flexShrink: 0,
   },
@@ -2272,7 +2123,7 @@ const styles = StyleSheet.create({
   heroStatValue: {
     color: "#FFFFFF",
     fontSize: 14,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
   heroStatDivider: {
     width: 1,
@@ -2314,7 +2165,7 @@ const styles = StyleSheet.create({
   },
   heroSegmentAmount: {
     fontSize: 14,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
 
   // Frosted Glass Metric Cards
@@ -2351,14 +2202,14 @@ const styles = StyleSheet.create({
   glassCardLabel: {
     color: "rgba(255, 255, 255, 0.85)",
     fontSize: 10,
-    fontFamily: "Inter_800ExtraBold",
+    fontFamily: "Inter_700Bold",
     letterSpacing: 0.3,
     textAlign: "center",
   },
   glassCardValue: {
     color: "#FFFFFF",
     fontSize: 11,
-    fontFamily: "Inter_800ExtraBold",
+    fontFamily: "Inter_700Bold",
     marginTop: 0.5,
     textAlign: "center",
   },
@@ -2371,7 +2222,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: -2,
   },
-  sectionTitle: { fontSize: 16, fontFamily: "Inter_700Bold", letterSpacing: -0.2 },
+  sectionTitle: { fontSize: 15, fontFamily: "Inter_600SemiBold", letterSpacing: -0.2 },
   sectionHint: { fontSize: 12, fontFamily: "Inter_500Medium" },
 
   // KPI grid: two equal columns per row, cards stretch to the tallest neighbour
@@ -2419,20 +2270,20 @@ const styles = StyleSheet.create({
   },
   kpiTagText: {
     fontSize: 11,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
     includeFontPadding: false,
   },
   kpiValueText: {
-    fontSize: 20,
-    fontFamily: "Inter_800ExtraBold",
+    fontSize: 17,
+    fontFamily: "Inter_700Bold",
     letterSpacing: -0.5,
   },
-  kpiValueWide: { fontSize: 24, letterSpacing: -0.7 },
+  kpiValueWide: { fontSize: 20, letterSpacing: -0.7 },
   kpiCompactBody: { gap: 4 },
   kpiSubValue: { fontSize: 12, lineHeight: 16, fontFamily: "Inter_500Medium" },
   kpiStatList: { gap: 4 },
   kpiStatRow: { flexDirection: "row", alignItems: "baseline", flexWrap: "wrap", columnGap: 6 },
-  kpiStatValue: { fontSize: 14, lineHeight: 19, fontFamily: "Inter_800ExtraBold" },
+  kpiStatValue: { fontSize: 14, lineHeight: 19, fontFamily: "Inter_700Bold" },
   kpiStatLabel: { flexShrink: 1, fontSize: 12, lineHeight: 17, fontFamily: "Inter_500Medium" },
   kpiValuePrefix: {
     fontSize: 13,
@@ -2445,7 +2296,7 @@ const styles = StyleSheet.create({
   kpiWideChart: { flex: 1, minWidth: 0 },
   kpiMonthText: { fontSize: 13, lineHeight: 17, fontFamily: "Inter_500Medium" },
   kpiChangePill: { alignSelf: "flex-start", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  kpiChangeText: { fontSize: 12, fontFamily: "Inter_700Bold" },
+  kpiChangeText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   sparkLabels: { flexDirection: "row", justifyContent: "space-between", marginTop: 4 },
   sparkLabel: { fontSize: 11, textAlign: "center" },
   kpiFooter: { gap: 8, marginTop: "auto" },
@@ -2467,29 +2318,19 @@ const styles = StyleSheet.create({
   kpiFootRight: {
     fontSize: 13,
     lineHeight: 17,
-    fontFamily: "Inter_800ExtraBold",
+    fontFamily: "Inter_700Bold",
     flexShrink: 0,
     textAlign: "right",
   },
 
   statCard: { width: 125, borderRadius: 14, borderWidth: 1, padding: 12, gap: 4, alignItems: "center" },
   statIcon: { width: 32, height: 32, borderRadius: 9, alignItems: "center", justifyContent: "center", marginBottom: 2 },
-  statCardValue: { fontSize: 13, fontFamily: "Inter_700Bold", textAlign: "center" },
+  statCardValue: { fontSize: 13, fontFamily: "Inter_600SemiBold", textAlign: "center" },
   statCardLabel: { fontSize: 10, fontFamily: "Inter_400Regular", textAlign: "center" },
 
-  card: {
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: 18,
-    gap: 16,
-    shadowColor: "#0F172A",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 2,
-  },
+  card: { borderRadius: 12, borderWidth: 1, padding: 16, gap: 14, shadowColor: "#000000", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
   cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12 },
-  cardTitle: { fontSize: 16, fontFamily: "Inter_700Bold", letterSpacing: -0.2 },
+  cardTitle: { fontSize: 15, fontFamily: "Inter_600SemiBold", letterSpacing: -0.2 },
   cardSub: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 3 },
   seeAllBtn: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, height: 30, borderRadius: 15, borderWidth: 1, flexShrink: 0 },
   seeAllText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
@@ -2587,7 +2428,7 @@ const styles = StyleSheet.create({
   },
   actionTitleText: {
     fontSize: 14,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
   actionSubText: {
     fontSize: 12,
@@ -2604,7 +2445,7 @@ const styles = StyleSheet.create({
   },
   actionSectionPillText: {
     fontSize: 12,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
 
   empty: { alignItems: "center", gap: 8, paddingVertical: 24 },
@@ -2647,8 +2488,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   txModalTitle: {
-    fontSize: 16,
-    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
   },
   txModalSub: {
     fontSize: 12,
@@ -2683,7 +2524,7 @@ const styles = StyleSheet.create({
   },
   txSummaryVal: {
     fontSize: 14,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
   txSummaryDivider: {
     width: 1,
@@ -2732,7 +2573,7 @@ const styles = StyleSheet.create({
   },
   txEmptyTitle: {
     fontSize: 14,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
   txEmptySub: {
     fontSize: 13,
@@ -2748,6 +2589,6 @@ const styles = StyleSheet.create({
   txClearBtnText: {
     color: "#FFFFFF",
     fontSize: 13,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
 });

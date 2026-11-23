@@ -89,7 +89,7 @@ export default function TabLayout() {
             minimumFontScale={0.7}
             style={{
               fontSize: 11,
-              fontFamily: color === colors.primary ? "Inter_700Bold" : "Inter_600SemiBold",
+              fontFamily: color === colors.primary ? "Inter_600SemiBold" : "Inter_600SemiBold",
               color,
               textAlign: "center",
               marginTop: isWeb ? 2 : 1,

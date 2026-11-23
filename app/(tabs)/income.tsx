@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   header: { paddingHorizontal: 16, paddingBottom: 10, borderBottomWidth: 1, gap: 12 },
   headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12 },
-  title: { fontSize: 22, fontFamily: "Inter_700Bold", letterSpacing: -0.4 },
+  title: { fontSize: 19, fontFamily: "Inter_600SemiBold", letterSpacing: -0.4 },
   count: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
   addBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5,
@@ -220,9 +220,9 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center",
   },
   summaryLabel: { color: "rgba(255,255,255,0.88)", fontSize: 12, fontFamily: "Inter_600SemiBold", letterSpacing: 0.6 },
-  summaryValue: { color: "#FFFFFF", fontSize: 22, fontFamily: "Inter_700Bold", letterSpacing: -0.4, marginTop: 2 },
+  summaryValue: { color: "#FFFFFF", fontSize: 19, fontFamily: "Inter_600SemiBold", letterSpacing: -0.4, marginTop: 2 },
   summaryPill: { backgroundColor: "rgba(255,255,255,0.2)", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
-  summaryPillText: { color: "#FFFFFF", fontSize: 12, fontFamily: "Inter_700Bold" },
+  summaryPillText: { color: "#FFFFFF", fontSize: 12, fontFamily: "Inter_600SemiBold" },
   searchBar: {
     flexDirection: "row", alignItems: "center", gap: 10,
     paddingHorizontal: 14, height: 44, borderRadius: 14, borderWidth: 1,
@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
   filterText: { fontSize: 13, fontFamily: "Inter_500Medium" },
   list: { padding: 16, gap: 0 },
   empty: { alignItems: "center", gap: 12, paddingVertical: 60 },
-  emptyText: { fontSize: 16, fontFamily: "Inter_500Medium" },
+  emptyText: { fontSize: 15, fontFamily: "Inter_500Medium" },
   emptyAddBtn: {
     flexDirection: "row", alignItems: "center", gap: 6,
     paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20,

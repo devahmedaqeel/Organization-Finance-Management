@@ -52,6 +52,7 @@ const SEV_CONFIG = {
 };
 
 export default function AIInsightsScreen() {
+  const [detailView, setDetailView] = useState<"trend" | "metrics" | "spending" | "budget" | "tx">("trend");
   const colors = useColors();
   // Role guard: leave if this role can't use this screen (e.g. opened via deep link)
   useRequirePermission("view_insights");
@@ -758,7 +759,7 @@ export default function AIInsightsScreen() {
               sublabel={!hasData ? "INACTIVE" : healthScore! >= 80 ? "Optimal" : healthScore! >= 60 ? "Stable" : "Watch"}
             />
             <View style={styles.healthRight}>
-              <Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>FINANCIAL HEALTH</Text>
+              <Text style={[styles.eyebrow, { color: colors.mutedForeground }]}>Financial health</Text>
               <Text style={[styles.healthScore, { color: healthColor }]}>
                 {healthScore !== null ? (
                   <>
@@ -798,286 +799,10 @@ export default function AIInsightsScreen() {
           </View>
         </View>
 
-        {/* ─── Financial Trend ─── */}
-        <View
-          style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
-          onLayout={(e) => {
-            const w = e.nativeEvent.layout.width;
-            if (w > 40 && Math.abs(w - chartContainerWidth) > 2) {
-              setChartContainerWidth(w);
-            }
-          }}
-        >
-          <View style={styles.cardHeaderRow}>
-            <View style={styles.cardHeaderText}>
-              <Text style={[styles.cardTitle, { color: colors.foreground }]}>Financial Trend</Text>
-              <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>
-                Income vs expenses · {activePeriod.label}
-              </Text>
-            </View>
-            <View style={[styles.growthBadge, { backgroundColor: tint(periodGrowth >= 0 ? "#10B981" : "#F43F5E") }]}>
-              <Feather name={periodGrowth >= 0 ? "trending-up" : "trending-down"} size={13} color={periodGrowth >= 0 ? "#10B981" : "#F43F5E"} />
-              <Text style={[styles.growthText, { color: periodGrowth >= 0 ? "#10B981" : "#F43F5E" }]}>{periodGrowthLabel}</Text>
-            </View>
-          </View>
-
-          {selectedPoint && (
-            <View style={[styles.inspectBanner, { backgroundColor: tint(colors.primary), borderColor: colors.primary + "40" }]}>
-              <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-                <Text style={[styles.inspectTitle, { color: colors.foreground }]} numberOfLines={1}>
-                  Inspecting <Text style={{ color: colors.primary }}>{selectedPoint.fullDate || selectedPoint.label}</Text>
-                </Text>
-                <Text style={[styles.inspectSub, { color: colors.mutedForeground }]} numberOfLines={1}>
-                  In {settings.currency} {fmt(displayedIncome)} · Out {settings.currency} {fmt(displayedExpense)}
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => setSelectedPoint(null)}
-                style={[styles.inspectClear, { backgroundColor: colors.primary }]}
-                activeOpacity={0.8}
-              >
-                <Feather name="x" size={13} color="#FFFFFF" />
-                <Text style={styles.inspectClearText}>Clear</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          <AreaLineChart
-            data={chartPoints}
-            width={chartContainerWidth > 40 ? chartContainerWidth - 34 : chartWidth - 34}
-            height={170}
-            currency={settings.currency}
-            activeRange={customSelection ? undefined : trendRange}
-            activePeriod={activePeriod}
-            onPointSelect={handlePointSelect}
-            onPeriodSelect={(p) => {
-              setActivePeriod(p);
-              setCustomPeriodName(p.label);
-              setSelectedPoint(null);
-            }}
-            onGranularityChange={(g) => {
-              setActivePeriod((prev) => ({
-                ...prev,
-                userGranularityOverride: g,
-              }));
-            }}
-            onRangeSelect={(range) => {
-              setTrendRange(range);
-              setCustomPeriodName(null);
-              setCustomSelection(null);
-              setSelectedPoint(null);
-            }}
-            onCustomDateSelect={(selection) => {
-              setCustomSelection(selection);
-              if (selection.presetName) setCustomPeriodName(selection.presetName);
-              setSelectedPoint(null);
-            }}
-            ranges={["1W", "2W", "1M", "3M", "6M", "1Y", "ALL"]}
-            transactions={transactions}
-            userId={user?.id || "default"}
-          />
-        </View>
-
-        {/* ─── Key Metrics (3 rings) ─── */}
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={styles.cardHeaderRow}>
-            <View style={styles.cardHeaderText}>
-              <Text style={[styles.cardTitle, { color: colors.foreground }]}>Key Metrics</Text>
-              <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>
-                {selectedPoint ? `Inspecting ${scopeLabel}` : `Performance indicators · ${activePeriod.label}`}
-              </Text>
-            </View>
-            {selectedPoint && (
-              <TouchableOpacity
-                style={[styles.smBtn, { borderColor: colors.primary + "40", backgroundColor: tint(colors.primary) }]}
-                onPress={() => setSelectedPoint(null)}
-              >
-                <Text style={[styles.smBtnText, { color: colors.primary }]}>Reset</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-          <View style={styles.ringsRow}>
-            {keyMetrics.map((m) => (
-              <View key={m.key} style={styles.ringItem}>
-                <RingProgress
-                  percentage={m.percentage}
-                  centerLabel={m.center}
-                  size={94}
-                  strokeWidth={9}
-                  color={m.tone}
-                  label={m.ringLabel}
-                  sublabel={m.ringSub}
-                />
-                <View style={[styles.ringStatusPill, { backgroundColor: tint(m.tone) }]}>
-                  <Text style={[styles.ringStatusText, { color: m.tone }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-                    {m.status}
-                  </Text>
-                </View>
-                <Text
-                  style={[styles.ringValue, { color: colors.foreground }]}
-                  numberOfLines={Platform.OS === "web" ? undefined : 2}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.75}
-                >
-                  {m.value}
-                </Text>
-                <Text style={[styles.ringCaption, { color: colors.mutedForeground }]} numberOfLines={1}>
-                  {m.caption}
-                </Text>
-              </View>
-            ))}
-          </View>
-        </View>
-
-        {/* ─── Expense Breakdown ─── */}
-        {displayedExpense > 0 && expenseByCategory.length > 0 ? (
-          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.cardHeaderText}>
-              <Text style={[styles.cardTitle, { color: colors.foreground }]}>Expense Breakdown</Text>
-              <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>
-                {selectedPoint ? `Spending in ${scopeLabel}` : `Where your money goes · ${activePeriod.label}`}
-              </Text>
-            </View>
-            <DonutChart
-              segments={expenseByCategory}
-              size={140}
-              strokeWidth={12}
-              currency={settings.currency}
-              centerLabel={`${settings.currency} ${fmt(displayedExpense)}`}
-              centerSub="total spent"
-            />
-          </View>
-        ) : selectedPoint ? (
-          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.cardHeaderText}>
-              <Text style={[styles.cardTitle, { color: colors.foreground }]}>Expense Breakdown</Text>
-              <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>Spending in {scopeLabel}</Text>
-            </View>
-            <View style={styles.emptyInline}>
-              <View style={[styles.emptyIcon, { backgroundColor: tint("#10B981") }]}>
-                <Feather name="check-circle" size={20} color="#10B981" />
-              </View>
-              <Text style={[styles.emptyInlineText, { color: colors.mutedForeground }]}>
-                No expenses recorded in this period.
-              </Text>
-            </View>
-          </View>
-        ) : null}
-
-        {/* ─── Department Spending ─── */}
-        {deptSpend.length > 0 && (
-          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.cardHeaderRow}>
-              <View style={styles.cardHeaderText}>
-                <Text style={[styles.cardTitle, { color: colors.foreground }]}>Department Spending</Text>
-                <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>
-                  {selectedPoint ? `Spending in ${scopeLabel}` : "Expenses by department"}
-                </Text>
-              </View>
-              <TouchableOpacity style={[styles.smBtn, { borderColor: colors.border }]} onPress={() => router.push("/departments")}>
-                <Text style={[styles.smBtnText, { color: colors.primary }]}>Details</Text>
-                <Feather name="chevron-right" size={14} color={colors.primary} />
-              </TouchableOpacity>
-            </View>
-            <HBarChart items={deptSpend} formatValue={(v) => `${settings.currency} ${fmt(v)}`} />
-          </View>
-        )}
-
-        {/* ─── Budget vs Actual ─── */}
-        {budgetItems.length > 0 && (
-          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.cardHeaderRow}>
-              <View style={styles.cardHeaderText}>
-                <Text style={[styles.cardTitle, { color: colors.foreground }]}>Budget vs Actual</Text>
-                <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>
-                  {selectedPoint ? `Spending during ${scopeLabel}` : "Spending per budget line"}
-                </Text>
-              </View>
-              <TouchableOpacity style={[styles.smBtn, { borderColor: colors.border }]} onPress={() => router.push("/budget")}>
-                <Text style={[styles.smBtnText, { color: colors.primary }]}>Manage</Text>
-                <Feather name="chevron-right" size={14} color={colors.primary} />
-              </TouchableOpacity>
-            </View>
-            <HBarChart items={budgetItems} formatValue={(v) => `${settings.currency} ${fmt(v)}`} />
-            <View style={styles.budgetSummaryRow}>
-              {[
-                { label: "Allocated", value: `${settings.currency} ${fmt(institutionalTotalBudget)}`, color: colors.primary },
-                { label: selectedPoint ? `Spent (${selectedPoint.label})` : "Spent", value: `${settings.currency} ${fmt(displayedBudgetSpent)}`, color: colors.expense },
-                { label: "Remaining", value: `${settings.currency} ${fmt(displayedBudgetRemaining)}`, color: colors.income },
-              ].map((s) => (
-                <View key={s.label} style={[styles.budgetSumCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                  <Text style={[styles.budgetSumLabel, { color: colors.mutedForeground }]} numberOfLines={1}>{s.label}</Text>
-                  <Text
-                    style={[styles.budgetSumValue, { color: s.color }]}
-                    numberOfLines={Platform.OS === "web" ? undefined : 1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.7}
-                  >
-                    {s.value}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* ─── Transactions overview ─── */}
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={styles.cardHeaderRow}>
-            <View style={styles.cardHeaderText}>
-              <Text style={[styles.cardTitle, { color: colors.foreground }]}>Transactions</Text>
-              <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={2}>
-                {txStats.totalCount} records · {txStats.inflowCount} in · {txStats.outflowCount} out
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={[styles.smBtn, { borderColor: colors.primary + "40", backgroundColor: tint(colors.primary) }]}
-              onPress={() => {
-                setTxModalFilter("all");
-                setAllTxModal(true);
-              }}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.smBtnText, { color: colors.primary }]}>View all</Text>
-              <Feather name="chevron-right" size={14} color={colors.primary} />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.txStatsGrid}>
-            {txTiles.map((tile) => (
-              <TouchableOpacity
-                key={tile.key}
-                style={[styles.txStatBox, { backgroundColor: colors.background, borderColor: colors.border }]}
-                onPress={tile.onPress}
-                activeOpacity={0.75}
-              >
-                <View style={styles.txStatTop}>
-                  <View style={[styles.txStatIcon, { backgroundColor: tint(tile.color) }]}>
-                    <Feather name={tile.icon as any} size={15} color={tile.color} />
-                  </View>
-                  {tile.action ? (
-                    <Text style={[styles.txStatAction, { color: tile.color }]} numberOfLines={1}>{tile.action}</Text>
-                  ) : null}
-                </View>
-                <Text style={[styles.txStatLabel, { color: colors.mutedForeground }]} numberOfLines={1}>{tile.label}</Text>
-                <Text
-                  style={[styles.txStatVal, { color: tile.color }]}
-                  numberOfLines={Platform.OS === "web" ? undefined : 1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.7}
-                >
-                  {tile.value}
-                </Text>
-                <Text style={[styles.txStatCaption, { color: colors.mutedForeground }]} numberOfLines={1}>{tile.caption}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
         {/* ─── AI Insight Cards ─── */}
         <View style={styles.sectionHeader}>
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Actionable Insights</Text>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>What needs attention</Text>
             <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
               {displayedInsights.length} {displayedInsights.length === 1 ? "insight" : "insights"}
               {insightFilter !== "all" ? ` · ${activeFilterLabel} only` : ""}
@@ -1177,7 +902,7 @@ export default function AIInsightsScreen() {
 
                 {insight.whyItMatters ? (
                   <View style={[styles.whyBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                    <Text style={[styles.whyTitle, { color: colors.mutedForeground }]}>WHY THIS MATTERS</Text>
+                    <Text style={[styles.whyTitle, { color: colors.mutedForeground }]}>Why this matters</Text>
                     <Text style={[styles.whyText, { color: colors.foreground }]}>{insight.whyItMatters}</Text>
                   </View>
                 ) : null}
@@ -1197,6 +922,344 @@ export default function AIInsightsScreen() {
               </TouchableOpacity>
             );
           })
+        )}
+
+        {/* ─── Details: one section at a time ─── */}
+        <View style={styles.sectionHeader}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Details</Text>
+            <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>The numbers behind these insights</Text>
+          </View>
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+          {([["trend", "Trend"], ["metrics", "Metrics"], ["spending", "Spending"], ["budget", "Budget"], ["tx", "Transactions"]] as const).map(([k, label]) => {
+            const on = detailView === k;
+            return (
+              <TouchableOpacity
+                key={k}
+                onPress={() => {
+                  if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
+                  setDetailView(k);
+                }}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: on }}
+                style={[styles.filterChip, { backgroundColor: on ? colors.foreground : colors.card, borderColor: on ? colors.foreground : colors.border }]}
+              >
+                <Text style={[styles.filterChipText, { color: on ? colors.background : colors.foreground }]}>{label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
+        {detailView === "trend" && (
+          <>
+        {/* ─── Financial Trend ─── */}
+        <View
+          style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
+          onLayout={(e) => {
+            const w = e.nativeEvent.layout.width;
+            if (w > 40 && Math.abs(w - chartContainerWidth) > 2) {
+              setChartContainerWidth(w);
+            }
+          }}
+        >
+          <View style={styles.cardHeaderRow}>
+            <View style={styles.cardHeaderText}>
+              <Text style={[styles.cardTitle, { color: colors.foreground }]}>Financial Trend</Text>
+              <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>
+                Income vs expenses · {activePeriod.label}
+              </Text>
+            </View>
+            <View style={[styles.growthBadge, { backgroundColor: tint(periodGrowth >= 0 ? "#10B981" : "#F43F5E") }]}>
+              <Feather name={periodGrowth >= 0 ? "trending-up" : "trending-down"} size={13} color={periodGrowth >= 0 ? "#10B981" : "#F43F5E"} />
+              <Text style={[styles.growthText, { color: periodGrowth >= 0 ? "#10B981" : "#F43F5E" }]}>{periodGrowthLabel}</Text>
+            </View>
+          </View>
+
+          {selectedPoint && (
+            <View style={[styles.inspectBanner, { backgroundColor: tint(colors.primary), borderColor: colors.primary + "40" }]}>
+              <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                <Text style={[styles.inspectTitle, { color: colors.foreground }]} numberOfLines={1}>
+                  Inspecting <Text style={{ color: colors.primary }}>{selectedPoint.fullDate || selectedPoint.label}</Text>
+                </Text>
+                <Text style={[styles.inspectSub, { color: colors.mutedForeground }]} numberOfLines={1}>
+                  In {settings.currency} {fmt(displayedIncome)} · Out {settings.currency} {fmt(displayedExpense)}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setSelectedPoint(null)}
+                style={[styles.inspectClear, { backgroundColor: colors.primary }]}
+                activeOpacity={0.8}
+              >
+                <Feather name="x" size={13} color="#FFFFFF" />
+                <Text style={styles.inspectClearText}>Clear</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <AreaLineChart
+            data={chartPoints}
+            width={chartContainerWidth > 40 ? chartContainerWidth - 34 : chartWidth - 34}
+            height={170}
+            currency={settings.currency}
+            activeRange={customSelection ? undefined : trendRange}
+            activePeriod={activePeriod}
+            onPointSelect={handlePointSelect}
+            onPeriodSelect={(p) => {
+              setActivePeriod(p);
+              setCustomPeriodName(p.label);
+              setSelectedPoint(null);
+            }}
+            onGranularityChange={(g) => {
+              setActivePeriod((prev) => ({
+                ...prev,
+                userGranularityOverride: g,
+              }));
+            }}
+            onRangeSelect={(range) => {
+              setTrendRange(range);
+              setCustomPeriodName(null);
+              setCustomSelection(null);
+              setSelectedPoint(null);
+            }}
+            onCustomDateSelect={(selection) => {
+              setCustomSelection(selection);
+              if (selection.presetName) setCustomPeriodName(selection.presetName);
+              setSelectedPoint(null);
+            }}
+            ranges={["1W", "2W", "1M", "3M", "6M", "1Y", "ALL"]}
+            transactions={transactions}
+            userId={user?.id || "default"}
+          />
+        </View>
+
+          </>
+        )}
+
+        {detailView === "metrics" && (
+          <>
+        {/* ─── Key Metrics (3 rings) ─── */}
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.cardHeaderRow}>
+            <View style={styles.cardHeaderText}>
+              <Text style={[styles.cardTitle, { color: colors.foreground }]}>Key Metrics</Text>
+              <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>
+                {selectedPoint ? `Inspecting ${scopeLabel}` : `Performance indicators · ${activePeriod.label}`}
+              </Text>
+            </View>
+            {selectedPoint && (
+              <TouchableOpacity
+                style={[styles.smBtn, { borderColor: colors.primary + "40", backgroundColor: tint(colors.primary) }]}
+                onPress={() => setSelectedPoint(null)}
+              >
+                <Text style={[styles.smBtnText, { color: colors.primary }]}>Reset</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          <View style={styles.ringsRow}>
+            {keyMetrics.map((m) => (
+              <View key={m.key} style={styles.ringItem}>
+                <RingProgress
+                  percentage={m.percentage}
+                  centerLabel={m.center}
+                  size={94}
+                  strokeWidth={9}
+                  color={m.tone}
+                  label={m.ringLabel}
+                  sublabel={m.ringSub}
+                />
+                <View style={[styles.ringStatusPill, { backgroundColor: tint(m.tone) }]}>
+                  <Text style={[styles.ringStatusText, { color: m.tone }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                    {m.status}
+                  </Text>
+                </View>
+                <Text
+                  style={[styles.ringValue, { color: colors.foreground }]}
+                  numberOfLines={Platform.OS === "web" ? undefined : 2}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.75}
+                >
+                  {m.value}
+                </Text>
+                <Text style={[styles.ringCaption, { color: colors.mutedForeground }]} numberOfLines={1}>
+                  {m.caption}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+          </>
+        )}
+
+        {detailView === "spending" && (
+          <>
+        {/* ─── Expense Breakdown ─── */}
+        {displayedExpense > 0 && expenseByCategory.length > 0 ? (
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.cardHeaderText}>
+              <Text style={[styles.cardTitle, { color: colors.foreground }]}>Expense Breakdown</Text>
+              <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>
+                {selectedPoint ? `Spending in ${scopeLabel}` : `Where your money goes · ${activePeriod.label}`}
+              </Text>
+            </View>
+            <DonutChart
+              segments={expenseByCategory}
+              size={140}
+              strokeWidth={12}
+              currency={settings.currency}
+              centerLabel={`${settings.currency} ${fmt(displayedExpense)}`}
+              centerSub="total spent"
+            />
+          </View>
+        ) : selectedPoint ? (
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.cardHeaderText}>
+              <Text style={[styles.cardTitle, { color: colors.foreground }]}>Expense Breakdown</Text>
+              <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>Spending in {scopeLabel}</Text>
+            </View>
+            <View style={styles.emptyInline}>
+              <View style={[styles.emptyIcon, { backgroundColor: tint("#10B981") }]}>
+                <Feather name="check-circle" size={20} color="#10B981" />
+              </View>
+              <Text style={[styles.emptyInlineText, { color: colors.mutedForeground }]}>
+                No expenses recorded in this period.
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
+        {/* ─── Department Spending ─── */}
+        {deptSpend.length > 0 && (
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.cardHeaderRow}>
+              <View style={styles.cardHeaderText}>
+                <Text style={[styles.cardTitle, { color: colors.foreground }]}>Department Spending</Text>
+                <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>
+                  {selectedPoint ? `Spending in ${scopeLabel}` : "Expenses by department"}
+                </Text>
+              </View>
+              <TouchableOpacity style={[styles.smBtn, { borderColor: colors.border }]} onPress={() => router.push("/departments")}>
+                <Text style={[styles.smBtnText, { color: colors.primary }]}>Details</Text>
+                <Feather name="chevron-right" size={14} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
+            <HBarChart items={deptSpend} formatValue={(v) => `${settings.currency} ${fmt(v)}`} />
+          </View>
+        )}
+
+        {!(displayedExpense > 0 && expenseByCategory.length > 0) && !selectedPoint && deptSpend.length === 0 && (
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.cardSub, { color: colors.mutedForeground, textAlign: "center", paddingVertical: 12 }]}>No spending recorded in this period yet.</Text>
+          </View>
+        )}
+          </>
+        )}
+
+        {detailView === "budget" && (
+          <>
+        {/* ─── Budget vs Actual ─── */}
+        {budgetItems.length > 0 && (
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.cardHeaderRow}>
+              <View style={styles.cardHeaderText}>
+                <Text style={[styles.cardTitle, { color: colors.foreground }]}>Budget vs Actual</Text>
+                <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>
+                  {selectedPoint ? `Spending during ${scopeLabel}` : "Spending per budget line"}
+                </Text>
+              </View>
+              <TouchableOpacity style={[styles.smBtn, { borderColor: colors.border }]} onPress={() => router.push("/budget")}>
+                <Text style={[styles.smBtnText, { color: colors.primary }]}>Manage</Text>
+                <Feather name="chevron-right" size={14} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
+            <HBarChart items={budgetItems} formatValue={(v) => `${settings.currency} ${fmt(v)}`} />
+            <View style={styles.budgetSummaryRow}>
+              {[
+                { label: "Allocated", value: `${settings.currency} ${fmt(institutionalTotalBudget)}`, color: colors.primary },
+                { label: selectedPoint ? `Spent (${selectedPoint.label})` : "Spent", value: `${settings.currency} ${fmt(displayedBudgetSpent)}`, color: colors.expense },
+                { label: "Remaining", value: `${settings.currency} ${fmt(displayedBudgetRemaining)}`, color: colors.income },
+              ].map((s) => (
+                <View key={s.label} style={[styles.budgetSumCard, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                  <Text style={[styles.budgetSumLabel, { color: colors.mutedForeground }]} numberOfLines={1}>{s.label}</Text>
+                  <Text
+                    style={[styles.budgetSumValue, { color: s.color }]}
+                    numberOfLines={Platform.OS === "web" ? undefined : 1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.7}
+                  >
+                    {s.value}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {budgetItems.length === 0 && (
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.cardSub, { color: colors.mutedForeground, textAlign: "center", paddingVertical: 12 }]}>No budget lines yet. Add budgets to compare plan vs actual.</Text>
+          </View>
+        )}
+          </>
+        )}
+
+        {detailView === "tx" && (
+          <>
+        {/* ─── Transactions overview ─── */}
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.cardHeaderRow}>
+            <View style={styles.cardHeaderText}>
+              <Text style={[styles.cardTitle, { color: colors.foreground }]}>Transactions</Text>
+              <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={2}>
+                {txStats.totalCount} records · {txStats.inflowCount} in · {txStats.outflowCount} out
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.smBtn, { borderColor: colors.primary + "40", backgroundColor: tint(colors.primary) }]}
+              onPress={() => {
+                setTxModalFilter("all");
+                setAllTxModal(true);
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.smBtnText, { color: colors.primary }]}>View all</Text>
+              <Feather name="chevron-right" size={14} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.txStatsGrid}>
+            {txTiles.map((tile) => (
+              <TouchableOpacity
+                key={tile.key}
+                style={[styles.txStatBox, { backgroundColor: colors.background, borderColor: colors.border }]}
+                onPress={tile.onPress}
+                activeOpacity={0.75}
+              >
+                <View style={styles.txStatTop}>
+                  <View style={[styles.txStatIcon, { backgroundColor: tint(tile.color) }]}>
+                    <Feather name={tile.icon as any} size={15} color={tile.color} />
+                  </View>
+                  {tile.action ? (
+                    <Text style={[styles.txStatAction, { color: tile.color }]} numberOfLines={1}>{tile.action}</Text>
+                  ) : null}
+                </View>
+                <Text style={[styles.txStatLabel, { color: colors.mutedForeground }]} numberOfLines={1}>{tile.label}</Text>
+                <Text
+                  style={[styles.txStatVal, { color: tile.color }]}
+                  numberOfLines={Platform.OS === "web" ? undefined : 1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.7}
+                >
+                  {tile.value}
+                </Text>
+                <Text style={[styles.txStatCaption, { color: colors.mutedForeground }]} numberOfLines={1}>{tile.caption}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+          </>
         )}
 
         {/* Disclaimer */}
@@ -1229,7 +1292,7 @@ const styles = StyleSheet.create({
   backBtn: { width: 40, height: 40, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   titleRow: { flexDirection: "row", alignItems: "center", gap: 10, flexShrink: 1 },
   aiIcon: { width: 36, height: 36, borderRadius: 11, alignItems: "center", justifyContent: "center" },
-  title: { fontSize: 18, fontFamily: "Inter_700Bold", letterSpacing: -0.2 },
+  title: { fontSize: 17, fontFamily: "Inter_600SemiBold", letterSpacing: -0.2 },
   subtitle: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 1 },
 
   card: {
@@ -1243,7 +1306,7 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 2,
   },
-  cardTitle: { fontSize: 16, fontFamily: "Inter_700Bold", letterSpacing: -0.2 },
+  cardTitle: { fontSize: 15, fontFamily: "Inter_600SemiBold", letterSpacing: -0.2 },
   cardSub: { fontSize: 13, fontFamily: "Inter_400Regular", marginTop: 3 },
   cardHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12 },
   cardHeaderText: { flex: 1, minWidth: 0 },
@@ -1252,8 +1315,8 @@ const styles = StyleSheet.create({
   healthRow: { flexDirection: "row", alignItems: "center", gap: 18 },
   healthRight: { flex: 1, minWidth: 0, gap: 6, alignItems: "flex-start" },
   eyebrow: { fontSize: 11, fontFamily: "Inter_600SemiBold", letterSpacing: 0.8 },
-  healthScore: { fontSize: 36, fontFamily: "Inter_800ExtraBold", letterSpacing: -1, lineHeight: 44 },
-  healthScoreMax: { fontSize: 16, fontFamily: "Inter_500Medium", letterSpacing: 0 },
+  healthScore: { fontSize: 28, fontFamily: "Inter_700Bold", letterSpacing: -1, lineHeight: 44 },
+  healthScoreMax: { fontSize: 15, fontFamily: "Inter_500Medium", letterSpacing: 0 },
   statusPill: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, maxWidth: "100%" },
   statusDot: { width: 7, height: 7, borderRadius: 3.5 },
   statusPillText: { fontSize: 13, fontFamily: "Inter_600SemiBold", flexShrink: 1 },
@@ -1261,11 +1324,11 @@ const styles = StyleSheet.create({
   statGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", rowGap: 10 },
   statTile: { width: "48.5%", borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, gap: 4 },
   statTileLabel: { fontSize: 12, fontFamily: "Inter_500Medium" },
-  statTileValue: { fontSize: 15, fontFamily: "Inter_700Bold" },
+  statTileValue: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
 
   // Trend
   growthBadge: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, height: 28, borderRadius: 14, flexShrink: 0 },
-  growthText: { fontSize: 12, fontFamily: "Inter_700Bold" },
+  growthText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   inspectBanner: { flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 },
   inspectTitle: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   inspectSub: { fontSize: 12, fontFamily: "Inter_400Regular" },
@@ -1277,7 +1340,7 @@ const styles = StyleSheet.create({
   ringItem: { flex: 1, minWidth: 0, alignItems: "center", gap: 8 },
   ringStatusPill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, maxWidth: "100%" },
   ringStatusText: { fontSize: 11, fontFamily: "Inter_600SemiBold", textAlign: "center" },
-  ringValue: { fontSize: 13, fontFamily: "Inter_700Bold", textAlign: "center", lineHeight: 17 },
+  ringValue: { fontSize: 13, fontFamily: "Inter_600SemiBold", textAlign: "center", lineHeight: 17 },
   ringCaption: { fontSize: 12, fontFamily: "Inter_400Regular", textAlign: "center", marginTop: -4 },
 
   smBtn: { flexDirection: "row", alignItems: "center", gap: 3, paddingLeft: 12, paddingRight: 9, height: 30, borderRadius: 15, borderWidth: 1, flexShrink: 0 },
@@ -1289,7 +1352,7 @@ const styles = StyleSheet.create({
 
   budgetSummaryRow: { flexDirection: "row", gap: 8 },
   budgetSumCard: { flex: 1, minWidth: 0, borderRadius: 12, borderWidth: 1, paddingVertical: 10, paddingHorizontal: 8, alignItems: "center", gap: 4 },
-  budgetSumValue: { fontSize: 14, fontFamily: "Inter_700Bold", textAlign: "center" },
+  budgetSumValue: { fontSize: 14, fontFamily: "Inter_600SemiBold", textAlign: "center" },
   budgetSumLabel: { fontSize: 12, fontFamily: "Inter_500Medium", textAlign: "center" },
 
   // Transactions tiles
@@ -1299,17 +1362,17 @@ const styles = StyleSheet.create({
   txStatIcon: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   txStatAction: { fontSize: 12, fontFamily: "Inter_600SemiBold", flexShrink: 1 },
   txStatLabel: { fontSize: 12, fontFamily: "Inter_500Medium" },
-  txStatVal: { fontSize: 16, fontFamily: "Inter_700Bold", letterSpacing: -0.3 },
+  txStatVal: { fontSize: 15, fontFamily: "Inter_600SemiBold", letterSpacing: -0.3 },
   txStatCaption: { fontSize: 12, fontFamily: "Inter_400Regular" },
 
   // Insights
   sectionHeader: { flexDirection: "row", alignItems: "flex-end", marginTop: 4, marginBottom: -6 },
-  sectionTitle: { fontSize: 18, fontFamily: "Inter_700Bold", letterSpacing: -0.3 },
+  sectionTitle: { fontSize: 17, fontFamily: "Inter_600SemiBold", letterSpacing: -0.3 },
   filterRow: { gap: 8, paddingVertical: 2 },
   filterChip: { flexDirection: "row", alignItems: "center", gap: 6, paddingLeft: 12, paddingRight: 6, height: 36, borderRadius: 18, borderWidth: 1 },
   filterChipText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   filterCount: { minWidth: 24, height: 24, borderRadius: 12, paddingHorizontal: 6, alignItems: "center", justifyContent: "center" },
-  filterCountText: { fontSize: 12, fontFamily: "Inter_700Bold" },
+  filterCountText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   emptyCard: { alignItems: "center", paddingVertical: 24 },
   emptyCardText: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 20, textAlign: "center" },
 
@@ -1330,12 +1393,12 @@ const styles = StyleSheet.create({
   insightHeader: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
   insightIcon: { width: 38, height: 38, borderRadius: 11, alignItems: "center", justifyContent: "center", flexShrink: 0 },
   insightTitleRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
-  insightTitle: { flex: 1, fontSize: 15, fontFamily: "Inter_700Bold", lineHeight: 20, letterSpacing: -0.1 },
+  insightTitle: { flex: 1, fontSize: 15, fontFamily: "Inter_600SemiBold", lineHeight: 20, letterSpacing: -0.1 },
   typeBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, flexShrink: 0, marginTop: 1 },
   typeBadgeText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
   metricRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
   metricChip: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
-  metricChipText: { fontSize: 13, fontFamily: "Inter_700Bold" },
+  metricChipText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   metricSource: { fontSize: 12, fontFamily: "Inter_400Regular", flexShrink: 1 },
   insightDetail: { fontSize: 14, fontFamily: "Inter_400Regular", lineHeight: 20 },
   whyBox: { borderRadius: 12, borderWidth: 1, padding: 12, gap: 4 },

@@ -30,6 +30,7 @@ import { POPULAR_CURRENCIES, WORLD_CURRENCIES } from "@/constants/currencies";
 import { useColors } from "@/hooks/useColors";
 import { useRequirePermission } from "@/hooks/useRequirePermission";
 import { showFloatingToast } from "@/utils/toast";
+import { MONTH_NAMES, DEFAULT_FY_START_MONTH, normalizeStartMonth } from "@/services/fiscalYear";
 
 interface FieldConfig {
   key: string;
@@ -447,6 +448,29 @@ export default function SettingsScreen() {
           </View>
         ))}
 
+        {/* Fiscal year start month (same setting as web) */}
+        <View style={styles.fieldWrap}>
+          <View style={styles.fieldLabelRow}>
+            <Feather name="calendar" size={13} color={colors.mutedForeground} />
+            <Text style={[styles.fieldLabelText, { color: colors.mutedForeground }]}>FISCAL YEAR STARTS IN</Text>
+          </View>
+          <View style={styles.fyChips}>
+            {MONTH_NAMES.map((m, i) => {
+              const on = normalizeStartMonth((form as any).fiscalYearStartMonth ?? DEFAULT_FY_START_MONTH) === i + 1;
+              return (
+                <TouchableOpacity
+                  key={m}
+                  disabled={!canEdit}
+                  onPress={() => handleChange("fiscalYearStartMonth", i + 1)}
+                  style={[styles.fyChip, { borderColor: on ? colors.primary : colors.border, backgroundColor: on ? colors.primary + "14" : colors.card, opacity: canEdit ? 1 : 0.7 }]}
+                >
+                  <Text style={[styles.fyChipText, { color: on ? colors.primary : colors.foreground, fontFamily: on ? "Inter_600SemiBold" : "Inter_500Medium" }]}>{m.slice(0, 3)}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
         <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>DEFAULT OPERATING CURRENCY</Text>
         <TouchableOpacity
           style={[
@@ -540,7 +564,7 @@ export default function SettingsScreen() {
 
                   {/* Urdu & English premium guide */}
                   <View style={{ backgroundColor: colors.muted, borderRadius: 10, padding: 12, marginTop: 8, borderWidth: 1, borderColor: colors.border }}>
-                    <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: colors.foreground, marginBottom: 4 }}>
+                    <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: colors.foreground, marginBottom: 4 }}>
                       💡 Quick Setup Guide / رہنمائی:
                     </Text>
                     
@@ -931,12 +955,15 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
+  fyChips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  fyChip: { minWidth: 52, height: 34, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  fyChipText: { fontSize: 13 },
   flex: { flex: 1 },
   header: { paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: 1 },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
   backBtn: { width: 38, height: 38, borderRadius: 12, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   headerTitleWrap: { flex: 1, justifyContent: "center" },
-  title: { fontSize: 18, fontFamily: "Inter_700Bold" },
+  title: { fontSize: 17, fontFamily: "Inter_600SemiBold" },
   headerSub: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 1 },
   container: { padding: 16, gap: 10 },
   successBanner: {
@@ -992,8 +1019,8 @@ const styles = StyleSheet.create({
   },
   orgLogoText: {
     color: "#fff",
-    fontSize: 18,
-    fontFamily: "Inter_700Bold",
+    fontSize: 17,
+    fontFamily: "Inter_600SemiBold",
     letterSpacing: 1,
   },
   orgPreviewInfo: {
@@ -1002,8 +1029,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   orgPreviewName: {
-    fontSize: 16,
-    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
     lineHeight: 20,
   },
   orgPreviewSub: {
@@ -1048,15 +1075,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
   },
-  currencyFlagText: { fontSize: 24 },
+  currencyFlagText: { fontSize: 20 },
   currencyTriggerInfo: { flex: 1, gap: 2 },
-  currencyCodeHero: { fontSize: 16, fontFamily: "Inter_800ExtraBold" },
+  currencyCodeHero: { fontSize: 15, fontFamily: "Inter_700Bold" },
   symbolBadge: {
     paddingHorizontal: 7,
     paddingVertical: 1.5,
     borderRadius: 6,
   },
-  symbolBadgeText: { fontSize: 11, fontFamily: "Inter_700Bold" },
+  symbolBadgeText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
   currencyNameHero: { fontSize: 12, fontFamily: "Inter_400Regular" },
   changeActionPill: {
     flexDirection: "row",
@@ -1066,7 +1093,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 8,
   },
-  changeActionText: { fontSize: 12, fontFamily: "Inter_700Bold" },
+  changeActionText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
 
   readonlyBanner: {
     flexDirection: "row", alignItems: "center", gap: 8,
@@ -1119,7 +1146,7 @@ const styles = StyleSheet.create({
   executiveSaveBtnText: {
     color: "#FFFFFF",
     fontSize: 15,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
   syncedStateRow: {
     flexDirection: "row",
@@ -1137,7 +1164,7 @@ const styles = StyleSheet.create({
   },
   syncedTitle: {
     fontSize: 14,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
   syncedSub: {
     fontSize: 11,
@@ -1153,7 +1180,7 @@ const styles = StyleSheet.create({
   statusActiveText: {
     color: "#10B981",
     fontSize: 10,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
     letterSpacing: 0.5,
   },
 
@@ -1169,7 +1196,7 @@ const styles = StyleSheet.create({
     flexDirection: "row", justifyContent: "space-between", alignItems: "center",
     paddingHorizontal: 16, marginBottom: 12,
   },
-  modalTitle: { fontSize: 18, fontFamily: "Inter_800ExtraBold" },
+  modalTitle: { fontSize: 17, fontFamily: "Inter_700Bold" },
   modalSub: { fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 1 },
   modalCloseBtn: {
     width: 32,
@@ -1185,7 +1212,7 @@ const styles = StyleSheet.create({
   },
   searchInput: { flex: 1, fontSize: 14, fontFamily: "Inter_400Regular" },
   groupLabel: {
-    fontSize: 11, fontFamily: "Inter_700Bold", letterSpacing: 0.8,
+    fontSize: 11, fontFamily: "Inter_600SemiBold", letterSpacing: 0.8,
     marginHorizontal: 16, marginVertical: 6,
   },
   popularRow: {
@@ -1204,8 +1231,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1.5,
   },
-  popularFlag: { fontSize: 18 },
-  popularCode: { fontSize: 13, fontFamily: "Inter_800ExtraBold" },
+  popularFlag: { fontSize: 17 },
+  popularCode: { fontSize: 13, fontFamily: "Inter_700Bold" },
   popularSymbol: { fontSize: 11, fontFamily: "Inter_500Medium" },
   currencyList: { flex: 1 },
   currencyRow: {
@@ -1220,9 +1247,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
   },
-  currencyRowFlag: { fontSize: 20 },
+  currencyRowFlag: { fontSize: 17 },
   currencyRowInfo: { flex: 1, gap: 2 },
-  currencyRowCode: { fontSize: 15, fontFamily: "Inter_800ExtraBold" },
+  currencyRowCode: { fontSize: 15, fontFamily: "Inter_700Bold" },
   symbolMiniPill: {
     paddingHorizontal: 6,
     paddingVertical: 1,
@@ -1259,7 +1286,7 @@ const styles = StyleSheet.create({
   },
   themeOptionText: {
     fontSize: 12,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
   inviteCard: {
     padding: 16,
@@ -1270,7 +1297,7 @@ const styles = StyleSheet.create({
   },
   inviteCardTitle: {
     fontSize: 14,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
   inviteCardSub: {
     fontSize: 11,
@@ -1299,7 +1326,7 @@ const styles = StyleSheet.create({
   },
   roleChipText: {
     fontSize: 11,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
   inviteBtn: {
     flexDirection: "row",
@@ -1313,7 +1340,7 @@ const styles = StyleSheet.create({
   inviteBtnText: {
     color: "#fff",
     fontSize: 14,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
 
   /* Executive Logo Customization Modal */
@@ -1339,8 +1366,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   logoModalTitle: {
-    fontSize: 16,
-    fontFamily: "Inter_800ExtraBold",
+    fontSize: 15,
+    fontFamily: "Inter_700Bold",
   },
   logoModalSub: {
     fontSize: 11,
@@ -1372,12 +1399,12 @@ const styles = StyleSheet.create({
   },
   logoPreviewInitials: {
     color: "#FFFFFF",
-    fontSize: 16,
-    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
   },
   logoPreviewOrgName: {
     fontSize: 14,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
   activeStatusDot: {
     width: 7,
@@ -1408,7 +1435,7 @@ const styles = StyleSheet.create({
   },
   optionTitle: {
     fontSize: 14,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
   optionDesc: {
     fontSize: 11,
@@ -1449,8 +1476,8 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   userAccountAvatarText: {
-    fontSize: 20,
-    fontFamily: "Inter_700Bold",
+    fontSize: 17,
+    fontFamily: "Inter_600SemiBold",
   },
   activeDot: {
     width: 11,
@@ -1468,7 +1495,7 @@ const styles = StyleSheet.create({
   },
   userAccountName: {
     fontSize: 15,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
   roleBadgePill: {
     flexDirection: "row",
@@ -1481,7 +1508,7 @@ const styles = StyleSheet.create({
   },
   roleBadgeText: {
     fontSize: 11,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
     letterSpacing: 0.5,
   },
   emailCalloutRow: {

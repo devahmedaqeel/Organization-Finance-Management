@@ -55,6 +55,7 @@ export default function ReportsScreen() {
   const [drillDownModal, setDrillDownModal] = useState<DrillDownType | null>(null);
   const [drillDownDept, setDrillDownDept] = useState<string | undefined>(undefined);
   const [staffModalVisible, setStaffModalVisible] = useState(false);
+  const [insightView, setInsightView] = useState<"budget" | "margin" | "spending">("budget");
   const [selectedStaffDept, setSelectedStaffDept] = useState<Department | null>(null);
   const webTop = Platform.OS === "web" ? 67 : 0;
   const chartWidth = chartW;
@@ -228,29 +229,34 @@ export default function ReportsScreen() {
       >
         <View style={styles.headerRow}>
           <View style={[styles.headerTitleWrap, { flex: 1, marginRight: 8 }]}>
-            <Text style={[styles.title, { color: colors.foreground }]}>Financial Analytics</Text>
+            <Text style={[styles.title, { color: colors.foreground }]}>Reports</Text>
             <Text style={[styles.orgText, { color: colors.mutedForeground }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
               {settings.organizationName}
             </Text>
           </View>
 
-          <TouchableOpacity
-            style={[
-              styles.exportBtn,
-              { backgroundColor: colors.primary + "18", borderColor: colors.primary + "35" },
-            ]}
-            onPress={handleExportPDF}
-            onLongPress={() => {
-              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setExportModalVisible(true);
-            }}
-            activeOpacity={0.75}
-          >
-            <Feather name="download" size={13} color={colors.primary} />
-            <Text style={[styles.exportBtnText, { color: colors.primary }]}>
-              Export PDF
-            </Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <TouchableOpacity
+              style={[styles.rIconBtn, { borderColor: colors.border, backgroundColor: colors.card }]}
+              onPress={handleExportPDF}
+              activeOpacity={0.75}
+              accessibilityLabel="Quick PDF of this period"
+            >
+              <Feather name="file-text" size={16} color={colors.foreground} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.rExportBtn, { backgroundColor: colors.primary }]}
+              onPress={() => {
+                if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setExportModalVisible(true);
+              }}
+              activeOpacity={0.85}
+              accessibilityLabel="Export report (PDF or CSV)"
+            >
+              <Feather name="download" size={14} color="#FFFFFF" />
+              <Text style={styles.rExportText}>Export</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.periodRow}>
@@ -301,7 +307,7 @@ export default function ReportsScreen() {
                     style={[
                       styles.quickPillText,
                       { color: isSelected ? "#FFFFFF" : colors.foreground },
-                      isSelected && { fontFamily: "Inter_700Bold" },
+                      isSelected && { fontFamily: "Inter_600SemiBold" },
                     ]}
                   >
                     {p.label}
@@ -312,106 +318,50 @@ export default function ReportsScreen() {
           </ScrollView>
         </View>
 
-        {totalAllocatedBudget > 0 ? (
-          <View style={{ gap: 8 }}>
-            <View style={styles.kpiRow}>
-              <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>INCOME</Text>
-                <Text style={[styles.kpiVal, { color: colors.income }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
-                  +{settings.currency} {fmt(metrics.totalIncome)}
-                </Text>
-                <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
-                  {metrics.recordCount} Inflows
-                </Text>
-              </View>
-
-              <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>EXPENSES</Text>
-                <Text style={[styles.kpiVal, { color: colors.expense }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
-                  -{settings.currency} {fmt(metrics.totalExpense)}
-                </Text>
-                <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
-                  {budgetUtilPct.toFixed(1)}% of Budget Used
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.kpiRow}>
-              <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>DEPARTMENT BUDGET</Text>
-                <Text style={[styles.kpiVal, { color: colors.primary }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
-                  {settings.currency} {fmt(totalAllocatedBudget)}
-                </Text>
-                <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
-                  Unallocated: {settings.currency} {fmt(unallocatedFunds)}
-                </Text>
-              </View>
-
-              <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>NET CASH POSITION</Text>
-                <Text style={[styles.kpiVal, { color: netCapitalSurplus >= 0 ? colors.income : colors.expense }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
-                  {netCapitalSurplus >= 0 ? "+" : "-"}
-                  {settings.currency} {fmt(Math.abs(netCapitalSurplus))}
-                </Text>
-                <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
-                  {retainedCapitalPct.toFixed(0)}% Income Retained
-                </Text>
-              </View>
-            </View>
-          </View>
-        ) : (
-          <View style={styles.kpiRow}>
-            <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>INCOME</Text>
-              <Text style={[styles.kpiVal, { color: colors.income }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
-                {settings.currency} {fmt(metrics.totalIncome)}
-              </Text>
-              <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
-                {metrics.recordCount} Transactions
-              </Text>
-            </View>
-
-            <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>EXPENSES</Text>
-              <Text style={[styles.kpiVal, { color: colors.expense }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
-                {settings.currency} {fmt(metrics.totalExpense)}
-              </Text>
-              <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
-                {metrics.durationDays} Days Period
-              </Text>
-            </View>
-
-            <View style={[styles.kpiCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>NET SURPLUS</Text>
-              <Text style={[styles.kpiVal, { color: metrics.netBalance >= 0 ? colors.income : colors.expense }]} numberOfLines={Platform.OS === "web" ? undefined : 2} adjustsFontSizeToFit minimumFontScale={0.7}>
-                {metrics.netBalance >= 0 ? "+" : ""}
-                {settings.currency} {fmt(metrics.netBalance)}
-              </Text>
-              <Text style={{ fontSize: 10, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
-                {metrics.savingsRate.toFixed(1)}% margin
-              </Text>
-            </View>
-          </View>
-        )}
       </View>
 
       <ScrollView
         contentContainerStyle={[styles.content, { paddingHorizontal: hPad, paddingBottom: 24 }]}
         showsVerticalScrollIndicator={false}
       >
+        {/* ─── Summary for the selected period ─── */}
+        <View style={[styles.rSummary, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.rSummaryTitle, { color: colors.foreground }]}>Summary</Text>
+          <Text style={[styles.rSummarySub, { color: colors.mutedForeground }]}>{activePeriod.label} · {metrics.recordCount} transactions · {metrics.durationDays} days</Text>
+          {[
+            { label: "Income", value: `${settings.currency} ${fmt(metrics.totalIncome)}`, color: colors.income },
+            { label: "Expenses", value: `${settings.currency} ${fmt(metrics.totalExpense)}`, color: colors.expense, note: totalAllocatedBudget > 0 ? `${budgetUtilPct.toFixed(0)}% of budget` : undefined },
+            { label: "Net", value: `${metrics.netBalance >= 0 ? "+" : "−"}${settings.currency} ${fmt(Math.abs(metrics.netBalance))}`, color: metrics.netBalance >= 0 ? colors.income : colors.expense, note: `${metrics.savingsRate.toFixed(0)}% margin` },
+            ...(totalAllocatedBudget > 0
+              ? [
+                  { label: "Department budget", value: `${settings.currency} ${fmt(totalAllocatedBudget)}`, color: colors.foreground, note: `${settings.currency} ${fmt(unallocatedFunds)} unallocated` },
+                  { label: "Net cash position", value: `${netCapitalSurplus >= 0 ? "+" : "−"}${settings.currency} ${fmt(Math.abs(netCapitalSurplus))}`, color: netCapitalSurplus >= 0 ? colors.income : colors.expense, note: `${retainedCapitalPct.toFixed(0)}% kept` },
+                ]
+              : []),
+          ].map((r: { label: string; value: string; color: string; note?: string }, i) => (
+            <View key={r.label} style={[styles.rRow, { borderTopColor: colors.border }, i === 0 && { borderTopWidth: 0 }]}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={[styles.rRowLabel, { color: colors.foreground }]} numberOfLines={2}>{r.label}</Text>
+                {r.note ? <Text style={[styles.rRowNote, { color: colors.mutedForeground }]} numberOfLines={2}>{r.note}</Text> : null}
+              </View>
+              <Text style={[styles.rRowValue, { color: r.color }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{r.value}</Text>
+            </View>
+          ))}
+        </View>
+
         {/* ─── 1. Financial Trend Analytics Area Graph ─── */}
         <View style={[styles.chartCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.chartCardHeader}>
             <View>
-              <Text style={[styles.cardTitle, { color: colors.foreground }]}>Financial Trend</Text>
+              <Text style={[styles.cardTitle, { color: colors.foreground }]}>Trend</Text>
               <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
-                {activePeriod.label} ({metrics.recordCount} Transactions)
+                Income and expenses over time
               </Text>
             </View>
             <View style={{ flexDirection: "row", gap: 6 }}>
               <View style={[styles.badge, { backgroundColor: colors.primary + "18", borderColor: colors.primary + "33" }]}>
                 <Text style={[styles.badgeText, { color: colors.primary, textTransform: "capitalize" }]}>
-                  {activePeriod.userGranularityOverride || activePeriod.granularity} View
+                  {activePeriod.userGranularityOverride || activePeriod.granularity}
                 </Text>
               </View>
             </View>
@@ -432,8 +382,20 @@ export default function ReportsScreen() {
           />
         </View>
 
-        {/* ─── Authoritative 3-Card Financial Analytics Suite ─── */}
+        {/* ─── Analytics: one card at a time ─── */}
+        <View style={styles.rTabsRow}>
+          <Text style={[styles.cardTitle, { color: colors.foreground }]}>Analytics</Text>
+          <View style={[styles.rSeg, { backgroundColor: colors.muted }]}>
+            {([["budget", "Budget"], ["margin", "Margin"], ["spending", "Spending"]] as const).map(([k, label]) => (
+              <TouchableOpacity key={k} onPress={() => setInsightView(k)} accessibilityRole="tab" accessibilityState={{ selected: insightView === k }}
+                style={[styles.rSegBtn, insightView === k && { backgroundColor: colors.card }]}>
+                <Text style={[styles.rSegText, { color: insightView === k ? colors.foreground : colors.mutedForeground }]}>{label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
         <FinancialAnalyticsSuite
+          only={insightView}
           budget={authFinancialModel.budget}
           margin={authFinancialModel.margin}
           distribution={authFinancialModel.distribution}
@@ -464,7 +426,7 @@ export default function ReportsScreen() {
             <View>
               <Text style={[styles.cardTitle, { color: colors.foreground }]}>Department Spending</Text>
               <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
-                Distribution across departments ({activePeriod.label})
+                Where the money went · {activePeriod.label}
               </Text>
             </View>
           </View>
@@ -546,6 +508,20 @@ export default function ReportsScreen() {
 }
 
 const styles = StyleSheet.create({
+  rIconBtn: { width: 38, height: 38, borderRadius: 10, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  rExportBtn: { flexDirection: "row", alignItems: "center", gap: 6, height: 38, paddingHorizontal: 14, borderRadius: 10 },
+  rExportText: { color: "#FFFFFF", fontSize: 13.5, fontFamily: "Inter_600SemiBold" },
+  rSummary: { borderWidth: 1, borderRadius: 12, padding: 16, gap: 2 },
+  rSummaryTitle: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  rSummarySub: { fontSize: 12, fontFamily: "Inter_400Regular", marginBottom: 8 },
+  rRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth },
+  rRowLabel: { fontSize: 14, fontFamily: "Inter_500Medium" },
+  rRowNote: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
+  rRowValue: { fontSize: 15, fontFamily: "Inter_600SemiBold", maxWidth: "55%", textAlign: "right" },
+  rTabsRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: -4 },
+  rSeg: { flexDirection: "row", padding: 3, borderRadius: 8, gap: 2 },
+  rSegBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
+  rSegText: { fontSize: 12.5, fontFamily: "Inter_600SemiBold" },
   flex: { flex: 1 },
   header: {
     paddingBottom: 12,
@@ -563,8 +539,8 @@ const styles = StyleSheet.create({
     paddingRight: 6,
   },
   title: {
-    fontSize: 20,
-    fontFamily: "Inter_700Bold",
+    fontSize: 17,
+    fontFamily: "Inter_600SemiBold",
   },
   orgText: {
     fontSize: 12,
@@ -619,7 +595,7 @@ const styles = StyleSheet.create({
   },
   exportBtnText: {
     fontSize: 12,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
   aiBtn: {
     flexDirection: "row",
@@ -632,7 +608,7 @@ const styles = StyleSheet.create({
   },
   aiBtnText: {
     fontSize: 12,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
   kpiRow: {
     flexDirection: "row",
@@ -647,12 +623,12 @@ const styles = StyleSheet.create({
   },
   kpiLabel: {
     fontSize: 10,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
     letterSpacing: 0.5,
   },
   kpiVal: {
     fontSize: 14,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
   content: {
     paddingTop: 14,
@@ -671,7 +647,7 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 15,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
   cardSub: {
     fontSize: 11,
@@ -686,7 +662,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     fontSize: 11,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
   budgetRow: {
     flexDirection: "row",
@@ -713,6 +689,6 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontSize: 13,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
 });

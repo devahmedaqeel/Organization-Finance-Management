@@ -1,5 +1,6 @@
 import { Platform, Share } from "react-native";
 import * as FileSystem from "expo-file-system/legacy";
+import * as Sharing from "expo-sharing";
 import * as WebBrowser from "expo-web-browser";
 import { Transaction, Budget, PayrollEntry, Department } from "@/context/FinanceContext";
 import { sharePdfFile, downloadFinancialReportPdf, downloadPdfBinaryDirectly, PdfExportResult } from "./pdfDownloadService";
@@ -2234,10 +2235,32 @@ export async function downloadCsvReport(
     }
   }
 
+  // Phones: write a real .csv file (with a UTF-8 marker so Excel shows currency symbols and names correctly)
+  const content = "﻿" + csvContent;
   try {
     const uri = `${FileSystem.cacheDirectory}${filename}`;
-    await FileSystem.writeAsStringAsync(uri, csvContent, { encoding: FileSystem.EncodingType.UTF8 });
-    await Share.share({ title: filename, url: uri });
+    await FileSystem.writeAsStringAsync(uri, content, { encoding: FileSystem.EncodingType.UTF8 });
+
+    // Android: let the user pick a folder (e.g. Downloads) and save it there — same as PDF export
+    if (Platform.OS === "android" && FileSystem.StorageAccessFramework) {
+      try {
+        const perm = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
+        if (perm.granted) {
+          const dest = await FileSystem.StorageAccessFramework.createFileAsync(perm.directoryUri, filename.replace(/.csv$/i, ""), "text/csv");
+          await FileSystem.writeAsStringAsync(dest, content, { encoding: FileSystem.EncodingType.UTF8 });
+          return { success: true, uri: dest, filename, message: "CSV saved to the selected folder." };
+        }
+      } catch {
+        // folder picker cancelled → fall through to the share sheet
+      }
+    }
+
+    // iPhone (and Android fallback): share the actual file — Save to Files, Drive, Mail, WhatsApp…
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(uri, { mimeType: "text/csv", UTI: "public.comma-separated-values-text", dialogTitle: filename });
+    } else {
+      await Share.share({ title: filename, message: csvContent });
+    }
     return { success: true, uri, filename };
   } catch (err: any) {
     return { success: false, message: err.message };

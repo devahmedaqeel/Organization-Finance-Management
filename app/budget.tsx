@@ -415,7 +415,7 @@ export default function BudgetScreen() {
                   style={[
                     styles.deptPillText,
                     { color: selectedDeptFilter === "All" ? "#FFFFFF" : colors.mutedForeground },
-                    selectedDeptFilter === "All" && { fontFamily: "Inter_700Bold" },
+                    selectedDeptFilter === "All" && { fontFamily: "Inter_600SemiBold" },
                   ]}
                 >
                   All Depts ({availableDepts.length})
@@ -446,7 +446,7 @@ export default function BudgetScreen() {
                       style={[
                         styles.deptPillText,
                         { color: isSelected ? "#FFFFFF" : colors.foreground },
-                        isSelected && { fontFamily: "Inter_700Bold" },
+                        isSelected && { fontFamily: "Inter_600SemiBold" },
                       ]}
                     >
                       {dName}
@@ -641,13 +641,13 @@ export default function BudgetScreen() {
                 </View>
                 <View style={styles.cardAmountsRow}>
                   <Text style={[styles.cardAmtText, { color: colors.mutedForeground }]}>
-                    Spent: <Text style={{ color: colors.expense, fontFamily: "Inter_700Bold" }}>{settings.currency} {fmtNum(item.spent)}</Text>
+                    Spent: <Text style={{ color: colors.expense, fontFamily: "Inter_600SemiBold" }}>{settings.currency} {fmtNum(item.spent)}</Text>
                   </Text>
                   <Text style={[styles.cardAmtText, { color: colors.mutedForeground }]}>
-                    Limit: <Text style={{ color: colors.foreground, fontFamily: "Inter_700Bold" }}>{settings.currency} {fmtNum(item.allocated)}</Text>
+                    Limit: <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold" }}>{settings.currency} {fmtNum(item.allocated)}</Text>
                   </Text>
                   <Text style={[styles.cardAmtText, { color: colors.mutedForeground }]}>
-                    Left: <Text style={{ color: colors.income, fontFamily: "Inter_700Bold" }}>{settings.currency} {fmtNum(remaining)}</Text>
+                    Left: <Text style={{ color: colors.income, fontFamily: "Inter_600SemiBold" }}>{settings.currency} {fmtNum(remaining)}</Text>
                   </Text>
                 </View>
               </View>
@@ -692,10 +692,10 @@ export default function BudgetScreen() {
                 }}
               >
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                  <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: unallocatedNetCash <= 0 ? "#EF4444" : "#10B981" }}>
+                  <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: unallocatedNetCash <= 0 ? "#EF4444" : "#10B981" }}>
                     {unallocatedNetCash <= 0 ? "⚠️ NO UNALLOCATED CASH AVAILABLE" : "✓ AVAILABLE TO ALLOCATE"}
                   </Text>
-                  <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: unallocatedNetCash <= 0 ? "#EF4444" : "#10B981" }}>
+                  <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: unallocatedNetCash <= 0 ? "#EF4444" : "#10B981" }}>
                     {settings.currency || "PKR"} {unallocatedNetCash.toLocaleString()}
                   </Text>
                 </View>
@@ -835,8 +835,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   title: {
-    fontSize: 20,
-    fontFamily: "Inter_700Bold",
+    fontSize: 17,
+    fontFamily: "Inter_600SemiBold",
   },
   addIconBtn: {
     width: 34,
@@ -870,12 +870,12 @@ const styles = StyleSheet.create({
   },
   kpiLabel: {
     fontSize: 10,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
     letterSpacing: 0.5,
   },
   kpiVal: {
     fontSize: 13,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
   deptMetricsRow: {
     flexDirection: "row",
@@ -893,12 +893,12 @@ const styles = StyleSheet.create({
   },
   deptMetricLabel: {
     fontSize: 10,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
     letterSpacing: 0.4,
   },
   deptMetricVal: {
     fontSize: 12,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
   deptActionBtn: {
     flexDirection: "row",
@@ -911,7 +911,7 @@ const styles = StyleSheet.create({
   },
   deptActionBtnText: {
     fontSize: 11,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
   summaryCardRow: {
     flexDirection: "row",
@@ -929,12 +929,12 @@ const styles = StyleSheet.create({
   },
   summaryColLabel: {
     fontSize: 10,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
     letterSpacing: 0.5,
   },
   summaryColValue: {
     fontSize: 13,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
   summaryDivider: {
     width: 1,
@@ -957,7 +957,7 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 15,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
   cardSub: {
     fontSize: 11,
@@ -972,7 +972,7 @@ const styles = StyleSheet.create({
   },
   utilBadgeText: {
     fontSize: 11,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
   filterPillsSection: {
     gap: 8,
@@ -980,7 +980,7 @@ const styles = StyleSheet.create({
   },
   filterLabel: {
     fontSize: 10,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
     letterSpacing: 0.6,
   },
   filterPillsScroll: {
@@ -1020,7 +1020,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 14,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
   itemCountText: {
     fontSize: 11,
@@ -1039,7 +1039,7 @@ const styles = StyleSheet.create({
   },
   budgetDept: {
     fontSize: 14,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
   budgetCat: {
     fontSize: 11,
@@ -1053,7 +1053,7 @@ const styles = StyleSheet.create({
   },
   statusBadgeText: {
     fontSize: 10,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
   trashBtn: {
     padding: 4,
@@ -1111,13 +1111,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   modalTitle: {
-    fontSize: 18,
-    fontFamily: "Inter_700Bold",
+    fontSize: 17,
+    fontFamily: "Inter_600SemiBold",
     marginBottom: 4,
   },
   fieldLabel: {
     fontSize: 11,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
     letterSpacing: 0.8,
   },
   modalChipsRow: {
@@ -1171,6 +1171,6 @@ const styles = StyleSheet.create({
   addBtnText: {
     color: "#FFFFFF",
     fontSize: 14,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
 });
