@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Modal, Pressable, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useColors } from "@/hooks/useColors";
 import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
 
@@ -114,6 +114,67 @@ export function Segmented<T extends string | number>({
   );
 }
 
+/** A compact choice field, using the browser's keyboard-accessible select on web. */
+export function SelectInput<T extends string | number>({
+  value, options, onChange, label,
+}: {
+  value: T;
+  options: Array<{ value: T; label: string }>;
+  onChange: (value: T) => void;
+  label: string;
+}) {
+  const colors = useColors();
+  const [open, setOpen] = useState(false);
+  if (Platform.OS === "web") {
+    return React.createElement("select", {
+      value: String(value),
+      "aria-label": label,
+      onChange: (event: React.ChangeEvent<HTMLSelectElement>) => {
+        const selected = options.find((option) => String(option.value) === event.target.value);
+        if (selected) onChange(selected.value);
+      },
+      style: {
+        width: "100%", minWidth: 0, height: 38, padding: "0 10px", borderRadius: 8,
+        border: "1px solid " + colors.border, backgroundColor: colors.background,
+        color: colors.foreground, fontFamily: "Inter, sans-serif", fontSize: 13, cursor: "pointer",
+      },
+    });
+  }
+  return (
+    <>
+      <TouchableOpacity
+        onPress={() => setOpen(true)} accessibilityRole="button" accessibilityLabel={label}
+        accessibilityState={{ expanded: open }}
+        style={[styles.input, { minHeight: 40, flexDirection: "row", alignItems: "center", gap: 8, borderColor: colors.border, backgroundColor: colors.background }]}
+      >
+        <Text style={{ flex: 1, color: colors.foreground, fontSize: 13 }}>{options.find((option) => option.value === value)?.label || "Choose an option"}</Text>
+        <Text style={{ color: colors.mutedForeground }}>▾</Text>
+      </TouchableOpacity>
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
+          <Pressable style={[styles.dialog, { maxHeight: "80%", borderColor: colors.border, backgroundColor: colors.card }]} onPress={() => {}}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
+              <Text style={[styles.panelTitle, { flex: 1, color: colors.foreground }]}>{label}</Text>
+              <SmallButton label="Close" onPress={() => setOpen(false)} />
+            </View>
+            <ScrollView keyboardShouldPersistTaps="handled">
+              {options.map((option) => (
+                <TouchableOpacity
+                  key={String(option.value)} accessibilityRole="button" accessibilityState={{ selected: option.value === value }}
+                  onPress={() => { onChange(option.value); setOpen(false); }}
+                  style={{ minHeight: 44, padding: 12, borderRadius: 6, backgroundColor: option.value === value ? colors.primary + "14" : "transparent" }}
+                >
+                  <Text style={{ color: option.value === value ? colors.primary : colors.foreground, fontSize: 14 }}>{option.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>
+  );
+}
+
 export function ToggleRow({
   label,
   value,
@@ -205,9 +266,9 @@ export function SmallButton({
   accessibilityLabel?: string;
 }) {
   const colors = useColors();
-  const bg = tone === "primary" ? ACCENT : tone === "danger" ? colors.expense + "14" : colors.background;
+  const bg = tone === "primary" ? colors.primary : tone === "danger" ? colors.expense + "14" : colors.background;
   const fg = tone === "primary" ? "#FFF" : tone === "danger" ? colors.expense : colors.foreground;
-  const border = tone === "primary" ? ACCENT : tone === "danger" ? colors.expense + "55" : colors.border;
+  const border = tone === "primary" ? colors.primary : tone === "danger" ? colors.expense + "55" : colors.border;
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -216,7 +277,7 @@ export function SmallButton({
       accessibilityLabel={accessibilityLabel || label}
       style={[styles.smallBtn, { backgroundColor: bg, borderColor: border, opacity: disabled ? 0.45 : 1 }]}
     >
-      <Text style={{ color: fg, fontSize: 12, fontWeight: "700" }}>{label}</Text>
+      <Text style={{ color: fg, fontSize: 13, fontFamily: "Inter_600SemiBold" }}>{label}</Text>
     </TouchableOpacity>
   );
 }

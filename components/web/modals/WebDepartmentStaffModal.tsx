@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { Department, useFinance } from "@/context/FinanceContext";
 import { useColors } from "@/hooks/useColors";
+import { FitText } from "../FitText";
 import { useSettings } from "@/context/SettingsContext";
 import {
   SvgUsers,
@@ -222,571 +223,248 @@ export function WebDepartmentStaffModal({
             {
               backgroundColor: colors.card,
               borderColor: colors.border,
-              width: isMobile ? "100%" : 620,
+              width: isMobile ? "100%" : 780,
             },
           ]}
         >
           {/* Header */}
           <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1 }}>
-              <View style={[styles.headerIconWrap, { backgroundColor: "#0EA5E918" }]}>
-                {isAllSelected ? (
-                  <SvgLayers size={20} color="#0EA5E9" />
-                ) : (
-                  <SvgUsers size={20} color="#0EA5E9" />
-                )}
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
+              <View style={[styles.headerIconWrap, { backgroundColor: colors.primary + "16" }]}>
+                {isAllSelected ? <SvgLayers size={20} color={colors.primary} /> : <SvgUsers size={20} color={colors.primary} />}
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.modalTitle, { color: colors.foreground }]}>
-                  {isAllSelected
-                    ? "All Cost Centers — Staff & Roster"
-                    : `${activeDept?.name || "Department"} — Staff & Roster`}
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={[styles.xTitle, { color: colors.foreground }]}>
+                  {isAllSelected ? "Staff roster · All departments" : `Staff roster · ${activeDept?.name || "Department"}`}
                 </Text>
-                <Text style={[styles.modalSubtitle, { color: colors.mutedForeground }]}>
-                  {isAllSelected
-                    ? `${totalHeadcount} Total Personnel Assigned • ${payroll.length} Payroll Profiles (All Units)`
-                    : `${totalHeadcount} Total Personnel Assigned • ${registeredCount} Payroll Profiles`}
+                <Text style={[styles.xSub, { color: colors.mutedForeground }]}>
+                  {totalHeadcount} {totalHeadcount === 1 ? "person" : "people"} assigned · {isAllSelected ? payroll.length : registeredCount} on payroll
                 </Text>
               </View>
             </View>
-            <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>
+            <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7} accessibilityLabel="Close">
               <SvgX size={18} color={colors.mutedForeground} />
             </TouchableOpacity>
           </View>
 
-          {/* Scrollable Modal Content Body */}
           <ScrollView
             style={styles.modalBody}
-            contentContainerStyle={styles.modalBodyContent}
-            showsVerticalScrollIndicator={true}
+            contentContainerStyle={[styles.modalBodyContent, { gap: 16 }, isMobile && { paddingHorizontal: 16, paddingTop: 16 }]}
+            showsVerticalScrollIndicator
             keyboardShouldPersistTaps="handled"
           >
-            {/* Department Filter Selector Bar */}
-          <View
-            style={[
-              styles.filterBar,
-              {
-                borderBottomColor: colors.border,
-                backgroundColor: colors.background,
-              },
-            ]}
-          >
-            <View style={styles.filterBarHeader}>
-              <Text style={[styles.filterBarLabel, { color: colors.mutedForeground }]}>
-                SWITCH DEPARTMENT / COST CENTER:
-              </Text>
-              <Text style={[styles.filterBarCount, { color: "#0EA5E9" }]}>
-                {allFilterDepts.length} Available
-              </Text>
-            </View>
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.filterTabsScroll}
-            >
-              {/* All Departments Option */}
-              <TouchableOpacity
-                style={[
-                  styles.filterTab,
-                  {
-                    backgroundColor: isAllSelected ? "#0EA5E9" : colors.card,
-                    borderColor: isAllSelected ? "#0EA5E9" : colors.border,
-                  },
-                ]}
-                onPress={() => setSelectedDeptId("ALL")}
-                activeOpacity={0.7}
-              >
-                <Text
-                  style={[
-                    styles.filterTabText,
-                    { color: isAllSelected ? "#FFFFFF" : colors.foreground },
-                  ]}
-                >
-                  All Departments
-                </Text>
-                <View
-                  style={[
-                    styles.tabBadge,
-                    {
-                      backgroundColor: isAllSelected
-                        ? "rgba(255, 255, 255, 0.25)"
-                        : colors.border,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.tabBadgeText,
-                      { color: isAllSelected ? "#FFFFFF" : colors.mutedForeground },
-                    ]}
-                  >
-                    {payroll.length}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-
-              {/* Individual Department Chips */}
-              {allFilterDepts.map((d) => {
-                const isSelected =
-                  selectedDeptId === d.id ||
-                  (!isAllSelected &&
-                    activeDept?.name?.toLowerCase() === d.name.toLowerCase());
-                const deptCount = payroll.filter(
-                  (p) =>
-                    (p.department || "").trim().toLowerCase() ===
-                    d.name.trim().toLowerCase()
-                ).length;
-
-                return (
-                  <TouchableOpacity
-                    key={d.id}
-                    style={[
-                      styles.filterTab,
-                      {
-                        backgroundColor: isSelected ? "#0EA5E9" : colors.card,
-                        borderColor: isSelected ? "#0EA5E9" : colors.border,
-                      },
-                    ]}
-                    onPress={() => setSelectedDeptId(d.id)}
-                    activeOpacity={0.7}
-                  >
-                    <Text
-                      style={[
-                        styles.filterTabText,
-                        { color: isSelected ? "#FFFFFF" : colors.foreground },
-                      ]}
+            {/* Department tabs */}
+            <View style={{ gap: 8 }}>
+              <Text style={[styles.xLabel, { color: colors.mutedForeground }]}>Department</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                {[{ id: "ALL", name: "All departments", count: payroll.length }, ...allFilterDepts.map((d) => ({
+                  id: d.id,
+                  name: d.name,
+                  count: payroll.filter((p) => (p.department || "").trim().toLowerCase() === d.name.trim().toLowerCase()).length,
+                }))].map((d) => {
+                  const isSel =
+                    d.id === "ALL"
+                      ? isAllSelected
+                      : selectedDeptId === d.id || (!isAllSelected && activeDept?.name?.toLowerCase() === d.name.toLowerCase());
+                  return (
+                    <TouchableOpacity
+                      key={d.id}
+                      onPress={() => setSelectedDeptId(d.id)}
+                      activeOpacity={0.75}
+                      style={[styles.xTab, { backgroundColor: isSel ? colors.primary : colors.card, borderColor: isSel ? colors.primary : colors.border }]}
                     >
-                      {d.name}
-                    </Text>
-                    <View
-                      style={[
-                        styles.tabBadge,
-                        {
-                          backgroundColor: isSelected
-                            ? "rgba(255, 255, 255, 0.25)"
-                            : colors.border,
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.tabBadgeText,
-                          { color: isSelected ? "#FFFFFF" : colors.mutedForeground },
-                        ]}
-                      >
-                        {deptCount}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-
-          {/* Search Box */}
-          <View
-            style={[
-              styles.searchBoxWrap,
-              { backgroundColor: colors.background, borderColor: colors.border },
-            ]}
-          >
-            <SvgSearch size={15} color={colors.mutedForeground} />
-            <TextInput
-              style={[styles.searchInput, { color: colors.foreground }]}
-              placeholder={`Search ${isAllSelected ? "all employees" : (activeDept?.name || "department") + " employees"} by name, ID, designation...`}
-              placeholderTextColor={colors.mutedForeground}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity
-                onPress={() => setSearchQuery("")}
-                activeOpacity={0.7}
-                style={{ padding: 4 }}
-              >
-                <SvgX size={14} color={colors.mutedForeground} />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Quick Stats Grid with Headcount, Payroll, Allocated Budget, Total Used, Remaining Funds, and Operations */}
-          <View style={styles.statsRow}>
-            {/* Box 1: Allocated Budget */}
-            <View
-              style={[
-                styles.statBox,
-                { backgroundColor: colors.background, borderColor: colors.border },
-              ]}
-            >
-              <Text
-                style={[styles.statLabel, { color: colors.mutedForeground }]}
-              >
-                ALLOCATED BUDGET
-              </Text>
-              <Text
-                style={[styles.statValue, { color: colors.foreground }]}
-              >
-                {activeDeptFinances.allocated > 0
-                  ? `${settings.currency} ${activeDeptFinances.allocated.toLocaleString()}`
-                  : "No Cap Set"}
-              </Text>
-              <Text
-                style={[styles.statSub, { color: colors.mutedForeground }]}
-              >
-                Approved ceiling
-              </Text>
+                      <Text style={[styles.xTabText, { color: isSel ? "#FFFFFF" : colors.foreground }]}>{d.name}</Text>
+                      <View style={[styles.xTabCount, { backgroundColor: isSel ? "rgba(255,255,255,0.25)" : colors.muted }]}>
+                        <Text style={[styles.xTabCountText, { color: isSel ? "#FFFFFF" : colors.mutedForeground }]}>{d.count}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
             </View>
 
-            {/* Box 2: Total Used (Kitna Used Hoa) */}
-            <View
-              style={[
-                styles.statBox,
-                { backgroundColor: colors.background, borderColor: colors.border },
-              ]}
-            >
-              <Text
-                style={[styles.statLabel, { color: colors.mutedForeground }]}
-              >
-                TOTAL USED
-              </Text>
-              <Text
-                style={[
-                  styles.statValue,
-                  { color: activeDeptFinances.isOver ? colors.expense : "#F59E0B" },
-                ]}
-              >
-                {settings.currency} {activeDeptFinances.spent.toLocaleString()}
-              </Text>
-              <Text
-                style={[
-                  styles.statSub,
-                  { color: activeDeptFinances.isOver ? colors.expense : colors.mutedForeground },
-                ]}
-              >
-                {activeDeptFinances.otherSpending > 0
-                  ? `Pay: ${settings.currency} ${activeDeptFinances.payrollSpending.toLocaleString()} + Other: ${settings.currency} ${activeDeptFinances.otherSpending.toLocaleString()}`
-                  : activeDeptFinances.allocated > 0
-                  ? `${activeDeptFinances.ratio.toFixed(1)}% Cap utilized`
-                  : "Actual spend"}
-              </Text>
-            </View>
-
-            {/* Box 3: Remaining Funds */}
-            <View
-              style={[
-                styles.statBox,
-                { backgroundColor: colors.background, borderColor: colors.border },
-              ]}
-            >
-              <Text
-                style={[styles.statLabel, { color: colors.mutedForeground }]}
-              >
-                {activeDeptFinances.isOver ? "DEFICIT / OVER" : "REMAINING FUNDS"}
-              </Text>
-              <Text
-                style={[
-                  styles.statValue,
-                  {
-                    color: activeDeptFinances.isOver
-                      ? colors.expense
-                      : activeDeptFinances.remaining > 0
-                      ? colors.income
-                      : colors.mutedForeground,
-                  },
-                ]}
-              >
-                {activeDeptFinances.allocated > 0
-                  ? `${settings.currency} ${activeDeptFinances.remaining.toLocaleString()}`
-                  : "Uncapped"}
-              </Text>
-              <Text
-                style={[
-                  styles.statSub,
-                  { color: activeDeptFinances.isOver ? colors.expense : colors.mutedForeground },
-                ]}
-              >
-                {activeDeptFinances.allocated > 0
-                  ? activeDeptFinances.isOver
-                    ? `${(activeDeptFinances.ratio - 100).toFixed(1)}% Over budget`
-                    : `${activeDeptFinances.remainingRatio.toFixed(1)}% Buffer left`
-                  : "No limit assigned"}
-              </Text>
-            </View>
-
-            {/* Box 4: Monthly Payroll */}
-            <View
-              style={[
-                styles.statBox,
-                { backgroundColor: colors.background, borderColor: colors.border },
-              ]}
-            >
-              <Text
-                style={[styles.statLabel, { color: colors.mutedForeground }]}
-              >
-                MONTHLY PAYROLL
-              </Text>
-              <Text
-                style={[styles.statValue, { color: "#8B5CF6" }]}
-              >
-                {settings.currency} {totalMonthlyPayroll.toLocaleString()}
-              </Text>
-              <Text
-                style={[styles.statSub, { color: colors.mutedForeground }]}
-              >
-                Direct compensation
-              </Text>
-            </View>
-
-            {/* Box 5: Other Department Expenses */}
-            <View
-              style={[
-                styles.statBox,
-                { backgroundColor: colors.background, borderColor: colors.border },
-              ]}
-            >
-              <Text
-                style={[styles.statLabel, { color: colors.mutedForeground }]}
-              >
-                OTHER EXPENSES
-              </Text>
-              <Text
-                style={[styles.statValue, { color: "#06B6D4" }]}
-              >
-                {settings.currency} {activeDeptFinances.otherSpending.toLocaleString()}
-              </Text>
-              <Text
-                style={[styles.statSub, { color: colors.mutedForeground }]}
-              >
-                {activeDeptFinances.otherSpending > 0
-                  ? activeDeptFinances.otherCategorySummary
-                  : "Non-payroll operations"}
-              </Text>
-            </View>
-
-            {/* Box 6: Unit Headcount */}
-            <View
-              style={[
-                styles.statBox,
-                { backgroundColor: colors.background, borderColor: colors.border },
-              ]}
-            >
-              <Text
-                style={[styles.statLabel, { color: colors.mutedForeground }]}
-              >
-                {isAllSelected ? "TOTAL HEADCOUNT" : "UNIT HEADCOUNT"}
-              </Text>
-              <Text
-                style={[styles.statValue, { color: "#0EA5E9" }]}
-              >
-                {totalHeadcount}
-              </Text>
-              <Text
-                style={[styles.statSub, { color: colors.mutedForeground }]}
-              >
-                {registeredCount} {registeredCount === 1 ? "profile" : "profiles"} active
-              </Text>
-            </View>
-          </View>
-
-          {/* Executive Budget Reconciliation Progress Bar */}
-          {activeDeptFinances.allocated > 0 && (
-            <View
-              style={[
-                styles.budgetBarCard,
-                { backgroundColor: colors.background, borderColor: colors.border },
-              ]}
-            >
-              <View style={styles.budgetBarHeader}>
-                <Text style={[styles.budgetBarTitle, { color: colors.mutedForeground }]}>
-                  BUDGET RECONCILIATION
-                </Text>
-                <Text
-                  style={[
-                    styles.budgetBarRatio,
-                    { color: activeDeptFinances.isOver ? colors.expense : "#10B981" },
-                  ]}
-                >
-                  {activeDeptFinances.ratio.toFixed(1)}% Used • {activeDeptFinances.remainingRatio.toFixed(1)}% Remaining
-                </Text>
-              </View>
-
-              <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
-                {/* Payroll Portion (Purple) */}
-                <View
-                  style={[
-                    styles.progressSegment,
-                    {
-                      width: `${Math.min(100, (activeDeptFinances.payrollSpending / activeDeptFinances.allocated) * 100)}%`,
-                      backgroundColor: "#8B5CF6",
-                    },
-                  ]}
-                />
-                {/* Other Expenses Portion (Cyan) */}
-                <View
-                  style={[
-                    styles.progressSegment,
-                    {
-                      width: `${Math.min(
-                        Math.max(0, 100 - (activeDeptFinances.payrollSpending / activeDeptFinances.allocated) * 100),
-                        (activeDeptFinances.otherSpending / activeDeptFinances.allocated) * 100
-                      )}%`,
-                      backgroundColor: "#06B6D4",
-                    },
-                  ]}
-                />
-              </View>
-
-              {/* Legend with exact amounts */}
-              <View style={styles.legendRow}>
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: "#8B5CF6" }]} />
-                  <Text style={[styles.legendLabel, { color: colors.mutedForeground }]}>
-                    Payroll:{" "}
-                    <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold" }}>
-                      {settings.currency} {activeDeptFinances.payrollSpending.toLocaleString()}
-                    </Text>
-                  </Text>
-                </View>
-
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: "#06B6D4" }]} />
-                  <Text style={[styles.legendLabel, { color: colors.mutedForeground }]}>
-                    Other:{" "}
-                    <Text style={{ color: colors.foreground, fontFamily: "Inter_600SemiBold" }}>
-                      {settings.currency} {activeDeptFinances.otherSpending.toLocaleString()}
-                    </Text>
-                  </Text>
-                </View>
-
-                <View style={styles.legendItem}>
-                  <View style={[styles.legendDot, { backgroundColor: "#10B981" }]} />
-                  <Text style={[styles.legendLabel, { color: colors.mutedForeground }]}>
-                    Remaining:{" "}
-                    <Text style={{ color: "#10B981", fontFamily: "Inter_600SemiBold" }}>
-                      {settings.currency} {activeDeptFinances.remaining.toLocaleString()}
-                    </Text>
-                  </Text>
-                </View>
-              </View>
-            </View>
-          )}
-
-          {/* Personnel List */}
-          <View style={styles.listContainer}>
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <Text style={[styles.sectionHeading, { color: colors.mutedForeground }]}>
-                REGISTERED EMPLOYEES ({filteredStaff.length}
-                {filteredStaff.length !== deptStaff.length ? ` of ${deptStaff.length}` : ""})
-              </Text>
-              {searchQuery.trim().length > 0 && (
-                <TouchableOpacity onPress={() => setSearchQuery("")} activeOpacity={0.7}>
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      color: "#0EA5E9",
-                      fontFamily: "Inter_600SemiBold",
-                    }}
-                  >
-                    Clear Filter
-                  </Text>
+            {/* Search */}
+            <View style={[styles.searchBoxWrap, { backgroundColor: colors.background, borderColor: colors.border }]}>
+              <SvgSearch size={15} color={colors.mutedForeground} />
+              <TextInput
+                style={[styles.searchInput, { color: colors.foreground }]}
+                placeholder="Search by name, employee ID or role"
+                placeholderTextColor={colors.mutedForeground}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery("")} activeOpacity={0.7} style={{ padding: 4 }} accessibilityLabel="Clear search">
+                  <SvgX size={14} color={colors.mutedForeground} />
                 </TouchableOpacity>
               )}
             </View>
 
-            {filteredStaff.length === 0 ? (
-              <View
-                style={[
-                  styles.emptyRoster,
-                  { backgroundColor: colors.background, borderColor: colors.border },
-                ]}
-              >
-                <SvgBriefcase size={28} color={colors.mutedForeground} />
-                <Text style={[styles.emptyRosterText, { color: colors.foreground }]}>
-                  {searchQuery.trim().length > 0
-                    ? `No employees match "${searchQuery}"`
-                    : isAllSelected
-                    ? "No staff payroll entries found in the organization yet."
-                    : `No individual staff payroll entries mapped for "${activeDept?.name || "this department"}" yet.`}
-                </Text>
-                <Text style={[styles.emptyRosterSub, { color: colors.mutedForeground }]}>
-                  {searchQuery.trim().length > 0
-                    ? "Try searching for a different keyword or switch to another department tab above."
-                    : "Individual profiles can be registered and assigned in the Staff Payroll tab."}
-                </Text>
-              </View>
-            ) : (
-              filteredStaff.map((staff) => (
-                <View
-                  key={staff.id}
-                  style={[
-                    styles.staffCard,
-                    { backgroundColor: colors.background, borderColor: colors.border },
-                  ]}
-                >
-                  <View style={styles.staffAvatar}>
-                    <Text style={styles.staffAvatarText}>
-                      {staff.employeeName
-                        ? staff.employeeName
-                            .split(" ")
-                            .filter(Boolean)
-                            .map((n) => n[0])
-                            .slice(0, 2)
-                            .join("")
-                            .toUpperCase()
-                        : "EM"}
+            {/* Figures: 3 × 2 grid */}
+            {(() => {
+              const f = activeDeptFinances;
+              const hasCap = f.allocated > 0;
+              const tiles = [
+                { label: "Budget", value: hasCap ? `${settings.currency} ${f.allocated.toLocaleString()}` : "Not set", sub: hasCap ? "Approved limit" : "No limit assigned", color: colors.foreground },
+                { label: "Spent", value: `${settings.currency} ${f.spent.toLocaleString()}`, sub: hasCap ? `${f.ratio.toFixed(1)}% of budget` : "Actual spend", color: f.isOver ? colors.expense : colors.foreground },
+                {
+                  label: f.isOver ? "Over budget" : "Remaining",
+                  value: hasCap ? `${settings.currency} ${Math.abs(f.remaining).toLocaleString()}` : "—",
+                  sub: hasCap ? (f.isOver ? `${(f.ratio - 100).toFixed(1)}% over` : `${f.remainingRatio.toFixed(1)}% left`) : "No limit",
+                  color: f.isOver ? colors.expense : colors.income,
+                },
+                { label: "Monthly payroll", value: `${settings.currency} ${totalMonthlyPayroll.toLocaleString()}`, sub: "Salaries", color: colors.foreground },
+                { label: "Other expenses", value: `${settings.currency} ${f.otherSpending.toLocaleString()}`, sub: f.otherSpending > 0 ? f.otherCategorySummary : "Non-payroll costs", color: colors.foreground },
+                { label: "Headcount", value: String(totalHeadcount), sub: `${registeredCount} ${registeredCount === 1 ? "profile" : "profiles"} on payroll`, color: colors.foreground },
+              ];
+              return (
+                <View style={[styles.xGrid, { borderColor: colors.border }]}>
+                  {tiles.map((t, i) => (
+                    <View
+                      key={t.label}
+                      style={[
+                        styles.xTile,
+                        isMobile ? { width: "50%" } : { width: "33.333%" },
+                        { borderColor: colors.border },
+                        (isMobile ? i % 2 !== 0 : i % 3 !== 0) && { borderLeftWidth: 1 },
+                        (isMobile ? i >= 2 : i >= 3) && { borderTopWidth: 1 },
+                      ]}
+                    >
+                      <Text style={[styles.xLabel, { color: colors.mutedForeground }]}>{t.label}</Text>
+                      <FitText style={[styles.xValue, { color: t.color }]}>{t.value}</FitText>
+                      <Text style={[styles.xTileSub, { color: colors.mutedForeground }]}>{t.sub}</Text>
+                    </View>
+                  ))}
+                </View>
+              );
+            })()}
+
+            {/* Budget usage bar */}
+            {activeDeptFinances.allocated > 0 && (() => {
+              const f = activeDeptFinances;
+              const payPct = Math.min(100, (f.payrollSpending / f.allocated) * 100);
+              const otherPct = Math.min(Math.max(0, 100 - payPct), (f.otherSpending / f.allocated) * 100);
+              return (
+                <View style={[styles.xCard, { borderColor: colors.border }]}>
+                  <View style={styles.xRowBetween}>
+                    <Text style={[styles.xCardTitle, { color: colors.foreground }]}>Budget usage</Text>
+                    <Text style={[styles.xCardTitle, { color: f.isOver ? colors.expense : colors.income }]}>
+                      {f.ratio.toFixed(1)}% used
                     </Text>
                   </View>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text
-                      style={[styles.staffName, { color: colors.foreground }]}
-                    >
-                      {staff.employeeName}
-                    </Text>
-                    <Text
-                      style={[styles.staffMeta, { color: colors.mutedForeground }]}
-                    >
-                      {staff.employeeId} • {staff.designation || "Staff Member"}
-                    </Text>
-                    <View style={styles.deptBadgeWrap}>
-                      <View style={[styles.deptBadge, { backgroundColor: "#0EA5E915" }]}>
-                        <Text style={[styles.deptBadgeText, { color: "#0EA5E9" }]}>
-                          {staff.department || "General"}
+                  <View style={[styles.progressTrack, { backgroundColor: colors.muted, height: 10, borderRadius: 5, gap: 2 }]}>
+                    <View style={[styles.progressSegment, { width: `${payPct}%`, backgroundColor: "#8B5CF6" }]} />
+                    <View style={[styles.progressSegment, { width: `${otherPct}%`, backgroundColor: "#06B6D4" }]} />
+                  </View>
+                  <View style={styles.xLegend}>
+                    {[
+                      { label: "Payroll", value: f.payrollSpending, color: "#8B5CF6" },
+                      { label: "Other", value: f.otherSpending, color: "#06B6D4" },
+                      { label: f.isOver ? "Over" : "Remaining", value: Math.abs(f.remaining), color: f.isOver ? colors.expense : colors.income },
+                    ].map((l) => (
+                      <View key={l.label} style={styles.xLegendItem}>
+                        <View style={[styles.legendDot, { backgroundColor: l.color }]} />
+                        <Text style={[styles.xLegendText, { color: colors.mutedForeground }]}>{l.label}</Text>
+                        <Text style={[styles.xLegendValue, { color: colors.foreground }]}>
+                          {settings.currency} {l.value.toLocaleString()}
                         </Text>
                       </View>
-                    </View>
-                  </View>
-                  <View style={{ alignItems: "flex-end" }}>
-                    <Text style={[styles.staffSalary, { color: colors.foreground }]}>
-                      {settings.currency}{" "}
-                      {Number(staff.netSalary || staff.baseSalary || 0).toLocaleString()}
-                    </Text>
-                    <View style={styles.paidBadge}>
-                      <SvgCheck size={10} color="#10B981" />
-                      <Text style={styles.paidBadgeText}>Active</Text>
-                    </View>
+                    ))}
                   </View>
                 </View>
-              ))
-            )}
+              );
+            })()}
 
-            {!isAllSelected && unassignedSlots > 0 && !searchQuery.trim() && (
-              <View style={[styles.unassignedBox, { borderColor: colors.border }]}>
-                <Text style={[styles.unassignedText, { color: colors.mutedForeground }]}>
-                  + {unassignedSlots} additional operational personnel positions assigned to this department
+            {/* Employees */}
+            <View style={{ gap: 10 }}>
+              <View style={styles.xRowBetween}>
+                <Text style={[styles.xCardTitle, { color: colors.foreground }]}>
+                  Employees ({filteredStaff.length}
+                  {filteredStaff.length !== deptStaff.length ? ` of ${deptStaff.length}` : ""})
                 </Text>
+                {searchQuery.trim().length > 0 && (
+                  <TouchableOpacity onPress={() => setSearchQuery("")} activeOpacity={0.7}>
+                    <Text style={[styles.xLink, { color: colors.primary }]}>Clear search</Text>
+                  </TouchableOpacity>
+                )}
               </View>
-            )}
-          </View>
-        </ScrollView>
 
-          {/* Footer Actions */}
+              {filteredStaff.length === 0 ? (
+                <View style={[styles.emptyRoster, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                  <SvgBriefcase size={28} color={colors.mutedForeground} />
+                  <Text style={[styles.emptyRosterText, { color: colors.foreground }]}>
+                    {searchQuery.trim().length > 0
+                      ? `No employees match "${searchQuery}"`
+                      : isAllSelected
+                      ? "No employees on payroll yet"
+                      : `No employees in ${activeDept?.name || "this department"} yet`}
+                  </Text>
+                  <Text style={[styles.emptyRosterSub, { color: colors.mutedForeground }]}>
+                    {searchQuery.trim().length > 0
+                      ? "Try another name, or choose a different department above."
+                      : "Add employees from the Staff Payroll page."}
+                  </Text>
+                </View>
+              ) : (
+                <View style={[styles.xList, { borderColor: colors.border }]}>
+                  {!isMobile && (
+                    <View style={[styles.xListHead, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+                      <Text style={[styles.xHeadText, { color: colors.mutedForeground, flex: 1 }]}>Employee</Text>
+                      <Text style={[styles.xHeadText, { color: colors.mutedForeground, width: 120 }]}>Department</Text>
+                      <Text style={[styles.xHeadText, { color: colors.mutedForeground, width: 120, textAlign: "right" }]}>Net salary</Text>
+                      <Text style={[styles.xHeadText, { color: colors.mutedForeground, width: 80, textAlign: "right" }]}>Status</Text>
+                    </View>
+                  )}
+                  {filteredStaff.map((staff, i) => (
+                    <View
+                      key={staff.id}
+                      style={[styles.xListRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }, isMobile && { flexWrap: "wrap" }]}
+                    >
+                      <View style={{ flex: 1, minWidth: isMobile ? "60%" : 0, flexDirection: "row", alignItems: "center", gap: 10 }}>
+                        <View style={[styles.xAvatar, { backgroundColor: colors.info + "18" }]}>
+                          <Text style={[styles.xAvatarText, { color: colors.info }]}>
+                            {staff.employeeName
+                              ? staff.employeeName.split(" ").filter(Boolean).map((n) => n[0]).slice(0, 2).join("").toUpperCase()
+                              : "EM"}
+                          </Text>
+                        </View>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={[styles.xName, { color: colors.foreground }]}>{staff.employeeName}</Text>
+                          <Text style={[styles.xMeta, { color: colors.mutedForeground }]}>
+                            {staff.employeeId} · {staff.designation || "Staff member"}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={{ width: isMobile ? undefined : 120 }}>
+                        <View style={[styles.xDept, { backgroundColor: colors.muted }]}>
+                          <Text style={[styles.xDeptText, { color: colors.foreground }]}>{staff.department || "General"}</Text>
+                        </View>
+                      </View>
+                      <FitText style={[styles.xSalary, { color: colors.foreground, width: isMobile ? 110 : 120 }]}>
+                        {`${settings.currency} ${Number(staff.netSalary || staff.baseSalary || 0).toLocaleString()}`}
+                      </FitText>
+                      <View style={{ width: isMobile ? undefined : 80, alignItems: "flex-end" }}>
+                        <View style={styles.paidBadge}>
+                          <SvgCheck size={10} color="#10B981" />
+                          <Text style={styles.paidBadgeText}>Active</Text>
+                        </View>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {!isAllSelected && unassignedSlots > 0 && !searchQuery.trim() && (
+                <View style={[styles.unassignedBox, { borderColor: colors.border }]}>
+                  <Text style={[styles.unassignedText, { color: colors.mutedForeground }]}>
+                    + {unassignedSlots} more {unassignedSlots === 1 ? "position" : "positions"} assigned to this department without a payroll profile
+                  </Text>
+                </View>
+              )}
+            </View>
+          </ScrollView>
+
+          {/* Footer */}
           <View style={[styles.modalFooter, { borderTopColor: colors.border }]}>
             {!isAllSelected && activeDept && onEditDepartment && (
               <TouchableOpacity
@@ -797,16 +475,10 @@ export function WebDepartmentStaffModal({
                 }}
                 activeOpacity={0.8}
               >
-                <Text style={[styles.secondaryBtnText, { color: colors.foreground }]}>
-                  Adjust Headcount ({activeDept.name})
-                </Text>
+                <Text style={[styles.secondaryBtnText, { color: colors.foreground }]}>Edit {activeDept.name}</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity
-              style={[styles.primaryBtn, { backgroundColor: "#0EA5E9" }]}
-              onPress={onClose}
-              activeOpacity={0.85}
-            >
+            <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: colors.primary }]} onPress={onClose} activeOpacity={0.85}>
               <Text style={styles.primaryBtnText}>Done</Text>
             </TouchableOpacity>
           </View>
@@ -817,6 +489,36 @@ export function WebDepartmentStaffModal({
 }
 
 const styles = StyleSheet.create({
+  xTitle: { fontSize: 17, fontFamily: "Inter_600SemiBold", lineHeight: 23 },
+  xSub: { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 18, marginTop: 2 },
+  xLabel: { fontSize: 12.5, fontFamily: "Inter_500Medium" },
+  xTab: { flexDirection: "row", alignItems: "center", gap: 8, height: 34, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1 },
+  xTabText: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  xTabCount: { minWidth: 22, alignItems: "center", paddingHorizontal: 6, paddingVertical: 1, borderRadius: 999 },
+  xTabCountText: { fontSize: 11.5, fontFamily: "Inter_600SemiBold" },
+  xGrid: { flexDirection: "row", flexWrap: "wrap", borderWidth: 1, borderRadius: 8, overflow: "hidden" },
+  xTile: { paddingHorizontal: 14, paddingVertical: 12, gap: 4 },
+  xValue: { fontSize: 18, fontFamily: "Inter_600SemiBold" },
+  xTileSub: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 17 },
+  xCard: { borderWidth: 1, borderRadius: 8, padding: 14, gap: 10 },
+  xCardTitle: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  xRowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" },
+  xLegend: { flexDirection: "row", flexWrap: "wrap", gap: 16 },
+  xLegendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
+  xLegendText: { fontSize: 12.5, fontFamily: "Inter_500Medium" },
+  xLegendValue: { fontSize: 12.5, fontFamily: "Inter_600SemiBold" },
+  xLink: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  xList: { borderWidth: 1, borderRadius: 8, overflow: "hidden" },
+  xListHead: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 9, borderBottomWidth: 1 },
+  xHeadText: { fontSize: 12.5, fontFamily: "Inter_600SemiBold" },
+  xListRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
+  xAvatar: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  xAvatarText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  xName: { fontSize: 14, fontFamily: "Inter_600SemiBold", lineHeight: 19 },
+  xMeta: { fontSize: 12.5, fontFamily: "Inter_400Regular", lineHeight: 17 },
+  xDept: { alignSelf: "flex-start", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4 },
+  xDeptText: { fontSize: 12.5, fontFamily: "Inter_500Medium" },
+  xSalary: { fontSize: 14, fontFamily: "Inter_600SemiBold", textAlign: "right" },
   backdrop: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.75)",
@@ -826,7 +528,7 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     maxHeight: "90%",
-    borderRadius: 16,
+    borderRadius: 10,
     borderWidth: 1,
     overflow: "hidden",
     display: "flex",
@@ -840,8 +542,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    gap: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
     borderBottomWidth: 1,
     flexShrink: 0,
   },
@@ -849,6 +552,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   modalBodyContent: {
+    paddingHorizontal: 24,
+    paddingTop: 20,
     paddingBottom: 24,
   },
   headerIconWrap: {
@@ -885,12 +590,12 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   filterBarLabel: {
-    fontSize: 10,
+    fontSize: 11.5,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.5,
   },
   filterBarCount: {
-    fontSize: 10,
+    fontSize: 11.5,
     fontFamily: "Inter_600SemiBold",
   },
   filterTabsScroll: {
@@ -905,7 +610,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 20,
+    borderRadius: 10,
     borderWidth: 1,
   },
   filterTabText: {
@@ -918,19 +623,16 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   tabBadgeText: {
-    fontSize: 10,
+    fontSize: 11.5,
     fontFamily: "Inter_700Bold",
   },
   searchBoxWrap: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    marginHorizontal: 20,
-    marginTop: 10,
-    marginBottom: 4,
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
+    height: 40,
+    borderRadius: 8,
     borderWidth: 1,
   },
   searchInput: {
@@ -954,7 +656,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   statLabel: {
-    fontSize: 10,
+    fontSize: 11.5,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.5,
   },
@@ -982,7 +684,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   budgetBarTitle: {
-    fontSize: 10,
+    fontSize: 11.5,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.5,
   },
@@ -1018,7 +720,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   legendLabel: {
-    fontSize: 10.5,
+    fontSize: 11.5,
     fontFamily: "Inter_400Regular",
   },
   listContainer: {
@@ -1072,7 +774,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   deptBadgeText: {
-    fontSize: 10,
+    fontSize: 11.5,
     fontFamily: "Inter_600SemiBold",
   },
   staffSalary: {
@@ -1087,7 +789,7 @@ const styles = StyleSheet.create({
   },
   paidBadgeText: {
     color: "#10B981",
-    fontSize: 10,
+    fontSize: 11.5,
     fontFamily: "Inter_600SemiBold",
   },
   emptyRoster: {
@@ -1111,8 +813,9 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   unassignedBox: {
-    padding: 10,
-    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
     borderWidth: 1,
     borderStyle: "dashed",
     alignItems: "center",
@@ -1127,8 +830,8 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     alignItems: "center",
     gap: 10,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
     borderTopWidth: 1,
     flexShrink: 0,
   },

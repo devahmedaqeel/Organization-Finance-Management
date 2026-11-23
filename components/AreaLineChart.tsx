@@ -448,81 +448,63 @@ export function AreaLineChart({
         </TouchableOpacity>
       </View>
 
-      {/* ─── Clean, Non-Overlapping Inspector Box (2-Row Layout) ─── */}
-      <View
-        style={[
-          styles.inspectorCard,
-          {
-            backgroundColor: (colors.cardAlt ?? colors.muted) + "90",
-            borderColor: colors.border,
-          },
-        ]}
-      >
-        {/* Top Header: Date & Net Margin */}
-        <View style={styles.inspectorHeaderRow}>
-          <View style={styles.dateBadgeWrap}>
-            <SvgCalendar size={12} color={colors.primary} />
-            <Text style={[styles.inspectorDate, { color: colors.foreground }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>
-              {activePoint ? (activePoint.fullDate || activePoint.label) : "-"}
-            </Text>
-          </View>
-
-          <View
-            style={[
-              styles.netSurplusPill,
-              {
-                backgroundColor: (isNetPositive ? colors.income : colors.expense) + "18",
-                borderColor: (isNetPositive ? colors.income : colors.expense) + "40",
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.netSurplusText,
-                { color: isNetPositive ? colors.income : colors.expense },
-              ]}
-              numberOfLines={Platform.OS === "web" ? undefined : 1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.7}
-            >
-              Net: {isNetPositive ? "+" : "-"}{currency} {Number(Math.abs(netSurplus) || 0).toLocaleString()}
-            </Text>
-          </View>
-        </View>
-
-        {/* Bottom Badges: Income and Expense */}
-        <View style={styles.inspectorBadgesRow}>
-          <View style={[styles.statBadge, { backgroundColor: colors.income + "14", borderColor: colors.income + "30" }]}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 3.5, flexShrink: 0 }}>
-              <View style={[styles.legendDot, { backgroundColor: colors.income }]} />
-              <Text style={[styles.statBadgeLabel, { color: colors.income }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>Inflow</Text>
+      {/* ─── Period summary: Income | Expenses | Net ─── */}
+      {(() => {
+        const inc = Number(activePoint ? activePoint.income : 0) || 0;
+        const exp = Number(activePoint ? activePoint.expense : 0) || 0;
+        const flow = inc + exp;
+        const incShare = flow > 0 ? (inc / flow) * 100 : 0;
+        const fmtAmt = (v: number) => `${currency} ${Math.round(Math.abs(v)).toLocaleString()}`;
+        const cells = [
+          { label: "Income", value: fmtAmt(inc), color: colors.income, accent: colors.income },
+          { label: "Expenses", value: fmtAmt(exp), color: colors.expense, accent: colors.expense },
+          { label: "Net", value: `${isNetPositive ? "+" : "-"}${fmtAmt(netSurplus)}`, color: isNetPositive ? colors.income : colors.expense, accent: colors.foreground },
+        ];
+        return (
+          <View style={[styles.sumCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.sumHead}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexShrink: 1 }}>
+                <SvgCalendar size={13} color={colors.mutedForeground} />
+                <Text style={[styles.sumPeriod, { color: colors.foreground }]} numberOfLines={1}>
+                  {activePoint ? (activePoint.fullDate || activePoint.label) : "-"}
+                </Text>
+              </View>
+              <Text style={[styles.sumHint, { color: colors.mutedForeground }]} numberOfLines={1}>
+                {flow === 0 ? "No activity" : isNetPositive ? `Kept ${inc > 0 ? Math.round((netSurplus / inc) * 100) : 0}% of income` : "Spent more than earned"}
+              </Text>
             </View>
-            <Text
-              style={[styles.statBadgeValue, { color: colors.income }]}
-              numberOfLines={Platform.OS === "web" ? undefined : 1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.7}
-            >
-              {currency} {Number(activePoint ? activePoint.income : 0).toLocaleString()}
-            </Text>
-          </View>
 
-          <View style={[styles.statBadge, { backgroundColor: colors.expense + "14", borderColor: colors.expense + "30" }]}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 3.5, flexShrink: 0 }}>
-              <View style={[styles.legendDot, { backgroundColor: colors.expense }]} />
-              <Text style={[styles.statBadgeLabel, { color: colors.expense }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>Expenses</Text>
+            <View style={[styles.sumRow, { borderColor: colors.border }]}>
+              {cells.map((c, i) => (
+                <View key={c.label} style={[styles.sumCell, i > 0 && { borderLeftWidth: 1, borderLeftColor: colors.border }]}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <View style={[styles.sumDot, { backgroundColor: c.accent }]} />
+                    <Text style={[styles.sumLabel, { color: colors.mutedForeground }]} numberOfLines={1}>{c.label}</Text>
+                  </View>
+                  <Text
+                    style={[styles.sumValue, { color: c.color }]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.7}
+                  >
+                    {c.value}
+                  </Text>
+                </View>
+              ))}
             </View>
-            <Text
-              style={[styles.statBadgeValue, { color: colors.expense }]}
-              numberOfLines={Platform.OS === "web" ? undefined : 1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.7}
-            >
-              {currency} {Number(activePoint ? activePoint.expense : 0).toLocaleString()}
-            </Text>
+
+            {/* Income vs expenses share */}
+            <View style={[styles.sumTrack, { backgroundColor: colors.muted }]}>
+              {flow > 0 ? (
+                <>
+                  <View style={{ width: `${Math.max(incShare, inc > 0 ? 2 : 0)}%`, height: "100%", backgroundColor: colors.income }} />
+                  <View style={{ flex: 1, height: "100%", backgroundColor: exp > 0 ? colors.expense : "transparent" }} />
+                </>
+              ) : null}
+            </View>
           </View>
-        </View>
-      </View>
+        );
+      })()}
 
       {/* ─── Interactive Navigation Bar for Scrollable Timelines ─── */}
       {isScrollable && (
@@ -835,6 +817,16 @@ export function AreaLineChart({
 }
 
 const styles = StyleSheet.create({
+  sumCard: { borderWidth: 1, borderRadius: 10, padding: 12, gap: 10, marginBottom: 10 },
+  sumHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  sumPeriod: { fontSize: 13.5, fontFamily: "Inter_600SemiBold" },
+  sumHint: { fontSize: 12.5, fontFamily: "Inter_400Regular", flexShrink: 1, textAlign: "right" },
+  sumRow: { flexDirection: "row", borderWidth: 1, borderRadius: 8, overflow: "hidden" },
+  sumCell: { flex: 1, minWidth: 0, paddingHorizontal: 12, paddingVertical: 10, gap: 4 },
+  sumDot: { width: 8, height: 8, borderRadius: 2 },
+  sumLabel: { fontSize: 12.5, fontFamily: "Inter_500Medium" },
+  sumValue: { fontSize: 16, fontFamily: "Inter_600SemiBold", letterSpacing: -0.2 },
+  sumTrack: { height: 6, borderRadius: 3, overflow: "hidden", flexDirection: "row", gap: 2 },
   container: {
     gap: 8,
   },

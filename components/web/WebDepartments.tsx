@@ -5,9 +5,11 @@ import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
 import { useColors } from "@/hooks/useColors";
 import { isSalaryExpenseCategory } from "@/constants/categories";
+import { calculateBudgetAllocation, calculateBudgetUsed } from "@/services/FinancialCalculationEngine";
 import { WebDepartmentModal } from "./modals/WebDepartmentModal";
 import { WebDepartmentStaffModal } from "./modals/WebDepartmentStaffModal";
 import { WebConfirmModal } from "./modals/WebConfirmModal";
+import { FitText } from "./FitText";
 import {
   SvgLayers,
   SvgPlus,
@@ -23,7 +25,9 @@ export function WebDepartments() {
 
   const { user } = useAuth();
   const { settings } = useSettings();
-  const { departments, transactions, deleteDepartment, budgets, payroll = [] } = useFinance();
+  const { departments, transactions, deleteDepartment, addDepartment, budgets, payroll = [] } = useFinance();
+  const [settingUp, setSettingUp] = useState<string | null>(null);
+  const [setupMsg, setSetupMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const [modalVisible, setModalVisible] = useState(false);
   const [editingDept, setEditingDept] = useState<Department | null>(null);
@@ -73,28 +77,80 @@ export function WebDepartments() {
   );
 
   const totalAllocated = useMemo(
-    () => deptsWithSpend.reduce((s, d) => s + (d.budgetAllocated || 0), 0),
-    [deptsWithSpend]
+    () => calculateBudgetAllocation(budgets, departments),
+    [budgets, departments]
   );
 
   const totalActualSpend = useMemo(
-    () => (deptsWithSpend || []).reduce((s, d) => s + (d.actualSpend || 0), 0),
-    [deptsWithSpend]
+    () => calculateBudgetUsed(transactions || [], budgets, undefined, departments),
+    [transactions, budgets, departments]
   );
+
+  // Departments that have a budget or spending but were never set up on this page
+  const unregisteredDepts = useMemo(() => {
+    const known = new Set((departments || []).map((d) => (d.name || "").trim().toLowerCase()));
+    const map = new Map<string, { name: string; budget: number; spent: number }>();
+    const touch = (raw?: string) => {
+      const name = (raw || "").trim();
+      const key = name.toLowerCase();
+      if (!name || known.has(key) || ["all", "general", "institutional", "organization"].includes(key)) return null;
+      if (!map.has(key)) map.set(key, { name, budget: 0, spent: 0 });
+      return map.get(key)!;
+    };
+    (budgets || []).forEach((b) => {
+      const e = touch(b.department);
+      if (e) e.budget += Number(b.allocated) || 0;
+    });
+    (transactions || []).forEach((t) => {
+      if (!t || t.type !== "expense") return;
+      const e = touch(t.department);
+      if (e) e.spent += Number(t.amount) || 0;
+    });
+    // staff on payroll for each missing department
+    (payroll || []).forEach((p: any) => {
+      const e = touch(p?.department);
+      if (e) (e as any).staff = ((e as any).staff || 0) + 1;
+    });
+    return Array.from(map.values()).sort((a, b) => b.budget + b.spent - (a.budget + a.spent)) as Array<{ name: string; budget: number; spent: number; staff?: number }>;
+  }, [departments, budgets, transactions, payroll]);
+
+  // Creates the missing department record so it gets a normal card. Budget lines already count,
+  // so the department-level budget starts at 0 (it can be changed later with Edit).
+  const setUpDepartments = async (list: Array<{ name: string; staff?: number }>) => {
+    if (!list.length || settingUp) return;
+    setSettingUp(list.length === 1 ? list[0].name : "all");
+    setSetupMsg(null);
+    let done = 0;
+    const failed: string[] = [];
+    for (const u of list) {
+      try {
+        await addDepartment({ name: u.name, headCount: u.staff || 0, budgetAllocated: 0 } as any);
+        done++;
+      } catch {
+        failed.push(u.name);
+      }
+    }
+    setSettingUp(null);
+    setSetupMsg(
+      failed.length === 0
+        ? { ok: true, text: done === 1 ? `${list[0].name} is now set up.` : `${done} departments are now set up.` }
+        : { ok: false, text: `Couldn't set up: ${failed.join(", ")}. Check that you're signed in as an admin.` }
+    );
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, isMobile && { padding: 14, gap: 14 }]} showsVerticalScrollIndicator={false}>
-      {/* ─── Page Title & Action Bar ─── */}
+      {/* ─── Page header ─── */}
       <View style={styles.pageHeader}>
         <View style={{ flex: 1, minWidth: isMobile ? "100%" : 240 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-            <View style={[styles.titleIconBadge, { backgroundColor: "#0EA5E920" }]}>
-              <SvgLayers size={20} color="#0EA5E9" />
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <View style={[styles.titleIconBadge, { backgroundColor: colors.primary + "16" }]}>
+              <SvgLayers size={20} color={colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.pageTitle, { color: colors.foreground, fontSize: isMobile ? 19 : 22 }]}>Monitored Cost Centers</Text>
-              <Text style={[styles.pageSubtitle, { color: colors.mutedForeground, fontSize: isMobile ? 12 : 13 }]}>
-                Headcount distribution, cost tracking, and unit leadership management
+              <Text style={[styles.pageTitle, { color: colors.foreground, fontSize: isMobile ? 19 : 22 }]}>Departments</Text>
+              <Text style={[styles.pageSubtitle, { color: colors.mutedForeground }]}>
+                Budget, spending and staff for each department
               </Text>
             </View>
           </View>
@@ -102,7 +158,7 @@ export function WebDepartments() {
 
         {canEdit && (
           <TouchableOpacity
-            style={[styles.primaryBtn, { backgroundColor: "#0EA5E9" }, isMobile && { width: "100%" }]}
+            style={[styles.primaryBtn, { backgroundColor: colors.primary }, isMobile && { width: "100%" }]}
             onPress={() => {
               setEditingDept(null);
               setModalVisible(true);
@@ -110,333 +166,275 @@ export function WebDepartments() {
             activeOpacity={0.8}
           >
             <SvgPlus size={15} color="#FFFFFF" />
-            <Text style={styles.primaryBtnText}>Add Department</Text>
+            <Text style={styles.primaryBtnText}>Add department</Text>
           </TouchableOpacity>
         )}
       </View>
 
-      {/* ─── Department KPIs ─── */}
-      <View style={styles.metricsGrid}>
-        <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 200 }]}>
-          <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>ACTIVE COST CENTERS</Text>
-          <Text style={[styles.metricValue, { color: "#0EA5E9" }]}>{departments.length} Units</Text>
-          <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
-            Monitored Organizational Divisions
-          </Text>
-        </View>
-
-        <TouchableOpacity
-          style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 240 }]}
-          onPress={() => {
-            setStaffModalDept(null);
-            setStaffModalVisible(true);
-          }}
-          activeOpacity={0.85}
-        >
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-            <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>TOTAL STAFF HEADCOUNT</Text>
-            <SvgUsers size={14} color="#0EA5E9" />
-          </View>
-          <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
-            <Text style={[styles.metricValue, { color: colors.foreground }]}>{totalHeadcount} Personnel</Text>
-            {payroll.length > 0 && (
-              <Text style={{ fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#0EA5E9" }}>
-                ({payroll.length} registered)
+      {/* ─── Summary cards ─── */}
+      {(() => {
+        const usedPct = totalAllocated > 0 ? (Number(totalActualSpend || 0) / Number(totalAllocated)) * 100 : 0;
+        return (
+          <View style={styles.metricsGrid}>
+            <View style={[styles.metricCard, styles.sumCard, { backgroundColor: colors.card, borderColor: colors.border, borderTopColor: colors.info }]}>
+              <Text style={[styles.sumLabel, { color: colors.mutedForeground }]}>Departments</Text>
+              <Text style={[styles.sumValue, { color: colors.foreground }]}>{departments.length}</Text>
+              <Text style={[styles.sumSub, { color: colors.mutedForeground }]}>
+                {departments.length === 1 ? "active department" : "active departments"}
               </Text>
-            )}
-          </View>
-
-          {/* Available Employees with Departments Preview */}
-          {payroll.length > 0 ? (
-            <View style={styles.kpiStaffWrap}>
-              <Text style={[styles.kpiStaffTitle, { color: colors.mutedForeground }]}>
-                AVAILABLE EMPLOYEES:
-              </Text>
-              <View style={styles.kpiStaffChips}>
-                {payroll.slice(0, 4).map((p) => (
-                  <View
-                    key={p.id}
-                    style={[
-                      styles.kpiEmpChip,
-                      { backgroundColor: colors.background, borderColor: colors.border },
-                    ]}
-                  >
-                    <View style={styles.kpiEmpAvatar}>
-                      <Text style={styles.kpiEmpAvatarText}>
-                        {p.employeeName ? p.employeeName.trim()[0].toUpperCase() : "E"}
-                      </Text>
-                    </View>
-                    <Text style={[styles.kpiEmpName, { color: colors.foreground }]}>
-                      {p.employeeName}
-                    </Text>
-                    <View style={styles.kpiDeptBadge}>
-                      <Text style={styles.kpiDeptBadgeText}>
-                        {p.department || "General"}
-                      </Text>
-                    </View>
-                  </View>
-                ))}
-                {payroll.length > 4 && (
-                  <View
-                    style={[
-                      styles.kpiMoreBadge,
-                      { borderColor: colors.border, backgroundColor: colors.background },
-                    ]}
-                  >
-                    <Text style={[styles.kpiMoreText, { color: "#0EA5E9" }]}>
-                      +{payroll.length - 4} more
-                    </Text>
-                  </View>
-                )}
-              </View>
             </View>
-          ) : (
-            <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
-              No registered employee profiles yet
+
+            <TouchableOpacity
+              style={[styles.metricCard, styles.sumCard, { backgroundColor: colors.card, borderColor: colors.border, borderTopColor: "#8B5CF6" }]}
+              onPress={() => {
+                setStaffModalDept(null);
+                setStaffModalVisible(true);
+              }}
+              activeOpacity={0.85}
+            >
+              <View style={styles.rowBetween}>
+                <Text style={[styles.sumLabel, { color: colors.mutedForeground }]}>Staff</Text>
+                <Text style={[styles.sumLink, { color: colors.primary }]}>View roster →</Text>
+              </View>
+              <Text style={[styles.sumValue, { color: colors.foreground }]}>{totalHeadcount}</Text>
+              {payroll.length > 0 ? (
+                <View style={styles.chipWrap}>
+                  {payroll.slice(0, 4).map((p) => (
+                    <View key={p.id} style={[styles.personChip, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                      <View style={[styles.personAvatar, { backgroundColor: "#8B5CF61F" }]}>
+                        <Text style={[styles.personAvatarText, { color: "#8B5CF6" }]}>
+                          {p.employeeName ? p.employeeName.trim()[0].toUpperCase() : "E"}
+                        </Text>
+                      </View>
+                      <Text style={[styles.personName, { color: colors.foreground }]}>{p.employeeName}</Text>
+                      <Text style={[styles.personMeta, { color: colors.mutedForeground }]}>· {p.department || "General"}</Text>
+                    </View>
+                  ))}
+                  {payroll.length > 4 && (
+                    <Text style={[styles.personMeta, { color: colors.primary, alignSelf: "center" }]}>+{payroll.length - 4} more</Text>
+                  )}
+                </View>
+              ) : (
+                <Text style={[styles.sumSub, { color: colors.mutedForeground }]}>No employees registered yet</Text>
+              )}
+            </TouchableOpacity>
+
+            <View style={[styles.metricCard, styles.sumCard, { backgroundColor: colors.card, borderColor: colors.border, borderTopColor: colors.primary }]}>
+              <Text style={[styles.sumLabel, { color: colors.mutedForeground }]}>Total budget</Text>
+              <FitText style={[styles.sumValue, { color: colors.foreground }]}>
+                {`${settings.currency} ${Number(totalAllocated || 0).toLocaleString()}`}
+              </FitText>
+              <Text style={[styles.sumSub, { color: colors.mutedForeground }]}>
+                {settings.currency} {Number(totalActualSpend || 0).toLocaleString()} spent from budgets · {usedPct.toFixed(1)}% used
+              </Text>
+              <Text style={[styles.sumSub, { color: colors.mutedForeground }]}>Same total as Dashboard and Budgets</Text>
+            </View>
+          </View>
+        );
+      })()}
+
+      {unregisteredDepts.length > 0 && (
+        <View style={[styles.metricCard, { backgroundColor: colors.warning + "10", borderColor: colors.warning + "55", gap: 8 }]}>
+          <Text style={[styles.dName, { color: colors.foreground, fontSize: 14.5 }]}>
+            {unregisteredDepts.length === 1 ? "1 department is" : `${unregisteredDepts.length} departments are`} not set up yet
+          </Text>
+          <Text style={[styles.sumSub, { color: colors.mutedForeground }]}>
+            Some records (budget lines, expenses or payroll) use these department names, but there's no department card for them — either they were never created, or the card was deleted. Their money is already counted in the totals above. Set them up to see staff, a head and contact details.
+          </Text>
+          <View style={[styles.dTable, { borderColor: colors.border, backgroundColor: colors.card }]}>
+            {unregisteredDepts.map((u, i) => (
+              <View key={u.name} style={[styles.dRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={[styles.dName, { color: colors.foreground, fontSize: 14 }]}>{u.name}</Text>
+                  <Text style={[styles.sumSub, { color: colors.mutedForeground }]}>
+                    Budget lines {settings.currency} {u.budget.toLocaleString()} · spent {settings.currency} {u.spent.toLocaleString()}
+                    {u.staff ? ` · ${u.staff} on payroll` : ""}
+                  </Text>
+                </View>
+                {canEdit ? (
+                  <TouchableOpacity
+                    disabled={!!settingUp}
+                    style={[styles.dBtn, { borderColor: colors.primary, opacity: settingUp ? 0.6 : 1 }]}
+                    onPress={() => setUpDepartments([u])}
+                    accessibilityLabel={`Set up ${u.name} as a department`}
+                  >
+                    <SvgPlus size={14} color={colors.primary} />
+                    <Text style={[styles.dBtnText, { color: colors.primary }]}>{settingUp === u.name ? "Setting up…" : "Set up"}</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            ))}
+          </View>
+          {setupMsg ? (
+            <Text style={[styles.sumSub, { color: setupMsg.ok ? colors.income : colors.expense, fontFamily: "Inter_600SemiBold" }]}>
+              {setupMsg.ok ? "✓ " : "⚠ "}{setupMsg.text}
             </Text>
-          )}
-
-          <Text style={[styles.metricSub, { color: "#0EA5E9", marginTop: 4 }]}>
-            Across all active units • Click to view roster →
-          </Text>
-        </TouchableOpacity>
-
-        <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 200 }]}>
-          <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>TOTAL BUDGETED CEILINGS</Text>
-          <Text style={[styles.metricValue, { color: colors.foreground }]}>
-            {settings.currency} {Number(totalAllocated || 0).toLocaleString()}
-          </Text>
-          <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
-            Disbursed: {settings.currency} {Number(totalActualSpend || 0).toLocaleString()}
-          </Text>
+          ) : null}
+          {canEdit && unregisteredDepts.length > 1 ? (
+            <TouchableOpacity
+              disabled={!!settingUp}
+              style={[styles.dBtn, { borderColor: colors.primary, backgroundColor: colors.primary, alignSelf: "flex-start", opacity: settingUp ? 0.6 : 1 }]}
+              onPress={() => setUpDepartments(unregisteredDepts)}
+            >
+              <SvgPlus size={14} color="#FFFFFF" />
+              <Text style={[styles.dBtnText, { color: "#FFFFFF" }]}>{settingUp === "all" ? "Setting up…" : `Set up all ${unregisteredDepts.length}`}</Text>
+            </TouchableOpacity>
+          ) : null}
+          {!canEdit ? (
+            <Text style={[styles.sumSub, { color: colors.mutedForeground }]}>Ask an admin to set these up.</Text>
+          ) : null}
         </View>
-      </View>
+      )}
 
-      {/* ─── Department Cards Grid ─── */}
+      {/* ─── Department cards ─── */}
       <View style={styles.deptGrid}>
         {deptsWithSpend.length === 0 ? (
           <View style={[styles.emptyWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <SvgFileText size={36} color={colors.mutedForeground} />
-            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No cost centers found</Text>
+            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No departments yet</Text>
             <Text style={[styles.emptySubtitle, { color: colors.mutedForeground }]}>
-              Click "Add Department" to register an organizational division.
+              Click "Add department" to create your first one.
             </Text>
           </View>
         ) : (
           deptsWithSpend.map((dept) => {
-            const pct = Math.min(Math.round(dept.ratio), 100);
-            const statusColor = dept.isOver ? colors.expense : dept.isWarning ? colors.warning : "#0EA5E9";
+            const ratio = Number(dept.ratio || 0);
+            const pct = Math.min(Math.round(ratio), 100);
+            const allocated = Number(dept.budgetAllocated || 0);
+            const spent = Number(dept.actualSpend || 0);
+            const remaining = Number(dept.remainingBudget || 0);
+            const statusColor = allocated <= 0 ? colors.mutedForeground : dept.isOver ? colors.expense : dept.isWarning ? colors.warning : colors.income;
+            const statusText = allocated <= 0 ? "No budget" : dept.isOver ? "Over budget" : dept.isWarning ? "Near limit" : "On track";
+            const initials = dept.name.trim().split(/\s+/).slice(0, 2).map((w: string) => w[0] || "").join("").toUpperCase() || "D";
+            const deptStaff = payroll.filter(
+              (p) => (p.department || "").trim().toLowerCase() === dept.name.trim().toLowerCase()
+            );
+            const rows = [
+              { label: "Budget", value: `${settings.currency} ${allocated.toLocaleString()}`, color: colors.foreground },
+              { label: "Payroll", value: `${settings.currency} ${Number(dept.payrollSpending || 0).toLocaleString()}`, color: colors.foreground },
+              { label: "Other expenses", value: `${settings.currency} ${Number(dept.otherSpending || 0).toLocaleString()}`, color: colors.foreground },
+              { label: remaining < 0 ? "Over by" : "Remaining", value: `${settings.currency} ${Math.abs(remaining).toLocaleString()}`, color: remaining < 0 ? colors.expense : colors.income },
+            ];
 
             return (
               <View
                 key={dept.id}
                 style={[
                   styles.deptCard,
-                  {
-                    backgroundColor: colors.card,
-                    borderColor: dept.isOver ? colors.expense + "60" : colors.border,
-                  },
+                  { backgroundColor: colors.card, borderColor: dept.isOver ? colors.expense + "60" : colors.border },
+                  !isMobile && { maxWidth: 640 },
                 ]}
               >
                 {/* Header */}
-                <View style={styles.deptCardHeader}>
-                  <View style={styles.deptIconBadge}>
-                    <SvgLayers size={18} color="#0EA5E9" />
+                <View style={styles.dHeader}>
+                  <View style={[styles.dAvatar, { backgroundColor: colors.info + "18" }]}>
+                    <Text style={[styles.dAvatarText, { color: colors.info }]}>{initials}</Text>
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.deptName, { color: colors.foreground }]}>
-                      {dept.name}
-                    </Text>
-                    <Text style={[styles.deptHead, { color: colors.mutedForeground }]}>
-                      {dept.headOfDepartment ? `Head: ${dept.headOfDepartment}` : "No Head Appointed"}
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={[styles.dName, { color: colors.foreground }]}>{dept.name}</Text>
+                    <Text style={[styles.dSub, { color: colors.mutedForeground }]}>
+                      {dept.headOfDepartment ? `Head: ${dept.headOfDepartment}` : "No head assigned"} · {dept.code || `DPT-${dept.id.slice(-4).toUpperCase()}`}
                     </Text>
                   </View>
-                  
-                  {/* Interactive Headcount & Staff Roster Badge */}
-                  <TouchableOpacity
-                    style={[
-                      styles.headcountBadge,
-                      {
-                        backgroundColor: "#0EA5E915",
-                        borderColor: "#0EA5E940",
-                      },
-                    ]}
-                    onPress={() => {
-                      setStaffModalDept(dept);
-                      setStaffModalVisible(true);
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <SvgUsers size={13} color="#0EA5E9" />
-                    <Text style={[styles.headcountText, { color: "#0EA5E9" }]}>
-                      {dept.headCount || 0}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Utilization Track */}
-                <View style={styles.deptTrackWrap}>
-                  <View style={styles.deptTrackLabels}>
-                    <Text style={[styles.trackRatio, { color: statusColor }]}>
-                      {(dept.ratio || 0).toFixed(1)}% Budget Spent
-                    </Text>
-                    <Text style={[styles.trackSpend, { color: colors.mutedForeground }]}>
-                      {settings.currency} {Number(dept.actualSpend || 0).toLocaleString()} / {settings.currency} {Number(dept.budgetAllocated || 0).toLocaleString()}
-                    </Text>
-                  </View>
-                  <View style={[styles.deptTrack, { backgroundColor: colors.border }]}>
-                    <View style={[styles.deptFill, { width: `${pct}%`, backgroundColor: statusColor }]} />
+                  <View style={[styles.dStatus, { backgroundColor: statusColor + "14" }]}>
+                    <View style={[styles.dDot, { backgroundColor: statusColor }]} />
+                    <Text style={[styles.dStatusText, { color: statusColor }]}>{statusText}</Text>
                   </View>
                 </View>
 
-                {/* 6-Metric Financial Breakdown Strip */}
-                <View style={[styles.breakdownBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                  <View style={styles.breakdownRow}>
-                    <View style={styles.breakdownItem}>
-                      <Text style={[styles.breakdownLabel, { color: colors.mutedForeground }]}>ALLOCATED</Text>
-                      <Text style={[styles.breakdownVal, { color: colors.foreground }]}>
-                        {settings.currency} {Number(dept.budgetAllocated || 0).toLocaleString()}
-                      </Text>
-                    </View>
-                    <View style={styles.breakdownItem}>
-                      <Text style={[styles.breakdownLabel, { color: "#8B5CF6" }]}>PAYROLL SPEND</Text>
-                      <Text style={[styles.breakdownVal, { color: "#8B5CF6" }]}>
-                        {settings.currency} {Number(dept.payrollSpending || 0).toLocaleString()}
-                      </Text>
-                    </View>
-                    <View style={styles.breakdownItem}>
-                      <Text style={[styles.breakdownLabel, { color: colors.mutedForeground }]}>OTHER EXPENSES</Text>
-                      <Text style={[styles.breakdownVal, { color: colors.mutedForeground }]}>
-                        {settings.currency} {Number(dept.otherSpending || 0).toLocaleString()}
-                      </Text>
-                    </View>
+                {/* Spend vs budget */}
+                <View style={{ gap: 8 }}>
+                  <View style={styles.rowBetween}>
+                    <FitText style={[styles.dSpendText, { color: colors.foreground, flex: 1 }]}>
+                      {allocated > 0
+                        ? `${settings.currency} ${spent.toLocaleString()} spent of ${settings.currency} ${allocated.toLocaleString()}`
+                        : `${settings.currency} ${spent.toLocaleString()} spent · no budget set`}
+                    </FitText>
+                    <Text style={[styles.dPct, { color: statusColor }]}>{allocated > 0 ? `${ratio.toFixed(1)}%` : "—"}</Text>
                   </View>
-                  <View style={[styles.breakdownDivider, { backgroundColor: colors.border }]} />
-                  <View style={styles.breakdownRow}>
-                    <View style={styles.breakdownItem}>
-                      <Text style={[styles.breakdownLabel, { color: colors.mutedForeground }]}>TOTAL SPENT</Text>
-                      <Text style={[styles.breakdownVal, { color: statusColor }]}>
-                        {settings.currency} {Number(dept.actualSpend || 0).toLocaleString()}
-                      </Text>
-                    </View>
-                    <View style={styles.breakdownItem}>
-                      <Text style={[styles.breakdownLabel, { color: colors.mutedForeground }]}>REMAINING</Text>
-                      <Text style={[styles.breakdownVal, { color: (dept.remainingBudget || 0) > 0 ? colors.income : colors.expense }]}>
-                        {settings.currency} {Number(dept.remainingBudget || 0).toLocaleString()}
-                      </Text>
-                    </View>
-                    <View style={styles.breakdownItem}>
-                      <Text style={[styles.breakdownLabel, { color: colors.mutedForeground }]}>UTILIZATION</Text>
-                      <Text style={[styles.breakdownVal, { color: statusColor }]}>
-                        {(dept.ratio || 0).toFixed(1)}%
-                      </Text>
-                    </View>
+                  <View style={[styles.deptTrack, { backgroundColor: colors.muted, height: 8, borderRadius: 4 }]}>
+                    <View style={[styles.deptFill, { width: `${allocated > 0 ? Math.max(pct, spent > 0 ? 2 : 0) : 0}%`, backgroundColor: statusColor, borderRadius: 4 }]} />
                   </View>
                 </View>
 
-                {/* Meta details */}
-                <View style={[styles.metaBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                  <View style={styles.metaItem}>
-                    <Text style={[styles.metaLabel, { color: colors.mutedForeground }]}>CODE</Text>
-                    <Text style={[styles.metaValue, { color: colors.foreground }]}>
-                      {dept.code || `DPT-${dept.id.slice(-4).toUpperCase()}`}
-                    </Text>
-                  </View>
-                  <View style={[styles.metaDivider, { backgroundColor: colors.border }]} />
-                  <View style={styles.metaItem}>
-                    <Text style={[styles.metaLabel, { color: colors.mutedForeground }]}>CONTACT</Text>
-                    <Text style={[styles.metaValue, { color: colors.foreground }]}>
-                      {dept.contactEmail || "N/A"}
-                    </Text>
-                  </View>
+                {/* Figures */}
+                <View style={[styles.dTable, { borderColor: colors.border }]}>
+                  {rows.map((r, i) => (
+                    <View key={r.label} style={[styles.dRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
+                      <Text style={[styles.dRowLabel, { color: colors.mutedForeground }]}>{r.label}</Text>
+                      <FitText style={[styles.dRowValue, { color: r.color }]}>{r.value}</FitText>
+                    </View>
+                  ))}
                 </View>
 
-                {/* Assigned Employees */}
-                {(() => {
-                  const deptStaff = payroll.filter(
-                    (p) => (p.department || "").trim().toLowerCase() === dept.name.trim().toLowerCase()
-                  );
-                  if (deptStaff.length === 0) return null;
-                  return (
-                    <View
-                      style={[
-                        styles.deptEmployeesBox,
-                        { backgroundColor: colors.background, borderColor: colors.border },
-                      ]}
-                    >
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                        }}
-                      >
-                        <Text style={[styles.deptEmployeesLabel, { color: colors.mutedForeground }]}>
-                          ASSIGNED PERSONNEL ({deptStaff.length}):
-                        </Text>
-                        <Text style={{ fontSize: 10, color: "#0EA5E9", fontFamily: "Inter_600SemiBold" }}>
-                          Active
-                        </Text>
-                      </View>
-                      <View style={styles.deptEmployeesList}>
-                        {deptStaff.slice(0, 3).map((emp) => (
-                          <View key={emp.id} style={styles.deptEmpItem}>
-                            <View style={styles.deptEmpDot} />
-                            <Text
-                              style={[styles.deptEmpName, { color: colors.foreground }]}
-                            >
-                              {emp.employeeName}
+                {/* Contact & staff */}
+                <View style={{ gap: 10 }}>
+                  <View style={styles.rowBetween}>
+                    <Text style={[styles.dRowLabel, { color: colors.mutedForeground }]}>Contact</Text>
+                    <Text style={[styles.dContact, { color: dept.contactEmail ? colors.foreground : colors.mutedForeground }]}>
+                      {dept.contactEmail || "Not provided"}
+                    </Text>
+                  </View>
+                  <View style={styles.rowBetween}>
+                    <Text style={[styles.dRowLabel, { color: colors.mutedForeground }]}>
+                      Staff ({deptStaff.length || dept.headCount || 0})
+                    </Text>
+                  </View>
+                  {deptStaff.length > 0 ? (
+                    <View style={styles.chipWrap}>
+                      {deptStaff.slice(0, 6).map((emp) => (
+                        <View key={emp.id} style={[styles.personChip, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                          <View style={[styles.personAvatar, { backgroundColor: colors.info + "18" }]}>
+                            <Text style={[styles.personAvatarText, { color: colors.info }]}>
+                              {emp.employeeName ? emp.employeeName.trim()[0].toUpperCase() : "E"}
                             </Text>
-                            {emp.designation ? (
-                              <Text
-                                style={[styles.deptEmpRole, { color: colors.mutedForeground }]}
-                              >
-                                • {emp.designation}
-                              </Text>
-                            ) : null}
                           </View>
-                        ))}
-                        {deptStaff.length > 3 && (
-                          <Text style={[styles.deptEmpMore, { color: "#0EA5E9" }]}>
-                            +{deptStaff.length - 3} more
-                          </Text>
-                        )}
-                      </View>
+                          <Text style={[styles.personName, { color: colors.foreground }]}>{emp.employeeName}</Text>
+                          {emp.designation ? (
+                            <Text style={[styles.personMeta, { color: colors.mutedForeground }]}>· {emp.designation}</Text>
+                          ) : null}
+                        </View>
+                      ))}
+                      {deptStaff.length > 6 && (
+                        <Text style={[styles.personMeta, { color: colors.primary, alignSelf: "center" }]}>+{deptStaff.length - 6} more</Text>
+                      )}
                     </View>
-                  );
-                })()}
+                  ) : (
+                    <Text style={[styles.sumSub, { color: colors.mutedForeground }]}>No staff assigned yet</Text>
+                  )}
+                </View>
 
                 {/* Actions */}
-                <View style={styles.cardActions}>
+                <View style={[styles.dActions, { borderTopColor: colors.border }]}>
                   <TouchableOpacity
-                    style={[styles.cardActionBtn, { borderColor: "#0EA5E930", backgroundColor: "#0EA5E910" }]}
+                    style={[styles.dBtn, { borderColor: colors.border }]}
                     onPress={() => {
                       setStaffModalDept(dept);
                       setStaffModalVisible(true);
                     }}
                   >
-                    <Text style={[styles.cardActionText, { color: "#0EA5E9" }]}>View Personnel</Text>
+                    <SvgUsers size={14} color={colors.foreground} />
+                    <Text style={[styles.dBtnText, { color: colors.foreground }]}>View staff</Text>
                   </TouchableOpacity>
 
                   {canEdit && (
-                    <>
+                    <View style={{ flexDirection: "row", gap: 8 }}>
                       <TouchableOpacity
-                        style={[styles.cardActionBtn, { borderColor: colors.border }]}
+                        style={[styles.dBtn, { borderColor: colors.border }]}
                         onPress={() => {
                           setEditingDept(dept);
                           setModalVisible(true);
                         }}
                       >
-                        <Text style={[styles.cardActionText, { color: colors.primary }]}>Edit</Text>
+                        <Text style={[styles.dBtnText, { color: colors.primary }]}>Edit</Text>
                       </TouchableOpacity>
-
                       <TouchableOpacity
-                        style={[styles.cardActionBtn, { borderColor: colors.expense + "40", backgroundColor: colors.expense + "10" }]}
+                        style={[styles.dBtn, { borderColor: colors.expense + "40" }]}
                         onPress={() => setDeletingDept(dept)}
                       >
-                        <Text style={[styles.cardActionText, { color: colors.expense }]}>Delete</Text>
+                        <Text style={[styles.dBtnText, { color: colors.expense }]}>Delete</Text>
                       </TouchableOpacity>
-                    </>
+                    </View>
                   )}
                 </View>
               </View>
@@ -517,8 +515,8 @@ const styles = StyleSheet.create({
   },
   pageTitle: {
     fontSize: 22,
-    fontFamily: "Inter_800ExtraBold",
-    letterSpacing: -0.6,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: -0.4,
   },
   pageSubtitle: {
     fontSize: 13,
@@ -552,7 +550,7 @@ const styles = StyleSheet.create({
   metricCard: {
     flex: 1,
     padding: 16,
-    borderRadius: 14,
+    borderRadius: 8,
     borderWidth: 1,
     gap: 4,
   },
@@ -570,19 +568,50 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Inter_400Regular",
   },
+  sumCard: { borderTopWidth: 3, minWidth: 220, gap: 6 },
+  sumLabel: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  sumValue: { fontSize: 24, fontFamily: "Inter_600SemiBold", letterSpacing: -0.4 },
+  sumSub: { fontSize: 12.5, fontFamily: "Inter_400Regular", lineHeight: 18 },
+  sumLink: { fontSize: 12.5, fontFamily: "Inter_600SemiBold" },
+  rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 },
+  chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  personChip: { flexDirection: "row", alignItems: "center", gap: 6, paddingLeft: 4, paddingRight: 10, paddingVertical: 4, borderRadius: 999, borderWidth: 1 },
+  personAvatar: { width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center" },
+  personAvatarText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  personName: { fontSize: 12.5, fontFamily: "Inter_500Medium" },
+  personMeta: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  dHeader: { flexDirection: "row", alignItems: "center", gap: 12 },
+  dAvatar: { width: 42, height: 42, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  dAvatarText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  dName: { fontSize: 16, fontFamily: "Inter_600SemiBold", lineHeight: 22 },
+  dSub: { fontSize: 12.5, fontFamily: "Inter_400Regular", lineHeight: 18, marginTop: 1 },
+  dStatus: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 },
+  dDot: { width: 7, height: 7, borderRadius: 4 },
+  dStatusText: { fontSize: 12.5, fontFamily: "Inter_600SemiBold" },
+  dSpendText: { fontSize: 13.5, fontFamily: "Inter_500Medium" },
+  dPct: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  dTable: { borderWidth: 1, borderRadius: 8, overflow: "hidden" },
+  dRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, paddingHorizontal: 14, paddingVertical: 10 },
+  dRowLabel: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  dRowValue: { fontSize: 14, fontFamily: "Inter_600SemiBold", textAlign: "right", flex: 1 },
+  dContact: { fontSize: 13, fontFamily: "Inter_500Medium", textAlign: "right", flexShrink: 1 },
+  dActions: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, paddingTop: 14, borderTopWidth: 1 },
+  dBtn: { flexDirection: "row", alignItems: "center", gap: 6, height: 34, paddingHorizontal: 14, borderRadius: 6, borderWidth: 1 },
+  dBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   deptGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 16,
   },
   deptCard: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: 360,
     minWidth: 300,
     maxWidth: "100%",
-    borderRadius: 14,
+    borderRadius: 10,
     borderWidth: 1,
-    padding: 18,
-    gap: 14,
+    padding: 20,
+    gap: 16,
   },
   deptCardHeader: {
     flexDirection: "row",
@@ -613,7 +642,7 @@ const styles = StyleSheet.create({
     gap: 5,
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 20,
+    borderRadius: 10,
     borderWidth: 1,
     cursor: "pointer" as any,
   },
@@ -658,7 +687,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   metaLabel: {
-    fontSize: 9,
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.4,
   },
@@ -693,7 +722,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     padding: 40,
-    borderRadius: 14,
+    borderRadius: 8,
     borderWidth: 1,
     gap: 10,
   },
@@ -723,7 +752,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   breakdownLabel: {
-    fontSize: 9,
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.4,
   },
@@ -740,7 +769,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   kpiStaffTitle: {
-    fontSize: 9.5,
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.5,
   },
@@ -768,7 +797,7 @@ const styles = StyleSheet.create({
   },
   kpiEmpAvatarText: {
     color: "#0EA5E9",
-    fontSize: 10,
+    fontSize: 11.5,
     fontFamily: "Inter_700Bold",
   },
   kpiEmpName: {
@@ -784,7 +813,7 @@ const styles = StyleSheet.create({
   },
   kpiDeptBadgeText: {
     color: "#0EA5E9",
-    fontSize: 9.5,
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
   },
   kpiMoreBadge: {
@@ -796,7 +825,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   kpiMoreText: {
-    fontSize: 10,
+    fontSize: 11.5,
     fontFamily: "Inter_600SemiBold",
   },
   deptEmployeesBox: {
@@ -806,7 +835,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   deptEmployeesLabel: {
-    fontSize: 9.5,
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.5,
   },
@@ -832,11 +861,11 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
   },
   deptEmpRole: {
-    fontSize: 10.5,
+    fontSize: 11.5,
     fontFamily: "Inter_400Regular",
   },
   deptEmpMore: {
-    fontSize: 10.5,
+    fontSize: 11.5,
     fontFamily: "Inter_600SemiBold",
   },
 });

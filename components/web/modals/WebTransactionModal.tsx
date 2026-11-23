@@ -220,10 +220,10 @@ export function WebTransactionModal({
               </View>
               <View>
                 <Text style={[styles.title, { color: colors.foreground }]}>
-                  {isEditing ? "Edit General Ledger Entry" : type === "income" ? "Record Revenue Inflow" : "Record Operational Outflow"}
+                  {isEditing ? "Edit transaction" : type === "income" ? "Add income" : "Add expense"}
                 </Text>
                 <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-                  Live synchronized double-entry cloud ledger
+                  {type === "income" ? "Money your organization received" : "Money your organization paid out"} · saved to your ledger instantly
                 </Text>
               </View>
             </View>
@@ -238,7 +238,7 @@ export function WebTransactionModal({
             {/* Type Switcher */}
             {!isEditing && (
               <View style={styles.formGroup}>
-                <Text style={[styles.label, { color: colors.mutedForeground }]}>ENTRY CLASSIFICATION</Text>
+                <Text style={[styles.label, { color: colors.foreground }]}>Type</Text>
                 <View style={[styles.typeSwitcher, { backgroundColor: colors.background, borderColor: colors.border }]}>
                   <TouchableOpacity
                     style={[
@@ -258,7 +258,7 @@ export function WebTransactionModal({
                         { color: type === "income" ? colors.income : colors.mutedForeground },
                       ]}
                     >
-                      Income (Inflow)
+                      Income
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -279,7 +279,7 @@ export function WebTransactionModal({
                         { color: type === "expense" ? colors.expense : colors.mutedForeground },
                       ]}
                     >
-                      Expense (Outflow)
+                      Expense
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -289,7 +289,7 @@ export function WebTransactionModal({
             {/* Amount & Date */}
             <View style={[styles.row, isMobile && { flexDirection: "column" }]}>
               <View style={[styles.formGroup, { flex: 1 }]}>
-                <Text style={[styles.label, { color: colors.mutedForeground }]}>AMOUNT ({settings.currency}) *</Text>
+                <Text style={[styles.label, { color: colors.foreground }]}>Amount ({settings.currency})<Text style={{ color: colors.expense }}> *</Text></Text>
                 <View style={[styles.inputWrap, { backgroundColor: colors.background, borderColor: colors.border }]}>
                   <Text style={[styles.currencyPrefix, { color: colors.mutedForeground }]}>{settings.currency}</Text>
                   <TextInput
@@ -305,11 +305,11 @@ export function WebTransactionModal({
               </View>
 
               <View style={[styles.formGroup, { flex: 1 }]}>
-                <Text style={[styles.label, { color: colors.mutedForeground }]}>TRANSACTION DATE *</Text>
+                <Text style={[styles.label, { color: colors.foreground }]}>Date<Text style={{ color: colors.expense }}> *</Text></Text>
                 <View style={[styles.inputWrap, { backgroundColor: colors.background, borderColor: colors.border }]}>
                   <TextInput
                     style={[styles.input, { color: colors.foreground }]}
-                    placeholder="YYYY-MM-DD"
+                    placeholder="YYYY-MM-DD, e.g. 2026-11-23"
                     placeholderTextColor={colors.mutedForeground + "80"}
                     value={date}
                     onChangeText={setDate}
@@ -320,9 +320,9 @@ export function WebTransactionModal({
 
             {/* Category */}
             <View style={styles.formGroup}>
-              <Text style={[styles.label, { color: colors.mutedForeground }]}>CATEGORY *</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -2 }}>
-                <View style={{ flexDirection: "row", gap: 6, paddingVertical: 4 }}>
+              <Text style={[styles.label, { color: colors.foreground }]}>Category<Text style={{ color: colors.expense }}> *</Text></Text>
+              <View>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, paddingVertical: 4 }}>
                   {categories.map((cat) => (
                     <TouchableOpacity
                       key={cat}
@@ -358,11 +358,11 @@ export function WebTransactionModal({
                     onPress={() => setIsAddingCategory((prev) => !prev)}
                   >
                     <Text style={[styles.chipText, { color: type === "income" ? colors.income : colors.expense, fontWeight: "600" }]}>
-                      + Add Category
+                      + New category
                     </Text>
                   </TouchableOpacity>
                 </View>
-              </ScrollView>
+              </View>
 
               {isAddingCategory && (
                 <View style={{ flexDirection: "row", gap: 8, marginTop: 8, alignItems: "center" }}>
@@ -381,7 +381,7 @@ export function WebTransactionModal({
                         fontSize: 13,
                       },
                     ]}
-                    placeholder="New category name..."
+                    placeholder="New category name"
                     placeholderTextColor={colors.mutedForeground + "80"}
                     value={newCatInput}
                     onChangeText={setNewCatInput}
@@ -427,12 +427,13 @@ export function WebTransactionModal({
             {/* Department (Expenses only) */}
             {type === "expense" && (
               <View style={styles.formGroup}>
-                <Text style={[styles.label, { color: colors.mutedForeground }]}>DEPARTMENT COST CENTER *</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={{ flexDirection: "row", gap: 6, paddingVertical: 4 }}>
+                <Text style={[styles.label, { color: colors.foreground }]}>Department<Text style={{ color: colors.expense }}> *</Text></Text>
+                <Text style={[styles.hint, { color: colors.mutedForeground }]}>Which department is paying for this?</Text>
+                <View>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, paddingVertical: 4 }}>
                     {departments.length === 0 ? (
                       <Text style={{ color: colors.mutedForeground, fontSize: 13, fontStyle: "italic", paddingVertical: 4 }}>
-                        No departments created yet. Please register a department first.
+                        No departments yet. Create one on the Departments page first.
                       </Text>
                     ) : (
                       departments.map((d) => d.name).map((dept) => (
@@ -459,7 +460,7 @@ export function WebTransactionModal({
                       ))
                     )}
                   </View>
-                </ScrollView>
+                </View>
               </View>
             )}
 
@@ -484,7 +485,7 @@ export function WebTransactionModal({
                   <View>
                     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                       <Text style={{ fontSize: 11, fontWeight: "700", color: colors.mutedForeground, letterSpacing: 0.5 }}>
-                        DEPARTMENT BUDGET HEALTH
+                        {department ? `${department} budget` : "Department budget"}
                       </Text>
                       <Text
                         style={{
@@ -494,25 +495,25 @@ export function WebTransactionModal({
                         }}
                       >
                         {selectedDeptMetric.isExhausted
-                          ? "Budget Depleted"
-                          : `${((selectedDeptMetric.spent / selectedDeptMetric.allocated) * 100).toFixed(0)}% Utilized`}
+                          ? "Fully used"
+                          : `${((selectedDeptMetric.spent / selectedDeptMetric.allocated) * 100).toFixed(0)}% used`}
                       </Text>
                     </View>
                     <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
                       <View>
-                        <Text style={{ fontSize: 10, color: colors.mutedForeground }}>Allocated</Text>
+                        <Text style={{ fontSize: 11.5, color: colors.mutedForeground }}>Allocated</Text>
                         <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>
                           {settings.currency} {selectedDeptMetric.allocated.toLocaleString()}
                         </Text>
                       </View>
                       <View>
-                        <Text style={{ fontSize: 10, color: colors.mutedForeground }}>Spent</Text>
+                        <Text style={{ fontSize: 11.5, color: colors.mutedForeground }}>Spent</Text>
                         <Text style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}>
                           {settings.currency} {selectedDeptMetric.spent.toLocaleString()}
                         </Text>
                       </View>
                       <View>
-                        <Text style={{ fontSize: 10, color: colors.mutedForeground }}>Remaining Budget</Text>
+                        <Text style={{ fontSize: 11.5, color: colors.mutedForeground }}>Left</Text>
                         <Text
                           style={{
                             fontSize: 13,
@@ -529,7 +530,7 @@ export function WebTransactionModal({
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                     <Text style={{ fontSize: 16 }}>⚠️</Text>
                     <Text style={{ fontSize: 12, color: colors.expense, fontWeight: "600", flex: 1 }}>
-                      No budget has been allocated to this department. Allocate a department budget before recording an expense.
+                      This department has no budget yet. Give it a budget on the Budgets page before adding expenses.
                     </Text>
                   </View>
                 )}
@@ -540,9 +541,9 @@ export function WebTransactionModal({
             {type === "expense" && budgets && budgets.length > 0 && (
               <View style={styles.formGroup}>
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                  <Text style={[styles.label, { color: colors.mutedForeground, marginBottom: 0 }]}>LINKED BUDGET (OPTIONAL)</Text>
+                  <Text style={[styles.label, { color: colors.foreground, marginBottom: 0 }]}>Charge to a budget <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular" }}>(optional)</Text></Text>
                   <Text style={{ fontSize: 11, color: selectedBudgetId ? colors.expense : colors.mutedForeground }}>
-                    {selectedBudgetId ? "Linked to Budget Ceiling" : "Unbudgeted (Discretionary)"}
+                    {selectedBudgetId ? "Counts against the selected budget" : "Not linked to a budget"}
                   </Text>
                 </View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -563,7 +564,7 @@ export function WebTransactionModal({
                           { color: !selectedBudgetId ? "#FFFFFF" : colors.foreground },
                         ]}
                       >
-                        None (Unbudgeted Expense)
+                        No budget
                       </Text>
                     </TouchableOpacity>
                     {budgets.map((b) => {
@@ -590,7 +591,7 @@ export function WebTransactionModal({
                               { color: isSelected ? "#FFFFFF" : colors.foreground },
                             ]}
                           >
-                            [{b.department || "General"}] {b.category || "All"} ({settings.currency} {Number(b.allocated || 0).toLocaleString()})
+                            {b.department || "General"} · {b.category || "All categories"} · {settings.currency} {Number(b.allocated || 0).toLocaleString()}
                           </Text>
                         </TouchableOpacity>
                       );
@@ -602,7 +603,7 @@ export function WebTransactionModal({
 
             {/* Reference Number */}
             <View style={styles.formGroup}>
-              <Text style={[styles.label, { color: colors.mutedForeground }]}>REFERENCE / INVOICE #</Text>
+              <Text style={[styles.label, { color: colors.foreground }]}>Reference / invoice no.</Text>
               <View style={[styles.inputWrap, { backgroundColor: colors.background, borderColor: colors.border }]}>
                 <TextInput
                   style={[styles.input, { color: colors.foreground }]}
@@ -612,15 +613,16 @@ export function WebTransactionModal({
                   onChangeText={setReferenceNumber}
                 />
               </View>
+              <Text style={[styles.hint, { color: colors.mutedForeground }]}>Filled in for you — replace it with your invoice or receipt number if you have one.</Text>
             </View>
 
             {/* Description */}
             <View style={styles.formGroup}>
-              <Text style={[styles.label, { color: colors.mutedForeground }]}>MEMO / DESCRIPTION</Text>
+              <Text style={[styles.label, { color: colors.foreground }]}>Description <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular" }}>(optional)</Text></Text>
               <View style={[styles.textAreaWrap, { backgroundColor: colors.background, borderColor: colors.border }]}>
                 <TextInput
                   style={[styles.textArea, { color: colors.foreground }]}
-                  placeholder="Add institutional memo, grant details, or vendor notes..."
+                  placeholder={type === "income" ? "e.g. HEC research grant, first instalment" : "e.g. Office supplies from ABC Traders"}
                   placeholderTextColor={colors.mutedForeground + "80"}
                   value={description}
                   onChangeText={setDescription}
@@ -640,6 +642,11 @@ export function WebTransactionModal({
 
           {/* Footer Actions */}
           <View style={[styles.footer, { borderTopColor: colors.border }]}>
+            <Text style={[styles.footerSummary, { color: colors.mutedForeground }]} numberOfLines={2}>
+              {Number(amount) > 0
+                ? `${type === "income" ? "+" : "-"}${settings.currency} ${Number(amount).toLocaleString()} · ${category || "No category"}${type === "expense" && department ? ` · ${department}` : ""} · ${date}`
+                : "Enter an amount to continue"}
+            </Text>
             <TouchableOpacity style={[styles.cancelBtn, { borderColor: colors.border }]} onPress={onClose} disabled={submitting}>
               <Text style={[styles.cancelBtnText, { color: colors.foreground }]}>Cancel</Text>
             </TouchableOpacity>
@@ -657,7 +664,7 @@ export function WebTransactionModal({
             >
               <SvgPlus size={15} color="#FFFFFF" />
               <Text style={styles.submitBtnText}>
-                {submitting ? "Saving..." : isEditing ? "Update Transaction" : type === "income" ? "Record Inflow" : "Record Outflow"}
+                {submitting ? "Saving…" : isEditing ? "Save changes" : type === "income" ? "Save income" : "Save expense"}
               </Text>
             </TouchableOpacity>
           </View>
@@ -668,6 +675,8 @@ export function WebTransactionModal({
 }
 
 const styles = StyleSheet.create({
+  hint: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 17 },
+  footerSummary: { flex: 1, fontSize: 12.5, fontFamily: "Inter_500Medium", marginRight: 6 },
   backdrop: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.65)",
@@ -677,9 +686,9 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     width: "100%",
-    maxWidth: 580,
+    maxWidth: 640,
     maxHeight: "90%",
-    borderRadius: 20,
+    borderRadius: 10,
     borderWidth: 1,
     overflow: "hidden",
     display: "flex",
@@ -701,11 +710,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   title: {
-    fontSize: 16,
-    fontFamily: "Inter_700Bold",
+    fontSize: 17,
+    fontFamily: "Inter_600SemiBold",
   },
   subtitle: {
-    fontSize: 11.5,
+    fontSize: 13,
     fontFamily: "Inter_400Regular",
     marginTop: 2,
   },
@@ -730,9 +739,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   label: {
-    fontSize: 10.5,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: 0.5,
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
   },
   typeSwitcher: {
     flexDirection: "row",
@@ -753,7 +761,7 @@ const styles = StyleSheet.create({
     borderColor: "transparent",
   },
   typeBtnText: {
-    fontSize: 12.5,
+    fontSize: 13.5,
     fontFamily: "Inter_600SemiBold",
   },
   inputWrap: {
@@ -788,13 +796,14 @@ const styles = StyleSheet.create({
   },
   chip: {
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+    height: 32,
+    justifyContent: "center",
+    borderRadius: 6,
     borderWidth: 1,
   },
   chipText: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
   },
   errorBanner: {
     flexDirection: "row",
@@ -838,7 +847,7 @@ const styles = StyleSheet.create({
   },
   submitBtnText: {
     color: "#FFFFFF",
-    fontSize: 13,
-    fontFamily: "Inter_700Bold",
+    fontSize: 13.5,
+    fontFamily: "Inter_600SemiBold",
   },
 });

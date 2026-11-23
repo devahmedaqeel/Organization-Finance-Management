@@ -281,7 +281,7 @@ export function WebSalaryComponents() {
                       : "Employer Cost"}
                   </Text>
                   {item.isStatutory && (
-                    <Text style={{ fontSize: 10, color: "#64748B", marginTop: 2 }}>Statutory Required</Text>
+                    <Text style={{ fontSize: 11.5, color: "#64748B", marginTop: 2 }}>Statutory Required</Text>
                   )}
                 </View>
 
@@ -290,9 +290,9 @@ export function WebSalaryComponents() {
                     {item.calculationType.replace(/_/g, " ")}
                   </Text>
                   {item.isTaxable ? (
-                    <Text style={{ fontSize: 10, color: "#10B981" }}>Taxable</Text>
+                    <Text style={{ fontSize: 11.5, color: "#10B981" }}>Taxable</Text>
                   ) : (
-                    <Text style={{ fontSize: 10, color: colors.mutedForeground }}>Tax-Exempt</Text>
+                    <Text style={{ fontSize: 11.5, color: colors.mutedForeground }}>Tax-Exempt</Text>
                   )}
                 </View>
 
@@ -315,7 +315,7 @@ export function WebSalaryComponents() {
                   >
                     <Text
                       style={{
-                        fontSize: 10.5,
+                        fontSize: 11.5,
                         fontWeight: "700",
                         color: item.isActive ? "#10B981" : "#64748B",
                       }}
@@ -589,7 +589,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   th: {
-    fontSize: 10.5,
+    fontSize: 11.5,
     fontWeight: "700",
     letterSpacing: 0.4,
   },
@@ -615,7 +615,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   codeBadgeText: {
-    fontSize: 9.5,
+    fontSize: 11,
     fontWeight: "800",
     color: "#8B5CF6",
   },
@@ -656,7 +656,7 @@ const styles = StyleSheet.create({
   modalContent: {
     width: "100%",
     maxWidth: 580,
-    borderRadius: 14,
+    borderRadius: 8,
     borderWidth: 1,
     padding: 22,
     gap: 16,
@@ -682,7 +682,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   label: {
-    fontSize: 10,
+    fontSize: 11.5,
     fontWeight: "700",
     letterSpacing: 0.4,
     marginBottom: 5,

@@ -16,12 +16,13 @@ export default function RootHtml({ children }: PropsWithChildren) {
           name="description"
           content="OFM — Organization Finance Management. Enterprise Cloud Ledger, Budget Allocations, Payroll Administration, and Real-time Auditing."
         />
-        <meta name="theme-color" content="#060D1F" />
+        <meta name="theme-color" content="#1F2125" />
         <link rel="manifest" href="/manifest.json" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=6" />
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon.png?v=5" />
         <link rel="icon" type="image/png" sizes="192x192" href="/icon.png?v=5" />
         <link rel="apple-touch-icon" sizes="180x180" href="/icon.png?v=5" />
-        <link rel="shortcut icon" href="/favicon.ico?v=5" />
+        <link rel="shortcut icon" href="/favicon.svg?v=6" />
         
         {/* Preconnect and Asynchronously Load Google Inter Font (Non-blocking) */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />

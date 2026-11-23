@@ -229,7 +229,7 @@ export function WebDepartmentModal({ visible, onClose, deptToEdit }: WebDepartme
                     {settings.currency} {maxAvailableForDept.toLocaleString()}
                   </Text>
                 </View>
-                <Text style={{ fontSize: 10, color: colors.mutedForeground }}>
+                <Text style={{ fontSize: 11.5, color: colors.mutedForeground }}>
                   Total Net Cash: {settings.currency} {netCash.toLocaleString()} · Other Units: {settings.currency} {Math.max(0, netCash - maxAvailableForDept).toLocaleString()}
                 </Text>
               </View>
@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 580,
     maxHeight: "90%",
-    borderRadius: 20,
+    borderRadius: 10,
     borderWidth: 1,
     overflow: "hidden",
     display: "flex",
@@ -366,7 +366,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   label: {
-    fontSize: 10.5,
+    fontSize: 11.5,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.5,
   },

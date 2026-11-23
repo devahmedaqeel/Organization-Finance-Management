@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import * as Haptics from "expo-haptics";
+import { FitText } from "@/components/web/FitText";
 import {
   NetOperatingBalanceHealth,
   NormalizedPeriod,
@@ -207,12 +208,12 @@ export function FinancialDrillDownModal({
 
   const modalTitle =
     type === "budget"
-      ? "Budget Utilization & Burn-Rate Audit"
+      ? "Budget details"
       : type === "nob"
-      ? "Net Operating Balance Health Breakdown"
-      : "Expense Distribution & Disbursement Ledger";
+      ? "Net operating balance"
+      : "Spending details";
 
-  const modalSubtitle = `Authoritative data for ${period.label} (${period.startDate} to ${period.endDate})`;
+  const modalSubtitle = `${period.label} · ${period.startDate} to ${period.endDate}`;
 
   return (
     <Modal
@@ -267,10 +268,10 @@ export function FinancialDrillDownModal({
               contentContainerStyle={styles.tabBarScroll}
             >
               {[
-                { id: "overview", label: "Executive KPI" },
-                { id: "breakdown", label: type === "budget" ? "Department Ceilings" : "Category Ledger" },
-                { id: "trend", label: "Monthly Timeline" },
-                { id: "ledger", label: "Transaction Audit" },
+                { id: "overview", label: "Overview" },
+                { id: "breakdown", label: type === "budget" ? "By department" : "By category" },
+                { id: "trend", label: "Monthly trend" },
+                { id: "ledger", label: "Transactions" },
               ].map((tab) => {
                 const isSelected = activeTab === tab.id;
                 return (
@@ -320,7 +321,7 @@ export function FinancialDrillDownModal({
                   activeOpacity={0.7}
                 >
                   <Text style={[styles.drillDeptPillText, { color: !isDeptFilter ? "#FFFFFF" : colors.foreground }]}>
-                    All Units
+                    All departments
                   </Text>
                 </TouchableOpacity>
                 {allAvailableDepts.map((dName) => {
@@ -378,7 +379,7 @@ export function FinancialDrillDownModal({
                   ]}
                 >
                   <Text style={[styles.insightTitle, { color: colors.foreground }]}>
-                    {type === "budget" && isDeptFilter ? `Financial Insight (${selectedDepartment})` : "Financial Insight"}
+                    {type === "budget" && isDeptFilter ? `Summary · ${selectedDepartment}` : "Summary"}
                   </Text>
                   <Text style={[styles.insightText, { color: colors.mutedForeground }]}>
                     {type === "budget"
@@ -395,31 +396,31 @@ export function FinancialDrillDownModal({
                     <>
                       <View style={[styles.kpiCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border }]}>
                         <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>
-                          {isDeptFilter ? `${selectedDepartment.toUpperCase()} ALLOCATED` : "ALLOCATED BUDGET"}
+                          {isDeptFilter ? `${selectedDepartment} budget` : "Budget"}
                         </Text>
-                        <Text style={[styles.kpiVal, { color: activeAllocated > 0 ? colors.foreground : colors.mutedForeground }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>
-                          {activeAllocated > 0 ? `${currency} ${fmt(activeAllocated)}` : "No Cap Set"}
-                        </Text>
+                        <FitText style={[styles.kpiVal, { color: activeAllocated > 0 ? colors.foreground : colors.mutedForeground }]}>
+                          {activeAllocated > 0 ? `${currency} ${fmt(activeAllocated)}` : "Not set"}
+                        </FitText>
                       </View>
                       <View style={[styles.kpiCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border }]}>
                         <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>
-                          {isDeptFilter ? `${selectedDepartment.toUpperCase()} SPENT` : "ACTUAL SPENT"}
+                          {isDeptFilter ? `${selectedDepartment} spent` : "Spent"}
                         </Text>
-                        <Text style={[styles.kpiVal, { color: colors.expense }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>{currency} {fmt(activeDeptSpent)}</Text>
+                        <FitText style={[styles.kpiVal, { color: colors.expense }]}>{currency} {fmt(activeDeptSpent)}</FitText>
                       </View>
                       <View style={[styles.kpiCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border }]}>
                         <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>
-                          {activeIsOverBudget ? "OVER BUDGET" : "REMAINING CAP"}
+                          {activeIsOverBudget ? "Over budget by" : "Left to spend"}
                         </Text>
-                        <Text style={[styles.kpiVal, { color: activeIsOverBudget ? colors.expense : colors.income }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                        <FitText style={[styles.kpiVal, { color: activeIsOverBudget ? colors.expense : colors.income }]}>
                           {activeAllocated > 0 ? `${activeIsOverBudget ? "+" : ""}${currency} ${fmt(Math.abs(activeRemainingBudget))}` : "—"}
-                        </Text>
+                        </FitText>
                       </View>
                       <View style={[styles.kpiCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border }]}>
-                        <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>USAGE RATIO</Text>
-                        <Text style={[styles.kpiVal, { color: activeIsOverBudget ? colors.expense : colors.income }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                        <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>Budget used</Text>
+                        <FitText style={[styles.kpiVal, { color: activeIsOverBudget ? colors.expense : colors.income }]}>
                           {activeAllocated > 0 ? `${activeBudgetRatio.toFixed(1)}%` : "0%"}
-                        </Text>
+                        </FitText>
                       </View>
                     </>
                   )}
@@ -427,24 +428,24 @@ export function FinancialDrillDownModal({
                   {type === "nob" && (
                     <>
                       <View style={[styles.kpiCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border }]}>
-                        <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>OPERATING INFLOW</Text>
-                        <Text style={[styles.kpiVal, { color: colors.income }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>+{currency} {fmt(totalIncome)}</Text>
+                        <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>Income</Text>
+                        <FitText style={[styles.kpiVal, { color: colors.income }]}>+{currency} {fmt(totalIncome)}</FitText>
                       </View>
                       <View style={[styles.kpiCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border }]}>
-                        <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>OPERATING OUTFLOW</Text>
-                        <Text style={[styles.kpiVal, { color: colors.expense }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>-{currency} {fmt(totalSpent)}</Text>
+                        <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>Expenses</Text>
+                        <FitText style={[styles.kpiVal, { color: colors.expense }]}>-{currency} {fmt(totalSpent)}</FitText>
                       </View>
                       <View style={[styles.kpiCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border }]}>
-                        <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>NET OPERATING BALANCE</Text>
-                        <Text style={[styles.kpiVal, { color: isDeficit ? colors.expense : colors.income }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                        <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>Net balance</Text>
+                        <FitText style={[styles.kpiVal, { color: isDeficit ? colors.expense : colors.income }]}>
                           {isDeficit ? "-" : "+"}{currency} {fmt(Math.abs(netOperatingBalance))}
-                        </Text>
+                        </FitText>
                       </View>
                       <View style={[styles.kpiCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border }]}>
-                        <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>OPERATING MARGIN</Text>
-                        <Text style={[styles.kpiVal, { color: nobStatusColor }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                        <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>Operating margin</Text>
+                        <FitText style={[styles.kpiVal, { color: nobStatusColor }]}>
                           {isDeficit ? `-${Math.abs(operatingMargin).toFixed(1)}%` : `${operatingMargin.toFixed(1)}%`}
-                        </Text>
+                        </FitText>
                       </View>
                     </>
                   )}
@@ -452,22 +453,22 @@ export function FinancialDrillDownModal({
                   {type === "expense" && (
                     <>
                       <View style={[styles.kpiCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border }]}>
-                        <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>TOTAL DISBURSED</Text>
-                        <Text style={[styles.kpiVal, { color: colors.expense }]}>{currency} {fmt(totalSpent)}</Text>
+                        <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>Total spent</Text>
+                        <FitText style={[styles.kpiVal, { color: colors.expense }]}>{currency} {fmt(totalSpent)}</FitText>
                       </View>
                       <View style={[styles.kpiCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border }]}>
-                        <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>ACTIVE CATEGORIES</Text>
-                        <Text style={[styles.kpiVal, { color: colors.foreground }]}>{expenseBreakdown.length}</Text>
+                        <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>Categories</Text>
+                        <FitText style={[styles.kpiVal, { color: colors.foreground }]}>{expenseBreakdown.length}</FitText>
                       </View>
                       <View style={[styles.kpiCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border }]}>
-                        <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>TRANSACTION COUNT</Text>
-                        <Text style={[styles.kpiVal, { color: colors.foreground }]}>{expenseCount} Records</Text>
+                        <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>Transactions</Text>
+                        <FitText style={[styles.kpiVal, { color: colors.foreground }]}>{expenseCount}</FitText>
                       </View>
                       <View style={[styles.kpiCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "30", borderColor: colors.border }]}>
-                        <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>TOP COST DRIVER</Text>
-                        <Text style={[styles.kpiVal, { color: colors.primary }]}>
+                        <Text style={[styles.kpiLabel, { color: colors.mutedForeground }]}>Biggest category</Text>
+                        <FitText style={[styles.kpiVal, { color: colors.primary }]}>
                           {expenseBreakdown[0]?.category || "None"}
-                        </Text>
+                        </FitText>
                       </View>
                     </>
                   )}
@@ -476,25 +477,29 @@ export function FinancialDrillDownModal({
                 {/* Arithmetic Equation Box for NOB */}
                 {type === "nob" && (
                   <View style={[styles.equationCard, { backgroundColor: (colors.cardAlt ?? colors.muted) + "20", borderColor: colors.border }]}>
-                    <Text style={[styles.equationTitle, { color: colors.foreground }]}>Mathematical Balance Equation</Text>
+                    <Text style={[styles.equationTitle, { color: colors.foreground }]}>How it's calculated</Text>
                     <View style={styles.equationRow}>
                       <View style={styles.equationCol}>
-                        <Text style={[styles.eqLabel, { color: colors.mutedForeground }]}>Total Operating Inflows</Text>
-                        <Text style={[styles.eqVal, { color: colors.income }]}>+{currency} {fmt(totalIncome)}</Text>
+                        <Text style={[styles.eqLabel, { color: colors.mutedForeground }]}>Total income</Text>
+                        <Text style={[styles.eqVal, { color: colors.income }]}>{currency} {fmt(totalIncome)}</Text>
                       </View>
                       <Text style={[styles.eqOp, { color: colors.mutedForeground }]}>−</Text>
                       <View style={styles.equationCol}>
-                        <Text style={[styles.eqLabel, { color: colors.mutedForeground }]}>Operating Outflows</Text>
-                        <Text style={[styles.eqVal, { color: colors.expense }]}>-{currency} {fmt(totalSpent)}</Text>
+                        <Text style={[styles.eqLabel, { color: colors.mutedForeground }]}>Total expenses</Text>
+                        <Text style={[styles.eqVal, { color: colors.expense }]}>{currency} {fmt(totalSpent)}</Text>
                       </View>
                       <Text style={[styles.eqOp, { color: colors.mutedForeground }]}>=</Text>
                       <View style={styles.equationCol}>
-                        <Text style={[styles.eqLabel, { color: colors.mutedForeground }]}>Net Operating Balance</Text>
+                        <Text style={[styles.eqLabel, { color: colors.mutedForeground }]}>Net balance</Text>
                         <Text style={[styles.eqVal, { color: isDeficit ? colors.expense : colors.income }]}>
                           {isDeficit ? "-" : "+"}{currency} {fmt(Math.abs(netOperatingBalance))}
                         </Text>
                       </View>
                     </View>
+                    <Text style={[styles.eqNote, { color: colors.mutedForeground }]}>
+                      Operating margin = net balance ÷ total income = {totalIncome > 0 ? `${operatingMargin.toFixed(1)}%` : "—"}
+                      {totalIncome > 0 ? (isDeficit ? " — you spent more than you earned." : ` — you kept ${operatingMargin.toFixed(1)}% of your income.`) : ""}
+                    </Text>
                   </View>
                 )}
               </View>
@@ -649,10 +654,10 @@ export function FinancialDrillDownModal({
                 ) : (
                   <View style={[styles.tableWrap, { borderColor: colors.border }]}>
                     <View style={[styles.tableHeader, { backgroundColor: (colors.cardAlt ?? colors.muted) + "60", borderBottomColor: colors.border }]}>
-                      <Text style={[styles.th, { color: colors.mutedForeground, flex: 1 }]}>MONTH</Text>
-                      <Text style={[styles.th, { color: colors.mutedForeground, flex: 1, textAlign: "right" }]}>INFLOW</Text>
-                      <Text style={[styles.th, { color: colors.mutedForeground, flex: 1, textAlign: "right" }]}>OUTFLOW</Text>
-                      <Text style={[styles.th, { color: colors.mutedForeground, flex: 1, textAlign: "right" }]}>NET BALANCE</Text>
+                      <Text style={[styles.th, { color: colors.mutedForeground, flex: 1 }]}>Month</Text>
+                      <Text style={[styles.th, { color: colors.mutedForeground, flex: 1, textAlign: "right" }]}>Income</Text>
+                      <Text style={[styles.th, { color: colors.mutedForeground, flex: 1, textAlign: "right" }]}>Expenses</Text>
+                      <Text style={[styles.th, { color: colors.mutedForeground, flex: 1, textAlign: "right" }]}>Net</Text>
                     </View>
                     {monthlyTrend.map((m) => (
                       <View key={m.month} style={[styles.tableRow, { borderBottomColor: colors.border }]}>
@@ -738,7 +743,7 @@ export function FinancialDrillDownModal({
               activeOpacity={0.8}
             >
               <Text style={styles.footerBtnText}>
-                {type === "budget" ? "Go to Budget Manager →" : type === "nob" ? "Go to Full Reports →" : "View All Outflow Ledgers →"}
+                {type === "budget" ? "Open Budgets →" : type === "nob" ? "Open Reports →" : "Open Expenses →"}
               </Text>
             </TouchableOpacity>
           </View>
@@ -749,6 +754,7 @@ export function FinancialDrillDownModal({
 }
 
 const styles = StyleSheet.create({
+  eqNote: { fontSize: 12.5, fontFamily: "Inter_400Regular", lineHeight: 18, marginTop: 10, textAlign: "center" },
   overlay: {
     flex: 1,
     alignItems: "center",
@@ -773,11 +779,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   title: {
-    fontSize: 16,
-    fontFamily: "Inter_700Bold",
+    fontSize: 17,
+    fontFamily: "Inter_600SemiBold",
   },
   subtitle: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: "Inter_400Regular",
     marginTop: 2,
   },
@@ -806,7 +812,7 @@ const styles = StyleSheet.create({
   },
   tabItemActive: {},
   tabItemText: {
-    fontSize: 12,
+    fontSize: 13.5,
   },
   scrollBody: {
     padding: 20,
@@ -818,13 +824,13 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   insightTitle: {
-    fontSize: 12,
-    fontFamily: "Inter_700Bold",
+    fontSize: 13.5,
+    fontFamily: "Inter_600SemiBold",
   },
   insightText: {
-    fontSize: 12,
-    fontFamily: "Inter_500Medium",
-    lineHeight: 18,
+    fontSize: 13.5,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 20,
   },
   kpiGrid: {
     flexDirection: "row",
@@ -833,19 +839,18 @@ const styles = StyleSheet.create({
   },
   kpiCard: {
     flex: 1,
-    minWidth: 140,
-    padding: 12,
-    borderRadius: 12,
+    minWidth: 150,
+    padding: 14,
+    borderRadius: 8,
     borderWidth: 1,
   },
   kpiLabel: {
-    fontSize: 10,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: 0.1,
+    fontSize: 12.5,
+    fontFamily: "Inter_500Medium",
   },
   kpiVal: {
-    fontSize: 15,
-    fontFamily: "Inter_800ExtraBold",
+    fontSize: 18,
+    fontFamily: "Inter_600SemiBold",
     marginTop: 4,
   },
   equationCard: {
@@ -855,35 +860,39 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   equationTitle: {
-    fontSize: 12,
-    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
   },
   equationRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     flexWrap: "wrap",
-    gap: 6,
+    gap: 10,
   },
   equationCol: {
     alignItems: "center",
+    flex: 1,
+    minWidth: 120,
   },
   eqLabel: {
-    fontSize: 10,
+    fontSize: 12.5,
     fontFamily: "Inter_500Medium",
+    textAlign: "center",
   },
   eqVal: {
-    fontSize: 13,
-    fontFamily: "Inter_800ExtraBold",
-    marginTop: 2,
+    fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
+    marginTop: 3,
+    textAlign: "center",
   },
   eqOp: {
     fontSize: 18,
     fontFamily: "Inter_700Bold",
   },
   sectionHeading: {
-    fontSize: 13,
-    fontFamily: "Inter_700Bold",
+    fontSize: 14.5,
+    fontFamily: "Inter_600SemiBold",
   },
   breakdownRow: {
     padding: 10,

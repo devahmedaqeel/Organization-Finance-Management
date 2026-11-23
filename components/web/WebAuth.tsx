@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { BrandMark } from "./BrandMark";
 import {
   StyleSheet,
   Text,
@@ -299,17 +300,13 @@ export function WebAuth() {
           {/* Header Brand */}
           <View style={styles.brandRow}>
             <View style={[styles.logoWrap, { backgroundColor: "transparent", borderWidth: 0, padding: 0 }]}>
-              <Image
-                source={require("@/assets/images/icon.png")}
-                style={{ width: 44, height: 44, borderRadius: 10 }}
-                resizeMode="cover"
-              />
+              <BrandMark size={44} />
             </View>
             <View style={{ flex: 1 }}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                 <Text style={[styles.brandTitle, { color: colors.foreground }]}>OFM</Text>
                 <View style={[styles.cloudBadge, { backgroundColor: colors.primary + "18" }]}>
-                  <Text style={[styles.cloudBadgeText, { color: colors.primary }]}>ENTERPRISE CLOUD</Text>
+                  <Text style={[styles.cloudBadgeText, { color: colors.primary }]}>Cloud</Text>
                 </View>
               </View>
               <Text style={[styles.brandSubtitle, { color: colors.mutedForeground }]}>
@@ -633,7 +630,7 @@ const styles = StyleSheet.create({
   heroTitleAccent: { color: "#7DD3FC" },
   heroSubtitle: { color: "rgba(203, 213, 225, 0.82)", fontSize: 15.5, lineHeight: 24, fontFamily: "Inter_400Regular", maxWidth: 500 },
   featureList: { gap: 10 },
-  featureRow: { flexDirection: "row", alignItems: "center", gap: 14, padding: 14, borderRadius: 16, borderWidth: 1, backgroundColor: "rgba(255, 255, 255, 0.05)" },
+  featureRow: { flexDirection: "row", alignItems: "center", gap: 14, padding: 14, borderRadius: 10, borderWidth: 1, backgroundColor: "rgba(255, 255, 255, 0.05)" },
   featureIcon: { width: 36, height: 36, borderRadius: 11, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   featureTitle: { color: "#F8FAFC", fontSize: 13.5, fontFamily: "Inter_700Bold" },
   featureDesc: { color: "rgba(203, 213, 225, 0.75)", fontSize: 12, lineHeight: 17, marginTop: 1 },
@@ -641,23 +638,23 @@ const styles = StyleSheet.create({
   cardFooter: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: -2 },
   cardFooterText: { fontSize: 11, fontFamily: "Inter_500Medium", letterSpacing: 0.2 },
   brandRow: { flexDirection: "row", alignItems: "center", gap: 14 },
-  logoWrap: { width: 48, height: 48, borderRadius: 14, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  logoWrap: { width: 48, height: 48, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   brandTitle: { fontSize: 22, fontFamily: "Inter_800ExtraBold", letterSpacing: 0.2 },
   cloudBadge: { paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 6 },
-  cloudBadgeText: { fontSize: 9, fontFamily: "Inter_800ExtraBold", letterSpacing: 0.7 },
+  cloudBadgeText: { fontSize: 11, fontFamily: "Inter_800ExtraBold", letterSpacing: 0.7 },
   brandSubtitle: { fontSize: 12.5, fontFamily: "Inter_500Medium", marginTop: 2 },
-  modeTabs: { flexDirection: "row", padding: 4, borderRadius: 14, borderWidth: 1, gap: 4 },
+  modeTabs: { flexDirection: "row", padding: 4, borderRadius: 8, borderWidth: 1, gap: 4 },
   modeTabBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 10, borderRadius: 10 },
   modeTabBtnActive: {},
   modeTabText: { fontSize: 13, fontFamily: "Inter_700Bold" },
   alertBanner: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: 12, borderWidth: 1 },
   alertText: { fontSize: 12.5, fontFamily: "Inter_500Medium", flex: 1 },
-  fieldLabel: { fontSize: 10.5, fontFamily: "Inter_700Bold", letterSpacing: 0.6 },
+  fieldLabel: { fontSize: 11.5, fontFamily: "Inter_700Bold", letterSpacing: 0.6 },
   roleGrid: { gap: 8 },
-  roleCard: { padding: 12, borderRadius: 14, borderWidth: 1.2, gap: 4 },
+  roleCard: { padding: 12, borderRadius: 8, borderWidth: 1.2, gap: 4 },
   roleCardTitle: { fontSize: 13.5, fontFamily: "Inter_700Bold" },
   roleBadge: { paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 6 },
-  roleBadgeText: { fontSize: 9, fontFamily: "Inter_800ExtraBold" },
+  roleBadgeText: { fontSize: 11, fontFamily: "Inter_800ExtraBold" },
   roleCardDesc: { fontSize: 11.5, lineHeight: 15 },
   formWrap: { gap: 14 },
   inputGroup: { gap: 5 },
@@ -668,10 +665,10 @@ const styles = StyleSheet.create({
   submitBtnText: { color: "#FFFFFF", fontSize: 14, fontFamily: "Inter_700Bold" },
   dividerRow: { flexDirection: "row", alignItems: "center", gap: 10, marginVertical: 6 },
   dividerLine: { flex: 1, height: 1 },
-  dividerText: { fontSize: 10, fontFamily: "Inter_700Bold", letterSpacing: 0.7 },
+  dividerText: { fontSize: 11.5, fontFamily: "Inter_700Bold", letterSpacing: 0.7 },
   googleBtn: { height: 46, borderRadius: 12, borderWidth: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10 },
   googleBtnText: { fontSize: 13.5, fontFamily: "Inter_600SemiBold" },
   modalBackdrop: { flex: 1, backgroundColor: "rgba(2, 6, 23, 0.6)", alignItems: "center", justifyContent: "center", padding: 20 },
-  forgotCard: { width: "100%", maxWidth: 440, borderRadius: 20, borderWidth: 1, padding: 26, gap: 10, elevation: 8 },
+  forgotCard: { width: "100%", maxWidth: 440, borderRadius: 10, borderWidth: 1, padding: 26, gap: 10, elevation: 8 },
   forgotTitle: { fontSize: 18, fontFamily: "Inter_700Bold" },
 });

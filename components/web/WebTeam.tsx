@@ -6,6 +6,7 @@ import { useAuth, User, UserRole } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
 import { useColors } from "@/hooks/useColors";
 import { WebInviteModal } from "./modals/WebInviteModal";
+import { FitText } from "./FitText";
 import { WebMemberRoleModal } from "./modals/WebMemberRoleModal";
 import {
   SvgShield,
@@ -17,11 +18,11 @@ import {
   SvgFileText,
 } from "./SvgIcons";
 
-const ROLE_CONFIG: Record<UserRole, { color: string; bg: string; border: string; label: string }> = {
-  admin: { color: "#818CF8", bg: "#6366F120", border: "#6366F140", label: "ADMIN" },
-  accountant: { color: "#FBBF24", bg: "#F59E0B20", border: "#F59E0B40", label: "ACCOUNTANT" },
-  manager: { color: "#C084FC", bg: "#8B5CF620", border: "#8B5CF640", label: "MANAGER" },
-  employee: { color: "#34D399", bg: "#10B98120", border: "#10B98140", label: "EMPLOYEE" },
+const ROLE_CONFIG: Record<UserRole, { color: string; bg: string; border: string; label: string; desc: string }> = {
+  admin: { color: "#4F46E5", bg: "#4F46E516", border: "#4F46E540", label: "Admin", desc: "Full access, including team, settings and payroll" },
+  accountant: { color: "#B45309", bg: "#B4530916", border: "#B4530940", label: "Accountant", desc: "Records income, expenses, budgets and payroll" },
+  manager: { color: "#7C3AED", bg: "#7C3AED16", border: "#7C3AED40", label: "Manager", desc: "Views reports, budgets and department spending" },
+  employee: { color: "#047857", bg: "#04785716", border: "#04785740", label: "Employee", desc: "Sees only their own payslips" },
 };
 
 
@@ -128,14 +129,14 @@ export function WebTeam() {
       {/* ─── Header ─── */}
       <View style={styles.pageHeader}>
         <View style={{ flex: 1, minWidth: isMobile ? "100%" : 240 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-            <View style={[styles.titleIconBadge, { backgroundColor: "#6366F120" }]}>
-              <SvgShield size={20} color="#6366F1" />
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <View style={[styles.titleIconBadge, { backgroundColor: colors.primary + "16" }]}>
+              <SvgShield size={20} color={colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.pageTitle, { color: colors.foreground, fontSize: isMobile ? 19 : 22 }]}>Team & Access Control</Text>
-              <Text style={[styles.pageSubtitle, { color: colors.mutedForeground, fontSize: isMobile ? 12 : 13 }]}>
-                Role-based access matrix, personnel management, and system authorization
+              <Text style={[styles.pageTitle, { color: colors.foreground, fontSize: isMobile ? 19 : 22 }]}>Team & permissions</Text>
+              <Text style={[styles.pageSubtitle, { color: colors.mutedForeground }]}>
+                Invite people and choose what each person can see and do
               </Text>
             </View>
           </View>
@@ -143,134 +144,124 @@ export function WebTeam() {
 
         {canManage && (
           <TouchableOpacity
-            style={[styles.primaryBtn, { backgroundColor: "#6366F1" }, isMobile && { width: "100%" }]}
+            style={[styles.primaryBtn, { backgroundColor: colors.primary }, isMobile && { width: "100%" }]}
             onPress={() => setInviteModalVisible(true)}
             activeOpacity={0.8}
           >
             <SvgPlus size={15} color="#FFFFFF" />
-            <Text style={styles.primaryBtnText}>Invite Colleague</Text>
+            <Text style={styles.primaryBtnText}>Invite a team member</Text>
           </TouchableOpacity>
         )}
       </View>
 
-      {/* ─── Role Count KPIs ─── */}
+      {/* ─── Summary cards ─── */}
       <View style={styles.metricsGrid}>
-        <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 200 }]}>
-          <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>ACTIVE TEAM MEMBERS</Text>
-          <Text style={[styles.metricValue, { color: colors.foreground }]}>{members.length} Users</Text>
-          <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
-            Authorized institutional staff
-          </Text>
-        </View>
-
-        <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 200 }]}>
-          <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>ADMINISTRATORS & MANAGERS</Text>
-          <Text style={[styles.metricValue, { color: "#818CF8" }]}>{adminCount + managerCount} Officers</Text>
-          <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
-            {adminCount} Admins · {managerCount} Managers
-          </Text>
-        </View>
-
-        <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 200 }]}>
-          <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>ACCOUNTANTS & EMPLOYEES</Text>
-          <Text style={[styles.metricValue, { color: "#FBBF24" }]}>{accountantCount + employeeCount} Staff</Text>
-          <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
-            {accountantCount} Accountants · {employeeCount} Employees
-          </Text>
-        </View>
+        {[
+          { label: "Team members", value: String(members.length), sub: `${members.length === 1 ? "person has" : "people have"} access`, color: colors.primary },
+          { label: "Admins & managers", value: String(adminCount + managerCount), sub: `${adminCount} ${adminCount === 1 ? "admin" : "admins"} · ${managerCount} ${managerCount === 1 ? "manager" : "managers"}`, color: ROLE_CONFIG.admin.color },
+          { label: "Accountants & employees", value: String(accountantCount + employeeCount), sub: `${accountantCount} ${accountantCount === 1 ? "accountant" : "accountants"} · ${employeeCount} ${employeeCount === 1 ? "employee" : "employees"}`, color: ROLE_CONFIG.accountant.color },
+        ].map((c) => (
+          <View key={c.label} style={[styles.metricCard, styles.tSumCard, { backgroundColor: colors.card, borderColor: colors.border, borderTopColor: c.color, minWidth: isMobile ? "100%" : 200 }]}>
+            <Text style={[styles.tSumLabel, { color: colors.mutedForeground }]}>{c.label}</Text>
+            <Text style={[styles.tSumValue, { color: colors.foreground }]}>{c.value}</Text>
+            <Text style={[styles.tSumSub, { color: colors.mutedForeground }]}>{c.sub}</Text>
+          </View>
+        ))}
       </View>
 
-      {/* ─── Search & Role Filters ─── */}
+      {/* ─── Search & role filter ─── */}
       <View style={[styles.filterBarCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={[styles.searchWrap, { backgroundColor: colors.background, borderColor: colors.border }]}>
           <SvgSearch size={15} color={colors.mutedForeground} />
           <TextInput
             style={[styles.searchInput, { color: colors.foreground }]}
-            placeholder="Search by name, email, or role..."
-            placeholderTextColor={colors.mutedForeground + "80"}
+            placeholder="Search by name, email or role"
+            placeholderTextColor={colors.mutedForeground}
             value={search}
             onChangeText={setSearch}
           />
           {search ? (
-            <TouchableOpacity onPress={() => setSearch("")}>
+            <TouchableOpacity onPress={() => setSearch("")} accessibilityLabel="Clear search">
               <SvgX size={14} color={colors.mutedForeground} />
             </TouchableOpacity>
           ) : null}
         </View>
 
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <Text style={[styles.filterLabel, { color: colors.mutedForeground }]}>Filter Role:</Text>
-          <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
+        <View style={styles.tFilterRow}>
+          <Text style={[styles.tFilterLabel, { color: colors.mutedForeground }]}>Role</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
             {[
-              { id: "all", label: "All Roles" },
-              { id: "admin", label: "ADMIN" },
-              { id: "accountant", label: "ACCOUNTANT" },
-              { id: "manager", label: "MANAGER" },
-              { id: "employee", label: "EMPLOYEE" },
-            ].map((rf) => (
-              <TouchableOpacity
-                key={rf.id}
-                style={[
-                  styles.filterChip,
-                  {
-                    backgroundColor: roleFilter === rf.id ? "#6366F1" : colors.background,
-                    borderColor: roleFilter === rf.id ? "#6366F1" : colors.border,
-                  },
-                ]}
-                onPress={() => setRoleFilter(rf.id as any)}
-              >
-                <Text
-                  style={[
-                    styles.filterChipText,
-                    { color: roleFilter === rf.id ? "#FFFFFF" : colors.foreground },
-                  ]}
+              { id: "all", label: "All", count: members.length },
+              { id: "admin", label: "Admin", count: adminCount },
+              { id: "accountant", label: "Accountant", count: accountantCount },
+              { id: "manager", label: "Manager", count: managerCount },
+              { id: "employee", label: "Employee", count: employeeCount },
+            ].map((rf) => {
+              const isSel = roleFilter === rf.id;
+              return (
+                <TouchableOpacity
+                  key={rf.id}
+                  style={[styles.filterChip, { backgroundColor: isSel ? colors.primary : colors.background, borderColor: isSel ? colors.primary : colors.border, flexDirection: "row", alignItems: "center", gap: 6 }]}
+                  onPress={() => setRoleFilter(rf.id as any)}
                 >
-                  {rf.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+                  <Text style={[styles.filterChipText, { color: isSel ? "#FFFFFF" : colors.foreground }]}>{rf.label}</Text>
+                  <Text style={[styles.filterChipText, { color: isSel ? "rgba(255,255,255,0.8)" : colors.mutedForeground }]}>{rf.count}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        <View style={[styles.tResultRow, { borderTopColor: colors.border }]}>
+          <Text style={[styles.tResultText, { color: colors.foreground }]}>
+            Showing {filteredMembers.length} of {members.length} {members.length === 1 ? "member" : "members"}
+          </Text>
+          {(roleFilter !== "all" || search.trim().length > 0) && (
+            <TouchableOpacity
+              onPress={() => {
+                setRoleFilter("all" as any);
+                setSearch("");
+              }}
+              style={[styles.tClearBtn, { borderColor: colors.border }]}
+            >
+              <SvgX size={12} color={colors.primary} />
+              <Text style={[styles.tClearText, { color: colors.primary }]}>Clear filters</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
-      {/* ─── Members Roster Table ─── */}
+      {/* ─── Members ─── */}
       {isMobile ? (
         <View style={{ gap: 10 }}>
           {filteredMembers.length === 0 ? (
-            <View style={[styles.emptyWrap, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 14 }]}>
+            <View style={[styles.emptyWrap, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 8 }]}>
               <SvgFileText size={36} color={colors.mutedForeground} />
-              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No team members matching filter</Text>
+              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No team members found</Text>
             </View>
           ) : (
             filteredMembers.map((m) => {
-              const roleCfg = ROLE_CONFIG[m.role] || { color: colors.primary, bg: colors.primary + "20", border: colors.primary + "40", label: m.role?.toUpperCase() };
+              const roleCfg = ROLE_CONFIG[m.role] || { color: colors.primary, bg: colors.primary + "18", border: colors.primary + "40", label: m.role || "Member", desc: "" };
+              const isCurrent = m.email?.toLowerCase() === user?.email?.toLowerCase();
               return (
-                <View
-                  key={m.id}
-                  style={[
-                    styles.mobileCard,
-                    { backgroundColor: colors.card, borderColor: colors.border },
-                  ]}
-                >
-                  <View style={styles.mobileCardTop}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                      <View style={[styles.avatarBox, { backgroundColor: roleCfg.bg }]}>
-                        <Text style={[styles.avatarText, { color: roleCfg.color }]}>
-                          {(m.name || m.email || "U").charAt(0).toUpperCase()}
-                        </Text>
-                      </View>
-                      <View>
-                        <Text style={[styles.memberName, { color: colors.foreground }]}>{m.name || m.email || "Member"}</Text>
-                        <Text style={[styles.memberEmail, { color: colors.mutedForeground }]}>{m.email}</Text>
-                      </View>
+                <View key={m.id} style={[styles.mobileCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                    <View style={[styles.tAvatar, { backgroundColor: roleCfg.bg }]}>
+                      <Text style={[styles.tAvatarText, { color: roleCfg.color }]}>{initialsOf(m)}</Text>
                     </View>
-
-                    <View style={[styles.roleBadge, { backgroundColor: roleCfg.bg, borderColor: roleCfg.border, borderWidth: 1 }]}>
-                      <Text style={[styles.roleBadgeText, { color: roleCfg.color }]}>{roleCfg.label}</Text>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={[styles.tName, { color: colors.foreground }]}>
+                        {m.name || m.email?.split("@")[0] || "Member"}
+                        {isCurrent ? <Text style={{ color: colors.primary }}>  (you)</Text> : null}
+                      </Text>
+                      <FitText style={[styles.tEmail, { color: colors.mutedForeground }]}>{m.email || ""}</FitText>
+                    </View>
+                    <View style={[styles.tRole, { backgroundColor: roleCfg.bg }]}>
+                      <Text style={[styles.tRoleText, { color: roleCfg.color }]}>{roleCfg.label}</Text>
                     </View>
                   </View>
-
-                  {canManage && m.email !== user?.email && (
+                  {roleCfg.desc ? <Text style={[styles.tSumSub, { color: colors.mutedForeground }]}>{roleCfg.desc}</Text> : null}
+                  {canManage && !isCurrent && (
                     <View style={styles.mobileActionsRow}>
                       <TouchableOpacity
                         style={[styles.mobileActionBtn, { borderColor: colors.border }]}
@@ -279,7 +270,7 @@ export function WebTeam() {
                           setRoleModalVisible(true);
                         }}
                       >
-                        <Text style={[styles.mobileActionText, { color: colors.primary }]}>Change Role</Text>
+                        <Text style={[styles.mobileActionText, { color: colors.primary }]}>Change role</Text>
                       </TouchableOpacity>
                     </View>
                   )}
@@ -290,94 +281,76 @@ export function WebTeam() {
         </View>
       ) : (
         <View style={[styles.tableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <ScrollView horizontal contentContainerStyle={{ width: "100%" }} showsHorizontalScrollIndicator={true}>
-            <View style={{ minWidth: 680, width: "100%" }}>
+          <ScrollView horizontal contentContainerStyle={{ minWidth: "100%" }} showsHorizontalScrollIndicator>
+            <View style={{ minWidth: 900, width: "100%" }}>
               <View style={[styles.tableHeader, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-                <View style={[styles.thCol, { flex: 1.5, minWidth: 160, paddingLeft: 14, paddingRight: 8, alignItems: "flex-start", justifyContent: "center" }]}>
-                  <Text style={[styles.thText, { color: colors.mutedForeground }]}>MEMBER</Text>
-                </View>
-                <View style={[styles.thCol, { flex: 1.8, minWidth: 170, paddingHorizontal: 8, alignItems: "flex-start", justifyContent: "center" }]}>
-                  <Text style={[styles.thText, { color: colors.mutedForeground }]}>EMAIL</Text>
-                </View>
-                <View style={[styles.thCol, { flex: 1.0, minWidth: 100, paddingHorizontal: 8, alignItems: "flex-start", justifyContent: "center" }]}>
-                  <Text style={[styles.thText, { color: colors.mutedForeground }]}>ROLE</Text>
-                </View>
-                <View style={[styles.thCol, { flex: 0.8, minWidth: 80, paddingHorizontal: 8, alignItems: "flex-start", justifyContent: "center" }]}>
-                  <Text style={[styles.thText, { color: colors.mutedForeground }]}>STATUS</Text>
-                </View>
-                {canManage && (
-                  <View style={[styles.thCol, { flex: 0.9, minWidth: 90, paddingRight: 14, paddingLeft: 8, alignItems: "flex-end", justifyContent: "center" }]}>
-                    <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>ACTIONS</Text>
+                {TEAM_COLS.filter((c) => canManage || c.key !== "act").map((c) => (
+                  <View key={c.key} style={[styles.tCell, c.style]}>
+                    <Text numberOfLines={1} style={[styles.tTh, { color: colors.mutedForeground, textAlign: c.align }]}>{c.label}</Text>
                   </View>
-                )}
+                ))}
               </View>
 
-              {filteredMembers.map((m) => {
-                const roleCfg = ROLE_CONFIG[m.role] || { color: colors.primary, bg: colors.primary + "20", border: colors.primary + "40", label: m.role?.toUpperCase() };
-                const isCurrent = m.email?.toLowerCase() === user?.email?.toLowerCase();
-                return (
-                  <View
-                    key={m.id}
-                    style={[
-                      styles.tableRow,
-                      {
-                        borderBottomColor: colors.border,
-                        backgroundColor: isCurrent ? colors.primary + "06" : "transparent",
-                      },
-                    ]}
-                  >
-                    <View style={[styles.tdCol, { flex: 1.5, minWidth: 160, paddingLeft: 14, paddingRight: 8, flexDirection: "row", alignItems: "center", justifyContent: "flex-start", gap: 10 }]}>
-                      <View style={[styles.avatarBox, { backgroundColor: roleCfg.bg }]}>
-                        <Text style={[styles.avatarText, { color: roleCfg.color }]}>
-                          {(m.name || m.email || "U").charAt(0).toUpperCase()}
-                        </Text>
-                      </View>
-                      <View style={{ flex: 1, minWidth: 0 }}>
-                        <Text style={[styles.memberName, { color: colors.foreground }]}>
-                          {m.name || m.email?.split("@")[0] || "User"}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View style={[styles.tdCol, { flex: 1.8, minWidth: 170, paddingHorizontal: 8, alignItems: "flex-start", justifyContent: "center" }]}>
-                      <Text style={[styles.memberEmail, { color: colors.mutedForeground }]}>
-                        {m.email}
-                      </Text>
-                    </View>
-
-                    <View style={[styles.tdCol, { flex: 1.0, minWidth: 100, paddingHorizontal: 8, alignItems: "flex-start", justifyContent: "center" }]}>
-                      <View style={[styles.roleBadge, { backgroundColor: roleCfg.bg, borderColor: roleCfg.border, borderWidth: 1 }]}>
-                        <Text style={[styles.roleBadgeText, { color: roleCfg.color }]}>{roleCfg.label}</Text>
-                      </View>
-                    </View>
-
-                    <View style={[styles.tdCol, { flex: 0.8, minWidth: 80, paddingHorizontal: 8, flexDirection: "row", alignItems: "center", justifyContent: "flex-start", gap: 6 }]}>
-                      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: "#10B981" }} />
-                      <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#10B981" }}>Active</Text>
-                    </View>
-
-                    {canManage && (
-                      <View style={[styles.tdCol, { flex: 0.9, minWidth: 90, paddingRight: 14, paddingLeft: 8, alignItems: "flex-end", justifyContent: "center" }]}>
-                        {!isCurrent ? (
-                          <TouchableOpacity
-                            style={[styles.actionBtn, { borderColor: "#6366F135", backgroundColor: "#6366F112" }]}
-                            onPress={() => {
-                              setSelectedMember(m);
-                              setRoleModalVisible(true);
-                            }}
-                          >
-                            <Text style={{ fontSize: 11.5, fontFamily: "Inter_600SemiBold", color: "#818CF8" }}>Manage</Text>
-                          </TouchableOpacity>
-                        ) : (
-                          <View style={[styles.currentUserBadge, { backgroundColor: colors.primary + "15", borderColor: colors.primary + "30" }]}>
-                            <Text style={[styles.currentUserText, { color: colors.primary }]}>Current User</Text>
+              {filteredMembers.length === 0 ? (
+                <View style={styles.emptyWrap}>
+                  <SvgFileText size={36} color={colors.mutedForeground} />
+                  <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No team members found</Text>
+                </View>
+              ) : (
+                filteredMembers.map((m) => {
+                  const roleCfg = ROLE_CONFIG[m.role] || { color: colors.primary, bg: colors.primary + "18", border: colors.primary + "40", label: m.role || "Member", desc: "" };
+                  const isCurrent = m.email?.toLowerCase() === user?.email?.toLowerCase();
+                  return (
+                    <View key={m.id} style={[styles.tableRow, { borderBottomColor: colors.border, backgroundColor: isCurrent ? colors.primary + "08" : "transparent" }]}>
+                      <View style={[styles.tCell, TEAM_COLS[0].style, { flexDirection: "row", alignItems: "center", gap: 10 }]}>
+                        <View style={[styles.tAvatar, { backgroundColor: roleCfg.bg }]}>
+                          <Text style={[styles.tAvatarText, { color: roleCfg.color }]}>{initialsOf(m)}</Text>
+                        </View>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                            <FitText style={[styles.tName, { color: colors.foreground, flexShrink: 1 }]}>{m.name || m.email?.split("@")[0] || "User"}</FitText>
+                            {isCurrent ? (
+                              <View style={[styles.tYou, { backgroundColor: colors.primary + "18" }]}>
+                                <Text style={[styles.tYouText, { color: colors.primary }]}>You</Text>
+                              </View>
+                            ) : null}
                           </View>
-                        )}
+                          <FitText style={[styles.tEmail, { color: colors.mutedForeground }]}>{m.email || ""}</FitText>
+                        </View>
                       </View>
-                    )}
-                  </View>
-                );
-              })}
+                      <View style={[styles.tCell, TEAM_COLS[1].style]}>
+                        <View style={[styles.tRole, { backgroundColor: roleCfg.bg, alignSelf: "flex-start" }]}>
+                          <Text numberOfLines={1} style={[styles.tRoleText, { color: roleCfg.color }]}>{roleCfg.label}</Text>
+                        </View>
+                      </View>
+                      <View style={[styles.tCell, TEAM_COLS[2].style]}>
+                        <Text style={[styles.tDesc, { color: colors.mutedForeground }]}>{roleCfg.desc}</Text>
+                      </View>
+                      <View style={[styles.tCell, TEAM_COLS[3].style, { flexDirection: "row", alignItems: "center", gap: 6 }]}>
+                        <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: colors.income }} />
+                        <Text numberOfLines={1} style={[styles.tDesc, { color: colors.income, fontFamily: "Inter_600SemiBold" }]}>Active</Text>
+                      </View>
+                      {canManage && (
+                        <View style={[styles.tCell, TEAM_COLS[4].style, { alignItems: "flex-end" }]}>
+                          {!isCurrent ? (
+                            <TouchableOpacity
+                              style={[styles.tBtn, { borderColor: colors.border }]}
+                              onPress={() => {
+                                setSelectedMember(m);
+                                setRoleModalVisible(true);
+                              }}
+                            >
+                              <Text numberOfLines={1} style={[styles.tBtnText, { color: colors.primary }]}>Change role</Text>
+                            </TouchableOpacity>
+                          ) : (
+                            <Text numberOfLines={1} style={[styles.tDesc, { color: colors.mutedForeground }]}>Signed in</Text>
+                          )}
+                        </View>
+                      )}
+                    </View>
+                  );
+                })
+              )}
             </View>
           </ScrollView>
         </View>
@@ -387,6 +360,7 @@ export function WebTeam() {
       <WebInviteModal
         visible={inviteModalVisible}
         onClose={() => setInviteModalVisible(false)}
+        existingEmails={members.map((m) => m.email || "")}
         onInviteSuccess={(newMember) => {
           setMembers((prev) => [...prev, newMember]);
         }}
@@ -407,7 +381,45 @@ export function WebTeam() {
   );
 }
 
+/** Two-letter initials for the avatar (e.g. "Ahmed Aqeel" → "AA"). */
+function initialsOf(m: { name?: string; email?: string }): string {
+  const src = (m.name || m.email?.split("@")[0] || "U").trim();
+  return src.split(/[\s._-]+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "U";
+}
+
+// Shared column layout so the header and every row line up exactly.
+const TEAM_COLS = [
+  { key: "member", label: "Member", align: "left", style: { flex: 1.4, minWidth: 280, paddingLeft: 16 } },
+  { key: "role", label: "Role", align: "left", style: { width: 130 } },
+  { key: "access", label: "What they can do", align: "left", style: { flex: 1, minWidth: 220 } },
+  { key: "status", label: "Status", align: "left", style: { width: 90 } },
+  { key: "act", label: "Actions", align: "right", style: { width: 140, paddingRight: 16 } },
+] as const;
+
 const styles = StyleSheet.create({
+  tSumCard: { borderTopWidth: 3, gap: 6 },
+  tSumLabel: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  tSumValue: { fontSize: 24, fontFamily: "Inter_600SemiBold", letterSpacing: -0.3 },
+  tSumSub: { fontSize: 12.5, fontFamily: "Inter_400Regular", lineHeight: 18 },
+  tFilterRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  tFilterLabel: { width: 60, fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  tResultRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, paddingTop: 12, borderTopWidth: 1 },
+  tResultText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  tClearBtn: { flexDirection: "row", alignItems: "center", gap: 6, height: 32, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1 },
+  tClearText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  tCell: { paddingHorizontal: 8, justifyContent: "center" },
+  tTh: { fontSize: 12.5, fontFamily: "Inter_600SemiBold" },
+  tAvatar: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  tAvatarText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  tName: { fontSize: 14, fontFamily: "Inter_600SemiBold", lineHeight: 19 },
+  tEmail: { fontSize: 12.5, fontFamily: "Inter_400Regular", lineHeight: 17 },
+  tYou: { paddingHorizontal: 6, paddingVertical: 1, borderRadius: 999 },
+  tYouText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  tRole: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
+  tRoleText: { fontSize: 12.5, fontFamily: "Inter_600SemiBold" },
+  tDesc: { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 18 },
+  tBtn: { height: 32, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  tBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   container: {
     flex: 1,
     minWidth: 0,
@@ -438,8 +450,8 @@ const styles = StyleSheet.create({
   },
   pageTitle: {
     fontSize: 22,
-    fontFamily: "Inter_800ExtraBold",
-    letterSpacing: -0.6,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: -0.4,
   },
   pageSubtitle: {
     fontSize: 13,
@@ -473,13 +485,13 @@ const styles = StyleSheet.create({
   metricCard: {
     flex: 1,
     minWidth: 200,
-    borderRadius: 16,
+    borderRadius: 10,
     borderWidth: 1,
     padding: 16,
     gap: 4,
   },
   metricLabel: {
-    fontSize: 10.5,
+    fontSize: 11.5,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.6,
   },
@@ -494,7 +506,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
   },
   filterBarCard: {
-    borderRadius: 16,
+    borderRadius: 10,
     borderWidth: 1,
     padding: 14,
     gap: 12,
@@ -519,9 +531,10 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
   },
   filterChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingHorizontal: 14,
+    height: 32,
+    justifyContent: "center",
+    borderRadius: 6,
     borderWidth: 1,
   },
   filterChipText: {
@@ -529,7 +542,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
   },
   mobileCard: {
-    borderRadius: 14,
+    borderRadius: 8,
     borderWidth: 1,
     padding: 14,
     gap: 10,
@@ -588,7 +601,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
   },
   tableCard: {
-    borderRadius: 16,
+    borderRadius: 10,
     borderWidth: 1,
     overflow: "hidden",
     width: "100%",

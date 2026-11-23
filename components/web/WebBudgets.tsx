@@ -20,6 +20,7 @@ import { useSettings } from "@/context/SettingsContext";
 import { useColors } from "@/hooks/useColors";
 import { DonutChart } from "@/components/DonutChart";
 import { WebBudgetModal } from "./modals/WebBudgetModal";
+import { FitText } from "./FitText";
 import { WebDepartmentModal } from "./modals/WebDepartmentModal";
 import { WebConfirmModal } from "./modals/WebConfirmModal";
 import {
@@ -57,6 +58,8 @@ export function WebBudgets() {
   const [selectedDept, setSelectedDept] = useState("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "healthy" | "warning" | "over" | "no_budget">("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const hasActiveFilters = selectedDept !== "all" || statusFilter !== "all" || searchQuery.trim().length > 0;
+  const STATUS_LABELS: Record<string, string> = { all: "All", healthy: "On track", warning: "Near limit", over: "Over budget", no_budget: "No budget" };
 
   const [modalVisible, setModalVisible] = useState(false);
   const [initialModalDept, setInitialModalDept] = useState<string | undefined>(undefined);
@@ -184,19 +187,17 @@ export function WebBudgets() {
       contentContainerStyle={[styles.content, isMobile && { padding: 14, gap: 14 }]}
       showsVerticalScrollIndicator={false}
     >
-      {/* ─── Page Header ─── */}
+      {/* ─── Page header ─── */}
       <View style={styles.pageHeader}>
         <View style={{ flex: 1, minWidth: isMobile ? "100%" : 280 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-            <View style={[styles.titleIconBadge, { backgroundColor: colors.primary + "20" }]}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <View style={[styles.titleIconBadge, { backgroundColor: colors.primary + "16" }]}>
               <SvgPieChart size={20} color={colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.pageTitle, { color: colors.foreground, fontSize: isMobile ? 19 : 22 }]}>
-                Department Budget Allocations
-              </Text>
-              <Text style={[styles.pageSubtitle, { color: colors.mutedForeground, fontSize: isMobile ? 12 : 13 }]}>
-                Expenditure ceilings, live utilization tracking, and overrun alert thresholds
+              <Text style={[styles.pageTitle, { color: colors.foreground, fontSize: isMobile ? 19 : 22 }]}>Budgets</Text>
+              <Text style={[styles.pageSubtitle, { color: colors.mutedForeground }]}>
+                Set spending limits for each department and track how much is used
               </Text>
             </View>
           </View>
@@ -204,6 +205,17 @@ export function WebBudgets() {
 
         {canEdit && (
           <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap", width: isMobile ? "100%" : "auto" }}>
+            <TouchableOpacity
+              style={[styles.secondaryBtn, { borderColor: colors.border, backgroundColor: colors.card }, isMobile && { flex: 1 }]}
+              onPress={() => {
+                setEditingDept(null);
+                setDeptModalVisible(true);
+              }}
+              activeOpacity={0.8}
+            >
+              <SvgLayers size={15} color={colors.foreground} />
+              <Text style={[styles.secondaryBtnText, { color: colors.foreground }]}>Add department</Text>
+            </TouchableOpacity>
             <TouchableOpacity
               style={[styles.primaryBtn, { backgroundColor: colors.primary }, isMobile && { flex: 1 }]}
               onPress={() => {
@@ -214,256 +226,95 @@ export function WebBudgets() {
               activeOpacity={0.8}
             >
               <SvgPlus size={15} color="#FFFFFF" />
-              <Text style={styles.primaryBtnText}>Allocate Budget</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.secondaryBtn,
-                { borderColor: colors.border, backgroundColor: colors.card },
-                isMobile && { flex: 1 },
-              ]}
-              onPress={() => {
-                setEditingDept(null);
-                setDeptModalVisible(true);
-              }}
-              activeOpacity={0.8}
-            >
-              <SvgLayers size={15} color={colors.foreground} />
-              <Text style={[styles.secondaryBtnText, { color: colors.foreground }]}>+ Department</Text>
+              <Text style={styles.primaryBtnText}>Allocate budget</Text>
             </TouchableOpacity>
           </View>
         )}
       </View>
 
-      {/* ─── Section 8: 5 Top Executive Summary Cards ─── */}
-      <View style={styles.metricsGrid}>
-        {/* 1. TOTAL INCOME */}
-        <View
-          style={[
-            styles.metricCard,
-            { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 180 },
-          ]}
-        >
-          <View style={styles.metricCardTop}>
-            <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>TOTAL INCOME</Text>
-            <Feather name="trending-up" size={14} color={colors.income} />
-          </View>
-          <Text style={[styles.metricValue, { color: colors.income }]}>
-            {settings.currency} {totalIncome.toLocaleString()}
-          </Text>
-          <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
-            Central Revenue Inflows
-          </Text>
-        </View>
+      {/* ─── Summary cards ─── */}
+      {(() => {
+        const deptCount = departmentMetrics.filter((d) => d.allocated > 0).length;
+        const cards = [
+          { key: "income", label: "Total income", icon: "trending-up", value: totalIncome, color: colors.income, sub: "All money received" },
+          { key: "alloc", label: "Allocated", icon: "pie-chart", value: totalAllocatedBudget, color: colors.info, sub: `${deptCount} ${deptCount === 1 ? "department" : "departments"} · ${budgets.length} budget ${budgets.length === 1 ? "line" : "lines"}` },
+          { key: "avail", label: "Available to allocate", icon: availableToAllocate > 0 ? "check-circle" : "alert-circle", value: availableToAllocate, color: availableToAllocate > 0 ? colors.income : colors.warning, sub: availableToAllocate > 0 ? "Not yet given to any department" : "All income is allocated" },
+          { key: "spent", label: "Spent", icon: "arrow-up-right", value: totalBudgetSpent, color: colors.expense, sub: `${budgetUtilization.toFixed(1)}% of allocated budgets` },
+          { key: "left", label: totalBudgetRemaining >= 0 ? "Remaining" : "Over budget", icon: totalBudgetRemaining >= 0 ? "shield" : "alert-triangle", value: Math.abs(totalBudgetRemaining), color: totalBudgetRemaining >= 0 ? colors.foreground : colors.expense, sub: totalBudgetRemaining >= 0 ? "Left in department budgets" : "Spending is above the limits" },
+        ];
 
-        {/* 2. TOTAL ALLOCATED */}
-        <View
-          style={[
-            styles.metricCard,
-            { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 180 },
-          ]}
-        >
-          <View style={styles.metricCardTop}>
-            <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>TOTAL ALLOCATED</Text>
-            <Feather name="pie-chart" size={14} color={colors.primary} />
-          </View>
-          <Text style={[styles.metricValue, { color: colors.foreground }]}>
-            {settings.currency} {totalAllocatedBudget.toLocaleString()}
-          </Text>
-          <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
-            {departmentMetrics.filter((d) => d.allocated > 0).length} Depts · {budgets.length} Lines
-          </Text>
-        </View>
+        // Where the income goes: spent | still in budgets | not allocated
+        const base = Math.max(totalIncome, totalAllocatedBudget, 1);
+        const parts = [
+          { label: "Spent", value: totalBudgetSpent, color: colors.expense },
+          { label: "Left in budgets", value: Math.max(0, totalBudgetRemaining), color: colors.info },
+          { label: "Not allocated", value: Math.max(0, availableToAllocate), color: colors.income },
+        ];
 
-        {/* 3. AVAILABLE TO ALLOCATE */}
-        <View
-          style={[
-            styles.metricCard,
-            {
-              backgroundColor: colors.card,
-              borderColor: availableToAllocate > 0 ? colors.income + "40" : colors.border,
-              minWidth: isMobile ? "100%" : 180,
-            },
-          ]}
-        >
-          <View style={styles.metricCardTop}>
-            <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>AVAILABLE TO ALLOCATE</Text>
-            <Feather
-              name={availableToAllocate > 0 ? "check-circle" : "alert-circle"}
-              size={14}
-              color={availableToAllocate > 0 ? colors.income : colors.warning}
-            />
-          </View>
-          <Text
-            style={[
-              styles.metricValue,
-              { color: availableToAllocate > 0 ? colors.income : colors.warning },
-            ]}
-          >
-            {settings.currency} {availableToAllocate.toLocaleString()}
-          </Text>
-          <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
-            Net Cash Buffer · {settings.currency} {unallocatedFunds.toLocaleString()} Available
-          </Text>
-        </View>
-
-        {/* 4. TOTAL DEPARTMENT SPENDING */}
-        <View
-          style={[
-            styles.metricCard,
-            { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 180 },
-          ]}
-        >
-          <View style={styles.metricCardTop}>
-            <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>TOTAL DEPARTMENT SPENDING</Text>
-            <Feather name="arrow-up-right" size={14} color={colors.expense} />
-          </View>
-          <Text style={[styles.metricValue, { color: colors.expense }]}>
-            {settings.currency} {totalBudgetSpent.toLocaleString()}
-          </Text>
-          <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
-            {budgetUtilization.toFixed(1)}% Ceilings Utilized
-          </Text>
-        </View>
-
-        {/* 5. REMAINING DEPARTMENT FUNDS */}
-        <View
-          style={[
-            styles.metricCard,
-            { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 180 },
-          ]}
-        >
-          <View style={styles.metricCardTop}>
-            <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>REMAINING DEPARTMENT FUNDS</Text>
-            <Feather
-              name={totalBudgetRemaining >= 0 ? "shield" : "alert-triangle"}
-              size={14}
-              color={totalBudgetRemaining >= 0 ? colors.primary : colors.expense}
-            />
-          </View>
-          <Text
-            style={[
-              styles.metricValue,
-              { color: totalBudgetRemaining >= 0 ? colors.foreground : colors.expense },
-            ]}
-          >
-            {settings.currency} {totalBudgetRemaining.toLocaleString()}
-          </Text>
-          <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
-            {totalBudgetRemaining >= 0 ? "Under Expenditure Limit" : "Deficit Overrun"}
-          </Text>
-        </View>
-      </View>
-
-      {/* ─── Search & Status Filters Bar ─── */}
-      <View style={[styles.filterBarCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {/* Search Input */}
-        <View
-          style={[
-            styles.searchRow,
-            { backgroundColor: colors.background, borderColor: colors.border },
-          ]}
-        >
-          <Feather name="search" size={16} color={colors.mutedForeground} />
-          <TextInput
-            style={[styles.searchInput, { color: colors.foreground }]}
-            placeholder="Search departments, categories, or notes..."
-            placeholderTextColor={colors.mutedForeground}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery("")}>
-              <Feather name="x" size={16} color={colors.mutedForeground} />
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Status Filter Chips */}
-        <View style={styles.filterChipRow}>
-          <Text style={[styles.filterLabel, { color: colors.mutedForeground }]}>Status:</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-            {(
-              [
-                { key: "all", label: "All Status" },
-                { key: "healthy", label: "On Track" },
-                { key: "warning", label: "Near Ceiling" },
-                { key: "over", label: "Overrun" },
-                { key: "no_budget", label: "Unbudgeted" },
-              ] as const
-            ).map((st) => (
-              <TouchableOpacity
-                key={st.key}
-                style={[
-                  styles.filterChip,
-                  {
-                    backgroundColor: statusFilter === st.key ? colors.primary : colors.background,
-                    borderColor: statusFilter === st.key ? "transparent" : colors.border,
-                  },
-                ]}
-                onPress={() => setStatusFilter(st.key)}
-              >
-                <Text
-                  style={[
-                    styles.filterChipText,
-                    { color: statusFilter === st.key ? "#FFFFFF" : colors.foreground },
-                  ]}
+        return (
+          <>
+            <View style={styles.metricsGrid}>
+              {cards.map((c) => (
+                <View
+                  key={c.key}
+                  style={[styles.metricCard, styles.bSumCard, { backgroundColor: colors.card, borderColor: colors.border, borderTopColor: c.color, minWidth: isMobile ? "100%" : 190 }]}
                 >
-                  {st.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
+                  <View style={styles.metricCardTop}>
+                    <Text style={[styles.bSumLabel, { color: colors.mutedForeground }]}>{c.label}</Text>
+                    <Feather name={c.icon as any} size={15} color={c.color} />
+                  </View>
+                  <FitText style={[styles.bSumValue, { color: c.color }]}>
+                    {`${c.key === "left" && totalBudgetRemaining < 0 ? "-" : ""}${settings.currency} ${c.value.toLocaleString()}`}
+                  </FitText>
+                  <Text style={[styles.bSumSub, { color: colors.mutedForeground }]}>{c.sub}</Text>
+                </View>
+              ))}
+            </View>
 
-        {/* Department Filter Chips */}
-        <View style={styles.filterChipRow}>
-          <Text style={[styles.filterLabel, { color: colors.mutedForeground }]}>Department:</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-            {["all", ...allDeptNames].map((dept, idx) => (
-              <TouchableOpacity
-                key={`${dept}-${idx}`}
-                style={[
-                  styles.filterChip,
-                  {
-                    backgroundColor: selectedDept === dept ? colors.primary : colors.background,
-                    borderColor: selectedDept === dept ? "transparent" : colors.border,
-                  },
-                ]}
-                onPress={() => setSelectedDept(dept)}
-              >
-                <Text
-                  style={[
-                    styles.filterChipText,
-                    { color: selectedDept === dept ? "#FFFFFF" : colors.foreground },
-                  ]}
-                >
-                  {dept === "all" ? "All Departments" : dept}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      </View>
+            {totalIncome > 0 && (
+              <View style={[styles.bFlowCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={styles.bRowBetween}>
+                  <Text style={[styles.bFlowTitle, { color: colors.foreground }]}>Where your income goes</Text>
+                  <Text style={[styles.bFlowTotal, { color: colors.mutedForeground }]}>
+                    Total income {settings.currency} {totalIncome.toLocaleString()}
+                  </Text>
+                </View>
+                <View style={[styles.bFlowTrack, { backgroundColor: colors.muted }]}>
+                  {parts.map((p) =>
+                    p.value > 0 ? (
+                      <View key={p.label} style={{ width: `${Math.max(1.5, (p.value / base) * 100)}%`, height: "100%", backgroundColor: p.color }} />
+                    ) : null
+                  )}
+                </View>
+                <View style={styles.bLegend}>
+                  {parts.map((p) => (
+                    <View key={p.label} style={styles.bLegendItem}>
+                      <View style={[styles.bDot, { backgroundColor: p.color }]} />
+                      <Text style={[styles.bLegendLabel, { color: colors.mutedForeground }]}>{p.label}</Text>
+                      <Text style={[styles.bLegendValue, { color: colors.foreground }]}>
+                        {settings.currency} {p.value.toLocaleString()} · {((p.value / Math.max(totalIncome, 1)) * 100).toFixed(0)}%
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+          </>
+        );
+      })()}
 
-      {/* ─── Visual Budget Allocation Donut Chart ─── */}
+      {/* ─── Budget by department (donut) ─── */}
       <View style={[styles.chartCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.chartHeader}>
           <View style={{ flex: 1, minWidth: 180 }}>
-            <Text style={[styles.chartTitle, { color: colors.foreground }]}>Department Budget Distribution</Text>
+            <Text style={[styles.chartTitle, { color: colors.foreground }]}>Budget by department</Text>
             <Text style={[styles.chartSubtitle, { color: colors.mutedForeground }]}>
-              Authoritative fund distribution across organization departments
+              Share of the total budget given to each department
             </Text>
           </View>
-          <View
-            style={[
-              styles.badgePill,
-              { backgroundColor: colors.primary + "18", borderColor: colors.primary + "35" },
-            ]}
-          >
+          <View style={[styles.badgePill, { backgroundColor: colors.primary + "14", borderColor: colors.primary + "35" }]}>
             <Text style={[styles.badgePillText, { color: colors.primary }]}>
-              {deptBudgetData.length} Allocated {deptBudgetData.length === 1 ? "Dept" : "Depts"}
+              {deptBudgetData.length} {deptBudgetData.length === 1 ? "department" : "departments"}
             </Text>
           </View>
         </View>
@@ -473,7 +324,7 @@ export function WebBudgets() {
             <DonutChart
               segments={deptBudgetData}
               size={isMobile ? 140 : 170}
-              strokeWidth={isMobile ? 12 : 14}
+              strokeWidth={isMobile ? 9 : 10}
               centerLabel={`${settings.currency} ${totalAllocatedBudget.toLocaleString()}`}
               centerSub="Total Budget"
               currency={settings.currency}
@@ -486,7 +337,7 @@ export function WebBudgets() {
               <DonutChart
                 segments={[]}
                 size={isMobile ? 130 : 150}
-                strokeWidth={isMobile ? 10 : 12}
+                strokeWidth={isMobile ? 8 : 9}
                 centerLabel={`${settings.currency} 0`}
                 centerSub="Total Budget"
                 currency={settings.currency}
@@ -610,6 +461,100 @@ export function WebBudgets() {
             </View>
           </View>
         ) : null}
+      </View>
+
+      {/* ─── Search & filters ─── */}
+      <View style={[styles.filterBarCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View>
+          <Text style={[styles.bFilterTitle, { color: colors.foreground }]}>Find a budget</Text>
+          <Text style={[styles.bResultHint, { color: colors.mutedForeground }]}>Filter the department table and budget lines below</Text>
+        </View>
+        <View style={[styles.searchRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
+          <Feather name="search" size={16} color={colors.mutedForeground} />
+          <TextInput
+            style={[styles.searchInput, { color: colors.foreground }]}
+            placeholder="Search by department, category or note"
+            placeholderTextColor={colors.mutedForeground}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery("")} accessibilityLabel="Clear search">
+              <Feather name="x" size={16} color={colors.mutedForeground} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {[
+          {
+            label: "Status",
+            items: [
+              { key: "all", label: "All" },
+              { key: "healthy", label: "On track" },
+              { key: "warning", label: "Near limit" },
+              { key: "over", label: "Over budget" },
+              { key: "no_budget", label: "No budget" },
+            ],
+            value: statusFilter as string,
+            onChange: (k: string) => setStatusFilter(k as any),
+          },
+          {
+            label: "Department",
+            items: ["all", ...allDeptNames].map((d) => ({ key: d, label: d === "all" ? "All" : d })),
+            value: selectedDept,
+            onChange: (k: string) => setSelectedDept(k),
+          },
+        ].map((group) => (
+          <View key={group.label} style={styles.filterChipRow}>
+            <Text style={[styles.filterLabel, styles.bFilterLabel, { color: colors.mutedForeground }]}>{group.label}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+              {group.items.map((it, idx) => {
+                const isSel = group.value === it.key;
+                return (
+                  <TouchableOpacity
+                    key={`${it.key}-${idx}`}
+                    style={[styles.filterChip, { backgroundColor: isSel ? colors.primary : colors.background, borderColor: isSel ? colors.primary : colors.border }]}
+                    onPress={() => group.onChange(it.key)}
+                  >
+                    <Text style={[styles.filterChipText, { color: isSel ? "#FFFFFF" : colors.foreground }]}>{it.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        ))}
+        {/* Live result summary */}
+        <View style={[styles.bResultRow, { borderTopColor: colors.border }]}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1, minWidth: 0, flexWrap: "wrap" }}>
+            <Feather name="filter" size={14} color={hasActiveFilters ? colors.primary : colors.mutedForeground} />
+            <Text style={[styles.bResultText, { color: colors.foreground }]}>
+              Showing {filteredDepartmentMetrics.length} of {(departmentMetrics || []).length} departments · {filteredBudgets.length} of {budgetsWithLiveSpend.length} budget lines
+            </Text>
+            {hasActiveFilters && (
+              <Text style={[styles.bResultHint, { color: colors.mutedForeground }]}>
+                {[
+                  selectedDept !== "all" ? `Department: ${selectedDept}` : null,
+                  statusFilter !== "all" ? `Status: ${STATUS_LABELS[statusFilter]}` : null,
+                  searchQuery.trim() ? `Search: "${searchQuery.trim()}"` : null,
+                ].filter(Boolean).join(" · ")}
+              </Text>
+            )}
+          </View>
+          {hasActiveFilters && (
+            <TouchableOpacity
+              onPress={() => {
+                setSelectedDept("all");
+                setStatusFilter("all");
+                setSearchQuery("");
+              }}
+              style={[styles.bClearBtn, { borderColor: colors.border }]}
+              activeOpacity={0.75}
+            >
+              <Feather name="x" size={13} color={colors.primary} />
+              <Text style={[styles.bClearText, { color: colors.primary }]}>Clear filters</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* ─── Section 8: Department Allocation Table ─── */}
@@ -1104,6 +1049,27 @@ export function WebBudgets() {
 }
 
 const styles = StyleSheet.create({
+  bFilterTitle: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  bResultRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, paddingTop: 12, borderTopWidth: 1 },
+  bResultText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  bResultHint: { fontSize: 12.5, fontFamily: "Inter_400Regular", lineHeight: 18 },
+  bClearBtn: { flexDirection: "row", alignItems: "center", gap: 6, height: 32, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1 },
+  bClearText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  bSumCard: { borderTopWidth: 3, gap: 6 },
+  bSumLabel: { fontSize: 13, fontFamily: "Inter_500Medium", flexShrink: 1 },
+  bSumValue: { fontSize: 22, fontFamily: "Inter_600SemiBold", letterSpacing: -0.3 },
+  bSumSub: { fontSize: 12.5, fontFamily: "Inter_400Regular", lineHeight: 18 },
+  bFlowCard: { borderWidth: 1, borderRadius: 10, padding: 18, gap: 12 },
+  bRowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 },
+  bFlowTitle: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  bFlowTotal: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  bFlowTrack: { height: 12, borderRadius: 6, overflow: "hidden", flexDirection: "row", gap: 2 },
+  bLegend: { flexDirection: "row", flexWrap: "wrap", gap: 18 },
+  bLegendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
+  bDot: { width: 9, height: 9, borderRadius: 5 },
+  bLegendLabel: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  bLegendValue: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  bFilterLabel: { width: 90, fontSize: 13, fontFamily: "Inter_600SemiBold" },
   container: {
     flex: 1,
     minWidth: 0,
@@ -1134,8 +1100,8 @@ const styles = StyleSheet.create({
   },
   pageTitle: {
     fontSize: 22,
-    fontFamily: "Inter_800ExtraBold",
-    letterSpacing: -0.6,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: -0.4,
   },
   pageSubtitle: {
     fontSize: 13,
@@ -1183,7 +1149,7 @@ const styles = StyleSheet.create({
   metricCard: {
     flex: 1,
     minWidth: 180,
-    borderRadius: 16,
+    borderRadius: 10,
     borderWidth: 1,
     padding: 16,
     gap: 4,
@@ -1194,7 +1160,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   metricLabel: {
-    fontSize: 10,
+    fontSize: 11.5,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.6,
   },
@@ -1209,7 +1175,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
   },
   filterBarCard: {
-    borderRadius: 16,
+    borderRadius: 10,
     borderWidth: 1,
     padding: 14,
     gap: 12,
@@ -1240,17 +1206,18 @@ const styles = StyleSheet.create({
     minWidth: 70,
   },
   filterChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingHorizontal: 14,
+    height: 32,
+    justifyContent: "center",
+    borderRadius: 6,
     borderWidth: 1,
   },
   filterChipText: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
   },
   chartCard: {
-    borderRadius: 16,
+    borderRadius: 10,
     borderWidth: 1,
     padding: 18,
     gap: 12,
@@ -1263,9 +1230,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   chartTitle: {
-    fontSize: 15,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: -0.3,
+    fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
   },
   chartSubtitle: {
     fontSize: 12,
@@ -1275,7 +1241,7 @@ const styles = StyleSheet.create({
   badgePill: {
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 20,
+    borderRadius: 10,
     borderWidth: 1,
   },
   badgePillText: {
@@ -1283,7 +1249,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
   },
   tableContainer: {
-    borderRadius: 16,
+    borderRadius: 10,
     borderWidth: 1,
     overflow: "hidden",
   },
@@ -1322,7 +1288,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   th: {
-    fontSize: 10.5,
+    fontSize: 11.5,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.5,
   },
@@ -1353,7 +1319,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
   },
   tdSubtext: {
-    fontSize: 10.5,
+    fontSize: 11.5,
     fontFamily: "Inter_400Regular",
   },
   utilText: {
@@ -1405,7 +1371,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   deptNumLabel: {
-    fontSize: 9.5,
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
   },
   deptNumVal: {
@@ -1437,7 +1403,7 @@ const styles = StyleSheet.create({
   budgetItemCard: {
     flex: 1,
     minWidth: 280,
-    borderRadius: 16,
+    borderRadius: 10,
     borderWidth: 1,
     padding: 16,
     gap: 12,
@@ -1463,7 +1429,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   statusBadgeText: {
-    fontSize: 10,
+    fontSize: 11.5,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.3,
   },
@@ -1510,7 +1476,7 @@ const styles = StyleSheet.create({
     height: 24,
   },
   valLabel: {
-    fontSize: 10,
+    fontSize: 11.5,
     fontFamily: "Inter_600SemiBold",
     letterSpacing: 0.4,
   },
@@ -1536,7 +1502,7 @@ const styles = StyleSheet.create({
   emptyWrap: {
     width: "100%",
     padding: 36,
-    borderRadius: 16,
+    borderRadius: 10,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
@@ -1601,7 +1567,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   activeDeptKpiLabel: {
-    fontSize: 9.5,
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.4,
   },
@@ -1610,7 +1576,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_800ExtraBold",
   },
   activeDeptKpiSub: {
-    fontSize: 10,
+    fontSize: 11.5,
     fontFamily: "Inter_400Regular",
   },
 });

@@ -389,7 +389,7 @@ export function WebPayrollModal({ visible, onClose, entryToEdit }: WebPayrollMod
                 {/* Staff suggestion chips */}
                 {knownEmployees.length > 0 && !matchedStaff ? (
                   <View style={styles.knownStaffRow}>
-                    <Text style={{ fontSize: 10.5, color: colors.mutedForeground }}>Select Staff:</Text>
+                    <Text style={{ fontSize: 11.5, color: colors.mutedForeground }}>Select Staff:</Text>
                     {knownEmployees.slice(0, 4).map((emp) => (
                       <TouchableOpacity
                         key={emp.name}
@@ -494,7 +494,7 @@ export function WebPayrollModal({ visible, onClose, entryToEdit }: WebPayrollMod
                 >
                   <Text
                     style={{
-                      fontSize: 10.5,
+                      fontSize: 11.5,
                       fontFamily: "Inter_700Bold",
                       color: isZeroBudget ? colors.expense : isOverBudget ? colors.expense : colors.income,
                     }}
@@ -610,7 +610,7 @@ export function WebPayrollModal({ visible, onClose, entryToEdit }: WebPayrollMod
                     <View key={item.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                       <View style={{ flex: 1 }}>
                         <Text style={[styles.itemName, { color: colors.foreground }]}>{item.name}</Text>
-                        <Text style={{ fontSize: 10, color: colors.mutedForeground }}>Custom Allowance</Text>
+                        <Text style={{ fontSize: 11.5, color: colors.mutedForeground }}>Custom Allowance</Text>
                       </View>
                       <Text style={[styles.itemAmount, { color: colors.income }]}>
                         +{settings.currency} {Number(item.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -635,7 +635,7 @@ export function WebPayrollModal({ visible, onClose, entryToEdit }: WebPayrollMod
 
               {/* Quick preset chips for allowances */}
               <View style={{ gap: 4 }}>
-                <Text style={{ fontSize: 9.5, fontFamily: "Inter_700Bold", color: colors.mutedForeground, letterSpacing: 0.4 }}>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: colors.mutedForeground, letterSpacing: 0.4 }}>
                   QUICK PRESETS (CLICK TO AUTO-FILL):
                 </Text>
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
@@ -706,7 +706,7 @@ export function WebPayrollModal({ visible, onClose, entryToEdit }: WebPayrollMod
                     <View key={item.id} style={[styles.itemCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                       <View style={{ flex: 1 }}>
                         <Text style={[styles.itemName, { color: colors.foreground }]}>{item.name}</Text>
-                        <Text style={{ fontSize: 10, color: colors.mutedForeground }}>Custom Deduction</Text>
+                        <Text style={{ fontSize: 11.5, color: colors.mutedForeground }}>Custom Deduction</Text>
                       </View>
                       <Text style={[styles.itemAmount, { color: colors.expense }]}>
                         -{settings.currency} {Number(item.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -731,7 +731,7 @@ export function WebPayrollModal({ visible, onClose, entryToEdit }: WebPayrollMod
 
               {/* Quick preset chips for deductions */}
               <View style={{ gap: 4 }}>
-                <Text style={{ fontSize: 9.5, fontFamily: "Inter_700Bold", color: colors.mutedForeground, letterSpacing: 0.4 }}>
+                <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: colors.mutedForeground, letterSpacing: 0.4 }}>
                   QUICK PRESETS (CLICK TO AUTO-FILL):
                 </Text>
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
@@ -847,7 +847,7 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 580,
     maxHeight: "90%",
-    borderRadius: 20,
+    borderRadius: 10,
     borderWidth: 1,
     overflow: "hidden",
     display: "flex",
@@ -898,7 +898,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   label: {
-    fontSize: 10.5,
+    fontSize: 11.5,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.5,
   },
@@ -939,7 +939,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   netLabel: {
-    fontSize: 10,
+    fontSize: 11.5,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.6,
   },
@@ -1002,7 +1002,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   lockedBadgeText: {
-    fontSize: 10.5,
+    fontSize: 11.5,
     fontFamily: "Inter_600SemiBold",
   },
   knownStaffRow: {
@@ -1056,7 +1056,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   budgetMetricLabel: {
-    fontSize: 9.5,
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.4,
   },

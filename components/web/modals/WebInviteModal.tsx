@@ -17,9 +17,14 @@ interface WebInviteModalProps {
   visible: boolean;
   onClose: () => void;
   onInviteSuccess?: (newMember: any) => void;
+  /** Emails already on the team, so the same person isn't invited twice. */
+  existingEmails?: string[];
 }
 
-export function WebInviteModal({ visible, onClose, onInviteSuccess }: WebInviteModalProps) {
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const ROLE_LABEL: Record<string, string> = { admin: "Admin", accountant: "Accountant", manager: "Manager", employee: "Employee" };
+
+export function WebInviteModal({ visible, onClose, onInviteSuccess, existingEmails = [] }: WebInviteModalProps) {
   const colors = useColors();
   const { width } = useWindowDimensions();
   const isMobile = width < 768;
@@ -46,8 +51,16 @@ export function WebInviteModal({ visible, onClose, onInviteSuccess }: WebInviteM
   const handleSend = async () => {
     if (submitting) return;
     const cleanEmail = email.trim().toLowerCase();
-    if (!cleanEmail || !cleanEmail.includes("@")) {
-      setError("Please enter a valid email address.");
+    if (!cleanEmail) {
+      setError("Enter the person's email address.");
+      return;
+    }
+    if (!EMAIL_RE.test(cleanEmail)) {
+      setError("That email doesn't look right. Check it, for example name@company.com.");
+      return;
+    }
+    if (existingEmails.some((e) => (e || "").trim().toLowerCase() === cleanEmail)) {
+      setError("This person is already on your team. Use “Change role” on the Team page instead.");
       return;
     }
 
@@ -86,22 +99,24 @@ export function WebInviteModal({ visible, onClose, onInviteSuccess }: WebInviteM
         status: "active",
       }, { merge: true });
 
-      const appUrl = "https://ofmapp-main.web.app/login";
-      const inviteSubject = `Invitation to join ${orgName} on OFM (${role.toUpperCase()})`;
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const appUrl = origin && !/localhost|127\.0\.0\.1/.test(origin) ? `${origin}/login` : "https://ofmapp-main.web.app/login";
+      const roleName = ROLE_LABEL[role] || role;
+      const inviteSubject = `You're invited to join ${orgName} on OFM as ${roleName}`;
       const inviteBody = `Hello ${memberName},
 
 You have been invited by ${user?.name || "Administrator"} to join ${orgName} on the Organization Finance Management (OFM) platform.
 
-Assigned Role: ${role.toUpperCase()}
-Access Portal: ${appUrl}
+Your role: ${roleName}
+Sign-in page: ${appUrl}
 
-How to activate your access:
+How to get started:
 1. Open ${appUrl}
 2. Click "Create Account"
-3. Register using this email address: ${cleanEmail}
-4. Enter Admin email / Invite Code: ${user?.email || "admin@ofm.com"}
+3. Sign up with this email address: ${cleanEmail}
+4. When asked for an invite code, enter: ${user?.email || "admin@ofm.com"}
 
-Your account will automatically be activated with ${role.toUpperCase()} permissions upon registration.
+Your account will be set up with ${roleName} access automatically.
 
 Best regards,
 ${user?.name || "Administrator"}
@@ -131,7 +146,7 @@ ${orgName}`;
         gmailUrl,
       });
     } catch (e: any) {
-      setError(e?.message || "Failed to issue invitation.");
+      setError(/permission/i.test(e?.message || "") ? "You don't have permission to invite people. Ask an admin." : e?.message || "The invitation couldn't be saved. Check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
@@ -156,23 +171,23 @@ ${orgName}`;
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={handleResetAndClose}>
       <View style={[styles.backdrop, isMobile && { padding: 10 }]}>
         <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           {/* Header */}
           <View style={[styles.header, { borderBottomColor: colors.border }]}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-              <View style={[styles.iconWrap, { backgroundColor: "#6366F120" }]}>
-                <SvgShield size={20} color="#6366F1" />
+              <View style={[styles.iconWrap, { backgroundColor: colors.primary + "16" }]}>
+                <SvgShield size={20} color={colors.primary} />
               </View>
               <View>
-                <Text style={[styles.title, { color: colors.foreground }]}>Invite Team Member</Text>
+                <Text style={[styles.title, { color: colors.foreground }]}>Invite a team member</Text>
                 <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-                  Assign role permissions and send authorization
+                  Choose what they can do, then send them an email
                 </Text>
               </View>
             </View>
-            <TouchableOpacity style={[styles.closeBtn, { borderColor: colors.border }]} onPress={onClose}>
+            <TouchableOpacity style={[styles.closeBtn, { borderColor: colors.border }]} onPress={handleResetAndClose} accessibilityLabel="Close">
               <SvgX size={16} color={colors.foreground} />
             </TouchableOpacity>
           </View>
@@ -189,16 +204,16 @@ ${orgName}`;
               </View>
               <View style={{ alignItems: "center", gap: 3 }}>
                 <Text style={{ fontSize: 17, fontFamily: "Inter_700Bold", color: colors.foreground, textAlign: "center" }}>
-                  Invitation Created & Ready to Send!
+                  Invite ready — now send it
                 </Text>
                 <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground, textAlign: "center", lineHeight: 17 }}>
-                  <Text style={{ fontFamily: "Inter_700Bold", color: colors.foreground }}>{inviteSuccessData.email}</Text> is registered as <Text style={{ fontFamily: "Inter_700Bold", color: "#6366F1" }}>{inviteSuccessData.role.toUpperCase()}</Text> in {inviteSuccessData.orgName}.
+                  <Text style={{ fontFamily: "Inter_600SemiBold", color: colors.foreground }}>{inviteSuccessData.name}</Text> ({inviteSuccessData.email}) has been added to {inviteSuccessData.orgName} as <Text style={{ fontFamily: "Inter_600SemiBold", color: colors.primary }}>{ROLE_LABEL[inviteSuccessData.role] || inviteSuccessData.role}</Text>. Send them the email below so they can sign up.
                 </Text>
               </View>
 
               <View style={{ width: "100%", backgroundColor: colors.background, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: colors.border, gap: 6 }}>
-                <Text style={{ fontSize: 10, fontFamily: "Inter_700Bold", color: colors.mutedForeground, letterSpacing: 0.5 }}>
-                  INVITATION MESSAGE & ACCESS DETAILS
+                <Text style={{ fontSize: 11.5, fontFamily: "Inter_700Bold", color: colors.mutedForeground, letterSpacing: 0.5 }}>
+                  Email that will be sent
                 </Text>
                 <Text style={{ fontSize: 11.5, fontFamily: "Inter_500Medium", color: colors.foreground, lineHeight: 16 }}>
                   {inviteSuccessData.inviteText}
@@ -225,7 +240,7 @@ ${orgName}`;
                 >
                   <SvgMail size={16} color="#FFFFFF" />
                   <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: "#FFFFFF" }}>
-                    Send via Web Gmail
+                    Send with Gmail
                   </Text>
                 </TouchableOpacity>
 
@@ -247,7 +262,7 @@ ${orgName}`;
                   >
                     <SvgCheck size={14} color={copied ? "#10B981" : colors.foreground} />
                     <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: copied ? "#10B981" : colors.foreground }}>
-                      {copied ? "Copied!" : "Copy Details"}
+                      {copied ? "✓ Copied" : "Copy message"}
                     </Text>
                   </TouchableOpacity>
 
@@ -272,7 +287,7 @@ ${orgName}`;
                   >
                     <SvgMail size={14} color={colors.foreground} />
                     <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>
-                      Mail App
+                      Open mail app
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -293,14 +308,14 @@ ${orgName}`;
                 }}
                 onPress={handleResetAndClose}
               >
-                <Text style={{ fontSize: 13, fontFamily: "Inter_700Bold", color: colors.primary }}>Done / Close</Text>
+                <Text style={{ fontSize: 13.5, fontFamily: "Inter_600SemiBold", color: colors.primary }}>Done</Text>
               </TouchableOpacity>
             </ScrollView>
           ) : (
             <>
               <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
                 <View style={styles.formGroup}>
-                  <Text style={[styles.label, { color: colors.mutedForeground }]}>COLLEAGUE FULL NAME</Text>
+                  <Text style={[styles.label, { color: colors.foreground }]}>Full name <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular" }}>(optional)</Text></Text>
                   <View style={[styles.inputWrap, { backgroundColor: colors.background, borderColor: colors.border }]}>
                     <TextInput
                       style={[styles.input, { color: colors.foreground }]}
@@ -314,7 +329,7 @@ ${orgName}`;
                 </View>
 
                 <View style={styles.formGroup}>
-                  <Text style={[styles.label, { color: colors.mutedForeground }]}>OFFICIAL EMAIL ADDRESS *</Text>
+                  <Text style={[styles.label, { color: colors.foreground }]}>Email address<Text style={{ color: colors.expense }}> *</Text></Text>
                   <View style={[styles.inputWrap, { backgroundColor: colors.background, borderColor: colors.border }]}>
                     <TextInput
                       style={[styles.input, { color: colors.foreground }]}
@@ -323,20 +338,24 @@ ${orgName}`;
                       keyboardType="email-address"
                       autoCapitalize="none"
                       value={email}
-                      onChangeText={setEmail}
+                      onChangeText={(t) => {
+                        setEmail(t);
+                        if (error) setError("");
+                      }}
                     />
                   </View>
+                  <Text style={[styles.hint, { color: colors.mutedForeground }]}>They'll sign up with this exact email to join your organization.</Text>
                 </View>
 
                 {/* Role Selection */}
                 <View style={styles.formGroup}>
-                  <Text style={[styles.label, { color: colors.mutedForeground }]}>ASSIGNED ACCESS ROLE *</Text>
+                  <Text style={[styles.label, { color: colors.foreground }]}>What can they do?<Text style={{ color: colors.expense }}> *</Text></Text>
                   <View style={{ gap: 8 }}>
                     {[
-                      { id: "admin" as const, title: "Administrator", desc: "Full root ledger & user access", color: "#6366F1" },
-                      { id: "accountant" as const, title: "Accountant", desc: "Create/edit vouchers & financial statements", color: "#F59E0B" },
-                      { id: "manager" as const, title: "Department Manager", desc: "Department budget allocation oversight", color: "#8B5CF6" },
-                      { id: "employee" as const, title: "Employee", desc: "View department allocations and payroll slip", color: "#10B981" },
+                      { id: "admin" as const, title: "Admin", desc: "Full access, including team, settings and payroll", color: "#4F46E5" },
+                      { id: "accountant" as const, title: "Accountant", desc: "Records income, expenses, budgets and payroll", color: "#B45309" },
+                      { id: "manager" as const, title: "Manager", desc: "Views reports, budgets and department spending", color: "#7C3AED" },
+                      { id: "employee" as const, title: "Employee", desc: "Sees only their own payslips", color: "#047857" },
                     ].map((r) => (
                       <TouchableOpacity
                         key={r.id}
@@ -348,18 +367,19 @@ ${orgName}`;
                           },
                         ]}
                         onPress={() => setRole(r.id)}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected: role === r.id }}
                       >
+                        <View style={[styles.radio, { borderColor: role === r.id ? r.color : colors.border }]}>
+                          {role === r.id ? <View style={[styles.radioDot, { backgroundColor: r.color }]} /> : null}
+                        </View>
                         <View style={{ flex: 1 }}>
                           <Text style={[styles.roleTitle, { color: role === r.id ? r.color : colors.foreground }]}>
                             {r.title}
                           </Text>
                           <Text style={[styles.roleDesc, { color: colors.mutedForeground }]}>{r.desc}</Text>
                         </View>
-                        {role === r.id && (
-                          <View style={[styles.roleCheck, { backgroundColor: r.color }]}>
-                            <SvgCheck size={12} color="#FFFFFF" />
-                          </View>
-                        )}
+
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -374,7 +394,7 @@ ${orgName}`;
 
               {/* Footer Actions */}
               <View style={[styles.footer, { borderTopColor: colors.border }]}>
-                <TouchableOpacity style={[styles.cancelBtn, { borderColor: colors.border }]} onPress={onClose} disabled={submitting}>
+                <TouchableOpacity style={[styles.cancelBtn, { borderColor: colors.border }]} onPress={handleResetAndClose} disabled={submitting}>
                   <Text style={[styles.cancelBtnText, { color: colors.foreground }]}>Cancel</Text>
                 </TouchableOpacity>
 
@@ -382,7 +402,7 @@ ${orgName}`;
                   style={[
                     styles.submitBtn,
                     {
-                      backgroundColor: "#6366F1",
+                      backgroundColor: colors.primary,
                       opacity: submitting ? 0.7 : 1,
                     },
                   ]}
@@ -391,7 +411,7 @@ ${orgName}`;
                 >
                   <SvgPlus size={15} color="#FFFFFF" />
                   <Text style={styles.submitBtnText}>
-                    {submitting ? "Inviting..." : "Send Invitation"}
+                    {submitting ? "Creating invite…" : "Create invite"}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -404,6 +424,9 @@ ${orgName}`;
 }
 
 const styles = StyleSheet.create({
+  hint: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 17 },
+  radio: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, alignItems: "center", justifyContent: "center" },
+  radioDot: { width: 8, height: 8, borderRadius: 4 },
   backdrop: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.65)",
@@ -415,7 +438,7 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 520,
     maxHeight: "90%",
-    borderRadius: 20,
+    borderRadius: 10,
     borderWidth: 1,
     overflow: "hidden",
   },
@@ -435,11 +458,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   title: {
-    fontSize: 16,
-    fontFamily: "Inter_700Bold",
+    fontSize: 17,
+    fontFamily: "Inter_600SemiBold",
   },
   subtitle: {
-    fontSize: 11.5,
+    fontSize: 13,
     fontFamily: "Inter_400Regular",
     marginTop: 2,
   },
@@ -459,9 +482,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   label: {
-    fontSize: 10.5,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: 0.5,
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
   },
   inputWrap: {
     flexDirection: "row",
@@ -481,17 +503,19 @@ const styles = StyleSheet.create({
   roleCard: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 12,
     padding: 12,
-    borderRadius: 10,
+    borderRadius: 8,
     borderWidth: 1.5,
   },
   roleTitle: {
-    fontSize: 13.5,
-    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
   },
   roleDesc: {
-    fontSize: 11.5,
+    fontSize: 12.5,
     fontFamily: "Inter_400Regular",
+    lineHeight: 17,
     marginTop: 1,
   },
   roleCheck: {

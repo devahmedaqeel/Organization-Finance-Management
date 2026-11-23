@@ -22,6 +22,10 @@ import {
   SvgAward,
   SvgCpu,
 } from "@/components/web/SvgIcons";
+import { FitText } from "./FitText";
+
+// Plain-language names for insight severity
+const SEV_LABEL: Record<string, string> = { SUCCESS: "Good news", INFO: "For your info", WARNING: "Needs attention", CRITICAL: "Urgent" };
 import { useFinance } from "@/context/FinanceContext";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
@@ -397,7 +401,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
           label,
           value,
           color: CAT_COLORS[i % CAT_COLORS.length],
-          sublabel: `${pct}% of departmental outflows`,
+          sublabel: `${pct}% of department spending`,
         };
       });
   }, [displayedTxs]);
@@ -433,11 +437,12 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
           })
           .reduce((s, t) => s + Number(t.amount || 0), 0);
 
+        const cleanCat = isAllCategoryBudget(b.category) ? "All categories" : (b.category || "").replace(/\s*\(Department Pool\)/i, "");
         const label = b.isDepartmentPool
-          ? (b.department || b.category)
+          ? (b.department || cleanCat)
           : (b.department && b.department !== "All" && b.department !== "General"
-              ? `${b.category} · ${b.department}`
-              : b.category);
+              ? `${b.department} · ${cleanCat}`
+              : cleanCat);
 
         return {
           label,
@@ -447,7 +452,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
             : b.allocated > 0 && (spent / b.allocated) > 0.6
             ? "#F59E0B"
             : "#10B981",
-          sublabel: `Budget: ${settings.currency} ${fmt(b.allocated)}`,
+          sublabel: `of ${settings.currency} ${fmt(b.allocated)} budget · ${b.allocated > 0 ? ((spent / b.allocated) * 100).toFixed(0) : 0}% used`,
         };
       })
       .sort((a, b) => b.value - a.value || (a.label || "").localeCompare(b.label || ""));
@@ -546,15 +551,15 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
       <View style={styles.pageHeader}>
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-            <View style={[styles.titleIconBadge, { backgroundColor: "#10B98122" }]}>
-              <SvgZap size={20} color="#10B981" />
+            <View style={[styles.titleIconBadge, { backgroundColor: colors.primary + "16" }]}>
+              <SvgZap size={20} color={colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.pageTitle, { color: colors.foreground, fontSize: isMobile ? 20 : 23 }]}>
-                AI Insights & Financial Intelligence
+                AI insights
               </Text>
               <Text style={[styles.pageSubtitle, { color: colors.mutedForeground, fontSize: isMobile ? 12 : 13 }]}>
-                {settings.organizationName || "Smart Institutional Financial Diagnostics"} · Real-time data synchronization
+                {settings.organizationName || "Your organization"} · Automatic analysis of your income, spending and budgets, updated live
               </Text>
             </View>
           </View>
@@ -563,18 +568,21 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
 
       {/* ─── Health Score Card (Exact Mobile Parity) ─── */}
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Text style={[styles.cardTitle, { color: colors.foreground }]}>Financial Health Score</Text>
+        <View>
+          <Text style={[styles.cardTitle, { color: colors.foreground }]}>Financial health score</Text>
+          <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>A score out of 100 based on cash flow, budget use and spending — updates as you add records</Text>
+        </View>
         <View style={[styles.healthRow, isMobile && { flexDirection: "column", alignItems: "center", gap: 16 }]}>
           <RingProgress
             percentage={healthScore ?? 0}
             centerLabel={healthScore !== null ? `${healthScore}%` : "N/A"}
             size={126}
-            strokeWidth={12}
+            strokeWidth={9}
             color={healthColor}
-            label={hasData ? healthLabel : "NO DATA"}
+            label={hasData ? healthLabel : "No data"}
             sublabel={
               !hasData
-                ? "INACTIVE"
+                ? "Inactive"
                 : healthScore! >= 80
                 ? "Optimal"
                 : healthScore! >= 60
@@ -593,51 +601,49 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
               )}
             </Text>
             <Text style={[styles.healthLabel, { color: healthColor }]}>
-              {hasData ? healthLabel : "No Financial Data"}
+              {hasData ? healthLabel : "Not enough data yet"}
             </Text>
 
             <View style={[styles.healthStats, isMobile && { justifyContent: "center" }]}>
               {[
                 {
-                  label: "Allocated Budget",
+                  label: "Allocated budget",
                   value: `${settings.currency} ${fmt(institutionalTotalBudget)}`,
-                  color: "#38BDF8",
+                  color: colors.info,
                 },
                 {
-                  label: "Budget Spent",
+                  label: "Budget spent",
                   value: `${settings.currency} ${fmt(institutionalBudgetSpent)}`,
-                  color: "#F43F5E",
+                  color: colors.expense,
                 },
                 {
-                  label: "Remaining Budget",
+                  label: "Budget left",
                   value: `${settings.currency} ${fmt(institutionalBudgetRemaining)}`,
-                  color: institutionalBudgetRemaining > 0 ? "#10B981" : "#F43F5E",
+                  color: institutionalBudgetRemaining > 0 ? colors.income : colors.expense,
                 },
                 {
-                  label: "Budget Used",
+                  label: "Budget used",
                   value: institutionalTotalBudget > 0
                     ? `${institutionalBudgetUtil < 10 && institutionalBudgetUtil > 0 ? institutionalBudgetUtil.toFixed(1) : institutionalBudgetUtil.toFixed(0)}%`
                     : "0%",
                   color: institutionalTotalBudget > 0
-                    ? (institutionalBudgetUtil <= 75 ? "#10B981" : institutionalBudgetUtil <= 100 ? "#F59E0B" : "#F43F5E")
-                    : "#94A3B8",
+                    ? (institutionalBudgetUtil <= 75 ? colors.income : institutionalBudgetUtil <= 100 ? colors.warning : colors.expense)
+                    : colors.mutedForeground,
                 },
                 {
-                  label: "Net Cash",
+                  label: "Net cash",
                   value: `${institutionalNetCash >= 0 ? "+" : "-"}${settings.currency} ${fmt(Math.abs(institutionalNetCash))}`,
-                  color: institutionalNetCash >= 0 ? "#10B981" : "#F43F5E",
+                  color: institutionalNetCash >= 0 ? colors.income : colors.expense,
                 },
                 {
-                  label: "Unallocated",
+                  label: "Not allocated",
                   value: `${settings.currency} ${fmt(institutionalUnallocated)}`,
-                  color: institutionalUnallocated > 0 ? "#10B981" : "#F59E0B",
+                  color: institutionalUnallocated > 0 ? colors.income : colors.warning,
                 },
               ].map((s, i) => (
                 <View key={i} style={[styles.healthStat, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                  <Text style={[styles.healthStatValue, { color: s.color }]}>
-                    {s.value}
-                  </Text>
                   <Text style={[styles.healthStatLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
+                  <FitText style={[styles.healthStatValue, { color: s.color }]}>{s.value}</FitText>
                 </View>
               ))}
             </View>
@@ -660,7 +666,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
           >
             <SvgCheckCircle size={12} color="#10B981" />
             <Text style={[styles.badgeText, { color: "#10B981", fontFamily: insightFilter === "positive" ? "Inter_700Bold" : "Inter_600SemiBold" }]}>
-              {positiveCount} Positive
+              {positiveCount} good news
             </Text>
           </TouchableOpacity>
 
@@ -679,7 +685,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
             >
               <SvgAlertTriangle size={12} color="#F43F5E" />
               <Text style={[styles.badgeText, { color: "#F43F5E", fontFamily: insightFilter === "critical" ? "Inter_700Bold" : "Inter_600SemiBold" }]}>
-                {criticalCount} Critical
+                {criticalCount} urgent
               </Text>
             </TouchableOpacity>
           )}
@@ -698,7 +704,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
           >
             <SvgZap size={12} color="#F59E0B" />
             <Text style={[styles.badgeText, { color: "#F59E0B", fontFamily: insightFilter === "advisories" ? "Inter_700Bold" : "Inter_600SemiBold" }]}>
-              {advisoryCount} Advisories
+              {advisoryCount} to review
             </Text>
           </TouchableOpacity>
 
@@ -716,7 +722,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
           >
             <SvgInfo size={12} color="#3B82F6" />
             <Text style={[styles.badgeText, { color: "#3B82F6", fontFamily: insightFilter === "all" ? "Inter_700Bold" : "Inter_600SemiBold" }]}>
-              {actionableInsights.length} Total
+              All {actionableInsights.length} insights
             </Text>
           </TouchableOpacity>
         </View>
@@ -842,9 +848,9 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
         <View style={[styles.card, { flex: 1.2, backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.cardHeaderRow}>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.cardTitle, { color: colors.foreground }]}>Key Metrics</Text>
+              <Text style={[styles.cardTitle, { color: colors.foreground }]}>Key metrics</Text>
               <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
-                {selectedPoint ? `Inspecting ${selectedPoint.fullDate || selectedPoint.label}` : `Financial performance indicators · ${activePeriod.label}`}
+                {selectedPoint ? `Inspecting ${selectedPoint.fullDate || selectedPoint.label}` : `How your money is doing · ${activePeriod.label}`}
               </Text>
             </View>
             {selectedPoint && (
@@ -864,10 +870,10 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
                 percentage={displayedIncome === 0 && displayedExpense === 0 ? 0 : Math.min(Math.max(displayedSurplusPct >= 0 ? displayedSurplusPct : Math.abs(displayedSurplusPct), 0), 100)}
                 centerLabel={`${displayedSurplusPct >= 0 ? "+" : "-"}${Math.abs(displayedSurplusPct).toFixed(0)}%`}
                 size={98}
-                strokeWidth={9}
+                strokeWidth={7}
                 color={displayedIncome === 0 && displayedExpense === 0 ? "#64748B" : displayedSurplusPct >= 20 ? "#10B981" : displayedSurplusPct >= 0 ? "#0EA5E9" : "#F43F5E"}
                 label="Operating"
-                sublabel={displayedSurplusPct >= 0 ? "SURPLUS" : "DEFICIT"}
+                sublabel={displayedSurplusPct >= 0 ? "Surplus" : "Deficit"}
               />
               <View
                 style={[
@@ -885,21 +891,21 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
                   ]}
                 >
                   {displayedIncome === 0 && displayedExpense === 0
-                    ? "No Activity"
+                    ? "No activity"
                     : displayedSurplusPct >= 25
-                    ? "Healthy Surplus"
+                    ? "Healthy surplus"
                     : displayedSurplusPct > 0
-                    ? "Surplus Margin"
+                    ? "Small surplus"
                     : displayedSurplusPct === 0
-                    ? "Balanced"
-                    : "Operating Deficit"}
+                    ? "Break-even"
+                    : "Spending more than income"}
                 </Text>
               </View>
               <Text style={styles.ringValueSub}>
                 {authoritativeNetBalance >= 0 ? "+" : "-"}{settings.currency} {fmt(Math.abs(authoritativeNetBalance))}
               </Text>
-              <Text style={{ fontSize: 10, color: colors.mutedForeground, marginTop: 1, fontFamily: "Inter_500Medium" }}>
-                Net Cash Balance
+              <Text style={{ fontSize: 11.5, color: colors.mutedForeground, marginTop: 1, fontFamily: "Inter_500Medium" }}>
+                Net cash (income − expenses)
               </Text>
             </View>
 
@@ -909,10 +915,10 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
                 percentage={Math.min(displayedBudgetUtil, 100)}
                 centerLabel={`${displayedBudgetUtil < 10 && displayedBudgetUtil > 0 ? displayedBudgetUtil.toFixed(1) : displayedBudgetUtil.toFixed(0)}%`}
                 size={98}
-                strokeWidth={9}
+                strokeWidth={7}
                 color={displayedBudgetUtil === 0 ? "#64748B" : displayedBudgetUtil <= 75 ? "#3B82F6" : displayedBudgetUtil <= 95 ? "#F59E0B" : "#F43F5E"}
                 label="Budget"
-                sublabel="UTILIZED"
+                sublabel="Used"
               />
               <View
                 style={[
@@ -930,19 +936,19 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
                   ]}
                 >
                   {displayedBudgetUtil === 0
-                    ? "Unspent"
+                    ? "Not used yet"
                     : displayedBudgetUtil <= 75
-                    ? "On Track"
+                    ? "On track"
                     : displayedBudgetUtil <= 95
-                    ? "Near Limit"
-                    : "Over Budget"}
+                    ? "Near limit"
+                    : "Over budget"}
                 </Text>
               </View>
               <Text style={styles.ringValueSub}>
-                {settings.currency} {fmt(displayedBudgetSpent)} of {fmt(totalAllocatedBudget)}
+                {settings.currency} {fmt(displayedBudgetSpent)} of {settings.currency} {fmt(totalAllocatedBudget)}
               </Text>
-              <Text style={{ fontSize: 10, color: colors.mutedForeground, marginTop: 1, fontFamily: "Inter_500Medium" }}>
-                {settings.currency} {fmt(displayedBudgetRemaining)} Remaining
+              <Text style={{ fontSize: 11.5, color: colors.mutedForeground, marginTop: 1, fontFamily: "Inter_500Medium" }}>
+                {settings.currency} {fmt(displayedBudgetRemaining)} left in budgets
               </Text>
             </View>
 
@@ -952,10 +958,10 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
                 percentage={Math.min(displayedOutflowPct, 100)}
                 centerLabel={`${displayedOutflowPct.toFixed(0)}%`}
                 size={98}
-                strokeWidth={9}
+                strokeWidth={7}
                 color={displayedOutflowPct === 0 ? "#64748B" : displayedOutflowPct <= 40 ? "#8B5CF6" : displayedOutflowPct <= 75 ? "#F59E0B" : "#F43F5E"}
                 label="Outflow"
-                sublabel="BURN RATE"
+                sublabel="Spend rate"
               />
               <View
                 style={[
@@ -973,21 +979,21 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
                   ]}
                 >
                   {displayedOutflowPct === 0
-                    ? "Zero Outflow"
+                    ? "No spending"
                     : displayedOutflowPct <= 25
-                    ? "Low Burn (Safe)"
+                    ? "Low spending"
                     : displayedOutflowPct <= 60
-                    ? "Optimal Burn"
+                    ? "Normal spending"
                     : displayedOutflowPct <= 85
-                    ? "Moderate Outflow"
-                    : "High Burn Alert"}
+                    ? "High spending"
+                    : "Very high spending"}
                 </Text>
               </View>
               <Text style={styles.ringValueSub}>
-                {settings.currency} {fmt(displayedExpense)} of {fmt(displayedIncome)}
+                {settings.currency} {fmt(displayedExpense)} of {settings.currency} {fmt(displayedIncome)}
               </Text>
-              <Text style={{ fontSize: 10, color: colors.mutedForeground, marginTop: 1, fontFamily: "Inter_500Medium" }}>
-                Outflows of Inflow
+              <Text style={{ fontSize: 11.5, color: colors.mutedForeground, marginTop: 1, fontFamily: "Inter_500Medium" }}>
+                Expenses as a share of income
               </Text>
             </View>
           </View>
@@ -995,16 +1001,16 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
 
         {/* Expense Category Donut */}
         <View style={[styles.card, { flex: 1, backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.cardTitle, { color: colors.foreground }]}>Expense Breakdown</Text>
+          <Text style={[styles.cardTitle, { color: colors.foreground }]}>Expense breakdown</Text>
           <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
-            {selectedPoint ? `Disbursements in ${selectedPoint.fullDate || selectedPoint.label}` : `Where your money is going · ${activePeriod.label}`}
+            {selectedPoint ? `Spending in ${selectedPoint.fullDate || selectedPoint.label}` : `Where your money is going · ${activePeriod.label}`}
           </Text>
 
           {displayedExpense > 0 && expenseByCategory.length > 0 ? (
             <DonutChart
               segments={expenseByCategory}
               size={134}
-              strokeWidth={11}
+              strokeWidth={8}
               currency={settings.currency}
               centerLabel={`${settings.currency} ${fmt(displayedExpense)}`}
               centerSub="total spent"
@@ -1027,9 +1033,9 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
           <View>
             <View style={styles.cardHeaderRow}>
               <View>
-                <Text style={[styles.cardTitle, { color: colors.foreground }]}>Department Spending</Text>
+                <Text style={[styles.cardTitle, { color: colors.foreground }]}>Spending by department</Text>
                 <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
-                  {selectedPoint ? `Allocations in ${selectedPoint.fullDate || selectedPoint.label}` : "Expense allocation by unit"}
+                  {selectedPoint ? `Spending in ${selectedPoint.fullDate || selectedPoint.label}` : "How expenses are split across departments"}
                 </Text>
               </View>
               <TouchableOpacity
@@ -1054,24 +1060,24 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
             {deptSpend.length > 0 && (
               <View style={{ marginTop: 16, padding: 12, borderRadius: 12, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, gap: 8 }}>
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                  <Text style={{ fontSize: 11.5, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>Cost Center Distribution</Text>
-                  <Text style={{ fontSize: 10.5, fontFamily: "Inter_500Medium", color: colors.primary }}>{deptSpend.length} Monitored Units</Text>
+                  <Text style={{ fontSize: 13.5, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>Where spending is concentrated</Text>
+                  <Text style={{ fontSize: 12.5, fontFamily: "Inter_500Medium", color: colors.mutedForeground }}>{deptSpend.length} {deptSpend.length === 1 ? "department" : "departments"}</Text>
                 </View>
                 <View style={{ flexDirection: "row", gap: 8 }}>
                   <View style={{ flex: 1, padding: 8, borderRadius: 8, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }}>
-                    <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>Primary Driver</Text>
-                    <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: colors.foreground, marginTop: 2 }}>{deptSpend[0]?.label || "N/A"}</Text>
-                    <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: colors.expense, marginTop: 2 }}>{settings.currency} {fmt(deptSpend[0]?.value || 0)}</Text>
+                    <Text style={{ fontSize: 12.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>Biggest spender</Text>
+                    <Text style={{ fontSize: 13.5, fontFamily: "Inter_600SemiBold", color: colors.foreground, marginTop: 2 }}>{deptSpend[0]?.label || "—"}</Text>
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: colors.foreground, marginTop: 2 }}>{settings.currency} {fmt(deptSpend[0]?.value || 0)}</Text>
                   </View>
                   <View style={{ flex: 1, padding: 8, borderRadius: 8, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }}>
-                    <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>Secondary Driver</Text>
-                    <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: colors.foreground, marginTop: 2 }}>{deptSpend[1]?.label || "N/A"}</Text>
-                    <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: colors.expense, marginTop: 2 }}>{settings.currency} {fmt(deptSpend[1]?.value || 0)}</Text>
+                    <Text style={{ fontSize: 12.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>Second biggest</Text>
+                    <Text style={{ fontSize: 13.5, fontFamily: "Inter_600SemiBold", color: colors.foreground, marginTop: 2 }}>{deptSpend[1]?.label || "—"}</Text>
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: colors.foreground, marginTop: 2 }}>{settings.currency} {fmt(deptSpend[1]?.value || 0)}</Text>
                   </View>
                   <View style={{ flex: 1, padding: 8, borderRadius: 8, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }}>
-                    <Text style={{ fontSize: 9.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>Other Units ({Math.max(deptSpend.length - 2, 0)})</Text>
-                    <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: colors.foreground, marginTop: 2 }}>Combined</Text>
-                    <Text style={{ fontSize: 10, fontFamily: "Inter_600SemiBold", color: colors.income, marginTop: 2 }}>{settings.currency} {fmt(deptSpend.slice(2).reduce((s, d) => s + d.value, 0))}</Text>
+                    <Text style={{ fontSize: 12.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>All others</Text>
+                    <Text style={{ fontSize: 13.5, fontFamily: "Inter_600SemiBold", color: colors.foreground, marginTop: 2 }}>{Math.max(deptSpend.length - 2, 0)} {Math.max(deptSpend.length - 2, 0) === 1 ? "department" : "departments"}</Text>
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_500Medium", color: colors.foreground, marginTop: 2 }}>{settings.currency} {fmt(deptSpend.slice(2).reduce((s, d) => s + d.value, 0))}</Text>
                   </View>
                 </View>
               </View>
@@ -1081,13 +1087,13 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
           {/* Department spending summary */}
           <View style={[styles.budgetSummaryRow, { marginTop: 14 }]}>
             {[
-              { label: "Total Disbursed", value: `${settings.currency} ${fmt(deptSpend.reduce((s, d) => s + d.value, 0))}`, color: colors.primary },
-              { label: "Active Units", value: `${deptSpend.length} Units`, color: colors.income },
-              { label: "Top Cost Center", value: deptSpend[0]?.label || "None", color: colors.expense },
+              { label: "Total spent", value: `${settings.currency} ${fmt(deptSpend.reduce((s, d) => s + d.value, 0))}`, color: colors.expense },
+              { label: "Departments spending", value: String(deptSpend.length), color: colors.info },
+              { label: "Biggest spender", value: deptSpend[0]?.label || "—", color: colors.foreground },
             ].map((s, i) => (
-              <View key={i} style={[styles.budgetSumCard, { backgroundColor: s.color + "15", borderColor: s.color + "33" }]}>
-                <Text style={[styles.budgetSumValue, { color: s.color }]}>{s.value}</Text>
+              <View key={i} style={[styles.budgetSumCard, { backgroundColor: colors.background, borderColor: colors.border, borderTopColor: s.color }]}>
                 <Text style={[styles.budgetSumLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
+                <FitText style={[styles.budgetSumValue, { color: colors.foreground }]}>{s.value}</FitText>
               </View>
             ))}
           </View>
@@ -1098,16 +1104,16 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
           <View>
             <View style={styles.cardHeaderRow}>
               <View>
-                <Text style={[styles.cardTitle, { color: colors.foreground }]}>Budget vs Actual</Text>
+                <Text style={[styles.cardTitle, { color: colors.foreground }]}>Budget vs actual</Text>
                 <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
-                  {selectedPoint ? `Spending during ${selectedPoint.fullDate || selectedPoint.label}` : "Spending per budget category"}
+                  {selectedPoint ? `Spending during ${selectedPoint.fullDate || selectedPoint.label}` : "How much of each budget has been spent"}
                 </Text>
               </View>
               <TouchableOpacity
                 style={[styles.smBtn, { borderColor: colors.border }]}
                 onPress={() => onNavigate ? onNavigate("budget") : null}
               >
-                <Text style={[styles.smBtnText, { color: colors.primary }]}>Manage</Text>
+                <Text style={[styles.smBtnText, { color: colors.primary }]}>Open Budgets</Text>
               </TouchableOpacity>
             </View>
 
@@ -1117,7 +1123,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
               </View>
             ) : (
               <View style={{ paddingVertical: 20, alignItems: "center" }}>
-                <Text style={{ color: colors.mutedForeground, fontSize: 13, fontFamily: "Inter_500Medium" }}>No active budgets configured.</Text>
+                <Text style={{ color: colors.mutedForeground, fontSize: 13, fontFamily: "Inter_500Medium" }}>No budgets yet. Add one on the Budgets page.</Text>
               </View>
             )}
           </View>
@@ -1125,13 +1131,13 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
           {/* Budget progress summary */}
           <View style={[styles.budgetSummaryRow, { marginTop: 14 }]}>
             {[
-              { label: "Total Allocated", value: `${settings.currency} ${fmt(institutionalTotalBudget)}`, color: colors.primary },
-              { label: selectedPoint ? `${selectedPoint.label} Spent` : "Total Spent", value: `${settings.currency} ${fmt(displayedBudgetSpent)}`, color: colors.expense },
-              { label: "Remaining", value: `${settings.currency} ${fmt(displayedBudgetRemaining)}`, color: colors.income },
+              { label: "Allocated", value: `${settings.currency} ${fmt(institutionalTotalBudget)}`, color: colors.info },
+              { label: selectedPoint ? `Spent in ${selectedPoint.label}` : "Spent", value: `${settings.currency} ${fmt(displayedBudgetSpent)}`, color: colors.expense },
+              { label: "Left", value: `${settings.currency} ${fmt(displayedBudgetRemaining)}`, color: colors.income },
             ].map((s, i) => (
-              <View key={i} style={[styles.budgetSumCard, { backgroundColor: s.color + "15", borderColor: s.color + "33" }]}>
-                <Text style={[styles.budgetSumValue, { color: s.color }]}>{s.value}</Text>
+              <View key={i} style={[styles.budgetSumCard, { backgroundColor: colors.background, borderColor: colors.border, borderTopColor: s.color }]}>
                 <Text style={[styles.budgetSumLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
+                <FitText style={[styles.budgetSumValue, { color: colors.foreground }]}>{s.value}</FitText>
               </View>
             ))}
           </View>
@@ -1142,9 +1148,9 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.cardHeaderRow}>
           <View>
-            <Text style={[styles.cardTitle, { color: colors.foreground }]}>Total Transactions</Text>
+            <Text style={[styles.cardTitle, { color: colors.foreground }]}>Transactions</Text>
             <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
-              {txStats.totalCount} Records · {txStats.inflowCount} Inflows · {txStats.outflowCount} Outflows · Net: {txStats.netFlow >= 0 ? "+" : "-"}{settings.currency} {fmt(Math.abs(txStats.netFlow))}
+              {txStats.totalCount} {txStats.totalCount === 1 ? "record" : "records"} · {txStats.inflowCount} income · {txStats.outflowCount} expenses · Net {txStats.netFlow >= 0 ? "+" : "-"}{settings.currency} {fmt(Math.abs(txStats.netFlow))}
             </Text>
           </View>
           <TouchableOpacity
@@ -1173,11 +1179,11 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
               <View style={[styles.txStatIcon, { backgroundColor: colors.income + "18" }]}>
                 <SvgArrowDownLeft size={13} color={colors.income} />
               </View>
-              <Text style={{ fontSize: 9.5, color: colors.income, fontFamily: "Inter_600SemiBold" }}>View Inflows →</Text>
+              <Text style={{ fontSize: 11, color: colors.income, fontFamily: "Inter_600SemiBold" }}>View Inflows →</Text>
             </View>
             <Text style={[styles.txStatLabel, { color: colors.mutedForeground }]}>Inflows ({txStats.inflowCount})</Text>
             <Text style={[styles.txStatVal, { color: colors.income }]}>+{settings.currency} {fmt(txStats.inflowTotal)}</Text>
-            <Text style={{ fontSize: 9.5, color: colors.mutedForeground }}>
+            <Text style={{ fontSize: 11, color: colors.mutedForeground }}>
               {txStats.inflowCount > 0 ? `${settings.currency} ${fmt(txStats.avgInflow)} avg` : "No inflows"}
             </Text>
           </TouchableOpacity>
@@ -1195,11 +1201,11 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
               <View style={[styles.txStatIcon, { backgroundColor: colors.expense + "18" }]}>
                 <SvgArrowUpRight size={13} color={colors.expense} />
               </View>
-              <Text style={{ fontSize: 9.5, color: colors.expense, fontFamily: "Inter_600SemiBold" }}>View Outflows →</Text>
+              <Text style={{ fontSize: 11, color: colors.expense, fontFamily: "Inter_600SemiBold" }}>View Outflows →</Text>
             </View>
             <Text style={[styles.txStatLabel, { color: colors.mutedForeground }]}>Outflows ({txStats.outflowCount})</Text>
             <Text style={[styles.txStatVal, { color: colors.expense }]}>-{settings.currency} {fmt(txStats.outflowTotal)}</Text>
-            <Text style={{ fontSize: 9.5, color: colors.mutedForeground }}>
+            <Text style={{ fontSize: 11, color: colors.mutedForeground }}>
               {txStats.outflowCount > 0 ? `${settings.currency} ${fmt(txStats.avgOutflow)} avg` : "No outflows"}
             </Text>
           </TouchableOpacity>
@@ -1217,7 +1223,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
               <View style={[styles.txStatIcon, { backgroundColor: (txStats.netFlow >= 0 ? colors.income : colors.expense) + "18" }]}>
                 <SvgActivity size={13} color={txStats.netFlow >= 0 ? colors.income : colors.expense} />
               </View>
-              <Text style={{ fontSize: 9.5, color: txStats.netFlow >= 0 ? colors.income : colors.expense, fontFamily: "Inter_600SemiBold" }}>
+              <Text style={{ fontSize: 11, color: txStats.netFlow >= 0 ? colors.income : colors.expense, fontFamily: "Inter_600SemiBold" }}>
                 {txStats.netFlow >= 0 ? "Surplus" : "Deficit"}
               </Text>
             </View>
@@ -1225,7 +1231,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
             <Text style={[styles.txStatVal, { color: txStats.netFlow >= 0 ? colors.income : colors.expense }]}>
               {txStats.netFlow >= 0 ? "+" : "-"}{settings.currency} {fmt(Math.abs(txStats.netFlow))}
             </Text>
-            <Text style={{ fontSize: 9.5, color: colors.mutedForeground }}>
+            <Text style={{ fontSize: 11, color: colors.mutedForeground }}>
               Avg Ticket: {settings.currency} {fmt(txStats.avgTx)}
             </Text>
           </TouchableOpacity>
@@ -1243,7 +1249,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
               <View style={[styles.txStatIcon, { backgroundColor: "#F59E0B18" }]}>
                 <SvgAward size={13} color="#F59E0B" />
               </View>
-              <Text style={{ fontSize: 9.5, color: "#F59E0B", fontFamily: "Inter_600SemiBold" }}>
+              <Text style={{ fontSize: 11, color: "#F59E0B", fontFamily: "Inter_600SemiBold" }}>
                 {txStats.maxTx?.type === "expense" ? "Outflow" : "Inflow"}
               </Text>
             </View>
@@ -1251,7 +1257,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
             <Text style={[styles.txStatVal, { color: "#F59E0B" }]}>
               {txStats.maxTx ? `${settings.currency} ${fmt(txStats.maxTx.amount)}` : "None"}
             </Text>
-            <Text style={{ fontSize: 9.5, color: colors.mutedForeground }}>
+            <Text style={{ fontSize: 11, color: colors.mutedForeground }}>
               {txStats.maxTx ? `${txStats.maxTx.category || txStats.maxTx.title || "Transaction"}` : "No records"}
             </Text>
           </TouchableOpacity>
@@ -1260,7 +1266,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
 
       {/* ─── AI Insight Cards ─── */}
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-        {displayedInsights.length} Actionable Intelligence Insights {insightFilter !== "all" ? `(${insightFilter === "positive" ? "Positive Only" : "Alerts Only"})` : ""}
+        Insights ({displayedInsights.length}){insightFilter !== "all" ? ` · ${insightFilter === "positive" ? "Good news only" : insightFilter === "critical" ? "Urgent only" : "To review only"}` : ""}
       </Text>
 
       {displayedInsights.length === 0 ? (
@@ -1315,7 +1321,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
                             {insight.metric}
                           </Text>
                         </View>
-                        <Text style={{ fontSize: 10.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
+                        <Text style={{ fontSize: 11.5, color: colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
                           {insight.sourceReference}
                         </Text>
                       </View>
@@ -1323,21 +1329,21 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
                   </View>
                 </View>
                 <View style={[styles.typeBadge, { backgroundColor: conf.bg, flexShrink: 0 }]}>
-                  <Text style={[styles.typeBadgeText, { color: conf.color }]}>{insight.severity}</Text>
+                  <Text style={[styles.typeBadgeText, { color: conf.color }]}>{SEV_LABEL[insight.severity] || insight.severity}</Text>
                 </View>
               </View>
 
               {/* WHAT */}
-              <Text style={[styles.insightDetail, { color: colors.foreground, lineHeight: 18 }]}>
+              <Text style={[styles.insightDetail, { color: colors.foreground, lineHeight: 20 }]}>
                 {insight.summary || (insight as any).description}
               </Text>
 
               {/* WHY IT MATTERS */}
               <View style={{ backgroundColor: colors.background, padding: 10, borderRadius: 8, borderLeftWidth: 2, borderLeftColor: conf.color }}>
-                <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: colors.mutedForeground, marginBottom: 2 }}>
-                  WHY THIS MATTERS
+                <Text style={{ fontSize: 12.5, fontFamily: "Inter_600SemiBold", color: colors.foreground, marginBottom: 2 }}>
+                  Why it matters
                 </Text>
-                <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.mutedForeground, lineHeight: 17 }}>
+                <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.mutedForeground, lineHeight: 19 }}>
                   {insight.whyItMatters}
                 </Text>
               </View>
@@ -1345,9 +1351,12 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
               {/* ACTION */}
               {insight.isActionable && (
                 <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 4, flexWrap: "wrap", gap: 8 }}>
-                  <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: conf.color, flex: 1, minWidth: 200 }}>
-                    👉 {insight.recommendedAction}
-                  </Text>
+                  <View style={{ flex: 1, minWidth: 220 }}>
+                    <Text style={{ fontSize: 12.5, fontFamily: "Inter_600SemiBold", color: colors.foreground }}>Suggested next step</Text>
+                    <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.foreground, lineHeight: 19, marginTop: 1 }}>
+                      {insight.recommendedAction}
+                    </Text>
+                  </View>
                   {insight.actionRoute && onNavigate && (
                     <TouchableOpacity
                       onPress={() => onNavigate(insight.actionRoute?.replace(/^\/?(\(tabs\)\/)?/, "") || "dashboard")}
@@ -1363,7 +1372,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
                       activeOpacity={0.7}
                     >
                       <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: colors.primary }}>
-                        Resolve →
+                        Go there →
                       </Text>
                     </TouchableOpacity>
                   )}
@@ -1378,7 +1387,7 @@ export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
       <View style={[styles.disclaimerBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <SvgCpu size={14} color={colors.mutedForeground} />
         <Text style={[styles.disclaimerText, { color: colors.mutedForeground }]}>
-          Insights are generated from your financial data using rule-based analytics. Data refreshes as you add records.
+          These insights are calculated automatically from your live records and update the moment your data changes.
         </Text>
       </View>
 
@@ -1424,8 +1433,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   pageTitle: {
-    fontFamily: "Inter_800ExtraBold",
-    letterSpacing: -0.6,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: -0.4,
   },
   pageSubtitle: {
     fontFamily: "Inter_400Regular",
@@ -1433,19 +1442,19 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   card: {
-    borderRadius: 16,
+    borderRadius: 10,
     borderWidth: 1,
     padding: 18,
     gap: 12,
   },
   cardTitle: {
-    fontSize: 15,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: -0.3,
+    fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
   },
   cardSub: {
-    fontSize: 11.5,
+    fontSize: 13,
     fontFamily: "Inter_400Regular",
+    lineHeight: 18,
     marginTop: 2,
   },
   cardHeaderRow: {
@@ -1464,8 +1473,8 @@ const styles = StyleSheet.create({
   },
   healthScore: {
     fontSize: 34,
-    fontFamily: "Inter_800ExtraBold",
-    letterSpacing: -1,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: -0.6,
   },
   healthScoreMax: {
     fontSize: 16,
@@ -1484,21 +1493,22 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   healthStat: {
-    paddingHorizontal: 11,
-    paddingVertical: 8,
-    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
     borderWidth: 1,
-    minWidth: 102,
+    minWidth: 130,
+    flexBasis: 130,
     flexGrow: 1,
+    gap: 3,
   },
   healthStatValue: {
-    fontSize: 13,
-    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
   },
   healthStatLabel: {
-    fontSize: 10,
-    fontFamily: "Inter_400Regular",
-    marginTop: 1,
+    fontSize: 12.5,
+    fontFamily: "Inter_500Medium",
   },
   badgeRow: {
     flexDirection: "row",
@@ -1551,20 +1561,19 @@ const styles = StyleSheet.create({
   ringStatusPill: {
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 999,
     borderWidth: 1,
   },
   ringStatusText: {
-    fontSize: 10,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: 0.2,
+    fontSize: 12.5,
+    fontFamily: "Inter_600SemiBold",
   },
   ringValueSub: {
-    fontSize: 10.5,
+    fontSize: 13,
     fontFamily: "Inter_600SemiBold",
-    color: "#64748B",
+    color: "#52525B",
     textAlign: "center",
-    marginTop: 2,
+    marginTop: 4,
   },
   smBtn: {
     paddingHorizontal: 10,
@@ -1573,7 +1582,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   smBtnText: {
-    fontSize: 11,
+    fontSize: 12.5,
     fontFamily: "Inter_600SemiBold",
   },
   budgetSummaryRow: {
@@ -1583,19 +1592,21 @@ const styles = StyleSheet.create({
   },
   budgetSumCard: {
     flex: 1,
-    padding: 10,
-    borderRadius: 10,
+    minWidth: 0,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
     borderWidth: 1,
-    alignItems: "center",
+    borderTopWidth: 3,
+    gap: 3,
   },
   budgetSumValue: {
-    fontSize: 12.5,
-    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
   },
   budgetSumLabel: {
-    fontSize: 9.5,
+    fontSize: 12.5,
     fontFamily: "Inter_500Medium",
-    marginTop: 2,
   },
   txStatsGrid: {
     flexDirection: "row",
@@ -1627,13 +1638,12 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
   },
   sectionTitle: {
-    fontSize: 15,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: -0.3,
+    fontSize: 17,
+    fontFamily: "Inter_600SemiBold",
     marginTop: 4,
   },
   insightCard: {
-    borderRadius: 14,
+    borderRadius: 8,
     borderWidth: 1,
     padding: 14,
     gap: 8,
@@ -1646,8 +1656,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   insightTitle: {
-    fontSize: 13.5,
-    fontFamily: "Inter_700Bold",
+    fontSize: 14.5,
+    fontFamily: "Inter_600SemiBold",
+    lineHeight: 20,
   },
   typeBadge: {
     paddingHorizontal: 8,
@@ -1655,12 +1666,11 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   typeBadgeText: {
-    fontSize: 10,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: 0.5,
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
   },
   insightDetail: {
-    fontSize: 12.5,
+    fontSize: 13.5,
     fontFamily: "Inter_400Regular",
   },
   disclaimerBox: {

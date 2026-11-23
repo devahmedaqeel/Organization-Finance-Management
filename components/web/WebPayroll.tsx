@@ -18,6 +18,7 @@ import {
 } from "./SvgIcons";
 import { WebPayrollModal } from "./modals/WebPayrollModal";
 import { WebConfirmModal } from "./modals/WebConfirmModal";
+import { FitText } from "./FitText";
 import { PayslipViewerModal } from "@/components/payslip/PayslipViewerModal";
 import { PayslipTemplateManager } from "@/components/payslip/PayslipTemplateManager";
 import { usePayslipOrganizationProfile, usePayslipTemplates } from "@/hooks/usePayslipTemplates";
@@ -182,26 +183,37 @@ export function WebPayroll() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={[styles.content, isMobile && { padding: 14, gap: 14 }]} showsVerticalScrollIndicator={false}>
-      {/* ─── Page Title & Action Bar ─── */}
+      {/* ─── Page header ─── */}
       <View style={styles.pageHeader}>
         <View style={{ flex: 1, minWidth: isMobile ? "100%" : 240 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-            <View style={[styles.titleIconBadge, { backgroundColor: "#8B5CF620" }]}>
-              <SvgUsers size={20} color="#8B5CF6" />
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <View style={[styles.titleIconBadge, { backgroundColor: colors.primary + "16" }]}>
+              <SvgUsers size={20} color={colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.pageTitle, { color: colors.foreground, fontSize: isMobile ? 19 : 22 }]}>Staff Payroll & Compensation</Text>
-              <Text style={[styles.pageSubtitle, { color: colors.mutedForeground, fontSize: isMobile ? 12 : 13 }]}>
-                Monthly staff remuneration, allowances, statutory deductions, and net disbursals
+              <Text style={[styles.pageTitle, { color: colors.foreground, fontSize: isMobile ? 19 : 22 }]}>Payroll</Text>
+              <Text style={[styles.pageSubtitle, { color: colors.mutedForeground }]}>
+                Salaries, bonuses, deductions and payslips for your staff
               </Text>
             </View>
           </View>
         </View>
 
         <View style={[styles.headerRightActions, isMobile && { width: "100%", justifyContent: "flex-start" }]}>
+          {canEdit && activePayrollTab === "slips" && filteredPayroll.length > 0 && (
+            <TouchableOpacity
+              style={[styles.pBtn, { backgroundColor: colors.card, borderColor: colors.border }, isMobile && { flex: 1 }]}
+              onPress={() => setViewingSlipEntries(filteredPayroll)}
+              accessibilityLabel="Generate payslips for all listed records"
+              activeOpacity={0.8}
+            >
+              <SvgFileText size={15} color={colors.foreground} />
+              <Text style={[styles.pBtnText, { color: colors.foreground }]}>Payslips for all ({filteredPayroll.length})</Text>
+            </TouchableOpacity>
+          )}
           {canEdit && (
             <TouchableOpacity
-              style={[styles.primaryBtn, { backgroundColor: "#8B5CF6" }, isMobile && { flex: 1 }]}
+              style={[styles.pBtn, { backgroundColor: colors.primary, borderColor: colors.primary }, isMobile && { flex: 1 }]}
               onPress={() => {
                 setEditingEntry(null);
                 setModalVisible(true);
@@ -209,26 +221,15 @@ export function WebPayroll() {
               activeOpacity={0.8}
             >
               <SvgPlus size={15} color="#FFFFFF" />
-              <Text style={styles.primaryBtnText}>Add Entry</Text>
-            </TouchableOpacity>
-          )}
-          {canEdit && activePayrollTab === "slips" && filteredPayroll.length > 0 && (
-            <TouchableOpacity
-              style={[styles.primaryBtn, { backgroundColor: colors.card, borderWidth: 1, borderColor: "#8B5CF6" }, isMobile && { flex: 1 }]}
-              onPress={() => setViewingSlipEntries(filteredPayroll)}
-              accessibilityLabel="Generate payslips for all filtered records"
-              activeOpacity={0.8}
-            >
-              <SvgFileText size={15} color="#8B5CF6" />
-              <Text style={[styles.primaryBtnText, { color: "#8B5CF6" }]}>Bulk Payslips ({filteredPayroll.length})</Text>
+              <Text style={[styles.pBtnText, { color: "#FFFFFF" }]}>Add payroll entry</Text>
             </TouchableOpacity>
           )}
         </View>
       </View>
 
       {showTemplatesTab && (
-        <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }} accessibilityRole="tablist">
-          {([["slips", "Salary Slips"], ["templates", "Payslip Templates"]] as const).map(([key, label]) => {
+        <View style={[styles.pTabs, { borderBottomColor: colors.border }]} accessibilityRole="tablist">
+          {([["slips", "Salary slips"], ["templates", "Payslip templates"]] as const).map(([key, label]) => {
             const active = activePayrollTab === key;
             return (
               <TouchableOpacity
@@ -236,9 +237,11 @@ export function WebPayroll() {
                 accessibilityRole="tab"
                 accessibilityState={{ selected: active }}
                 onPress={() => setActivePayrollTab(key)}
-                style={[styles.filterChip, { backgroundColor: active ? "#8B5CF6" : colors.card, borderColor: active ? "transparent" : colors.border, paddingVertical: 8, paddingHorizontal: 14 }]}
+                style={[styles.pTab, { borderBottomColor: active ? colors.primary : "transparent" }]}
               >
-                <Text style={[styles.filterChipText, { color: active ? "#FFFFFF" : colors.foreground }]}>{label}</Text>
+                <Text style={[styles.pTabText, { color: active ? colors.foreground : colors.mutedForeground, fontFamily: active ? "Inter_600SemiBold" : "Inter_500Medium" }]}>
+                  {label}
+                </Text>
               </TouchableOpacity>
             );
           })}
@@ -249,155 +252,126 @@ export function WebPayroll() {
         <PayslipTemplateManager />
       ) : (
       <>
-      {/* ─── Payroll KPIs ─── */}
+      {/* ─── Summary cards ─── */}
       <View style={styles.metricsGrid}>
-        <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 200 }]}>
-          <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>NET DISBURSED DISBURSAL</Text>
-          <Text style={[styles.metricValue, { color: "#8B5CF6" }]}>
-            {settings.currency} {totalNetDisbursed.toLocaleString()}
-          </Text>
-          <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
-            {filteredPayroll.length} Staff Slips Generated
-          </Text>
-        </View>
-
-        <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 200 }]}>
-          <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>TOTAL BASE SALARY</Text>
-          <Text style={[styles.metricValue, { color: colors.foreground }]}>
-            {settings.currency} {totalBase.toLocaleString()}
-          </Text>
-          <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
-            Base Compensation
-          </Text>
-        </View>
-
-        <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 200 }]}>
-          <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>BONUSES & ALLOWANCES</Text>
-          <Text style={[styles.metricValue, { color: colors.income }]}>
-            +{settings.currency} {totalBonus.toLocaleString()}
-          </Text>
-          <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
-            Deductions: -{settings.currency} {totalDeductions.toLocaleString()}
-          </Text>
-        </View>
+        {[
+          { label: "Net pay", value: `${settings.currency} ${totalNetDisbursed.toLocaleString()}`, sub: `${filteredPayroll.length} ${filteredPayroll.length === 1 ? "payslip" : "payslips"}`, color: colors.primary },
+          { label: "Base salary", value: `${settings.currency} ${totalBase.toLocaleString()}`, sub: "Before bonuses and deductions", color: colors.foreground },
+          { label: "Bonuses & allowances", value: `+${settings.currency} ${totalBonus.toLocaleString()}`, sub: "Added to base salary", color: colors.income },
+          { label: "Deductions", value: `-${settings.currency} ${totalDeductions.toLocaleString()}`, sub: "Tax, loans and other cuts", color: colors.expense },
+        ].map((c) => (
+          <View key={c.label} style={[styles.metricCard, styles.pSumCard, { backgroundColor: colors.card, borderColor: colors.border, borderTopColor: c.color === colors.foreground ? colors.info : c.color, minWidth: isMobile ? "100%" : 190 }]}>
+            <Text style={[styles.pSumLabel, { color: colors.mutedForeground }]}>{c.label}</Text>
+            <FitText style={[styles.pSumValue, { color: c.color }]}>{c.value}</FitText>
+            <Text style={[styles.pSumSub, { color: colors.mutedForeground }]}>{c.sub}</Text>
+          </View>
+        ))}
       </View>
 
-      {/* ─── Search & Filters ─── */}
+      {/* ─── Search & filters ─── */}
       <View style={[styles.filterBarCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={[styles.searchWrap, { backgroundColor: colors.background, borderColor: colors.border }]}>
           <SvgSearch size={15} color={colors.mutedForeground} />
           <TextInput
             style={[styles.searchInput, { color: colors.foreground }]}
-            placeholder="Search staff payroll by employee name, ID, designation, department..."
-            placeholderTextColor={colors.mutedForeground + "80"}
+            placeholder="Search by name, employee ID, role or department"
+            placeholderTextColor={colors.mutedForeground}
             value={search}
             onChangeText={setSearch}
           />
           {search ? (
-            <TouchableOpacity onPress={() => setSearch("")}>
+            <TouchableOpacity onPress={() => setSearch("")} accessibilityLabel="Clear search">
               <SvgX size={14} color={colors.mutedForeground} />
             </TouchableOpacity>
           ) : null}
         </View>
 
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
-          <View style={styles.filterGroup}>
-            <Text style={[styles.filterLabel, { color: colors.mutedForeground }]}>Department:</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={{ flexDirection: "row", gap: 6 }}>
-                {Array.from(new Set(["all", ...departments.map((d) => d.name)].filter(Boolean))).map((dept, idx) => (
-                  <TouchableOpacity
-                    key={`${dept}-${idx}`}
-                    style={[
-                      styles.filterChip,
-                      {
-                        backgroundColor: selectedDept === dept ? "#8B5CF6" : colors.background,
-                        borderColor: selectedDept === dept ? "transparent" : colors.border,
-                      },
-                    ]}
-                    onPress={() => setSelectedDept(dept)}
-                  >
-                    <Text
-                      style={[
-                        styles.filterChipText,
-                        { color: selectedDept === dept ? "#FFFFFF" : colors.foreground },
-                      ]}
-                    >
-                      {dept === "all" ? "All Departments" : dept}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
-          </View>
+        <View style={styles.pFilterRow}>
+          <Text style={[styles.pFilterLabel, { color: colors.mutedForeground }]}>Department</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+            {Array.from(new Set(["all", ...departments.map((d) => d.name)].filter(Boolean))).map((dept, idx) => {
+              const isSel = selectedDept === dept;
+              return (
+                <TouchableOpacity
+                  key={`${dept}-${idx}`}
+                  style={[styles.filterChip, { backgroundColor: isSel ? colors.primary : colors.background, borderColor: isSel ? colors.primary : colors.border }]}
+                  onPress={() => setSelectedDept(dept)}
+                >
+                  <Text style={[styles.filterChipText, { color: isSel ? "#FFFFFF" : colors.foreground }]}>
+                    {dept === "all" ? "All" : dept}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+
+        <View style={[styles.pResultRow, { borderTopColor: colors.border }]}>
+          <Text style={[styles.pResultText, { color: colors.foreground }]}>
+            Showing {filteredPayroll.length} {filteredPayroll.length === 1 ? "record" : "records"}
+            {selectedDept !== "all" ? ` in ${selectedDept}` : ""}
+            {search.trim() ? ` matching "${search.trim()}"` : ""}
+          </Text>
+          {(selectedDept !== "all" || search.trim().length > 0) && (
+            <TouchableOpacity
+              onPress={() => {
+                setSelectedDept("all");
+                setSearch("");
+              }}
+              style={[styles.pClearBtn, { borderColor: colors.border }]}
+            >
+              <SvgX size={12} color={colors.primary} />
+              <Text style={[styles.pClearText, { color: colors.primary }]}>Clear filters</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
-      {/* ─── Mobile Card List OR Desktop Data Table ─── */}
+      {/* ─── Mobile cards OR desktop table ─── */}
       {isMobile ? (
         <View style={{ gap: 10 }}>
           {filteredPayroll.length === 0 ? (
-            <View style={[styles.emptyWrap, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 14 }]}>
+            <View style={[styles.emptyWrap, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 8 }]}>
               <SvgFileText size={36} color={colors.mutedForeground} />
-              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No payroll records matching filters</Text>
-              <Text style={[styles.emptySubtitle, { color: colors.mutedForeground }]}>
-                Try clearing your search query or generate a new payroll entry.
-              </Text>
+              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No payroll records found</Text>
+              <Text style={[styles.emptySubtitle, { color: colors.mutedForeground }]}>Clear the filters or add a new payroll entry.</Text>
             </View>
           ) : (
             filteredPayroll.map((p) => {
               const net = (p.baseSalary || 0) + (p.bonus || 0) - (p.deductions || 0);
               return (
-                <View
-                  key={p.id}
-                  style={[
-                    styles.mobileCard,
-                    { backgroundColor: colors.card, borderColor: colors.border },
-                  ]}
-                >
+                <View key={p.id} style={[styles.mobileCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                   <View style={styles.mobileCardTop}>
-                    <View style={{ flex: 1 }}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
                       <Text style={[styles.empName, { color: colors.foreground }]}>{p.employeeName}</Text>
-                      <Text style={[styles.empMeta, { color: colors.mutedForeground }]}>
-                        {p.employeeId} · {p.designation || p.department}
-                      </Text>
+                      <FitText style={[styles.empMeta, { color: colors.mutedForeground }]}>
+                        {`${p.employeeId} · ${p.designation || "Staff"} · ${p.department}`}
+                      </FitText>
                       <PeriodStatus entry={p} />
                     </View>
-                    <Text style={[styles.mobileAmount, { color: "#8B5CF6" }]}>
+                    <Text style={[styles.mobileAmount, { color: colors.foreground }]}>
                       {settings.currency} {net.toLocaleString()}
                     </Text>
                   </View>
 
                   <View style={[styles.breakdownBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                    <View style={styles.breakdownCol}>
-                      <Text style={[styles.breakdownLabel, { color: colors.mutedForeground }]}>BASE</Text>
-                      <Text style={[styles.breakdownVal, { color: colors.foreground }]}>
-                        {settings.currency} {p.baseSalary?.toLocaleString()}
-                      </Text>
-                    </View>
-                    <View style={styles.breakdownCol}>
-                      <Text style={[styles.breakdownLabel, { color: colors.mutedForeground }]}>BONUS</Text>
-                      <Text style={[styles.breakdownVal, { color: colors.income }]}>
-                        +{settings.currency} {p.bonus?.toLocaleString() || "0"}
-                      </Text>
-                    </View>
-                    <View style={styles.breakdownCol}>
-                      <Text style={[styles.breakdownLabel, { color: colors.mutedForeground }]}>DEDUCT</Text>
-                      <Text style={[styles.breakdownVal, { color: colors.expense }]}>
-                        -{settings.currency} {p.deductions?.toLocaleString() || "0"}
-                      </Text>
-                    </View>
+                    {[
+                      { label: "Base", value: `${settings.currency} ${(p.baseSalary || 0).toLocaleString()}`, color: colors.foreground },
+                      { label: "Bonus", value: `+${(p.bonus || 0).toLocaleString()}`, color: colors.income },
+                      { label: "Deductions", value: `-${(p.deductions || 0).toLocaleString()}`, color: colors.expense },
+                    ].map((b) => (
+                      <View key={b.label} style={styles.breakdownCol}>
+                        <Text style={[styles.pSumSub, { color: colors.mutedForeground }]}>{b.label}</Text>
+                        <FitText style={[styles.breakdownVal, { color: b.color }]}>{b.value}</FitText>
+                      </View>
+                    ))}
                   </View>
 
                   <View style={styles.mobileActionsRow}>
-                    <TouchableOpacity
-                      style={[styles.mobileActionBtn, { borderColor: "#8B5CF640", backgroundColor: "#8B5CF612" }]}
-                      onPress={() => setViewingSlipEntries([p])}
-                    >
-                      <SvgFileText size={12} color="#8B5CF6" />
-                      <Text style={[styles.mobileActionText, { color: "#8B5CF6" }]}>Salary Slip</Text>
+                    <TouchableOpacity style={[styles.mobileActionBtn, { borderColor: colors.border }]} onPress={() => setViewingSlipEntries([p])}>
+                      <SvgFileText size={13} color={colors.foreground} />
+                      <Text style={[styles.mobileActionText, { color: colors.foreground }]}>Payslip</Text>
                     </TouchableOpacity>
-
                     {canEdit && (
                       <>
                         <TouchableOpacity
@@ -409,11 +383,7 @@ export function WebPayroll() {
                         >
                           <Text style={[styles.mobileActionText, { color: colors.primary }]}>Edit</Text>
                         </TouchableOpacity>
-
-                        <TouchableOpacity
-                          style={[styles.mobileActionBtn, { borderColor: colors.expense + "40", backgroundColor: colors.expense + "10" }]}
-                          onPress={() => setDeletingPayroll(p)}
-                        >
+                        <TouchableOpacity style={[styles.mobileActionBtn, { borderColor: colors.expense + "40" }]} onPress={() => setDeletingPayroll(p)}>
                           <Text style={[styles.mobileActionText, { color: colors.expense }]}>Delete</Text>
                         </TouchableOpacity>
                       </>
@@ -426,120 +396,117 @@ export function WebPayroll() {
         </View>
       ) : (
         <View style={[styles.tableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <ScrollView horizontal contentContainerStyle={{ width: "100%" }} showsHorizontalScrollIndicator={true}>
-            <View style={{ minWidth: 690, width: "100%" }}>
+          <ScrollView horizontal contentContainerStyle={{ minWidth: "100%" }} showsHorizontalScrollIndicator>
+            <View style={{ minWidth: 1080, width: "100%" }}>
+              {/* Header */}
               <View style={[styles.tableHeader, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-                <View style={[styles.thCol, { flex: 1.8, minWidth: 140, paddingLeft: 14, paddingRight: 6, justifyContent: "flex-start" }]}>
-                  <Text style={[styles.thText, { color: colors.mutedForeground }]}>EMPLOYEE</Text>
-                </View>
-                <View style={[styles.thCol, { flex: 1.3, minWidth: 100, paddingHorizontal: 6, justifyContent: "flex-start" }]}>
-                  <Text style={[styles.thText, { color: colors.mutedForeground }]}>DEPARTMENT</Text>
-                </View>
-                <View style={[styles.thCol, { flex: 0.9, minWidth: 75, paddingHorizontal: 6, justifyContent: "flex-end" }]}>
-                  <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>BASE</Text>
-                </View>
-                <View style={[styles.thCol, { flex: 0.8, minWidth: 65, paddingHorizontal: 6, justifyContent: "flex-end" }]}>
-                  <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>BONUS</Text>
-                </View>
-                <View style={[styles.thCol, { flex: 0.9, minWidth: 75, paddingHorizontal: 6, justifyContent: "flex-end" }]}>
-                  <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>DEDUCT.</Text>
-                </View>
-                <View style={[styles.thCol, { flex: 1.1, minWidth: 90, paddingHorizontal: 6, justifyContent: "flex-end" }]}>
-                  <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>NET SALARY</Text>
-                </View>
-                <View style={[styles.thCol, { flex: 1.0, minWidth: 80, paddingRight: 14, paddingLeft: 6, justifyContent: "flex-end" }]}>
-                  <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>ACTIONS</Text>
-                </View>
+                {PAY_COLS.map((c) => (
+                  <View key={c.key} style={[styles.pCell, c.style]}>
+                    <Text numberOfLines={1} style={[styles.pTh, { color: colors.mutedForeground, textAlign: c.align }]}>{c.label}</Text>
+                  </View>
+                ))}
               </View>
 
               {filteredPayroll.length === 0 ? (
                 <View style={styles.emptyWrap}>
                   <SvgFileText size={36} color={colors.mutedForeground} />
-                  <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No payroll entries recorded</Text>
+                  <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No payroll records found</Text>
                   <Text style={[styles.emptySubtitle, { color: colors.mutedForeground }]}>
-                    Click "Add Entry" to generate a staff payroll slip.
+                    Clear the filters, or click "Add payroll entry" to create one.
                   </Text>
                 </View>
               ) : (
-                filteredPayroll.map((p) => {
-                  const net = (p.baseSalary || 0) + (p.bonus || 0) - (p.deductions || 0);
-                  return (
-                    <View key={p.id} style={[styles.tableRow, { borderBottomColor: colors.border }]}>
-                      <View style={[styles.tdCol, { flex: 1.8, minWidth: 140, paddingLeft: 14, paddingRight: 6, justifyContent: "center" }]}>
-                        <Text style={[styles.empName, { color: colors.foreground }]}>
-                          {p.employeeName}
-                        </Text>
-                        <Text style={[styles.empMeta, { color: colors.mutedForeground }]}>
-                          {p.employeeId} · {p.designation || "Staff"}
-                        </Text>
-                        <PeriodStatus entry={p} />
+                <>
+                  {filteredPayroll.map((p) => {
+                    const net = (p.baseSalary || 0) + (p.bonus || 0) - (p.deductions || 0);
+                    const pending = p.paymentStatus === "pending";
+                    const tone = pending ? colors.warning : colors.income;
+                    return (
+                      <View key={p.id} style={[styles.tableRow, { borderBottomColor: colors.border }]}>
+                        <View style={[styles.pCell, PAY_COLS[0].style, { flexDirection: "row", alignItems: "center", gap: 10 }]}>
+                          <View style={[styles.pAvatar, { backgroundColor: colors.info + "18" }]}>
+                            <Text style={[styles.pAvatarText, { color: colors.info }]}>
+                              {(p.employeeName || "E").trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase()}
+                            </Text>
+                          </View>
+                          <View style={{ flex: 1, minWidth: 0 }}>
+                            <FitText style={[styles.empName, { color: colors.foreground }]}>{p.employeeName}</FitText>
+                            <FitText style={[styles.empMeta, { color: colors.mutedForeground }]}>{`${p.employeeId} · ${p.designation || "Staff"}`}</FitText>
+                          </View>
+                        </View>
+                        <View style={[styles.pCell, PAY_COLS[1].style]}>
+                          <FitText style={[styles.pCellText, { color: colors.foreground }]}>{p.month}</FitText>
+                        </View>
+                        <View style={[styles.pCell, PAY_COLS[2].style]}>
+                          <FitText style={[styles.pCellText, { color: colors.foreground }]}>{p.department || "—"}</FitText>
+                        </View>
+                        <View style={[styles.pCell, PAY_COLS[3].style]}>
+                          <FitText style={[styles.pAmt, { color: colors.foreground }]}>{`${settings.currency} ${(p.baseSalary || 0).toLocaleString()}`}</FitText>
+                        </View>
+                        <View style={[styles.pCell, PAY_COLS[4].style]}>
+                          <FitText style={[styles.pAmt, { color: colors.income }]}>{`+${(p.bonus || 0).toLocaleString()}`}</FitText>
+                        </View>
+                        <View style={[styles.pCell, PAY_COLS[5].style]}>
+                          <FitText style={[styles.pAmt, { color: colors.expense }]}>{`-${(p.deductions || 0).toLocaleString()}`}</FitText>
+                        </View>
+                        <View style={[styles.pCell, PAY_COLS[6].style]}>
+                          <FitText style={[styles.pNet, { color: colors.foreground }]}>{`${settings.currency} ${net.toLocaleString()}`}</FitText>
+                        </View>
+                        <View style={[styles.pCell, PAY_COLS[7].style, { alignItems: "center" }]}>
+                          <View style={[styles.pStatus, { backgroundColor: tone + "16" }]}>
+                            <View style={[styles.pDot, { backgroundColor: tone }]} />
+                            <Text numberOfLines={1} style={[styles.pStatusText, { color: tone }]}>{pending ? "Pending" : "Paid"}</Text>
+                          </View>
+                        </View>
+                        <View style={[styles.pCell, PAY_COLS[8].style, { flexDirection: "row", justifyContent: "flex-end", gap: 6 }]}>
+                          <TouchableOpacity style={[styles.pIconBtn, { borderColor: colors.border }]} onPress={() => setViewingSlipEntries([p])} accessibilityLabel="Open payslip">
+                            <SvgFileText size={14} color={colors.foreground} />
+                          </TouchableOpacity>
+                          {canEdit && (
+                            <>
+                              <TouchableOpacity
+                                style={[styles.pIconBtn, { borderColor: colors.border }]}
+                                onPress={() => {
+                                  setEditingEntry(p);
+                                  setModalVisible(true);
+                                }}
+                                accessibilityLabel="Edit entry"
+                              >
+                                <SvgEdit size={14} color={colors.primary} />
+                              </TouchableOpacity>
+                              <TouchableOpacity style={[styles.pIconBtn, { borderColor: colors.expense + "40" }]} onPress={() => setDeletingPayroll(p)} accessibilityLabel="Delete entry">
+                                <SvgTrash size={14} color={colors.expense} />
+                              </TouchableOpacity>
+                            </>
+                          )}
+                        </View>
                       </View>
+                    );
+                  })}
 
-                      <View style={[styles.tdCol, { flex: 1.3, minWidth: 100, paddingHorizontal: 6, justifyContent: "center" }]}>
-                        <Text style={[styles.deptText, { color: colors.foreground }]}>
-                          {p.department}
-                        </Text>
-                      </View>
-
-                      <View style={[styles.tdCol, { flex: 0.9, minWidth: 75, paddingHorizontal: 6, alignItems: "flex-end", justifyContent: "center" }]}>
-                        <Text style={[styles.amountCell, { color: colors.foreground }]}>
-                          {settings.currency} {p.baseSalary?.toLocaleString()}
-                        </Text>
-                      </View>
-
-                      <View style={[styles.tdCol, { flex: 0.8, minWidth: 65, paddingHorizontal: 6, alignItems: "flex-end", justifyContent: "center" }]}>
-                        <Text style={[styles.amountCell, { color: colors.income }]}>
-                          +{p.bonus?.toLocaleString() || "0"}
-                        </Text>
-                      </View>
-
-                      <View style={[styles.tdCol, { flex: 0.9, minWidth: 75, paddingHorizontal: 6, alignItems: "flex-end", justifyContent: "center" }]}>
-                        <Text style={[styles.amountCell, { color: colors.expense }]}>
-                          -{p.deductions?.toLocaleString() || "0"}
-                        </Text>
-                      </View>
-
-                      <View style={[styles.tdCol, { flex: 1.1, minWidth: 90, paddingHorizontal: 6, alignItems: "flex-end", justifyContent: "center" }]}>
-                        <Text style={[styles.netAmountText, { color: "#8B5CF6" }]}>
-                          {settings.currency} {net.toLocaleString()}
-                        </Text>
-                      </View>
-
-                      <View style={[styles.tdCol, { flex: 1.0, minWidth: 80, paddingRight: 14, paddingLeft: 6, flexDirection: "row", alignItems: "center", justifyContent: "flex-end", gap: 4 }]}>
-                        <TouchableOpacity
-                          style={[styles.actionIconBtn, { borderColor: "#8B5CF640", backgroundColor: "#8B5CF612" }]}
-                          onPress={() => setViewingSlipEntries([p])}
-                          accessibilityLabel="Generate Salary Slip"
-                        >
-                          <SvgFileText size={13} color="#8B5CF6" />
-                        </TouchableOpacity>
-
-                        {canEdit && (
-                          <>
-                            <TouchableOpacity
-                              style={[styles.actionIconBtn, { borderColor: colors.border }]}
-                              onPress={() => {
-                                setEditingEntry(p);
-                                setModalVisible(true);
-                              }}
-                              accessibilityLabel="Edit Entry"
-                            >
-                              <SvgEdit size={14} color={colors.primary} />
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                              style={[styles.actionIconBtn, { borderColor: "#F43F5E30", backgroundColor: "#F43F5E12" }]}
-                              onPress={() => setDeletingPayroll(p)}
-                              accessibilityLabel="Delete Record"
-                            >
-                              <SvgTrash size={14} color="#F43F5E" />
-                            </TouchableOpacity>
-                          </>
-                        )}
-                      </View>
+                  {/* Totals */}
+                  <View style={[styles.tableRow, { borderBottomWidth: 0, backgroundColor: colors.background }]}>
+                    <View style={[styles.pCell, PAY_COLS[0].style]}>
+                      <Text numberOfLines={1} style={[styles.pNet, { color: colors.foreground }]}>Total ({filteredPayroll.length})</Text>
                     </View>
-                  );
-                })
+                    <View style={[styles.pCell, PAY_COLS[1].style]} />
+                    <View style={[styles.pCell, PAY_COLS[2].style]} />
+                    <View style={[styles.pCell, PAY_COLS[3].style]}>
+                      <FitText style={[styles.pNet, { color: colors.foreground }]}>{`${settings.currency} ${totalBase.toLocaleString()}`}</FitText>
+                    </View>
+                    <View style={[styles.pCell, PAY_COLS[4].style]}>
+                      <FitText style={[styles.pNet, { color: colors.income }]}>{`+${totalBonus.toLocaleString()}`}</FitText>
+                    </View>
+                    <View style={[styles.pCell, PAY_COLS[5].style]}>
+                      <FitText style={[styles.pNet, { color: colors.expense }]}>{`-${totalDeductions.toLocaleString()}`}</FitText>
+                    </View>
+                    <View style={[styles.pCell, PAY_COLS[6].style]}>
+                      <FitText style={[styles.pNet, { color: colors.primary }]}>{`${settings.currency} ${totalNetDisbursed.toLocaleString()}`}</FitText>
+                    </View>
+                    <View style={[styles.pCell, PAY_COLS[7].style]} />
+                    <View style={[styles.pCell, PAY_COLS[8].style]} />
+                  </View>
+                </>
               )}
             </View>
           </ScrollView>
@@ -589,15 +556,54 @@ function PeriodStatus({ entry }: { entry: PayrollEntry }) {
   const tone = pending ? "#F59E0B" : colors.income;
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 3, flexWrap: "wrap" }}>
-      <Text style={{ fontSize: 10.5, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>Period: {entry.month}</Text>
-      <View style={{ paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4, backgroundColor: tone + "18", borderWidth: 1, borderColor: tone + "40" }}>
-        <Text style={{ fontSize: 9.5, fontFamily: "Inter_700Bold", color: tone, textTransform: "uppercase" }}>{entry.paymentStatus || "PAID"}</Text>
+      <Text style={{ fontSize: 12.5, fontFamily: "Inter_400Regular", color: colors.mutedForeground }}>Period {entry.month}</Text>
+      <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: tone + "16" }}>
+        <Text style={{ fontSize: 12, fontFamily: "Inter_600SemiBold", color: tone }}>{pending ? "Pending" : "Paid"}</Text>
       </View>
     </View>
   );
 }
 
+// Column layout shared by the header, rows and totals so every value lines up.
+const PAY_COLS = [
+  { key: "emp", label: "Employee", align: "left", style: { flex: 1, minWidth: 230, paddingLeft: 16 } },
+  { key: "period", label: "Period", align: "left", style: { width: 90 } },
+  { key: "dept", label: "Department", align: "left", style: { width: 120 } },
+  { key: "base", label: "Base salary", align: "right", style: { width: 120 } },
+  { key: "bonus", label: "Bonus", align: "right", style: { width: 95 } },
+  { key: "ded", label: "Deductions", align: "right", style: { width: 105 } },
+  { key: "net", label: "Net pay", align: "right", style: { width: 125 } },
+  { key: "status", label: "Status", align: "center", style: { width: 95 } },
+  { key: "act", label: "Actions", align: "right", style: { width: 130, paddingRight: 16 } },
+] as const;
+
 const styles = StyleSheet.create({
+  pBtn: { flexDirection: "row", alignItems: "center", gap: 8, height: 38, paddingHorizontal: 16, borderRadius: 8, borderWidth: 1, justifyContent: "center" },
+  pBtnText: { fontSize: 13.5, fontFamily: "Inter_600SemiBold" },
+  pTabs: { flexDirection: "row", gap: 4, borderBottomWidth: 1 },
+  pTab: { paddingHorizontal: 14, paddingVertical: 11, borderBottomWidth: 2, marginBottom: -1 },
+  pTabText: { fontSize: 14 },
+  pSumCard: { borderTopWidth: 3, gap: 6 },
+  pSumLabel: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  pSumValue: { fontSize: 22, fontFamily: "Inter_600SemiBold", letterSpacing: -0.3 },
+  pSumSub: { fontSize: 12.5, fontFamily: "Inter_400Regular", lineHeight: 18 },
+  pFilterRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  pFilterLabel: { width: 90, fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  pResultRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, paddingTop: 12, borderTopWidth: 1 },
+  pResultText: { fontSize: 13, fontFamily: "Inter_600SemiBold", flexShrink: 1 },
+  pClearBtn: { flexDirection: "row", alignItems: "center", gap: 6, height: 32, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1 },
+  pClearText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  pCell: { paddingHorizontal: 8, justifyContent: "center" },
+  pTh: { fontSize: 12.5, fontFamily: "Inter_600SemiBold" },
+  pCellText: { fontSize: 13.5, fontFamily: "Inter_400Regular" },
+  pAmt: { fontSize: 13.5, fontFamily: "Inter_500Medium", textAlign: "right" },
+  pNet: { fontSize: 14, fontFamily: "Inter_600SemiBold", textAlign: "right" },
+  pAvatar: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
+  pAvatarText: { fontSize: 12.5, fontFamily: "Inter_600SemiBold" },
+  pStatus: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
+  pDot: { width: 7, height: 7, borderRadius: 4 },
+  pStatusText: { fontSize: 12.5, fontFamily: "Inter_600SemiBold" },
+  pIconBtn: { width: 32, height: 32, borderRadius: 6, borderWidth: 1, alignItems: "center", justifyContent: "center" },
   tabBtn: {
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -639,8 +645,8 @@ const styles = StyleSheet.create({
   },
   pageTitle: {
     fontSize: 22,
-    fontFamily: "Inter_800ExtraBold",
-    letterSpacing: -0.6,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: -0.4,
   },
   pageSubtitle: {
     fontSize: 13,
@@ -694,13 +700,13 @@ const styles = StyleSheet.create({
   metricCard: {
     flex: 1,
     minWidth: 200,
-    borderRadius: 16,
+    borderRadius: 10,
     borderWidth: 1,
     padding: 16,
     gap: 4,
   },
   metricLabel: {
-    fontSize: 10.5,
+    fontSize: 11.5,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.6,
   },
@@ -715,7 +721,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
   },
   filterBarCard: {
-    borderRadius: 16,
+    borderRadius: 10,
     borderWidth: 1,
     padding: 14,
     gap: 12,
@@ -745,17 +751,18 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
   },
   filterChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingHorizontal: 14,
+    height: 32,
+    justifyContent: "center",
+    borderRadius: 6,
     borderWidth: 1,
   },
   filterChipText: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
   },
   mobileCard: {
-    borderRadius: 14,
+    borderRadius: 8,
     borderWidth: 1,
     padding: 14,
     gap: 10,
@@ -783,7 +790,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   breakdownLabel: {
-    fontSize: 9.5,
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.6,
   },
@@ -811,7 +818,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
   },
   tableCard: {
-    borderRadius: 16,
+    borderRadius: 10,
     borderWidth: 1,
     overflow: "hidden",
     width: "100%",
@@ -827,7 +834,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   thText: {
-    fontSize: 10.5,
+    fontSize: 11.5,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.8,
   },
@@ -841,14 +848,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   empName: {
-    fontSize: 13.5,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: -0.2,
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: -0.1,
   },
   empMeta: {
-    fontSize: 11,
+    fontSize: 12.5,
     fontFamily: "Inter_400Regular",
-    marginTop: 1.5,
+    marginTop: 2,
   },
   deptText: {
     fontSize: 12,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from "react";
 // WebShell: Master desktop/tablet/mobile responsive shell for OFM with real-time notification center
 import { StyleSheet, Text, TouchableOpacity, View, ScrollView, useWindowDimensions, Modal, Image, ActivityIndicator } from "react-native";
 import { useAuth } from "@/context/AuthContext";
@@ -26,9 +26,16 @@ import {
   SvgMoon,
   SvgPlus,
   SvgBell,
+  SvgCalendar,
+  SvgCheckCircle,
+  SvgChevronDown,
 } from "./SvgIcons";
 
 import { WebDashboard } from "./WebDashboard";
+import { BrandMark } from "./BrandMark";
+import { FitText } from "./FitText";
+import { FiscalScopeMode, FiscalScopeProvider, loadScopeMode, saveScopeMode } from "./FiscalScope";
+import { MONTH_NAMES, fiscalMonthIndex, fiscalRange, fiscalStartYearFor, fiscalStatus, normalizeStartMonth, parseFiscalStartYear } from "@/services/fiscalYear";
 import { WebAuth } from "./WebAuth";
 import { OpenInAppBanner } from "./OpenInAppBanner";
 
@@ -184,7 +191,9 @@ export function normalizeWebTab(raw: string | null | undefined): WebTabKey {
 
 export function WebShell() {
   const colors = useColors();
-  const { width } = useWindowDimensions();
+  // Dark charcoal navigation rail (same in light & dark themes)
+  const SB = { bg: "#1F2125", border: "#33363C", text: "#D9DBDF", muted: "#8E9198", accent: "#53B700", activeBg: "#2E3137", badgeBg: "#33363C" };
+  const { width, height } = useWindowDimensions();
   const isMobile = width < 768;
   const isTablet = width >= 768 && width < 1080;
 
@@ -196,6 +205,17 @@ export function WebShell() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(isTablet);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [notificationModalVisible, setNotificationModalVisible] = useState(false);
+  const [fyOpen, setFyOpen] = useState(false);
+  const fyAnchorRef = useRef<View>(null);
+  const [fyAnchor, setFyAnchor] = useState({ bottom: 68, right: 16 });
+  const [fyViewYear, setFyViewYear] = useState<number | null>(null); // year being looked at in the picker
+  const [fyDraftMonth, setFyDraftMonth] = useState<number | null>(null); // start month being tried out
+  const [fyMsg, setFyMsg] = useState<string | null>(null);
+  const [scopeMode, setScopeModeState] = useState<FiscalScopeMode>(() => loadScopeMode());
+  const setScopeMode = (m: FiscalScopeMode) => {
+    setScopeModeState(m);
+    saveScopeMode(m);
+  };
 
   // Global Quick Modals
   const [txModalVisible, setTxModalVisible] = useState(false);
@@ -327,24 +347,75 @@ export function WebShell() {
   }
 
   const canEdit = user?.role === "admin" || user?.role === "accountant";
+  const userInitials = (user?.name || user?.email?.split("@")[0] || "U").trim().split(/[\s._-]+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "U";
+  // ── Fiscal year: saved in Settings (label + start month); the picker can browse other years ──
+  const fyStartMonthSaved = normalizeStartMonth(settings.fiscalYearStartMonth);
+  const fySavedYear = parseFiscalStartYear(settings.fiscalYear, fyStartMonthSaved);
+  const fyMonth = fyDraftMonth ?? fyStartMonthSaved;
+  const fyYear = fyViewYear ?? fySavedYear;
+  const fyThisYear = fiscalStartYearFor(new Date(), fyMonth);
+  const fyRangeSaved = fiscalRange(fySavedYear, fyStartMonthSaved);
+  const fyRangeView = fiscalRange(fyYear, fyMonth);
+  const fyFigures = (() => {
+    const inFy = (transactions || []).filter((t) => {
+      const d = (t.date || "").slice(0, 10);
+      return d >= fyRangeView.startYmd && d <= fyRangeView.endYmd && (t as any).status !== "failed" && (t as any).status !== "deleted";
+    });
+    const income = inFy.filter((t) => t.type === "income").reduce((x, t) => x + (Number(t.amount) || 0), 0);
+    const expenses = inFy.filter((t) => t.type === "expense").reduce((x, t) => x + (Number(t.amount) || 0), 0);
+    return { income, expenses, net: income - expenses, count: inFy.length };
+  })();
+  const fyViewStatus = fiscalStatus(fyRangeView);
+  const fySavedStatus = fiscalStatus(fyRangeSaved);
+  const fyViewPct = fyViewStatus === "active"
+    ? Math.min(100, ((Date.now() - fyRangeView.start.getTime()) / (fyRangeView.end.getTime() - fyRangeView.start.getTime())) * 100)
+    : fyViewStatus === "ended" ? 100 : 0;
+  const fyIsSaved = fyYear === fySavedYear && fyMonth === fyStartMonthSaved;
+  const fySavedCount = (transactions || []).filter((t) => {
+    const d = (t.date || "").slice(0, 10);
+    return d >= fyRangeSaved.startYmd && d <= fyRangeSaved.endYmd;
+  }).length;
+  const fyCurrentYear = fiscalStartYearFor(new Date(), fyStartMonthSaved);
+  const fyDate = (d: Date) => d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  const fyPanelWidth = Math.min(352, Math.max(0, width - 24));
+  const fyPanelTop = isMobile ? 12 : Math.min(fyAnchor.bottom + 8, Math.max(12, height - 480 - 12));
+  const fyPanelRight = Math.max(12, Math.min(fyAnchor.right, width - fyPanelWidth - 12));
+  const fyPanelMaxHeight = Math.min(480, Math.max(0, height - fyPanelTop - 12));
+  const closeFy = () => {
+    setFyOpen(false);
+    setFyViewYear(null);
+    setFyDraftMonth(null);
+    setFyMsg(null);
+  };
+  const userRoleLabel = (user?.role || "admin").charAt(0).toUpperCase() + (user?.role || "admin").slice(1);
   const hasCustomLogo = Boolean(settings?.organizationLogo && settings.organizationLogo.trim());
 
   const incomeCount = transactions.filter((t) => t.type === "income").length;
   const expenseCount = transactions.filter((t) => t.type === "expense").length;
 
   const NAV_ITEMS: NavItem[] = [
-    { id: "dashboard", section: "Overview", label: user?.role === "employee" ? "Employee Portal" : "Dashboard", icon: "grid" },
-    { id: "income", section: "Finance", label: "Income & Grants", icon: "arrow-up-right", badge: incomeCount, roleRestriction: ["admin", "accountant"] },
+    { id: "dashboard", section: "Overview", label: "Dashboard", icon: "grid", roleRestriction: ["admin", "accountant", "manager"] },
+    { id: "income", section: "Finance", label: "Income", icon: "arrow-up-right", badge: incomeCount, roleRestriction: ["admin", "accountant"] },
     { id: "expenses", section: "Finance", label: "Expenses", icon: "arrow-down-left", badge: expenseCount, roleRestriction: ["admin", "accountant", "manager"] },
     { id: "transactions", section: "Finance", label: "Transactions", icon: "list", roleRestriction: ["admin", "accountant", "manager"] },
-    { id: "budgets", section: "Finance", label: "Budget Allocations", icon: "pie-chart", badge: budgets.length, roleRestriction: ["admin", "accountant", "manager"] },
+    { id: "budgets", section: "Finance", label: "Budgets", icon: "pie-chart", badge: budgets.length, roleRestriction: ["admin", "accountant", "manager"] },
     { id: "departments", section: "Organization", label: "Departments", icon: "layers", badge: departments.length, roleRestriction: ["admin", "accountant", "manager"] },
-    { id: "payroll", section: "Organization", label: user?.role === "employee" ? "My Salary Slip" : "Staff Payroll", icon: "users", badge: user?.role === "employee" ? undefined : payroll.length, roleRestriction: ["admin", "accountant", "manager", "employee"] },
-    { id: "team", section: "Organization", label: "Team & Permissions", icon: "shield", roleRestriction: ["admin"] },
-    { id: "reports", section: "Insights", label: "Financial Reports", icon: "file-text", roleRestriction: ["admin", "accountant", "manager"] },
+    { id: "payroll", section: "Organization", label: user?.role === "employee" ? "My payslips" : "Payroll", icon: "users", badge: user?.role === "employee" ? undefined : payroll.length, roleRestriction: ["admin", "accountant", "manager", "employee"] },
+    { id: "team", section: "Organization", label: "Team", icon: "shield", roleRestriction: ["admin"] },
+    { id: "reports", section: "Insights", label: "Reports", icon: "file-text", roleRestriction: ["admin", "accountant", "manager"] },
     { id: "ai-insights", section: "Insights", label: "AI Insights", icon: "cpu", roleRestriction: ["admin", "manager"] },
     { id: "settings", section: "System", label: "Settings", icon: "settings", roleRestriction: ["admin"] },
   ];
+
+  // ── Role-based page access: pages are blocked, not just hidden from the menu ──
+  const allowedTabs = new Set<WebTabKey>(
+    NAV_ITEMS.filter((i) => !i.roleRestriction || (user && i.roleRestriction.includes(user.role))).map((i) => i.id)
+  );
+  const homeTab: WebTabKey = allowedTabs.has("dashboard") ? "dashboard" : "payroll";
+  const requestedTab: WebTabKey = VALID_TABS.includes(activeTab) ? activeTab : "dashboard";
+  // Landing on "dashboard" (default / unknown tab) quietly goes to this role's home page
+  const shownTab: WebTabKey | null = allowedTabs.has(requestedTab) ? requestedTab : requestedTab === "dashboard" ? homeTab : null;
+  const requestedLabel = NAV_ITEMS.find((n) => n.id === requestedTab)?.label || "This page";
 
   const handleOpenTx = (type: "income" | "expense") => {
     setTxModalType(type);
@@ -385,9 +456,9 @@ export function WebShell() {
             <React.Fragment key={item.id}>
             {startsSection && (
               isCollapsed ? (
-                idx > 0 && <View style={[styles.navSectionDivider, { backgroundColor: colors.border }]} />
+                idx > 0 && <View style={[styles.navSectionDivider, { backgroundColor: SB.border }]} />
               ) : (
-                <Text style={[styles.navSectionLabel, { color: colors.mutedForeground }, idx === 0 && { marginTop: 2 }]}>
+                <Text numberOfLines={1} style={[styles.navSectionLabel, { color: SB.muted }, idx === 0 && { marginTop: 2 }]}>
                   {item.section}
                 </Text>
               )
@@ -400,13 +471,12 @@ export function WebShell() {
                   justifyContent: "center",
                   paddingHorizontal: 0,
                   alignItems: "center",
-                  borderLeftWidth: 0,
-                  borderRadius: 10,
-                  height: 42,
+                  borderRadius: 12,
+                  height: 44,
                 },
                 isActive && {
-                  backgroundColor: colors.primary + "16",
-                  borderLeftColor: (!isDrawer && sidebarCollapsed) ? "transparent" : colors.primary,
+                  backgroundColor: SB.activeBg,
+                  borderLeftColor: (!isDrawer && sidebarCollapsed) ? "transparent" : SB.accent,
                 },
               ]}
               onPress={() => {
@@ -416,14 +486,14 @@ export function WebShell() {
               accessibilityLabel={(!isDrawer && sidebarCollapsed) ? item.label : undefined}
               activeOpacity={0.7}
             >
-              {renderNavIcon(item.icon, 16, isActive ? colors.primary : colors.mutedForeground)}
+              {renderNavIcon(item.icon, 18, isActive ? SB.accent : SB.muted)}
               {(isDrawer || !sidebarCollapsed) && (
-                <Text
+                <Text numberOfLines={1}
                   style={[
                     styles.navLabel,
                     {
-                      color: isActive ? colors.primary : colors.foreground,
-                      fontFamily: isActive ? "Inter_700Bold" : "Inter_500Medium",
+                      color: isActive ? "#FFFFFF" : SB.text,
+                      fontFamily: isActive ? "Inter_600SemiBold" : "Inter_500Medium",
                     },
                   ]}
                 >
@@ -432,8 +502,8 @@ export function WebShell() {
               )}
 
               {Boolean(item.badge) && (!isDrawer && sidebarCollapsed ? null : (
-                <View style={[styles.navBadge, { backgroundColor: isActive ? colors.primary + "1F" : colors.muted }]}>
-                  <Text style={[styles.navBadgeText, { color: isActive ? colors.primary : colors.mutedForeground }]}>{item.badge}</Text>
+                <View style={[styles.navBadge, { backgroundColor: isActive ? SB.accent + "33" : SB.badgeBg }]}>
+                  <Text style={[styles.navBadgeText, { color: isActive ? "#FFFFFF" : SB.muted }]}>{item.badge}</Text>
                 </View>
               ))}
             </TouchableOpacity>
@@ -457,8 +527,8 @@ export function WebShell() {
             styles.sidebar,
             {
               width: sidebarCollapsed ? 76 : 260,
-              backgroundColor: colors.card,
-              borderRightColor: colors.border,
+              backgroundColor: SB.bg,
+              borderRightColor: SB.border,
             },
           ]}
         >
@@ -466,7 +536,7 @@ export function WebShell() {
           <View
             style={[
               styles.brandHeader,
-              { borderBottomColor: colors.border },
+              { borderBottomColor: SB.border },
               sidebarCollapsed && { paddingHorizontal: 8, paddingVertical: 14, flexDirection: "column", gap: 10, alignItems: "center" },
             ]}
           >
@@ -479,9 +549,9 @@ export function WebShell() {
                 style={[
                   styles.brandLogoWrap,
                   {
-                    backgroundColor: hasCustomLogo ? "#FFFFFF" : colors.primary,
+                    backgroundColor: hasCustomLogo ? "#FFFFFF" : "transparent",
                     borderWidth: hasCustomLogo ? 1 : 0,
-                    borderColor: colors.border,
+                    borderColor: SB.border,
                     padding: hasCustomLogo ? 2 : 0,
                   },
                 ]}
@@ -494,20 +564,16 @@ export function WebShell() {
                     resizeMode="contain"
                   />
                 ) : (
-                  <Image
-                    source={require("@/assets/images/icon.png")}
-                    style={styles.brandLogoImg}
-                    resizeMode="cover"
-                  />
+                  <BrandMark size={38} />
                 )}
               </View>
 
               {!sidebarCollapsed && (
                 <View style={{ flex: 1, minWidth: 0, paddingRight: 6 }}>
-                  <Text style={[styles.brandTitle, { color: colors.foreground }]}>
+                  <Text numberOfLines={1} style={[styles.brandTitle, { color: "#FFFFFF" }]}>
                     OFM Cloud
                   </Text>
-                  <Text style={[styles.brandSubtitle, { color: colors.mutedForeground }]}>
+                  <Text style={[styles.brandSubtitle, { color: SB.muted }]}>
                     {settings.organizationName || "Financial Management"}
                   </Text>
                 </View>
@@ -516,15 +582,15 @@ export function WebShell() {
 
             {!isTablet && (
               <TouchableOpacity
-                {...ofm("ofmIconbtn")} style={[styles.collapseBtn, { borderColor: colors.border }]}
+                {...ofm("ofmIconbtn")} style={[styles.collapseBtn, { borderColor: SB.border }]}
                 onPress={() => setSidebarCollapsed(!sidebarCollapsed)}
                 accessibilityLabel={sidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
                 activeOpacity={0.7}
               >
                 {sidebarCollapsed ? (
-                  <SvgChevronRight size={14} color={colors.mutedForeground} />
+                  <SvgChevronRight size={14} color={SB.muted} />
                 ) : (
-                  <SvgChevronLeft size={14} color={colors.mutedForeground} />
+                  <SvgChevronLeft size={14} color={SB.muted} />
                 )}
               </TouchableOpacity>
             )}
@@ -537,59 +603,60 @@ export function WebShell() {
           <View
             style={[
               styles.userFooter,
-              { borderTopColor: colors.border },
+              { borderTopColor: SB.border },
               sidebarCollapsed && { paddingVertical: 14, paddingHorizontal: 4, flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12 },
             ]}
           >
             {sidebarCollapsed ? (
               <>
                 <View
-                  style={[styles.userAvatar, { backgroundColor: colors.primary + "20" }]}
-                  accessibilityLabel={`Logged in as ${user?.name || "User"} (${(user?.role || "admin").toUpperCase()})`}
+                  style={[styles.userAvatar, { backgroundColor: SB.accent + "20" }]}
+                  accessibilityLabel={`Signed in as ${user?.name || "User"} (${userRoleLabel})`}
                 >
-                  <Text style={[styles.userAvatarText, { color: colors.primary }]}>
-                    {(user?.name || "User").charAt(0).toUpperCase()}
+                  <Text style={[styles.userAvatarText, { color: SB.accent }]}>
+                    {userInitials}
                   </Text>
                 </View>
                 <TouchableOpacity
-                  {...ofm("ofmIconbtn")} style={[styles.logoutBtn, { borderColor: colors.border, padding: 8, borderRadius: 8 }]}
+                  {...ofm("ofmIconbtn")} style={[styles.logoutBtn, { borderColor: SB.border, padding: 8, borderRadius: 8 }]}
                   onPress={logout}
-                  accessibilityLabel="Log Out"
+                  accessibilityLabel="Sign out"
                   activeOpacity={0.75}
                 >
-                  <SvgLogOut size={14} color={colors.expense} />
+                  <SvgLogOut size={15} color="#F87171" />
                 </TouchableOpacity>
               </>
             ) : (
-              <>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
-                  <View style={[styles.userAvatar, { backgroundColor: colors.primary + "20" }]}>
-                    <Text style={[styles.userAvatarText, { color: colors.primary }]}>
-                      {(user?.name || "User").charAt(0).toUpperCase()}
-                    </Text>
+              <View style={[styles.accountCard, { backgroundColor: SB.activeBg, borderColor: SB.border }]}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                  <View style={[styles.userAvatar, { backgroundColor: SB.accent }]}>
+                    <Text style={[styles.userAvatarText, { color: "#FFFFFF" }]}>{userInitials}</Text>
                   </View>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={[styles.userName, { color: colors.foreground }]}>
-                      {user?.name || "User"}
-                    </Text>
-                    <Text style={[styles.userEmail, { color: colors.primary }]}>
+                  <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <FitText minSize={11} style={[styles.userName, { color: "#FFFFFF", flexShrink: 1 }]}>
+                        {user?.name || user?.email?.split("@")[0] || "User"}
+                      </FitText>
+                      <View style={[styles.roleChip, { backgroundColor: SB.accent + "26" }]}>
+                        <Text numberOfLines={1} style={[styles.roleChipText, { color: "#A7E08A" }]}>{userRoleLabel}</Text>
+                      </View>
+                    </View>
+                    <FitText minSize={10} style={[styles.userEmail, { color: SB.muted }]}>
                       {user?.email || ""}
-                    </Text>
-                    <Text style={[styles.userRole, { color: colors.mutedForeground }]}>
-                      {(user?.role || "admin").toUpperCase()}
-                    </Text>
+                    </FitText>
                   </View>
                 </View>
-
                 <TouchableOpacity
-                  {...ofm("ofmIconbtn")} style={[styles.logoutBtn, { borderColor: colors.border }]}
+                  {...ofm("ofmIconbtn")}
+                  style={[styles.signOutBtn, { borderTopColor: SB.border }]}
                   onPress={logout}
-                  accessibilityLabel="Log Out"
+                  accessibilityLabel="Sign out"
                   activeOpacity={0.75}
                 >
-                  <SvgLogOut size={15} color={colors.expense} />
+                  <SvgLogOut size={15} color="#F87171" />
+                  <Text style={styles.signOutText}>Sign out</Text>
                 </TouchableOpacity>
-              </>
+              </View>
             )}
           </View>
         </View>
@@ -599,17 +666,17 @@ export function WebShell() {
       {isMobile && (
         <Modal visible={mobileDrawerOpen} transparent animationType="fade" onRequestClose={() => setMobileDrawerOpen(false)}>
           <View style={styles.drawerBackdrop} {...ofm("ofmDrawerBackdrop")}>
-            <View {...ofm("ofmDrawer")} style={[styles.drawerContent, { backgroundColor: colors.card, borderRightColor: colors.border }]}>
+            <View {...ofm("ofmDrawer")} style={[styles.drawerContent, { backgroundColor: SB.bg, borderRightColor: SB.border }]}>
               {/* Drawer Brand Header */}
-              <View style={[styles.brandHeader, { borderBottomColor: colors.border }]}>
+              <View style={[styles.brandHeader, { borderBottomColor: SB.border }]}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1 }}>
                   <View
                     style={[
                       styles.brandLogoWrap,
                       {
-                        backgroundColor: hasCustomLogo ? "#FFFFFF" : colors.primary,
+                        backgroundColor: hasCustomLogo ? "#FFFFFF" : "transparent",
                         borderWidth: hasCustomLogo ? 1 : 0,
-                        borderColor: colors.border,
+                        borderColor: SB.border,
                         padding: hasCustomLogo ? 2 : 0,
                       },
                     ]}
@@ -622,28 +689,20 @@ export function WebShell() {
                         resizeMode="contain"
                       />
                     ) : (
-                      <Text style={styles.brandLogoInitials}>
-                        {(settings.organizationName || "OFM")
-                          .split(" ")
-                          .filter(Boolean)
-                          .slice(0, 2)
-                          .map((w) => w[0] || "")
-                          .join("")
-                          .toUpperCase() || "OFM"}
-                      </Text>
+                      <BrandMark size={38} />
                     )}
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.brandTitle, { color: colors.foreground }]}>
-                      Organization Finance Management
+                    <Text numberOfLines={1} style={[styles.brandTitle, { color: "#FFFFFF" }]}>
+                      OFM Cloud
                     </Text>
-                    <Text style={[styles.brandSubtitle, { color: colors.mutedForeground }]}>
+                    <Text style={[styles.brandSubtitle, { color: SB.muted }]}>
                       {settings.organizationName || "Enterprise Financial System"}
                     </Text>
                   </View>
                 </View>
-                <TouchableOpacity {...ofm("ofmIconbtn")} style={[styles.collapseBtn, { borderColor: colors.border }]} onPress={() => setMobileDrawerOpen(false)}>
-                  <SvgX size={16} color={colors.foreground} />
+                <TouchableOpacity {...ofm("ofmIconbtn")} style={[styles.collapseBtn, { borderColor: SB.border }]} onPress={() => setMobileDrawerOpen(false)}>
+                  <SvgX size={16} color={SB.text} />
                 </TouchableOpacity>
               </View>
 
@@ -651,27 +710,27 @@ export function WebShell() {
               {renderNavLinks(true)}
 
               {/* Drawer Footer */}
-              <View style={[styles.userFooter, { borderTopColor: colors.border }]}>
+              <View style={[styles.userFooter, { borderTopColor: SB.border }]}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1 }}>
-                  <View style={[styles.userAvatar, { backgroundColor: colors.primary + "20" }]}>
-                    <Text style={[styles.userAvatarText, { color: colors.primary }]}>
-                      {(user?.name || "User").charAt(0).toUpperCase()}
+                  <View style={[styles.userAvatar, { backgroundColor: SB.accent + "20" }]}>
+                    <Text style={[styles.userAvatarText, { color: SB.accent }]}>
+                      {userInitials}
                     </Text>
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={[styles.userName, { color: colors.foreground }]}>
+                    <Text numberOfLines={1} style={[styles.userName, { color: "#FFFFFF" }]}>
                       {user?.name || "User"}
                     </Text>
-                    <Text style={[styles.userEmail, { color: colors.primary }]}>
+                    <FitText minSize={10} style={[styles.userEmail, { color: SB.muted }]}>
                       {user?.email || ""}
-                    </Text>
-                    <Text style={[styles.userRole, { color: colors.mutedForeground }]}>
-                      {(user?.role || "admin").toUpperCase()}
+                    </FitText>
+                    <Text numberOfLines={1} style={[styles.userRole, { color: SB.accent }]}>
+                      {(user?.role || "admin").charAt(0).toUpperCase() + (user?.role || "admin").slice(1)}
                     </Text>
                   </View>
                 </View>
-                <TouchableOpacity {...ofm("ofmIconbtn")} style={[styles.logoutBtn, { borderColor: colors.border }]} onPress={logout}>
-                  <SvgLogOut size={15} color={colors.expense} />
+                <TouchableOpacity {...ofm("ofmIconbtn")} style={[styles.logoutBtn, { borderColor: SB.border }]} onPress={logout}>
+                  <SvgLogOut size={16} color="#F87171" />
                 </TouchableOpacity>
               </View>
             </View>
@@ -718,10 +777,10 @@ export function WebShell() {
                   style={[
                     styles.brandLogoWrap,
                     {
-                      width: 28,
-                      height: 28,
+                      width: 30,
+                      height: 30,
                       borderRadius: 8,
-                      backgroundColor: hasCustomLogo ? "#FFFFFF" : colors.primary,
+                      backgroundColor: hasCustomLogo ? "#FFFFFF" : "transparent",
                       borderWidth: hasCustomLogo ? 1 : 0,
                       borderColor: colors.border,
                       padding: hasCustomLogo ? 2 : 0,
@@ -736,207 +795,403 @@ export function WebShell() {
                       resizeMode="contain"
                     />
                   ) : (
-                    <Image
-                      source={require("@/assets/images/icon.png")}
-                      style={styles.brandLogoImg}
-                      resizeMode="cover"
-                    />
+                    <BrandMark size={30} />
                   )}
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={[styles.breadcrumbCurrent, { color: colors.foreground, fontSize: 13.5 }]}>
-                    {NAV_ITEMS.find((n) => n.id === activeTab)?.label || "Overview"}
+                  <Text numberOfLines={1} style={[styles.breadcrumbCurrent, { color: colors.foreground, fontSize: 15 }]}>
+                    {NAV_ITEMS.find((n) => n.id === (shownTab || requestedTab))?.label || "Overview"}
                   </Text>
-                  <Text style={{ color: colors.mutedForeground, fontSize: 9.5, fontFamily: "Inter_500Medium" }}>
+                  <Text numberOfLines={1} style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: "Inter_500Medium" }}>
                     {settings.organizationName || "OFM Cloud"}
                   </Text>
                 </View>
               </View>
             ) : (
               /* Desktop Breadcrumb Info */
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flex: 1, minWidth: 0 }}>
-                <Text style={[styles.breadcrumbRoot, { color: colors.mutedForeground }]}>
-                  {settings.organizationName || "OFM"}
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={[styles.pageTitle, { color: colors.foreground }]}>
+                  {NAV_ITEMS.find((n) => n.id === (shownTab || requestedTab))?.label || "Overview"}
                 </Text>
-                <Text style={[styles.breadcrumbSep, { color: colors.mutedForeground }]}>/</Text>
-                <Text style={[styles.breadcrumbCurrent, { color: colors.foreground, flexShrink: 1 }]}>
-                  {NAV_ITEMS.find((n) => n.id === activeTab)?.label || "Overview"}
+                <Text style={[styles.breadcrumbRoot, { color: colors.mutedForeground }]}>
+                  {settings.organizationName || "OFM Cloud"}
                 </Text>
               </View>
             )}
           </View>
 
           {/* Quick Header Right Actions */}
-          <View style={[styles.topRightActions, isMobile && { gap: 6 }]}>
-            {/* Live 2-Way Cloud Sync Indicator */}
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 5,
-                backgroundColor: "rgba(16, 185, 129, 0.12)",
-                borderColor: "rgba(16, 185, 129, 0.35)",
-                borderWidth: 1,
-                paddingHorizontal: isMobile ? 7 : 10,
-                paddingVertical: 4.5,
-                borderRadius: 14,
-                marginRight: isMobile ? 3 : 8,
-                flexShrink: 0,
-              }}
-            >
-              <View
-                {...ofm("ofmLiveDot")}
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: 3,
-                  backgroundColor: "#10B981",
-                  flexShrink: 0,
-                }}
-              />
-              {width >= 600 && (
-                <Text
-                  style={{
-                    fontSize: 10.5,
-                    fontFamily: "Inter_700Bold",
-                    color: "#10B981",
-                    letterSpacing: 0.2,
+          <View style={[styles.topRightActions, isMobile && { gap: 4 }]}>
+            {/* Fiscal year picker */}
+              <View ref={fyAnchorRef}>
+                <TouchableOpacity
+                  {...ofm("ofmIconbtn")}
+                  onPress={() => {
+                    if (fyOpen) { closeFy(); return; }
+                    fyAnchorRef.current?.measureInWindow((x, y, w, h) => {
+                      setFyAnchor({ bottom: y + h, right: width - x - w });
+                    });
+                    setFyOpen(true);
                   }}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: fyOpen }}
+                  accessibilityLabel={`Fiscal year ${fyRangeSaved.label}. Open fiscal year picker`}
+                  style={[
+                    styles.infoChip,
+                    isMobile && { width: 36, height: 36, paddingHorizontal: 0, marginLeft: 0, justifyContent: "center" },
+                    {
+                      borderColor: fySavedStatus === "ended" ? colors.warning + "66" : fyOpen ? colors.primary : colors.border,
+                      backgroundColor: fySavedStatus === "ended" ? colors.warning + "12" : colors.background,
+                    },
+                  ]}
                 >
-                  Cloud Sync
-                </Text>
+                  <SvgCalendar size={15} color={fySavedStatus === "ended" ? colors.warning : colors.mutedForeground} />
+                  {!isMobile && (
+                    <>
+                  <Text numberOfLines={1} style={[styles.syncText, { color: colors.foreground, fontFamily: "Inter_600SemiBold" }]}>{scopeMode === "all" ? "All time" : `FY ${fyRangeSaved.label}`}</Text>
+                  {width >= 1200 && (
+                  <Text numberOfLines={1} style={[styles.syncText, { color: fySavedStatus === "ended" ? colors.warning : colors.mutedForeground }]}>
+                    · {fySavedStatus === "active" ? `Month ${fiscalMonthIndex(fyRangeSaved)} of 12` : fySavedStatus === "ended" ? "Ended — update" : "Not started"}
+                  </Text>
+                  )}
+                  <SvgChevronDown size={13} color={colors.mutedForeground} />
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              <Modal visible={fyOpen} transparent animationType="fade" onRequestClose={closeFy}>
+                <View style={[styles.fyOverlay, isMobile && { justifyContent: "center", alignItems: "center" }]}>
+                  <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={closeFy} accessibilityRole="button" accessibilityLabel="Close fiscal year picker" />
+                  <View accessibilityViewIsModal style={[
+                    styles.fyPanel,
+                    { width: fyPanelWidth, maxHeight: fyPanelMaxHeight, backgroundColor: colors.card, borderColor: colors.border },
+                    !isMobile && { position: "absolute", top: fyPanelTop, right: fyPanelRight },
+                  ]}>
+                    {/* Header */}
+                    <View style={[styles.fyHead, { borderBottomColor: colors.border }]}>
+                      <View style={{ flex: 1 }}>
+                        <Text accessibilityRole="header" style={[styles.fyTitle, { color: colors.foreground }]}>Fiscal year</Text>
+                        <Text style={[styles.fySub, { color: colors.mutedForeground }]}>Choose a year for all pages.</Text>
+                      </View>
+                      <TouchableOpacity onPress={closeFy} accessibilityRole="button" accessibilityLabel="Close fiscal year picker" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={styles.fyClose}>
+                        <SvgX size={16} color={colors.mutedForeground} />
+                      </TouchableOpacity>
+                    </View>
+
+                    <ScrollView style={styles.fyScroll} contentContainerStyle={styles.fyBody} showsVerticalScrollIndicator keyboardShouldPersistTaps="handled">
+                      {/* 1. Year */}
+                      <View style={[styles.fyCard, { borderColor: colors.border }]}>
+                        <View style={{ flexDirection: "row", alignItems: "center" }}>
+                          <TouchableOpacity style={[styles.fyStepBtn, { borderColor: colors.border }]} onPress={() => { setFyViewYear(fyYear - 1); setFyMsg(null); }} accessibilityLabel="Previous fiscal year">
+                            <SvgChevronLeft size={16} color={colors.foreground} />
+                          </TouchableOpacity>
+                          <View style={{ flex: 1, minWidth: 0, alignItems: "center" }}>
+                            <Text style={[styles.fyYearText, { color: colors.foreground }]}>FY {fyRangeView.label}</Text>
+                            <Text style={[styles.fyDate, { color: colors.mutedForeground }]}>{fyDate(fyRangeView.start)} – {fyDate(fyRangeView.end)}</Text>
+                          </View>
+                          <TouchableOpacity style={[styles.fyStepBtn, { borderColor: colors.border }]} onPress={() => { setFyViewYear(fyYear + 1); setFyMsg(null); }} accessibilityLabel="Next fiscal year">
+                            <SvgChevronRight size={16} color={colors.foreground} />
+                          </TouchableOpacity>
+                        </View>
+
+                        <View style={[styles.fySeg, { backgroundColor: colors.muted }]}>
+                          {[
+                            { label: "Last year", y: fyThisYear - 1 },
+                            { label: "This year", y: fyThisYear },
+                            { label: "Next year", y: fyThisYear + 1 },
+                          ].map((q) => {
+                            const on = fyYear === q.y;
+                            return (
+                              <TouchableOpacity
+                                key={q.label}
+                                accessibilityRole="button"
+                                accessibilityState={{ selected: on }}
+                                onPress={() => { setFyViewYear(q.y); setFyMsg(null); }}
+                                style={[styles.fySegBtn, on && { backgroundColor: colors.card, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } }]}
+                              >
+                                <Text style={[styles.fyQuickText, { color: on ? colors.foreground : colors.mutedForeground }]}>{q.label}</Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+
+                        <View style={{ gap: 6 }}>
+                          <View style={{ flexDirection: "row", justifyContent: "space-between", flexWrap: "wrap", gap: 4 }}>
+                            <Text style={[styles.fySub, { color: colors.mutedForeground }]}>
+                              {fyViewStatus === "active" ? `Month ${fiscalMonthIndex(fyRangeView)} of 12` : fyViewStatus === "ended" ? "Completed" : "Not started yet"}
+                            </Text>
+                            <Text style={[styles.fySub, { color: colors.foreground, fontFamily: "Inter_600SemiBold" }]}>{fyViewPct.toFixed(0)}%</Text>
+                          </View>
+                          <View style={{ height: 6, borderRadius: 3, backgroundColor: colors.muted, overflow: "hidden" }}>
+                            <View style={{ width: `${fyViewPct}%`, height: "100%", backgroundColor: fyViewStatus === "ended" ? colors.mutedForeground : colors.primary }} />
+                          </View>
+                        </View>
+                      </View>
+
+                      {/* 2. Figures */}
+                      <View style={{ gap: 8 }}>
+                        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 4 }}>
+                          <Text style={[styles.fySection, { color: colors.foreground }]}>Year summary</Text>
+                          <Text style={[styles.fySub, { color: colors.mutedForeground }]}>
+                            {fyFigures.count === 0 ? "No transactions yet" : `${fyFigures.count} ${fyFigures.count === 1 ? "transaction" : "transactions"}`}
+                          </Text>
+                        </View>
+                        <View style={[styles.fyStats, { borderColor: colors.border }]}>
+                          {[
+                            { label: "Income", value: `${settings.currency || "PKR"} ${fyFigures.income.toLocaleString()}`, color: colors.income },
+                            { label: "Expenses", value: `${settings.currency || "PKR"} ${fyFigures.expenses.toLocaleString()}`, color: colors.expense },
+                            { label: "Net", value: `${fyFigures.net >= 0 ? "+" : "-"}${settings.currency || "PKR"} ${Math.abs(fyFigures.net).toLocaleString()}`, color: fyFigures.net >= 0 ? colors.income : colors.expense },
+                          ].map((r, i) => (
+                            <View key={r.label} style={[styles.fyStat, i > 0 && { borderLeftWidth: 1, borderLeftColor: colors.border }]}>
+                              <Text style={[styles.fySub, { color: colors.mutedForeground }]}>{r.label}</Text>
+                              <FitText minSize={10} style={[styles.fyVal, { color: i === 2 ? r.color : colors.foreground }]}>{r.value}</FitText>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+
+                      {/* 3. Start month */}
+                      <View style={{ gap: 4 }}>
+                        <View style={styles.fyControlRow}>
+                        <Text style={[styles.fySection, { color: colors.foreground }]}>Year starts in</Text>
+                        <select
+                          aria-label="Fiscal year start month"
+                          disabled={user?.role !== "admin"}
+                          value={fyMonth}
+                          onChange={(event) => {
+                            const month = Number(event.target.value);
+                            setFyDraftMonth(month);
+                            setFyViewYear(fiscalStartYearFor(new Date(), month));
+                            setFyMsg(null);
+                          }}
+                          style={{ flex: 1, minWidth: 0, maxWidth: 160, height: 34, padding: "0 8px", borderRadius: 6, border: `1px solid ${colors.border}`, backgroundColor: colors.card, color: colors.foreground, fontFamily: "Inter, sans-serif", fontSize: 12, cursor: user?.role === "admin" ? "pointer" : "default" }}
+                        >
+                          {MONTH_NAMES.map((name, i) => <option key={name} value={i + 1}>{name}</option>)}
+                        </select>
+                        </View>
+                        <Text style={[styles.fyHint, { color: colors.mutedForeground }]}>
+                          {fyMonth === 1 ? "January–December (calendar year)." : `${MONTH_NAMES[fyMonth - 1]}–${MONTH_NAMES[(fyMonth + 10) % 12]}${fyMonth === 7 ? " (Pakistan standard)" : ""}.`}
+                        </Text>
+                      </View>
+
+                      <View style={styles.fyControlRow}>
+                        <Text style={[styles.fySub, { color: colors.foreground, fontFamily: "Inter_600SemiBold" }]}>Pages show</Text>
+                        <View style={[styles.fySeg, { backgroundColor: colors.muted, flex: 1, maxWidth: 230 }]}>
+                          {([["fiscal", "Saved year"], ["all", "All time"]] as const).map(([k, label]) => {
+                            const on = scopeMode === k;
+                            return (
+                              <TouchableOpacity
+                                key={k}
+                                accessibilityRole="button"
+                                accessibilityState={{ selected: on }}
+                                onPress={() => setScopeMode(k)}
+                                style={[styles.fySegBtn, on && { backgroundColor: colors.card, shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } }]}
+                              >
+                                <Text numberOfLines={1} style={[styles.fyQuickText, { color: on ? colors.foreground : colors.mutedForeground }]}>{label}</Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      </View>
+                      <Text style={[styles.fyHint, { color: colors.mutedForeground }]}>Saved year applies across pages, reports and payslips.</Text>
+                    </ScrollView>
+
+                    {/* Keep Save visible while the controls scroll on short screens. */}
+                    <View style={[styles.fyFoot, { borderTopColor: colors.border, backgroundColor: colors.background }]}>
+                      {fyMsg ? <Text accessibilityLiveRegion="polite" style={[styles.fySub, { color: colors.income, fontFamily: "Inter_600SemiBold" }]}>✓ {fyMsg}</Text> : null}
+                      {user?.role === "admin" ? (
+                        <TouchableOpacity
+                          accessibilityRole="button"
+                          disabled={fyIsSaved}
+                          style={[styles.fySave, { backgroundColor: fyIsSaved ? "transparent" : colors.primary, borderColor: colors.primary, opacity: fyIsSaved ? 0.8 : 1 }]}
+                          onPress={async () => {
+                            await updateSettings({ fiscalYear: fyRangeView.label, fiscalYearStartMonth: fyMonth });
+                            setScopeMode("fiscal");
+                            setFyViewYear(null);
+                            setFyDraftMonth(null);
+                            setFyMsg(`FY ${fyRangeView.label} saved for all pages.`);
+                          }}
+                        >
+                          <Text style={[styles.fyBtnText, { color: fyIsSaved ? colors.primary : "#FFFFFF" }]}>
+                            {fyIsSaved ? `✓ FY ${fyRangeView.label} saved` : `Save & apply FY ${fyRangeView.label}`}
+                          </Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <Text style={[styles.fyHint, { color: colors.mutedForeground }]}>Only an admin can change the saved fiscal year.</Text>
+                      )}
+                    </View>
+                  </View>
+                </View>
+              </Modal>
+
+            {/* Connection status */}
+            <View style={[styles.infoChip, { borderColor: colors.income + "40", backgroundColor: colors.income + "0F" }]} accessibilityLabel="Online — your data is saved to the cloud automatically">
+              <SvgCheckCircle size={15} color={colors.income} />
+              {width >= 700 && (
+                <Text numberOfLines={1} style={[styles.syncText, { color: colors.income, fontFamily: "Inter_600SemiBold" }]}>Online</Text>
               )}
             </View>
 
-            {/* Header User Role Badge (ADMIN / etc.) */}
-            {width >= 480 && (
-              <View
-                style={{
-                  paddingHorizontal: isMobile ? 6 : 9,
-                  paddingVertical: 4,
-                  borderRadius: 12,
-                  borderWidth: 1.2,
-                  backgroundColor: (user?.role === "admin" ? "#6366F1" : user?.role === "accountant" ? "#0EA5E9" : user?.role === "manager" ? "#10B981" : "#F59E0B") + "18",
-                  borderColor: (user?.role === "admin" ? "#6366F1" : user?.role === "accountant" ? "#0EA5E9" : user?.role === "manager" ? "#10B981" : "#F59E0B") + "45",
-                  marginRight: isMobile ? 3 : 8,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 9.5,
-                    fontFamily: "Inter_800ExtraBold",
-                    color: user?.role === "admin" ? "#6366F1" : user?.role === "accountant" ? "#0EA5E9" : user?.role === "manager" ? "#10B981" : "#F59E0B",
-                    letterSpacing: 0.3,
-                    textAlign: "center",
-                  }}
-                >
-                  {(user?.role || "admin").toUpperCase()}
-                </Text>
-              </View>
-            )}
+            <View style={[styles.topDivider, { backgroundColor: colors.border }]} />
 
-
-
-            {/* Real-Time Notification Center Bell */}
+            {/* Notifications */}
             <TouchableOpacity
               {...ofm("ofmIconbtn")}
-              style={[styles.topIconBtn, { borderColor: colors.border, position: "relative" }]}
+              style={[styles.topIconBtn, { position: "relative" }]}
               onPress={() => setNotificationModalVisible(true)}
-              accessibilityLabel="Notifications & System Alerts"
+              accessibilityLabel={unreadNotificationCount > 0 ? `Notifications, ${unreadNotificationCount} unread` : "Notifications"}
               activeOpacity={0.75}
             >
-              <SvgBell size={16} color={colors.foreground} />
+              <SvgBell size={19} color={colors.foreground} />
               {unreadNotificationCount > 0 && (
-                <View
-                  style={{
-                    position: "absolute",
-                    top: -3,
-                    right: -3,
-                    minWidth: 15,
-                    height: 15,
-                    borderRadius: 7.5,
-                    backgroundColor: "#EF4444",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    paddingHorizontal: 3,
-                  }}
-                >
-                  <Text style={{ fontSize: 9, fontFamily: "Inter_800ExtraBold", color: "#FFFFFF" }}>
-                    {unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}
-                  </Text>
+                <View style={[styles.bellBadge, { borderColor: colors.card }]}>
+                  <Text style={styles.bellBadgeText}>{unreadNotificationCount > 9 ? "9+" : unreadNotificationCount}</Text>
                 </View>
               )}
             </TouchableOpacity>
 
-            {/* Theme Toggle */}
+            {/* Theme */}
             <TouchableOpacity
               {...ofm("ofmIconbtn")}
-              style={[styles.topIconBtn, { borderColor: colors.border }]}
+              style={styles.topIconBtn}
               onPress={toggleTheme}
-              accessibilityLabel="Toggle Theme"
+              accessibilityLabel={settings.theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
             >
-              {settings.theme === "dark" ? (
-                <SvgSun size={16} color={colors.foreground} />
-              ) : (
-                <SvgMoon size={16} color={colors.foreground} />
-              )}
+              {settings.theme === "dark" ? <SvgSun size={19} color={colors.foreground} /> : <SvgMoon size={19} color={colors.foreground} />}
             </TouchableOpacity>
+
+            {/* Profile: avatar + name + role */}
+            {width >= 480 && (
+              <>
+                <View style={[styles.topDivider, { backgroundColor: colors.border }]} />
+                <TouchableOpacity
+                  style={styles.profileWrap}
+                  onPress={() => user?.role === "admin" && navigateToTab("settings")}
+                  activeOpacity={user?.role === "admin" ? 0.75 : 1}
+                  accessibilityLabel={`Signed in as ${user?.name || user?.email || "user"}, ${user?.role || "admin"}`}
+                >
+                  <View style={[styles.profileAvatar, { backgroundColor: colors.primary + "1F" }]}>
+                    <Text style={[styles.profileAvatarText, { color: colors.primary }]}>
+                      {(user?.name || user?.email || "U").trim().split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase()}
+                    </Text>
+                  </View>
+                  {width >= 1024 && (
+                    <View style={{ maxWidth: 170 }}>
+                      <Text numberOfLines={1} style={[styles.profileName, { color: colors.foreground }]}>
+                        {user?.name || user?.email?.split("@")[0] || "User"}
+                      </Text>
+                      <Text numberOfLines={1} style={[styles.profileRole, { color: colors.mutedForeground }]}>
+                        {(user?.role || "admin").charAt(0).toUpperCase() + (user?.role || "admin").slice(1)}
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </View>
 
         {/* Dynamic Main Content Tab */}
+        {/* What period the pages are showing */}
+        {scopeMode === "fiscal" && activeTab !== "settings" && activeTab !== "team" && (
+          <View style={[styles.scopeBar, { backgroundColor: fySavedCount === 0 ? colors.warning + "14" : colors.primary + "0C", borderBottomColor: colors.border }]}>
+            <SvgCalendar size={14} color={fySavedCount === 0 ? colors.warning : colors.primary} />
+            <Text numberOfLines={1} style={[styles.scopeText, { color: colors.foreground, flexShrink: 1 }]}>
+              Showing <Text style={{ fontFamily: "Inter_600SemiBold" }}>FY {fyRangeSaved.label}</Text>
+              <Text style={{ color: colors.mutedForeground }}> · {fyDate(fyRangeSaved.start)} – {fyDate(fyRangeSaved.end)}</Text>
+              {fySavedCount === 0 ? <Text style={{ color: colors.warning }}> · no records in this fiscal year yet</Text> : <Text style={{ color: colors.mutedForeground }}> · {fySavedCount} {fySavedCount === 1 ? "transaction" : "transactions"}</Text>}
+            </Text>
+            <View style={{ flexDirection: "row", gap: 6, marginLeft: "auto" }}>
+              {fySavedYear !== fyCurrentYear && user?.role === "admin" && (
+                <TouchableOpacity
+                  style={[styles.scopeBtn, { borderColor: colors.primary, backgroundColor: colors.primary }]}
+                  onPress={() => updateSettings({ fiscalYear: fiscalRange(fyCurrentYear, fyStartMonthSaved).label, fiscalYearStartMonth: fyStartMonthSaved })}
+                >
+                  <Text style={[styles.scopeBtnText, { color: "#FFFFFF" }]}>Go to this year ({fiscalRange(fyCurrentYear, fyStartMonthSaved).label})</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity style={[styles.scopeBtn, { borderColor: colors.border }]} onPress={() => setScopeMode("all")}>
+                <Text style={[styles.scopeBtnText, { color: colors.foreground }]}>Show all time</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.scopeBtn, { borderColor: colors.border }]} onPress={() => setFyOpen(true)}>
+                <Text style={[styles.scopeBtnText, { color: colors.primary }]}>Change</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+        {scopeMode === "all" && activeTab !== "settings" && activeTab !== "team" && (
+          <View style={[styles.scopeBar, { backgroundColor: colors.muted, borderBottomColor: colors.border }]}>
+            <SvgCalendar size={14} color={colors.mutedForeground} />
+            <Text numberOfLines={1} style={[styles.scopeText, { color: colors.foreground, flexShrink: 1 }]}>
+              Showing <Text style={{ fontFamily: "Inter_600SemiBold" }}>all time</Text>
+              <Text style={{ color: colors.mutedForeground }}> · every record, not limited to a fiscal year</Text>
+            </Text>
+            <TouchableOpacity style={[styles.scopeBtn, { borderColor: colors.border, marginLeft: "auto" }]} onPress={() => setScopeMode("fiscal")}>
+              <Text style={[styles.scopeBtnText, { color: colors.primary }]}>Show FY {fyRangeSaved.label} only</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         <View style={[styles.tabContentArea, isMobile && { paddingBottom: 84 }]}>
+          <FiscalScopeProvider mode={scopeMode}>
           <WebPageTransition pageKey={activeTab}>
             <TabErrorBoundary tabKey={activeTab}>
-              {activeTab === "dashboard" && (
+              {shownTab === "dashboard" && (
                 <WebDashboard
                   onNavigate={(route) => navigateToTab(route as WebTabKey)}
                   onOpenTransactionModal={handleOpenTx}
                   onOpenBudgetModal={() => setBudgetModalVisible(true)}
                 />
               )}
-              {activeTab === "income" && (
+              {shownTab === "income" && (
                 <WebIncome onOpenReport={() => navigateToTab("reports")} />
               )}
-              {activeTab === "expenses" && (
+              {shownTab === "expenses" && (
                 <WebExpenses onOpenReport={() => navigateToTab("reports")} />
               )}
-              {activeTab === "transactions" && (
+              {shownTab === "transactions" && (
                 <WebTransactions />
               )}
-              {activeTab === "budgets" && (
+              {shownTab === "budgets" && (
                 <WebBudgets />
               )}
-              {activeTab === "departments" && (
+              {shownTab === "departments" && (
                 <WebDepartments />
               )}
-              {activeTab === "payroll" && (
+              {shownTab === "payroll" && (
                 <WebPayroll />
               )}
-              {activeTab === "team" && (
+              {shownTab === "team" && (
                 <WebTeam />
               )}
-              {activeTab === "reports" && (
+              {shownTab === "reports" && (
                 <WebReports onNavigate={(route) => navigateToTab(route as WebTabKey)} />
               )}
-              {activeTab === "ai-insights" && (
+              {shownTab === "ai-insights" && (
                 <WebAIInsights onNavigate={(route) => navigateToTab(route as WebTabKey)} />
               )}
-              {activeTab === "settings" && (
+              {shownTab === "settings" && (
                 <WebSettings />
               )}
-              {!VALID_TABS.includes(activeTab) && (
-                <WebDashboard
-                  onNavigate={(route) => navigateToTab(route as WebTabKey)}
-                  onOpenTransactionModal={handleOpenTx}
-                  onOpenBudgetModal={() => setBudgetModalVisible(true)}
-                />
+              {shownTab === null && (
+                <View style={styles.noAccessWrap}>
+                  <View style={[styles.noAccessIcon, { backgroundColor: colors.warning + "18" }]}>
+                    <SvgShield size={26} color={colors.warning} />
+                  </View>
+                  <Text style={[styles.noAccessTitle, { color: colors.foreground }]}>You don't have access to {requestedLabel}</Text>
+                  <Text style={[styles.noAccessText, { color: colors.mutedForeground }]}>
+                    Your role ({userRoleLabel}) can't open this page. Ask an admin if you need access.
+                  </Text>
+                  <TouchableOpacity style={[styles.noAccessBtn, { backgroundColor: colors.primary }]} onPress={() => navigateToTab(homeTab)}>
+                    <Text style={styles.noAccessBtnText}>Go to {NAV_ITEMS.find((n) => n.id === homeTab)?.label || "home"}</Text>
+                  </TouchableOpacity>
+                </View>
               )}
             </TabErrorBoundary>
           </WebPageTransition>
+          </FiscalScopeProvider>
         </View>
 
         {/* ─── NATIVE-APP-STYLE MOBILE BOTTOM NAVIGATION (<768px) ─── */}
@@ -952,6 +1207,7 @@ export function WebShell() {
             ]}
           >
             {/* 1. Home / Dashboard */}
+            {allowedTabs.has("dashboard") && (
             <TouchableOpacity
               {...ofm("ofmBottomnavItem")}
               style={styles.mobileBottomNavItem}
@@ -973,8 +1229,10 @@ export function WebShell() {
                 Home
               </Text>
             </TouchableOpacity>
+            )}
 
             {/* 2. Ledger / Transactions */}
+            {allowedTabs.has("transactions") && (
             <TouchableOpacity
               {...ofm("ofmBottomnavItem")}
               style={styles.mobileBottomNavItem}
@@ -996,8 +1254,10 @@ export function WebShell() {
                 Ledger
               </Text>
             </TouchableOpacity>
+            )}
 
             {/* 3. Reports */}
+            {allowedTabs.has("reports") && (
             <TouchableOpacity
               {...ofm("ofmBottomnavItem")}
               style={styles.mobileBottomNavItem}
@@ -1019,6 +1279,7 @@ export function WebShell() {
                 Reports
               </Text>
             </TouchableOpacity>
+            )}
 
             {/* 4. Payroll */}
             <TouchableOpacity
@@ -1069,6 +1330,7 @@ export function WebShell() {
         )}
       </View>
 
+      <FiscalScopeProvider mode={scopeMode}>
       {/* Global Quick Transaction Modal */}
       <WebTransactionModal
         visible={txModalVisible}
@@ -1081,6 +1343,8 @@ export function WebShell() {
         visible={budgetModalVisible}
         onClose={() => setBudgetModalVisible(false)}
       />
+
+      </FiscalScopeProvider>
 
       {/* Global Real-Time Notification Center Modal */}
       {notificationModalVisible && (
@@ -1095,6 +1359,51 @@ export function WebShell() {
 }
 
 const styles = StyleSheet.create({
+  noAccessWrap: { flex: 1, minHeight: 360, alignItems: "center", justifyContent: "center", padding: 24, gap: 12 },
+  noAccessIcon: { width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center" },
+  noAccessTitle: { fontSize: 18, fontFamily: "Inter_600SemiBold", textAlign: "center" },
+  noAccessText: { fontSize: 13.5, fontFamily: "Inter_400Regular", textAlign: "center", maxWidth: 420, lineHeight: 20 },
+  noAccessBtn: { marginTop: 6, height: 38, paddingHorizontal: 18, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  noAccessBtnText: { color: "#FFFFFF", fontSize: 13.5, fontFamily: "Inter_600SemiBold" },
+  fyOverlay: { flex: 1, backgroundColor: "rgba(0, 0, 0, 0.12)" },
+  fyHead: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: 1, flexShrink: 0 },
+  fyClose: { width: 36, height: 36, borderRadius: 6, alignItems: "center", justifyContent: "center" },
+  fyScroll: { flexShrink: 1, minHeight: 0 },
+  fyBody: { padding: 12, gap: 12 },
+  fyControlRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  fyCard: { borderWidth: 1, borderRadius: 8, padding: 8, gap: 8 },
+  fySeg: { flexDirection: "row", borderRadius: 8, padding: 3, gap: 3 },
+  fySegBtn: { flex: 1, height: 30, borderRadius: 6, alignItems: "center", justifyContent: "center", cursor: "pointer" as any },
+  fySection: { fontSize: 13.5, fontFamily: "Inter_600SemiBold" },
+  fyStats: { flexDirection: "row", borderWidth: 1, borderRadius: 8, overflow: "hidden" },
+  fyStat: { flex: 1, minWidth: 0, paddingHorizontal: 8, paddingVertical: 8, gap: 2 },
+  fyFoot: { paddingHorizontal: 12, paddingVertical: 8, gap: 6, borderTopWidth: 1, flexShrink: 0 },
+  fySave: { height: 38, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center", cursor: "pointer" as any },
+  scopeBar: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 24, paddingVertical: 7, borderBottomWidth: 1, flexWrap: "wrap" },
+  scopeText: { fontSize: 13, fontFamily: "Inter_400Regular" },
+  scopeBtn: { height: 28, paddingHorizontal: 10, borderRadius: 6, borderWidth: 1, justifyContent: "center", cursor: "pointer" as any },
+  scopeBtnText: { fontSize: 12.5, fontFamily: "Inter_600SemiBold" },
+  fyPanel: { borderWidth: 1, borderRadius: 12, overflow: "hidden", shadowColor: "#000", shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.16, shadowRadius: 24, elevation: 14 },
+  fyDate: { fontSize: 11, fontFamily: "Inter_400Regular", lineHeight: 16, textAlign: "center" },
+  fyTitle: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
+  fyStepper: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderRadius: 8, paddingVertical: 8 },
+  fyStepBtn: { width: 34, height: 34, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center", cursor: "pointer" as any },
+  fyYearText: { fontSize: 17, fontFamily: "Inter_600SemiBold" },
+  fyQuick: { height: 30, paddingHorizontal: 10, borderRadius: 6, borderWidth: 1, justifyContent: "center" },
+  fyQuickText: { fontSize: 12.5, fontFamily: "Inter_600SemiBold" },
+  fyHint: { fontSize: 11.5, fontFamily: "Inter_400Regular", lineHeight: 16 },
+  fySub: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 17 },
+  fyNotice: { padding: 10, borderRadius: 6 },
+  fyTable: { borderWidth: 1, borderRadius: 8, overflow: "hidden" },
+  fyRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 12, paddingVertical: 9 },
+  fyVal: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  fyBtn: { flex: 1, height: 34, borderRadius: 6, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  fyBtnText: { fontSize: 13.5, fontFamily: "Inter_600SemiBold" },
+  accountCard: { flex: 1, borderWidth: 1, borderRadius: 10, overflow: "hidden", paddingTop: 12, paddingHorizontal: 12, gap: 10 },
+  roleChip: { paddingHorizontal: 7, paddingVertical: 1, borderRadius: 999, flexShrink: 0 },
+  roleChipText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+  signOutBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, height: 38, marginHorizontal: -12, borderTopWidth: 1, cursor: "pointer" as any },
+  signOutText: { color: "#F87171", fontSize: 13, fontFamily: "Inter_600SemiBold" },
   root: {
     flex: 1,
     flexDirection: "row",
@@ -1123,7 +1432,8 @@ const styles = StyleSheet.create({
   },
   brandHeader: {
     paddingHorizontal: 16,
-    paddingVertical: 18,
+    paddingVertical: 16,
+    minHeight: 68,
     borderBottomWidth: 1,
     flexDirection: "row",
     alignItems: "center",
@@ -1131,8 +1441,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   brandLogoWrap: {
-    width: 36,
-    height: 36,
+    width: 38,
+    height: 38,
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
@@ -1151,12 +1461,12 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   brandTitle: {
-    fontSize: 14.5,
+    fontSize: 15.5,
     fontFamily: "Inter_700Bold",
     letterSpacing: -0.2,
   },
   brandSubtitle: {
-    fontSize: 11,
+    fontSize: 12.5,
     fontFamily: "Inter_400Regular",
     letterSpacing: 0.1,
     marginTop: 1,
@@ -1171,29 +1481,31 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   navContent: {
-    paddingTop: 10,
+    paddingTop: 12,
     paddingBottom: 28,
-    paddingHorizontal: 8,
+    paddingHorizontal: 12,
   },
   navItem: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    paddingVertical: 9,
+    paddingVertical: 10,
     paddingHorizontal: 12,
-    borderRadius: 10,
+    borderRadius: 8,
     borderLeftWidth: 3,
     borderLeftColor: "transparent",
+    marginBottom: 2,
+    cursor: "pointer" as any,
   },
   navSectionLabel: {
-    fontSize: 10.5,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: 0.8,
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 0.9,
     textTransform: "uppercase",
-    paddingHorizontal: 14,
-    marginTop: 14,
-    marginBottom: 4,
-    opacity: 0.8,
+    paddingHorizontal: 15,
+    marginTop: 20,
+    marginBottom: 6,
+    opacity: 0.75,
   },
   navSectionDivider: {
     height: 1,
@@ -1202,18 +1514,19 @@ const styles = StyleSheet.create({
   },
   navLabel: {
     flex: 1,
-    fontSize: 13.5,
-    letterSpacing: -0.15,
+    fontSize: 14,
+    letterSpacing: -0.1,
   },
   navBadge: {
-    paddingHorizontal: 7,
+    minWidth: 24,
+    alignItems: "center",
+    paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: 6,
+    borderRadius: 999,
   },
   navBadgeText: {
-    fontSize: 10,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: 0.2,
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
   },
   userFooter: {
     padding: 12,
@@ -1224,36 +1537,37 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   userAvatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: "center",
     justifyContent: "center",
   },
   userAvatarText: {
-    fontSize: 14,
-    fontFamily: "Inter_800ExtraBold",
+    fontSize: 13.5,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 0.3,
   },
   userName: {
-    fontSize: 13,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: -0.2,
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
   },
   userEmail: {
-    fontSize: 10.5,
-    fontFamily: "Inter_500Medium",
-    marginTop: 1,
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
   },
   userRole: {
-    fontSize: 9.5,
+    fontSize: 12,
     fontFamily: "Inter_600SemiBold",
-    letterSpacing: 0.6,
     marginTop: 1,
   },
   logoutBtn: {
-    padding: 8,
-    borderRadius: 8,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
   workspace: {
     flex: 1,
@@ -1266,9 +1580,10 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   topBar: {
-    height: 60,
+    height: 68,
+    zIndex: 40,
     borderBottomWidth: 1,
-    paddingHorizontal: 18,
+    paddingHorizontal: 24,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -1276,9 +1591,14 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   breadcrumbRoot: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontFamily: "Inter_500Medium",
-    letterSpacing: -0.1,
+    marginTop: 1,
+  },
+  pageTitle: {
+    fontSize: 18,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: -0.3,
   },
   breadcrumbSep: {
     fontSize: 13,
@@ -1310,10 +1630,25 @@ const styles = StyleSheet.create({
     letterSpacing: 0.1,
   },
   topIconBtn: {
-    padding: 8,
+    width: 38,
+    height: 38,
     borderRadius: 8,
-    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    cursor: "pointer" as any,
   },
+  topDivider: { width: 1, height: 24, marginHorizontal: 6 },
+  syncWrap: { flexDirection: "row", alignItems: "center", gap: 7, paddingHorizontal: 6 },
+  syncDot: { width: 8, height: 8, borderRadius: 4 },
+  infoChip: { flexDirection: "row", alignItems: "center", gap: 6, height: 32, paddingHorizontal: 10, borderRadius: 999, borderWidth: 1, marginLeft: 4 },
+  syncText: { fontSize: 13, fontFamily: "Inter_500Medium" },
+  bellBadge: { position: "absolute", top: 3, right: 3, minWidth: 18, height: 18, borderRadius: 9, borderWidth: 2, backgroundColor: "#D52B1E", alignItems: "center", justifyContent: "center", paddingHorizontal: 3 },
+  bellBadgeText: { fontSize: 10.5, fontFamily: "Inter_700Bold", color: "#FFFFFF" },
+  profileWrap: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 8 },
+  profileAvatar: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
+  profileAvatarText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  profileName: { fontSize: 13.5, fontFamily: "Inter_600SemiBold" },
+  profileRole: { fontSize: 12, fontFamily: "Inter_400Regular" },
   tabContentArea: {
     flex: 1,
     minHeight: 0,
@@ -1327,7 +1662,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 60,
+    height: 64,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-around",
@@ -1349,7 +1684,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   mobileBottomNavLabel: {
-    fontSize: 10,
-    letterSpacing: 0.1,
+    fontSize: 11.5,
   },
 });

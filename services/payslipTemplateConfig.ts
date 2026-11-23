@@ -105,6 +105,23 @@ export interface PayslipCustomField {
   placement: CustomFieldPlacement;
 }
 
+/** Extra document sections. Payroll values are read-only references to each slip's data. */
+export interface PayslipAddedSection {
+  id: string;
+  title: string;
+  visible: boolean;
+  anchor: PayslipSectionKey;
+  position: "before" | "after";
+  fields: Array<{
+    id: string;
+    label: string;
+    visible: boolean;
+    source: CustomFieldSource;
+    value?: string;
+    mappedKey?: string;
+  }>;
+}
+
 export type PageSize = "A4" | "Letter";
 export type PageOrientation = "portrait" | "landscape";
 export type TableBorderStyle = "grid" | "horizontal" | "none";
@@ -175,6 +192,7 @@ export interface PayslipTemplate {
   sections: PayslipSectionConfig[];
   customFields: PayslipCustomField[];
   textBlocks: PayslipTextBlock[];
+  addedSections?: PayslipAddedSection[];
 
   footer: {
     showSignatures: boolean;
@@ -699,6 +717,22 @@ export function normalizeTemplate(raw: any): PayslipTemplate {
       boxed: b.boxed === true,
     }));
 
+  const addedSections: PayslipAddedSection[] = (Array.isArray(raw.addedSections) ? raw.addedSections : [])
+    .filter((s: any) => s && typeof s === "object" && Object.prototype.hasOwnProperty.call(SECTION_CATALOG, s.anchor))
+    .slice(0, 20)
+    .map((s: any, index: number) => ({
+      id: str(s.id, "section_" + index, 60) || "section_" + index,
+      title: str(s.title, "New section", 120), visible: s.visible !== false,
+      anchor: s.anchor as PayslipSectionKey, position: s.position === "before" ? "before" : "after",
+      fields: (Array.isArray(s.fields) ? s.fields : []).filter((f: any) => f && typeof f === "object").slice(0, 30).map((f: any, fieldIndex: number) => ({
+        id: str(f.id, "field_" + fieldIndex, 60) || "field_" + fieldIndex,
+        label: str(f.label, "Detail", 120), visible: f.visible !== false,
+        source: f.source === "mapped" && MAPPABLE_FIELDS.some((m) => m.key === f.mappedKey) ? "mapped" as const : "text" as const,
+        mappedKey: MAPPABLE_FIELDS.some((m) => m.key === f.mappedKey) ? f.mappedKey : undefined,
+        value: str(f.value, "", 1000),
+      })),
+    }));
+
   const cw = comps.columnWidths || {};
   const widths = {
     code: clamp(cw.code, 5, 40, base.components.columnWidths.code),
@@ -753,6 +787,7 @@ export function normalizeTemplate(raw: any): PayslipTemplate {
     sections: orderedSections,
     customFields,
     textBlocks,
+    addedSections,
     footer: {
       showSignatures: typeof footer.showSignatures === "boolean" ? footer.showSignatures : base.footer.showSignatures,
       signatureLabels: Array.isArray(footer.signatureLabels)
@@ -784,6 +819,13 @@ export function validateTemplate(t: PayslipTemplate): string[] {
   for (const cf of t.customFields) {
     if (!cf.label.trim()) errors.push("Every custom field needs a label.");
     if (cf.source === "mapped" && !cf.mappedKey) errors.push(`Custom field "${cf.label}" must be mapped to a payroll value.`);
+  }
+  for (const section of t.addedSections || []) {
+    if (!section.title.trim()) errors.push("Give each added section a heading.");
+    for (const field of section.fields) {
+      if (!field.label.trim()) errors.push("Each detail in " + section.title + " needs a label.");
+      if (field.source === "mapped" && !MAPPABLE_FIELDS.some((m) => m.key === field.mappedKey)) errors.push("Choose a payroll value for " + field.label + ".");
+    }
   }
   return Array.from(new Set(errors));
 }

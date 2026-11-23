@@ -27,6 +27,7 @@ import {
   isSensitiveField,
 } from "./payslipTemplateConfig";
 import { WORLD_CURRENCIES } from "../constants/currencies";
+import type { PayslipEditTarget } from "./payslipTemplateEditing";
 
 // ============================================================================
 // RENDER DATA
@@ -474,6 +475,9 @@ export interface RenderHtmlOptions {
   /** Placeholder text shown when the profile has no logo (only in screen mode). */
   showLogoPlaceholder?: boolean;
   documentTitle?: string;
+  /** Editor markers are presentation-only and are always omitted from print output. */
+  editable?: boolean;
+  editablePreview?: boolean;
 }
 
 const DATE_FIELDS = new Set(["dateOfJoining", "issueDate", "paymentDate", "approvedAt"]);
@@ -483,6 +487,21 @@ interface Ctx {
   t: PayslipTemplate;
   d: PayslipRenderData;
   cur: string;
+  editable?: boolean;
+  editablePreview?: boolean;
+}
+
+function editableText(ctx: Ctx, value: string, target?: PayslipEditTarget, multiline = false): string {
+  const text = multiline ? escapeHtml(value).replace(/\n/g, "<br/>") : escapeHtml(value);
+  if (!ctx.editable || !target) return text;
+  return `<span data-ofm-edit="${escapeHtml(JSON.stringify(target))}"${multiline ? ' data-ofm-multiline="true"' : ""}>${text}</span>`;
+}
+
+interface InfoItem {
+  label: string;
+  value: string;
+  labelTarget?: PayslipEditTarget;
+  valueTarget?: PayslipEditTarget;
 }
 
 function visibleField(section: PayslipSectionConfig, key: string): string | null {
@@ -495,22 +514,26 @@ function amt(ctx: Ctx, n: number, negative = false): string {
   return escapeHtml(formatAmount(n, ctx.t, ctx.cur, negative));
 }
 
-function infoGrid(items: Array<{ label: string; value: string }>, columns: number): string {
+function previewAmount(ctx: Ctx, amount: number, path: string, negative = false): string {
+  return ctx.editablePreview ? editableText(ctx, formatAmount(amount, ctx.t, ctx.cur, negative), { kind: "preview-value", path }) : amt(ctx, amount, negative);
+}
+
+function infoGrid(ctx: Ctx, items: InfoItem[], columns: number): string {
   if (items.length === 0) return "";
   const rows: string[] = [];
   for (let i = 0; i < items.length; i += columns) {
     const cells = items.slice(i, i + columns);
     rows.push(
       `<tr>${cells
-        .map((c) => `<td><span class="lbl">${escapeHtml(c.label)}:</span> <span class="val">${escapeHtml(c.value)}</span></td>`)
-        .join("")}${"<td></td>".repeat(columns - cells.length)}</tr>`
+        .map((c) => `<td><span class="lbl">${editableText(ctx, c.label, c.labelTarget)}</span><span class="val">${editableText(ctx, c.value, c.valueTarget)}</span></td>`)
+        .join("")}${'<td class="empty"></td>'.repeat(columns - cells.length)}</tr>`
     );
   }
   return `<table class="info-grid">${rows.join("")}</table>`;
 }
 
-function sectionTitle(section: PayslipSectionConfig): string {
-  return section.title.trim() ? `<div class="sec-title">${escapeHtml(section.title)}</div>` : "";
+function sectionTitle(ctx: Ctx, section: PayslipSectionConfig): string {
+  return section.title.trim() || ctx.editable ? `<div class="sec-title">${editableText(ctx, section.title, { kind: "section-title", section: section.key })}</div>` : "";
 }
 
 function resolveMapped(ctx: Ctx, key?: string): string | undefined {
@@ -541,8 +564,9 @@ function decoratedHtml(f: PayslipFieldConfig | undefined, valueHtml: string): st
   return `${pre ? escapeHtml(pre) + " " : ""}${valueHtml}${suf ? " " + escapeHtml(suf) : ""}`;
 }
 
-function renderTextBlock(b: PayslipTextBlock, t: PayslipTemplate): string {
-  if (!b.visible || !b.text.trim()) return "";
+function renderTextBlock(b: PayslipTextBlock, ctx: Ctx): string {
+  const t = ctx.t;
+  if (!b.visible || (!b.text.trim() && !ctx.editable)) return "";
   const style = [
     `text-align:${b.align}`,
     `font-size:${(t.page.fontSizePt * b.scale).toFixed(1)}pt`,
@@ -550,25 +574,40 @@ function renderTextBlock(b: PayslipTextBlock, t: PayslipTemplate): string {
     b.bold ? "font-weight:bold" : "",
     b.italic ? "font-style:italic" : "",
   ].filter(Boolean).join(";");
-  return `<div class="tblock${b.boxed ? " boxed" : ""}" style="${style}">${escapeHtml(b.text).replace(/\n/g, "<br/>")}</div>`;
+  return `<div class="tblock${b.boxed ? " boxed" : ""}" style="${style}">${editableText(ctx, b.text, { kind: "text-block", id: b.id }, true)}</div>`;
 }
 
 function textBlocksFor(ctx: Ctx, anchor: PayslipSectionKey, position: "before" | "after"): string {
   return (ctx.t.textBlocks || [])
     .filter((b) => b.anchor === anchor && b.position === position)
-    .map((b) => renderTextBlock(b, ctx.t))
+    .map((b) => renderTextBlock(b, ctx))
     .join("");
 }
 
-function customItems(ctx: Ctx, placement: CustomFieldPlacement): Array<{ label: string; value: string }> {
+function customItems(ctx: Ctx, placement: CustomFieldPlacement): InfoItem[] {
   return ctx.t.customFields
     .filter((f) => f.visible && f.placement === placement)
-    .map((f) => ({ label: f.label, value: (f.source === "mapped" ? resolveMapped(ctx, f.mappedKey) : f.value)?.trim() || "" }))
+    .map((f): InfoItem => ({ label: f.label, value: (f.source === "mapped" ? resolveMapped(ctx, f.mappedKey) : f.value)?.trim() || "", labelTarget: { kind: "custom-label", id: f.id }, valueTarget: f.source === "text" ? { kind: "custom-value", id: f.id } : undefined }))
     .filter((i) => i.value);
 }
 
 function columns(ctx: Ctx): number {
   return ctx.t.page.orientation === "landscape" ? 4 : 3;
+}
+
+function addedSectionsFor(ctx: Ctx, anchor: PayslipSectionKey, position: "before" | "after"): string {
+  return (ctx.t.addedSections || []).filter((s) => s.visible && s.anchor === anchor && s.position === position).map((section) => {
+    const items: InfoItem[] = section.fields.filter((f) => f.visible).map((field): InfoItem => ({
+      label: field.label,
+      value: field.source === "mapped" ? resolveMapped(ctx, field.mappedKey) || "" : field.value || "",
+      labelTarget: { kind: "added-field-label", id: section.id, fieldId: field.id },
+      valueTarget: field.source === "text" ? { kind: "added-field-value", id: section.id, fieldId: field.id } : undefined,
+    })).filter((item) => ctx.editable || item.value);
+    if (!items.length) return "";
+    const title = '<div class="sec-title">' + editableText(ctx, section.title, { kind: "added-section-title", id: section.id }) + '</div>';
+    const content = '<div class="section">' + title + infoGrid(ctx, items, Math.max(1, columns(ctx) - 1)) + '</div>';
+    return ctx.editable ? '<div data-ofm-section="' + anchor + '" data-ofm-added-section="' + escapeHtml(section.id) + '">' + content + '</div>' : content;
+  }).join("");
 }
 
 function renderHeader(ctx: Ctx, section: PayslipSectionConfig, opts: RenderHtmlOptions): string {
@@ -581,18 +620,18 @@ function renderHeader(ctx: Ctx, section: PayslipSectionConfig, opts: RenderHtmlO
   }
   const contact = [d.org.phone, d.org.email].filter(Boolean).join(" · ");
   if (visibleField(section, "organizationContact") !== null && contact) lines.push(`<div class="org-sub">${escapeHtml(contact)}</div>`);
-  if (visibleField(section, "documentTitle") !== null && t.header.documentTitle.trim()) {
+  if (visibleField(section, "documentTitle") !== null && (t.header.documentTitle.trim() || ctx.editable)) {
     const periodInline = visibleField(section, "period") !== null && d.meta.periodLabel ? ` (${d.meta.periodLabel})` : "";
-    lines.push(`<div class="doc-title">${escapeHtml(t.header.documentTitle)}${escapeHtml(periodInline)}</div>`);
+    lines.push(`<div class="doc-title">${editableText(ctx, t.header.documentTitle, { kind: "document-title" })}${escapeHtml(periodInline)}</div>`);
   } else if (visibleField(section, "period") !== null && d.meta.periodLabel) {
     lines.push(`<div class="doc-title">${escapeHtml(visibleField(section, "period"))}: ${escapeHtml(d.meta.periodLabel)}</div>`);
   }
   const metaBits: string[] = [];
   const psLabel = visibleField(section, "payslipNumber");
-  if (psLabel !== null) metaBits.push(`${escapeHtml(psLabel)}: ${escapeHtml(decorate(getField(section, "payslipNumber"), d.meta.payslipNumber))}`);
+  if (psLabel !== null) metaBits.push(`${editableText(ctx, psLabel, { kind: "field-label", section: section.key, key: "payslipNumber" })}: ${escapeHtml(decorate(getField(section, "payslipNumber"), d.meta.payslipNumber))}`);
   const issueLabel = visibleField(section, "issueDate");
   const issue = formatDate(d.meta.issueDate || d.meta.generatedAt, t);
-  if (issueLabel !== null && issue) metaBits.push(`${escapeHtml(issueLabel)}: ${escapeHtml(decorate(getField(section, "issueDate"), issue))}`);
+  if (issueLabel !== null && issue) metaBits.push(`${editableText(ctx, issueLabel, { kind: "field-label", section: section.key, key: "issueDate" })}: ${escapeHtml(decorate(getField(section, "issueDate"), issue))}`);
   if (metaBits.length) lines.push(`<div class="doc-meta">${metaBits.join(" &nbsp;|&nbsp; ")}</div>`);
 
   // Logo: always the organization profile logo; template controls presentation only.
@@ -625,18 +664,18 @@ function renderHeader(ctx: Ctx, section: PayslipSectionConfig, opts: RenderHtmlO
 }
 
 function renderEmployee(ctx: Ctx, section: PayslipSectionConfig): string {
-  const items: Array<{ label: string; value: string }> = [];
+  const items: InfoItem[] = [];
   for (const f of section.fields) {
     if (!f.visible) continue;
     let v = ctx.d.employee[f.key];
     if (!v) continue;
     if (DATE_FIELDS.has(f.key)) v = formatDate(v, ctx.t);
     if (AMOUNT_EMPLOYEE_FIELDS.has(f.key)) v = formatAmount(Number(v), ctx.t, ctx.cur);
-    if (v) items.push({ label: f.label, value: decorate(f, v) });
+    if (v) items.push({ label: f.label, value: decorate(f, v), labelTarget: { kind: "field-label", section: section.key, key: f.key }, valueTarget: ctx.editablePreview && ["employeeName", "employeeId", "designation", "department"].includes(f.key) ? { kind: "preview-value", path: "employee:" + f.key } : undefined });
   }
   items.push(...customItems(ctx, "employee"));
   if (items.length === 0) return "";
-  return `<div class="section">${sectionTitle(section)}${infoGrid(items, columns(ctx))}</div>`;
+  return `<div class="section">${sectionTitle(ctx, section)}${infoGrid(ctx, items, columns(ctx))}</div>`;
 }
 
 interface DisplayLine extends PayslipLine {
@@ -669,13 +708,13 @@ function renderComponentTable(ctx: Ctx, section: PayslipSectionConfig, lines: Pa
   const pct = (n: number) => `${((n / wsum) * 100 * scale).toFixed(2)}%`;
 
   const headSide =
-    (showCode ? `<th style="width:${pct(w.code)}">${escapeHtml(codeLabel)}</th>` : "") +
-    `<th style="width:${pct(w.name)}">${escapeHtml(nameLabel)}</th>` +
-    `<th class="num" style="width:${pct(w.amount)}">${escapeHtml(amountLabel)}</th>`;
+    (showCode ? `<th style="width:${pct(w.code)}">${editableText(ctx, codeLabel, { kind: "field-label", section: section.key, key: "colCode" })}</th>` : "") +
+    `<th style="width:${pct(w.name)}">${editableText(ctx, nameLabel, { kind: "field-label", section: section.key, key: "colName" })}</th>` +
+    `<th class="num" style="width:${pct(w.amount)}">${editableText(ctx, amountLabel, { kind: "field-label", section: section.key, key: "colAmount" })}</th>`;
   const cellSide = (l?: DisplayLine) =>
     l
       ? (showCode ? `<td class="code">${escapeHtml(l.code || "")}</td>` : "") +
-        `<td>${escapeHtml(l.label)}</td><td class="num">${amt(ctx, l.amount, negative)}</td>`
+        `<td>${(ctx.editable ? editableText(ctx, ctx.t.components.overrides[componentKey(l)]?.label || l.name, { kind: "component-label", key: componentKey(l) }) + (ctx.t.components.overrides[componentKey(l)]?.note ? " " + escapeHtml(ctx.t.components.overrides[componentKey(l)].note) : "") : escapeHtml(l.label))}</td><td class="num">${previewAmount(ctx, l.amount, (section.key === "earnings" ? "earning" : section.key === "deductions" ? "deduction" : "employer") + ":" + componentKey(l), negative)}</td>`
       : (showCode ? "<td></td>" : "") + "<td></td><td></td>";
 
   // Group rows (groups are presentation-only sub-headings).
@@ -698,10 +737,10 @@ function renderComponentTable(ctx: Ctx, section: PayslipSectionConfig, lines: Pa
   const totalLabel = visibleField(section, "total");
   if (ctx.t.components.showSectionTotals && totalLabel !== null) {
     body.push(
-      `<tr class="total"><td colspan="${totalCols - 1}">${escapeHtml(totalLabel)}</td><td class="num">${amt(ctx, total, negative)}</td></tr>`
+      `<tr class="total"><td colspan="${totalCols - 1}">${editableText(ctx, totalLabel, { kind: "field-label", section: section.key, key: "total" })}</td><td class="num">${amt(ctx, total, negative)}</td></tr>`
     );
   }
-  return `<div class="section">${sectionTitle(section)}<table class="grid"><thead><tr>${dual ? headSide + headSide : headSide}</tr></thead><tbody>${body.join("")}</tbody></table></div>`;
+  return `<div class="section">${sectionTitle(ctx, section)}<table class="grid"><thead><tr>${dual ? headSide + headSide : headSide}</tr></thead><tbody>${body.join("")}</tbody></table></div>`;
 }
 
 function renderLoans(ctx: Ctx, section: PayslipSectionConfig): string {
@@ -711,7 +750,7 @@ function renderLoans(ctx: Ctx, section: PayslipSectionConfig): string {
     { key: "loanId", get: (l) => escapeHtml(l.loanId) },
     { key: "description", get: (l) => escapeHtml(l.description) },
     { key: "principal", num: true, get: (l) => (l.principal !== undefined ? amt(ctx, l.principal) : "") },
-    { key: "installment", num: true, get: (l) => amt(ctx, l.installment, true) },
+    { key: "installment", num: true, get: (l) => previewAmount(ctx, l.installment, "loan:" + l.loanId, true) },
     { key: "balance", num: true, get: (l) => (l.balance !== undefined ? amt(ctx, l.balance) : "") },
     { key: "status", get: (l) => escapeHtml(l.status || "") },
   ];
@@ -720,29 +759,29 @@ function renderLoans(ctx: Ctx, section: PayslipSectionConfig): string {
     .filter((c) => visibleField(section, c.key) !== null)
     .filter((c) => c.key !== "status" || loans.some((l) => l.status))
     .sort((a, b) => order.indexOf(a.key) - order.indexOf(b.key));
-  const head = active.map((c) => `<th${c.num ? ' class="num"' : ""}>${escapeHtml(getField(section, c.key)!.label)}</th>`).join("");
+  const head = active.map((c) => `<th${c.num ? ' class="num"' : ""}>${editableText(ctx, getField(section, c.key)!.label, { kind: "field-label", section: section.key, key: c.key })}</th>`).join("");
   const rows = loans.map((l) => `<tr>${active.map((c) => `<td${c.num ? ' class="num"' : ""}>${c.get(l)}</td>`).join("")}</tr>`);
   const totalLabel = visibleField(section, "total");
   if (ctx.t.components.showSectionTotals && totalLabel !== null && active.length > 1) {
     rows.push(
-      `<tr class="total"><td colspan="${active.length - 1}">${escapeHtml(totalLabel)}</td><td class="num">${amt(ctx, ctx.d.totals.totalLoanDeductions, true)}</td></tr>`
+      `<tr class="total"><td colspan="${active.length - 1}">${editableText(ctx, totalLabel, { kind: "field-label", section: section.key, key: "total" })}</td><td class="num">${amt(ctx, ctx.d.totals.totalLoanDeductions, true)}</td></tr>`
     );
   }
-  return `<div class="section">${sectionTitle(section)}<table class="grid"><thead><tr>${head}</tr></thead><tbody>${rows.join("")}</tbody></table></div>`;
+  return `<div class="section">${sectionTitle(ctx, section)}<table class="grid"><thead><tr>${head}</tr></thead><tbody>${rows.join("")}</tbody></table></div>`;
 }
 
 function renderTax(ctx: Ctx, section: PayslipSectionConfig): string {
   const tax = ctx.d.tax;
-  const items: Array<{ label: string; value: string }> = [];
+  const items: InfoItem[] = [];
   for (const f of tax ? section.fields : []) {
     if (!f.visible) continue;
     const v = (tax as any)[f.key];
     if (v === undefined || v === "") continue;
-    items.push({ label: f.label, value: decorate(f, typeof v === "number" ? formatAmount(v, ctx.t, ctx.cur) : String(v)) });
+    items.push({ label: f.label, value: decorate(f, typeof v === "number" ? formatAmount(v, ctx.t, ctx.cur) : String(v)), labelTarget: { kind: "field-label", section: section.key, key: f.key }, valueTarget: ctx.editablePreview && f.key === "taxDeductedThisMonth" ? { kind: "preview-value", path: "tax" } : undefined });
   }
   items.push(...customItems(ctx, "tax"));
   if (items.length === 0) return "";
-  return `<div class="section">${sectionTitle(section)}${infoGrid(items, columns(ctx) + 1)}</div>`;
+  return `<div class="section">${sectionTitle(ctx, section)}${infoGrid(ctx, items, columns(ctx) + 1)}</div>`;
 }
 
 function renderSummary(ctx: Ctx, section: PayslipSectionConfig): string {
@@ -755,13 +794,16 @@ function renderSummary(ctx: Ctx, section: PayslipSectionConfig): string {
     .filter((f) => !(f.key === "totalEmployerCost" && T.employerContributions === 0))
     .map((f) => {
       const isNet = f.key === "netSalary";
-      return `<td class="${isNet ? "net" : ""}"><span class="lbl">${escapeHtml(f.label)}:</span> ${decoratedHtml(f, `<strong>${amt(ctx, T[f.key], NEG.has(f.key))}</strong>`)}</td>`;
+      return `<td class="${isNet ? "net" : ""}"><span class="lbl">${editableText(ctx, f.label, { kind: "field-label", section: section.key, key: f.key })}</span><span class="val">${decoratedHtml(f, `<strong>${amt(ctx, T[f.key], NEG.has(f.key))}</strong>`)}</span></td>`;
     });
   if (cells.length === 0) return "";
   const per = ctx.t.page.orientation === "landscape" ? 4 : 3;
   const rows: string[] = [];
-  for (let i = 0; i < cells.length; i += per) rows.push(`<tr>${cells.slice(i, i + per).join("")}</tr>`);
-  return `<div class="section">${sectionTitle(section)}<table class="summary">${rows.join("")}</table></div>`;
+  for (let i = 0; i < cells.length; i += per) {
+    const row = cells.slice(i, i + per);
+    rows.push(`<tr>${row.join("")}${'<td class="empty"></td>'.repeat(per - row.length)}</tr>`);
+  }
+  return `<div class="section">${sectionTitle(ctx, section)}<table class="summary">${rows.join("")}</table></div>`;
 }
 
 function renderSimpleGrid(
@@ -770,23 +812,23 @@ function renderSimpleGrid(
   source: Record<string, any> | undefined,
   placement: CustomFieldPlacement
 ): string {
-  const items: Array<{ label: string; value: string }> = [];
+  const items: InfoItem[] = [];
   for (const f of source ? section.fields : []) {
     if (!f.visible) continue;
     const raw = source![f.key];
     if (raw === undefined || raw === null || raw === "") continue;
     const value = DATE_FIELDS.has(f.key) ? formatDate(String(raw), ctx.t) : String(raw);
-    if (value) items.push({ label: f.label, value: decorate(f, value) });
+    if (value) items.push({ label: f.label, value: decorate(f, value), labelTarget: { kind: "field-label", section: section.key, key: f.key } });
   }
   items.push(...customItems(ctx, placement));
   if (items.length === 0) return "";
-  return `<div class="section">${sectionTitle(section)}${infoGrid(items, columns(ctx))}</div>`;
+  return `<div class="section">${sectionTitle(ctx, section)}${infoGrid(ctx, items, columns(ctx))}</div>`;
 }
 
 function renderCustom(ctx: Ctx, section: PayslipSectionConfig): string {
   const items = customItems(ctx, "custom");
   if (items.length === 0) return "";
-  return `<div class="section">${sectionTitle(section)}${infoGrid(items, Math.max(1, columns(ctx) - 1))}</div>`;
+  return `<div class="section">${sectionTitle(ctx, section)}${infoGrid(ctx, items, Math.max(1, columns(ctx) - 1))}</div>`;
 }
 
 function renderFooter(ctx: Ctx, section: PayslipSectionConfig): string {
@@ -794,37 +836,37 @@ function renderFooter(ctx: Ctx, section: PayslipSectionConfig): string {
   const parts: string[] = [];
   const approvalBits: string[] = [];
   const ab = visibleField(section, "approvedBy");
-  if (ab !== null && d.approval.approvedBy) approvalBits.push(`${escapeHtml(ab)}: ${decoratedHtml(getField(section, "approvedBy"), `<strong>${escapeHtml(d.approval.approvedBy)}</strong>`)}`);
+  if (ab !== null && d.approval.approvedBy) approvalBits.push(`${editableText(ctx, ab, { kind: "field-label", section: section.key, key: "approvedBy" })}: ${decoratedHtml(getField(section, "approvedBy"), `<strong>${escapeHtml(d.approval.approvedBy)}</strong>`)}`);
   const aa = visibleField(section, "approvedAt");
   const approvedAt = formatDate(d.approval.approvedAt, t);
-  if (aa !== null && approvedAt) approvalBits.push(`${escapeHtml(aa)}: ${escapeHtml(decorate(getField(section, "approvedAt"), approvedAt))}`);
+  if (aa !== null && approvedAt) approvalBits.push(`${editableText(ctx, aa, { kind: "field-label", section: section.key, key: "approvedAt" })}: ${escapeHtml(decorate(getField(section, "approvedAt"), approvedAt))}`);
   if (approvalBits.length) parts.push(`<div class="foot-line">${approvalBits.join(" &nbsp;|&nbsp; ")}</div>`);
 
   for (const cf of customItems(ctx, "footer")) {
-    parts.push(`<div class="foot-line">${escapeHtml(cf.label)}: ${escapeHtml(cf.value)}</div>`);
+    parts.push(`<div class="foot-line">${editableText(ctx, cf.label, cf.labelTarget)}: ${editableText(ctx, cf.value, cf.valueTarget)}</div>`);
   }
 
   if (t.footer.showSignatures && t.footer.signatureLabels.length > 0) {
     parts.push(
       `<table class="sigs"><tr>${t.footer.signatureLabels
-        .map((l) => `<td><div class="sig-line"></div><div>${escapeHtml(l)}</div></td>`)
+        .map((l, index) => `<td><div class="sig-line"></div><div>${editableText(ctx, l, { kind: "signature", index })}</div></td>`)
         .join("")}</tr></table>`
     );
   }
   if (visibleField(section, "notes") !== null && t.footer.notes.trim()) {
-    parts.push(`<div class="foot-note">${escapeHtml(t.footer.notes).replace(/\n/g, "<br/>")}</div>`);
+    parts.push(`<div class="foot-note">${editableText(ctx, t.footer.notes, { kind: "footer", key: "notes" }, true)}</div>`);
   }
   const meta: string[] = [];
   const gd = visibleField(section, "generatedDate");
-  if (gd !== null) meta.push(`${escapeHtml(gd)}: ${escapeHtml(formatDate(d.meta.generatedAt, t) || "")}`);
+  if (gd !== null) meta.push(`${editableText(ctx, gd, { kind: "field-label", section: section.key, key: "generatedDate" })}: ${escapeHtml(formatDate(d.meta.generatedAt, t) || "")}`);
   const vc = visibleField(section, "verificationCode");
-  if (vc !== null) meta.push(`${escapeHtml(vc)}: ${escapeHtml(d.meta.verificationCode)}`);
+  if (vc !== null) meta.push(`${editableText(ctx, vc, { kind: "field-label", section: section.key, key: "verificationCode" })}: ${escapeHtml(d.meta.verificationCode)}`);
   if (meta.length) parts.push(`<div class="foot-note">${meta.join(" &nbsp;|&nbsp; ")}</div>`);
   if (visibleField(section, "digitalNotice") !== null && t.footer.digitalNotice.trim()) {
-    parts.push(`<div class="foot-note">${escapeHtml(t.footer.digitalNotice)}</div>`);
+    parts.push(`<div class="foot-note">${editableText(ctx, t.footer.digitalNotice, { kind: "footer", key: "digitalNotice" })}</div>`);
   }
   if (visibleField(section, "customText") !== null && t.footer.customText.trim()) {
-    parts.push(`<div class="foot-note">${escapeHtml(t.footer.customText).replace(/\n/g, "<br/>")}</div>`);
+    parts.push(`<div class="foot-note">${editableText(ctx, t.footer.customText, { kind: "footer", key: "customText" }, true)}</div>`);
   }
   if (parts.length === 0) return "";
   return `<div class="section footer-section">${parts.join("")}</div>`;
@@ -834,7 +876,9 @@ function renderFooter(ctx: Ctx, section: PayslipSectionConfig): string {
 function renderSection(ctx: Ctx, section: PayslipSectionConfig, opts: RenderHtmlOptions): string {
   const before = textBlocksFor(ctx, section.key, "before");
   const after = textBlocksFor(ctx, section.key, "after");
-  return before + renderSectionBody(ctx, section, opts) + after;
+  const content = before + renderSectionBody(ctx, section, opts) + after;
+  const wrapped = ctx.editable && content ? '<div data-ofm-section="' + section.key + '">' + content + '</div>' : content;
+  return addedSectionsFor(ctx, section.key, "before") + wrapped + addedSectionsFor(ctx, section.key, "after");
 }
 
 function renderSectionBody(ctx: Ctx, section: PayslipSectionConfig, opts: RenderHtmlOptions): string {
@@ -903,25 +947,33 @@ function buildCss(t: PayslipTemplate, mode: "screen" | "print"): string {
     .doc-title { font-size: ${(t.page.fontSizePt * 1.12).toFixed(1)}pt; font-weight: bold; margin-top: 3px; }
     .doc-meta { margin-top: 2px; font-size: ${(t.page.fontSizePt * 0.92).toFixed(1)}pt; }
     .divider { border-bottom: 2px solid ${accent}; margin-top: 8px; }
-    .sec-title { font-weight: bold; margin-bottom: 3px; color: ${accent}; }
+    .sec-title { font-weight: bold; font-size: ${(t.page.fontSizePt * 1.02).toFixed(1)}pt; text-transform: uppercase; letter-spacing: 0.6px;
+                 color: ${accent}; padding-bottom: 3px; margin-bottom: 5px; border-bottom: 1.5px solid ${accent}; }
     .info-grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
-    .info-grid td { padding: 1.5px 6px 1.5px 0; vertical-align: top; word-wrap: break-word; overflow-wrap: anywhere; }
-    .info-grid .val { font-weight: bold; }
+    .info-grid td { border: 1px solid #D4D4D8; padding: 4px 7px; vertical-align: top; word-wrap: break-word; overflow-wrap: anywhere; }
+    .info-grid td.empty, .summary td.empty { background: transparent; }
+    .info-grid .lbl, .summary .lbl { display: block; font-size: ${(t.page.fontSizePt * 0.82).toFixed(1)}pt; color: #52525B; text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 1px; }
+    .info-grid .val { display: block; font-weight: bold; }
     .grid { width: 100%; border-collapse: collapse; table-layout: fixed; }
-    .grid th { text-align: left; font-weight: bold; padding: 3px 5px; }
-    .grid td { padding: 2px 5px; vertical-align: top; word-wrap: break-word; overflow-wrap: anywhere; }
-    .grid .num { text-align: right; white-space: nowrap; }
+    .grid th { text-align: left; font-weight: bold; padding: 4px 7px; background: #F4F4F5; }
+    .grid td { padding: 3px 7px; vertical-align: top; word-wrap: break-word; overflow-wrap: anywhere; }
+    .grid .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .grid tbody tr:nth-child(even) td { background: #FAFAFA; }
     .grid .code { font-family: "Courier New", Courier, monospace; font-size: ${(t.page.fontSizePt * 0.9).toFixed(1)}pt; }
     .grid tr.grp td { font-weight: bold; font-style: italic; background: #F4F4F5; }
-    .grid tr.total td { font-weight: bold; }
+    .grid tr.total td { font-weight: bold; border-top: 1.5px solid #000; background: #F4F4F5; }
     .grid thead { display: table-header-group; }
     .grid tr { page-break-inside: avoid; break-inside: avoid; }
     ${border}
-    .summary { width: 100%; border-collapse: collapse; border-top: 1px solid #000; border-bottom: 1px solid #000; }
-    .summary td { padding: 4px 6px 4px 0; font-size: ${(t.page.fontSizePt * 1.05).toFixed(1)}pt; }
-    .summary td.net strong { font-size: ${(t.page.fontSizePt * 1.2).toFixed(1)}pt; color: ${accent}; }
+    .summary { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .summary td { border: 1px solid #A1A1AA; padding: 5px 8px; vertical-align: top; font-size: ${(t.page.fontSizePt * 1.05).toFixed(1)}pt; font-variant-numeric: tabular-nums; }
+    .summary .val { display: block; }
+    .summary td.net { background: ${accent}14; border: 1.5px solid ${accent}; }
+    .summary td.net .lbl { color: ${accent}; font-weight: bold; }
+    .summary td.net strong { font-size: ${(t.page.fontSizePt * 1.25).toFixed(1)}pt; color: ${accent}; }
     .footer-section { margin-top: ${Math.max(10, t.page.sectionSpacingPx)}px; }
     .foot-line { margin-bottom: 2px; }
+    .footer-section { border-top: 1px solid #D4D4D8; padding-top: 6px; }
     .foot-note { font-size: ${(t.page.fontSizePt * 0.85).toFixed(1)}pt; color: #333; margin-top: 4px; }
     .sigs { width: 100%; margin-top: 28px; border-collapse: collapse; }
     .sigs td { text-align: center; padding: 0 12px; vertical-align: top; }
@@ -932,7 +984,7 @@ function buildCss(t: PayslipTemplate, mode: "screen" | "print"): string {
 }
 
 function renderSheet(t: PayslipTemplate, d: PayslipRenderData, opts: RenderHtmlOptions): string {
-  const ctx: Ctx = { t, d, cur: d.org.currency || "PKR" };
+  const ctx: Ctx = { t, d, cur: d.org.currency || "PKR", editable: Boolean(opts.editable && opts.mode !== "print"), editablePreview: Boolean(opts.editable && opts.editablePreview && opts.mode !== "print" && d.meta.recordId === "sample" && d.meta.verificationCode === "SAMPLE-PREVIEW") };
   return `<div class="sheet">${t.sections.map((s) => renderSection(ctx, s, opts)).join("")}</div>`;
 }
 

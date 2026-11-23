@@ -317,7 +317,7 @@ export function WebLoanManagement() {
                   <Text style={{ fontSize: 12, fontWeight: "700", color: colors.foreground }}>
                     {item.installmentsPaid} / {item.totalInstallments}
                   </Text>
-                  <Text style={{ fontSize: 9.5, color: colors.mutedForeground }}>
+                  <Text style={{ fontSize: 11, color: colors.mutedForeground }}>
                     {Math.round((item.installmentsPaid / item.totalInstallments) * 100)}% paid
                   </Text>
                 </View>
@@ -344,7 +344,7 @@ export function WebLoanManagement() {
                   >
                     <Text
                       style={{
-                        fontSize: 10.5,
+                        fontSize: 11.5,
                         fontWeight: "700",
                         color:
                           item.status === "completed"
@@ -552,7 +552,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   kpiLabel: {
-    fontSize: 10,
+    fontSize: 11.5,
     fontWeight: "700",
     letterSpacing: 0.5,
   },
@@ -612,7 +612,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   th: {
-    fontSize: 10.5,
+    fontSize: 11.5,
     fontWeight: "700",
     letterSpacing: 0.4,
   },
@@ -664,7 +664,7 @@ const styles = StyleSheet.create({
   modalContent: {
     width: "100%",
     maxWidth: 580,
-    borderRadius: 14,
+    borderRadius: 8,
     borderWidth: 1,
     padding: 22,
     gap: 16,
@@ -690,7 +690,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   label: {
-    fontSize: 10,
+    fontSize: 11.5,
     fontWeight: "700",
     letterSpacing: 0.4,
     marginBottom: 5,

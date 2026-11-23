@@ -17,6 +17,7 @@ import {
   SvgTrash,
   SvgEdit,
 } from "./SvgIcons";
+import { FitText, splitDescription } from "./FitText";
 
 interface WebExpensesProps {
   onOpenReport?: () => void;
@@ -292,7 +293,7 @@ export function WebExpenses({ onOpenReport }: WebExpensesProps) {
       {isMobile ? (
         <View style={{ gap: 10 }}>
           {filteredTransactions.length === 0 ? (
-            <View style={[styles.emptyWrap, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 14 }]}>
+            <View style={[styles.emptyWrap, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 8 }]}>
               <SvgFileText size={36} color={colors.mutedForeground} />
               <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No expense records matching filters</Text>
               <Text style={[styles.emptySubtitle, { color: colors.mutedForeground }]}>
@@ -319,15 +320,13 @@ export function WebExpenses({ onOpenReport }: WebExpensesProps) {
 
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                   <Text style={[styles.mobileDesc, { color: colors.foreground }]}>
-                    {tx.description || "No description provided"}
+                    {splitDescription(tx.description).title}
                   </Text>
-                  {(tx.expenseSource === "payroll" || tx.payrollId) && (
-                    <View style={[styles.payrollBadge, { backgroundColor: "#8B5CF618", borderColor: "#8B5CF630" }]}>
-                      <Text style={[styles.payrollBadgeText, { color: "#8B5CF6" }]}>
-                        💼 Payroll · {tx.employeeName || "Staff"}
-                      </Text>
-                    </View>
-                  )}
+                  {splitDescription(tx.description).detail ? (
+                    <FitText style={[styles.refText, { color: colors.mutedForeground, width: "100%" }]}>
+                      {splitDescription(tx.description).detail}
+                    </FitText>
+                  ) : null}
                 </View>
 
                 <View style={styles.mobileCardMeta}>
@@ -368,11 +367,11 @@ export function WebExpenses({ onOpenReport }: WebExpensesProps) {
       ) : (
         <View style={[styles.tableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <ScrollView horizontal contentContainerStyle={{ width: "100%" }} showsHorizontalScrollIndicator={true}>
-            <View style={{ minWidth: 700, width: "100%" }}>
+            <View style={{ minWidth: 1060, width: "100%" }}>
               {/* Table Header */}
               <View style={[styles.tableHeader, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
                 <TouchableOpacity
-                  style={[styles.thCol, { width: 92, paddingLeft: 14, paddingRight: 4 }]}
+                  style={[styles.thCol, { width: 112, paddingLeft: 14, paddingRight: 4 }]}
                   onPress={() => {
                     if (sortField === "date") setSortAsc(!sortAsc);
                     else {
@@ -381,12 +380,12 @@ export function WebExpenses({ onOpenReport }: WebExpensesProps) {
                     }
                   }}
                 >
-                  <Text style={[styles.thText, { color: colors.mutedForeground }]}>DATE</Text>
+                  <Text numberOfLines={1} style={[styles.thText, { color: colors.mutedForeground }]}>Date</Text>
                   {sortField === "date" && <SvgChevronDown size={11} color={colors.primary} />}
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.thCol, { width: 108, paddingHorizontal: 4 }]}
+                  style={[styles.thCol, { width: 160, paddingHorizontal: 4 }]}
                   onPress={() => {
                     if (sortField === "category") setSortAsc(!sortAsc);
                     else {
@@ -395,24 +394,24 @@ export function WebExpenses({ onOpenReport }: WebExpensesProps) {
                     }
                   }}
                 >
-                  <Text style={[styles.thText, { color: colors.mutedForeground }]}>CATEGORY</Text>
+                  <Text numberOfLines={1} style={[styles.thText, { color: colors.mutedForeground }]}>Category</Text>
                   {sortField === "category" && <SvgChevronDown size={11} color={colors.primary} />}
                 </TouchableOpacity>
 
-                <View style={[styles.thCol, { flex: 1, minWidth: 120, paddingHorizontal: 6 }]}>
-                  <Text style={[styles.thText, { color: colors.mutedForeground }]}>DESCRIPTION / REF</Text>
+                <View style={[styles.thCol, { flex: 1, minWidth: 220, paddingHorizontal: 6 }]}>
+                  <Text numberOfLines={1} style={[styles.thText, { color: colors.mutedForeground }]}>Description / Ref</Text>
                 </View>
 
-                <View style={[styles.thCol, { width: 135, paddingHorizontal: 4 }]}>
-                  <Text style={[styles.thText, { color: colors.mutedForeground }]}>DEPARTMENT</Text>
+                <View style={[styles.thCol, { width: 165, paddingHorizontal: 4 }]}>
+                  <Text numberOfLines={1} style={[styles.thText, { color: colors.mutedForeground }]}>Department</Text>
                 </View>
 
-                <View style={[styles.thCol, { width: 110, paddingHorizontal: 4 }]}>
-                  <Text style={[styles.thText, { color: colors.mutedForeground }]}>METHOD</Text>
+                <View style={[styles.thCol, { width: 150, paddingHorizontal: 4 }]}>
+                  <Text numberOfLines={1} style={[styles.thText, { color: colors.mutedForeground }]}>Method</Text>
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.thCol, { width: 125, paddingHorizontal: 4, justifyContent: "flex-end" }]}
+                  style={[styles.thCol, { width: 145, paddingHorizontal: 4, justifyContent: "flex-end" }]}
                   onPress={() => {
                     if (sortField === "amount") setSortAsc(!sortAsc);
                     else {
@@ -421,13 +420,13 @@ export function WebExpenses({ onOpenReport }: WebExpensesProps) {
                     }
                   }}
                 >
-                  <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>AMOUNT</Text>
+                  <Text numberOfLines={1} style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>Amount</Text>
                   {sortField === "amount" && <SvgChevronDown size={11} color={colors.primary} />}
                 </TouchableOpacity>
 
                 {canEdit && (
                   <View style={[styles.thCol, { width: 85, paddingRight: 14, paddingLeft: 4, justifyContent: "flex-end" }]}>
-                    <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>ACTIONS</Text>
+                    <Text numberOfLines={1} style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>Actions</Text>
                   </View>
                 )}
               </View>
@@ -444,48 +443,47 @@ export function WebExpenses({ onOpenReport }: WebExpensesProps) {
               ) : (
                 filteredTransactions.map((tx) => (
                   <View key={tx.id} style={[styles.tableRow, { borderBottomColor: colors.border }]}>
-                    <View style={[styles.tdCol, { width: 92, paddingLeft: 14, paddingRight: 4 }]}>
-                      <Text style={[styles.dateText, { color: colors.foreground }]}>{tx.date}</Text>
+                    <View style={[styles.tdCol, { width: 112, paddingLeft: 14, paddingRight: 4 }]}>
+                      <Text numberOfLines={1} style={[styles.dateText, { color: colors.foreground }]}>{tx.date}</Text>
                     </View>
 
-                    <View style={[styles.tdCol, { width: 108, paddingHorizontal: 4 }]}>
+                    <View style={[styles.tdCol, { width: 160, paddingHorizontal: 4 }]}>
                       <View style={[styles.catBadge, { backgroundColor: colors.expense + "18" }]}>
-                        <Text style={[styles.catBadgeText, { color: colors.expense }]}>{tx.category}</Text>
+                        <Text numberOfLines={1} style={[styles.catBadgeText, { color: colors.expense }]}>{tx.category}</Text>
                       </View>
                     </View>
 
-                    <View style={[styles.tdCol, { flex: 1, minWidth: 120, paddingHorizontal: 6, overflow: "hidden" }]}>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
-                        <Text style={[styles.descText, { color: colors.foreground }]}>
-                          {tx.description || "No description provided"}
-                        </Text>
-                        {(tx.expenseSource === "payroll" || tx.payrollId) && (
-                          <View style={[styles.payrollBadge, { backgroundColor: "#8B5CF618", borderColor: "#8B5CF630" }]}>
-                            <Text style={[styles.payrollBadgeText, { color: "#8B5CF6" }]}>
-                              💼 Payroll · {tx.employeeName || "Staff"}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                      <Text style={[styles.refText, { color: colors.mutedForeground }]}>
-                        {tx.referenceNumber || `TXN-${tx.id.slice(-6).toUpperCase()}`}
-                      </Text>
+                    <View style={[styles.tdCol, { flex: 1, minWidth: 220, paddingHorizontal: 6, overflow: "hidden" }]}>
+                      {(() => {
+                        const p = splitDescription(tx.description);
+                        const ref = tx.referenceNumber || `TXN-${tx.id.slice(-6).toUpperCase()}`;
+                        return (
+                          <>
+                            {p.detail ? (
+                              <FitText style={[styles.descText, { color: colors.foreground }]}>{p.title}</FitText>
+                            ) : (
+                              <Text style={[styles.descText, { color: colors.foreground }]}>{p.title}</Text>
+                            )}
+                            <FitText style={[styles.refText, { color: colors.mutedForeground }]}>{p.detail ? `${ref} · ${p.detail}` : ref}</FitText>
+                          </>
+                        );
+                      })()}
                     </View>
 
-                    <View style={[styles.tdCol, { width: 135, paddingHorizontal: 4 }]}>
-                      <Text style={[styles.deptText, { color: colors.foreground }]}>
+                    <View style={[styles.tdCol, { width: 165, paddingHorizontal: 4 }]}>
+                      <FitText style={[styles.deptText, { color: colors.foreground }]}>
                         {tx.department}
-                      </Text>
+                      </FitText>
                     </View>
 
-                    <View style={[styles.tdCol, { width: 110, paddingHorizontal: 4 }]}>
-                      <Text style={[styles.methodText, { color: colors.mutedForeground }]}>
+                    <View style={[styles.tdCol, { width: 150, paddingHorizontal: 4 }]}>
+                      <FitText style={[styles.methodText, { color: colors.mutedForeground }]}>
                         {tx.paymentMethod || "Electronic"}
-                      </Text>
+                      </FitText>
                     </View>
 
-                    <View style={[styles.tdCol, { width: 125, paddingHorizontal: 4, alignItems: "flex-end" }]}>
-                      <Text style={[styles.amountText, { color: colors.expense, textAlign: "right" }]}>
+                    <View style={[styles.tdCol, { width: 145, paddingHorizontal: 4, alignItems: "flex-end" }]}>
+                      <Text numberOfLines={1} style={[styles.amountText, { color: colors.expense, textAlign: "right" }]}>
                         -{settings.currency} {tx.amount.toLocaleString()}
                       </Text>
                     </View>
@@ -638,7 +636,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   metricLabel: {
-    fontSize: 9.5,
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.5,
   },
@@ -649,7 +647,7 @@ const styles = StyleSheet.create({
     marginVertical: 1,
   },
   metricSub: {
-    fontSize: 10.5,
+    fontSize: 11.5,
     fontFamily: "Inter_400Regular",
   },
   filterBarCard: {
@@ -694,7 +692,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
   },
   mobileCard: {
-    borderRadius: 14,
+    borderRadius: 8,
     borderWidth: 1,
     padding: 14,
     gap: 8,
@@ -742,7 +740,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
   },
   tableCard: {
-    borderRadius: 16,
+    borderRadius: 10,
     borderWidth: 1,
     overflow: "hidden",
     width: "100%",
@@ -759,9 +757,9 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   thText: {
-    fontSize: 10.5,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: 0.8,
+    fontSize: 12.5,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 0.1,
   },
   tableRow: {
     flexDirection: "row",
@@ -788,11 +786,12 @@ const styles = StyleSheet.create({
   },
   descText: {
     fontSize: 13,
-    fontFamily: "Inter_600SemiBold",
+    lineHeight: 19,
+    fontFamily: "Inter_500Medium",
     letterSpacing: -0.2,
   },
   refText: {
-    fontSize: 10.5,
+    fontSize: 11.5,
     fontFamily: "Inter_400Regular",
     marginTop: 1,
   },
@@ -838,7 +837,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   payrollBadgeText: {
-    fontSize: 10,
+    fontSize: 11.5,
     fontFamily: "Inter_700Bold",
   },
 });

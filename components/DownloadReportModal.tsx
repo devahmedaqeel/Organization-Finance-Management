@@ -321,6 +321,42 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
 
   const includedCount = compiledEnterpriseData.generalLedger.transactions.length;
 
+  // Counts shown on the filter buttons, based on the chosen dates, so users can see what each choice includes
+  const filterCounts = useMemo(() => {
+    const start = compiledEnterpriseData.filters.startDate;
+    const end = compiledEnterpriseData.filters.endDate;
+    const inRange = transactions.filter((t) => {
+      const d = (t.date || "").slice(0, 10);
+      return (!start || d >= start) && (!end || d <= end);
+    });
+    const norm = (v?: string) => (v || "").trim().toLowerCase();
+    const matchDept = (t: any) => selectedDept === "all" || norm(t.department) === norm(selectedDept);
+    const matchCat = (t: any) => selectedCategory === "all" || norm(t.category) === norm(selectedCategory);
+    const matchType = (t: any) => selectedTypeFilter === "all" || t.type === selectedTypeFilter;
+    const dept: Record<string, number> = {};
+    const cat: Record<string, number> = {};
+    const type: Record<string, number> = { all: 0, income: 0, expense: 0 };
+    inRange.forEach((t: any) => {
+      if (matchCat(t) && matchType(t)) dept[norm(t.department)] = (dept[norm(t.department)] || 0) + 1;
+      if (matchDept(t) && matchType(t)) cat[norm(t.category)] = (cat[norm(t.category)] || 0) + 1;
+      if (matchDept(t) && matchCat(t)) {
+        type.all++;
+        if (t.type === "income") type.income++;
+        if (t.type === "expense") type.expense++;
+      }
+    });
+    const deptAll = inRange.filter((t) => matchCat(t) && matchType(t)).length;
+    const catAll = inRange.filter((t) => matchDept(t) && matchType(t)).length;
+    return {
+      dept: (name: string) => (name === "all" ? deptAll : dept[norm(name)] || 0),
+      cat: (name: string) => (name === "all" ? catAll : cat[norm(name)] || 0),
+      type,
+    };
+  }, [transactions, compiledEnterpriseData.filters.startDate, compiledEnterpriseData.filters.endDate, selectedDept, selectedCategory, selectedTypeFilter]);
+
+  const selectedTypeMeta = REPORT_TYPE_OPTIONS.find((o) => o.id === selectedType);
+  const fmtMoney = (n: number) => `${settings.currency || "PKR"} ${Math.round(Math.abs(n || 0)).toLocaleString()}`;
+
   const relevantSections = SECTIONS_BY_TYPE[selectedType] ?? Object.keys(SECTION_LABELS);
   const allRelevantOn = relevantSections.every((k) => (sections as any)[k] !== false);
   const noSectionSelected = relevantSections.every((k) => (sections as any)[k] === false);
@@ -433,7 +469,7 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
             <ScrollView ref={sheetScrollRef} onTouchEnd={sheetOnTouchEnd} keyboardShouldPersistTaps="handled" style={styles.body} showsVerticalScrollIndicator={false}>
               {/* Report Type Selector */}
               <Text style={[styles.sectionTitle, { color: colors.foreground }]}>1. Report type</Text>
-              <View style={{ gap: 8, marginBottom: 16 }}>
+              <View style={{ gap: 8, marginBottom: 16, flexDirection: Platform.OS === "web" ? "row" : "column", flexWrap: "wrap" }}>
                 {REPORT_TYPE_OPTIONS.map((opt) => {
                   const isSelected = selectedType === opt.id;
                   return (
@@ -444,7 +480,9 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
                         {
                           backgroundColor: isSelected ? opt.color + "12" : colors.background,
                           borderColor: isSelected ? opt.color : colors.border,
+                          borderWidth: isSelected ? 2 : 1,
                         },
+                        Platform.OS === "web" && { flexBasis: "48%", flexGrow: 1, minWidth: 260 },
                       ]}
                       onPress={() => {
                         setSelectedType(opt.id);
@@ -601,7 +639,7 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
               </View>
               {/* Department Cost Center Filter */}
               <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 14 }]}>3. Filter the data</Text>
-              <Text style={[styles.stepHint, { color: colors.mutedForeground }]}>Leave on “All” to include everything.</Text>
+              <Text style={[styles.stepHint, { color: colors.mutedForeground }]}>Leave on “All” to include everything. The number on each button is how many transactions it includes.</Text>
               <Text style={[styles.filterLabel, { color: colors.mutedForeground }]}>Department</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
                 <View style={{ flexDirection: "row", gap: 6 }}>
@@ -619,8 +657,8 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
                         ]}
                         onPress={() => setSelectedDept(dept)}
                       >
-                        <Text style={[styles.deptChipText, { color: isSel ? "#FFF" : colors.foreground }]}>
-                          {dept === "all" ? "All Departments" : dept}
+                        <Text style={[styles.deptChipText, { color: isSel ? "#FFF" : filterCounts.dept(dept) === 0 ? colors.mutedForeground : colors.foreground }]}>
+                          {dept === "all" ? "All" : dept} · {filterCounts.dept(dept)}
                         </Text>
                       </TouchableOpacity>
                     );
@@ -646,8 +684,8 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
                         ]}
                         onPress={() => setSelectedCategory(cat)}
                       >
-                        <Text style={[styles.deptChipText, { color: isSel ? "#FFF" : colors.foreground }]}>
-                          {cat === "all" ? "All Categories" : cat}
+                        <Text style={[styles.deptChipText, { color: isSel ? "#FFF" : filterCounts.cat(cat) === 0 ? colors.mutedForeground : colors.foreground }]}>
+                          {cat === "all" ? "All" : cat} · {filterCounts.cat(cat)}
                         </Text>
                       </TouchableOpacity>
                     );
@@ -663,23 +701,23 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
                   onPress={() => setSelectedTypeFilter("all")}
                 >
                   <Text style={[styles.toggleBtnText, { color: selectedTypeFilter === "all" ? "#FFF" : colors.foreground }]}>
-                    All
+                    Both · {filterCounts.type.all}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.toggleBtn, selectedTypeFilter === "income" && { backgroundColor: "#10B981" }]}
+                  style={[styles.toggleBtn, selectedTypeFilter === "income" && { backgroundColor: colors.income }]}
                   onPress={() => setSelectedTypeFilter("income")}
                 >
                   <Text style={[styles.toggleBtnText, { color: selectedTypeFilter === "income" ? "#FFF" : colors.foreground }]}>
-                    Income only
+                    Income · {filterCounts.type.income}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.toggleBtn, selectedTypeFilter === "expense" && { backgroundColor: "#F43F5E" }]}
+                  style={[styles.toggleBtn, selectedTypeFilter === "expense" && { backgroundColor: colors.expense }]}
                   onPress={() => setSelectedTypeFilter("expense")}
                 >
                   <Text style={[styles.toggleBtnText, { color: selectedTypeFilter === "expense" ? "#FFF" : colors.foreground }]}>
-                    Expenses only
+                    Expenses · {filterCounts.type.expense}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -806,6 +844,27 @@ export function DownloadReportModal({ visible, onClose, activePeriod }: Props) {
                 },
               ]}
             >
+              {!generating ? (
+                <View style={[styles.summaryBox, { backgroundColor: colors.background, borderColor: includedCount === 0 ? colors.warning : colors.border }]}>
+                  <Text style={[styles.summaryTitle, { color: colors.foreground }]}>
+                    Your report: {customTitle.trim() || selectedTypeMeta?.title || "Report"}
+                  </Text>
+                  <Text style={[styles.summaryLine, { color: colors.mutedForeground }]}>
+                    {compiledEnterpriseData.filters.periodLabel} ({compiledEnterpriseData.filters.startDate} → {compiledEnterpriseData.filters.endDate})
+                    {" · "}
+                    {selectedDept === "all" ? "All departments" : selectedDept}
+                    {" · "}
+                    {selectedCategory === "all" ? "All categories" : selectedCategory}
+                    {" · "}
+                    {selectedTypeFilter === "all" ? "Income & expenses" : selectedTypeFilter === "income" ? "Income only" : "Expenses only"}
+                  </Text>
+                  <Text style={[styles.summaryLine, { color: includedCount === 0 ? colors.warning : colors.foreground }]}>
+                    {includedCount === 0
+                      ? "⚠ No transactions match — the report will show empty tables. Try a wider date range or set filters to “All”."
+                      : `${includedCount} ${includedCount === 1 ? "transaction" : "transactions"} · Income ${fmtMoney(compiledEnterpriseData.executiveSummary.totalRevenue)} · Expenses ${fmtMoney(compiledEnterpriseData.executiveSummary.totalExpenses)} · ${relevantSections.filter((k) => (sections as any)[k] !== false).length} of ${relevantSections.length} parts · ${format === "pdf" ? "PDF" : "Excel (CSV)"}`}
+                  </Text>
+                </View>
+              ) : null}
               {generating ? (
                 <View style={styles.loadingBox}>
                   <ActivityIndicator size="small" color={colors.primary} />
@@ -895,7 +954,7 @@ const styles = StyleSheet.create({
   },
   sheet: {
     width: "100%",
-    maxWidth: Platform.OS === "web" ? 640 : "100%",
+    maxWidth: Platform.OS === "web" ? 780 : "100%",
     borderRadius: Platform.OS === "web" ? 20 : 0,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
@@ -954,11 +1013,9 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   sectionTitle: {
-    fontSize: 12,
-    fontWeight: "800",
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-    marginBottom: 10,
+    fontSize: 14.5,
+    fontFamily: "Inter_600SemiBold",
+    marginBottom: 8,
   },
   reportTypeCard: {
     flexDirection: "row",
@@ -1110,6 +1167,22 @@ const styles = StyleSheet.create({
   sectionToggleText: {
     fontSize: 13,
     fontWeight: "600",
+  },
+  summaryBox: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 3,
+    marginBottom: 12,
+  },
+  summaryTitle: {
+    fontSize: 13.5,
+    fontFamily: "Inter_600SemiBold",
+  },
+  summaryLine: {
+    fontSize: 12.5,
+    lineHeight: 18,
   },
   footer: {
     paddingHorizontal: 20,

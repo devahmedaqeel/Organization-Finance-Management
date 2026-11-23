@@ -329,14 +329,14 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
       {/* ─── Header ─── */}
       <View style={styles.pageHeader}>
         <View style={{ flex: 1, minWidth: isMobile ? "100%" : 240 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-            <View style={[styles.titleIconBadge, { backgroundColor: colors.primary + "20" }]}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <View style={[styles.titleIconBadge, { backgroundColor: colors.primary + "16" }]}>
               <SvgFileText size={20} color={colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.pageTitle, { color: colors.foreground, fontSize: isMobile ? 19 : 22 }]}>Financial Auditing & Reports</Text>
-              <Text style={[styles.pageSubtitle, { color: colors.mutedForeground, fontSize: isMobile ? 12 : 13 }]}>
-                {settings.organizationName || "Organization Finance Management"} · Institutional Statement & Compliance Engine
+              <Text style={[styles.pageTitle, { color: colors.foreground, fontSize: isMobile ? 19 : 22 }]}>Reports</Text>
+              <Text style={[styles.pageSubtitle, { color: colors.mutedForeground }]}>
+                {settings.organizationName || "Organization Finance Management"} · Financial statements & audit
               </Text>
             </View>
           </View>
@@ -349,8 +349,8 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
             onPress={() => setExportModalVisible(true)}
             activeOpacity={0.8}
           >
-            <SvgLayers size={14} color={colors.foreground} />
-            <Text style={[styles.outlineBtnText, { color: colors.foreground, fontSize: isMobile ? 11.5 : 13 }]}>Export Custom</Text>
+            <SvgLayers size={15} color={colors.foreground} />
+            <Text style={[styles.outlineBtnText, { color: colors.foreground }]}>Custom export</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -358,40 +358,33 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
             onPress={handleExportPDF}
             activeOpacity={0.8}
           >
-            <SvgFileText size={14} color="#FFFFFF" />
-            <Text style={[styles.primaryBtnText, { fontSize: isMobile ? 11.5 : 13 }]}>
+            <SvgFileText size={15} color="#FFFFFF" />
+            <Text style={styles.primaryBtnText}>
               {activeTab === "payroll"
-                ? "Payroll Dossier"
+                ? "Download payroll PDF"
                 : activeTab === "departments"
-                ? "Department Matrix"
+                ? "Download department PDF"
                 : activeTab === "analytics"
-                ? "Financial Trends"
-                : "Full Dossier"}
+                ? "Download trends PDF"
+                : "Download full report"}
             </Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* ─── Dedicated Period & Audit Scope Toolbar ─── */}
+      {/* ─── Period toolbar ─── */}
       <View style={[styles.scopeToolbar, { backgroundColor: colors.card, borderColor: colors.border }, isMobile && { flexDirection: "column", alignItems: "stretch", gap: 10, padding: 12 }]}>
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-          <Text style={{ fontSize: 11, fontFamily: "Inter_800ExtraBold", color: colors.mutedForeground, letterSpacing: 0.5 }}>
-            AUDIT SCOPE:
-          </Text>
-
-          {/* Active Range Scope Tag */}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <Text style={[styles.toolbarLabel, { color: colors.mutedForeground }]}>Report period</Text>
           <View style={[styles.activeScopeTag, { backgroundColor: colors.background, borderColor: colors.border }]}>
-            <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: colors.primary }} />
-            <Text style={{ fontSize: 11, fontFamily: "Inter_700Bold", color: colors.foreground }}>
-              Scope: {activePeriod.label}
-            </Text>
-            <Text style={{ fontSize: 10.5, color: colors.mutedForeground }}>
-              ({periodTransactions.length} records)
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary }} />
+            <Text style={[styles.scopeTagText, { color: colors.foreground }]}>{activePeriod.label}</Text>
+            <Text style={[styles.scopeTagSub, { color: colors.mutedForeground }]}>
+              · {periodTransactions.length} {periodTransactions.length === 1 ? "record" : "records"}
             </Text>
           </View>
         </View>
 
-        {/* Quick Period Selector Pills with Horizontal ScrollView */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}>
           <View style={[styles.periodPillsContainer, { backgroundColor: colors.background, borderColor: colors.border }]}>
             {REPORT_PERIOD_PRESETS.map((p) => {
@@ -400,134 +393,84 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
                 <TouchableOpacity
                   key={p.id}
                   onPress={() => setActivePeriod(getPresetPeriod(p.id))}
-                  style={[
-                    styles.periodPill,
-                    isSelected && { backgroundColor: colors.primary },
-                  ]}
+                  style={[styles.periodPill, isSelected && { backgroundColor: colors.card, borderColor: colors.border }]}
                   activeOpacity={0.7}
                 >
-                  <Text
-                    style={[
-                      styles.periodPillText,
-                      { color: isSelected ? "#FFFFFF" : colors.mutedForeground },
-                    ]}
-                  >
+                  <Text style={[styles.periodPillText, { color: isSelected ? colors.primary : colors.mutedForeground }]}>
                     {p.label}
                   </Text>
                 </TouchableOpacity>
               );
             })}
 
-            {/* Custom Range Button */}
             <TouchableOpacity
               onPress={() => {
                 setCustomStart(activePeriod.startDate || "2026-01-01");
                 setCustomEnd(activePeriod.endDate || "2026-09-01");
                 setCustomDateModalVisible(true);
               }}
-              style={[
-                styles.periodPill,
-                activePeriod.presetId === "custom" && { backgroundColor: colors.primary },
-              ]}
+              style={[styles.periodPill, activePeriod.presetId === "custom" && { backgroundColor: colors.card, borderColor: colors.border }]}
               activeOpacity={0.7}
             >
-              <Text
-                style={[
-                  styles.periodPillText,
-                  { color: activePeriod.presetId === "custom" ? "#FFFFFF" : colors.mutedForeground },
-                ]}
-              >
-                📅 Custom Date Range
+              <Text style={[styles.periodPillText, { color: activePeriod.presetId === "custom" ? colors.primary : colors.mutedForeground }]}>
+                Custom range
               </Text>
             </TouchableOpacity>
           </View>
         </ScrollView>
       </View>
 
-      {/* ─── Executive Period KPIs ─── */}
-      <View style={styles.metricsGrid}>
-        <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 180 }]}>
-          <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>PERIOD REVENUE (INFLOWS)</Text>
-          <Text style={[styles.metricValue, { color: colors.income }]}>
-            +{settings.currency} {fmt(metrics.totalIncome)}
-          </Text>
-          <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
-            {incomeByCat.length} Revenue Streams
-          </Text>
-        </View>
-
-        <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 180 }]}>
-          <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>PERIOD EXPENDITURE (OUTFLOWS)</Text>
-          <Text style={[styles.metricValue, { color: colors.expense }]}>
-            -{settings.currency} {fmt(metrics.totalExpense)}
-          </Text>
-          <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
-            {totalBudgetAllocated > 0
-              ? `${((metrics.totalExpense / totalBudgetAllocated) * 100).toFixed(1)}% of Budget Used`
-              : `${expenseByCat.length} Expense Categories`}
-          </Text>
-        </View>
-
-        {totalBudgetAllocated > 0 ? (
-          <>
-            <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 180 }]}>
-              <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>DEPARTMENT BUDGET</Text>
-              <Text style={[styles.metricValue, { color: colors.primary }]}>
-                {settings.currency} {fmt(totalBudgetAllocated)}
-              </Text>
-              <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
-                {settings.currency} {fmt(unallocatedFunds)} Unallocated Funds
-              </Text>
-            </View>
-
-            <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 180 }]}>
-              <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>NET CASH POSITION</Text>
-              <Text style={[styles.metricValue, { color: netCapitalSurplus >= 0 ? colors.income : colors.expense }]}>
-                {netCapitalSurplus >= 0 ? "+" : "-"}
-                {settings.currency} {fmt(Math.abs(netCapitalSurplus))}
-              </Text>
-              <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
-                {retainedCapitalPct.toFixed(1)}% Income Retained
-              </Text>
-            </View>
-          </>
-        ) : (
-          <View style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border, minWidth: isMobile ? "100%" : 180 }]}>
-            <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>NET OPERATING SURPLUS</Text>
-            <Text style={[styles.metricValue, { color: metrics.netBalance >= 0 ? colors.income : colors.expense }]}>
-              {metrics.netBalance >= 0 ? "+" : "-"}
-              {settings.currency} {fmt(Math.abs(metrics.netBalance))}
-            </Text>
-            <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>
-              {metrics.totalIncome > 0 ? `${((metrics.netBalance / metrics.totalIncome) * 100).toFixed(1)}% Net Margin` : "Operating Surplus"}
-            </Text>
+      {/* ─── Period summary cards ─── */}
+      {(() => {
+        const cards =
+          totalBudgetAllocated > 0
+            ? [
+                { label: "Income", value: `+${settings.currency} ${fmt(metrics.totalIncome)}`, sub: `${incomeByCat.length} income ${incomeByCat.length === 1 ? "source" : "sources"}`, color: colors.income },
+                { label: "Expenses", value: `-${settings.currency} ${fmt(metrics.totalExpense)}`, sub: `${((metrics.totalExpense / totalBudgetAllocated) * 100).toFixed(1)}% of budget used`, color: colors.expense },
+                { label: "Department budget", value: `${settings.currency} ${fmt(totalBudgetAllocated)}`, sub: `${settings.currency} ${fmt(unallocatedFunds)} unallocated`, color: colors.info },
+                { label: "Net cash position", value: `${netCapitalSurplus >= 0 ? "+" : "-"}${settings.currency} ${fmt(Math.abs(netCapitalSurplus))}`, sub: `${retainedCapitalPct.toFixed(1)}% of income retained`, color: netCapitalSurplus >= 0 ? colors.income : colors.expense },
+              ]
+            : [
+                { label: "Income", value: `+${settings.currency} ${fmt(metrics.totalIncome)}`, sub: `${incomeByCat.length} income ${incomeByCat.length === 1 ? "source" : "sources"}`, color: colors.income },
+                { label: "Expenses", value: `-${settings.currency} ${fmt(metrics.totalExpense)}`, sub: `${expenseByCat.length} expense ${expenseByCat.length === 1 ? "category" : "categories"}`, color: colors.expense },
+                { label: "Net operating surplus", value: `${metrics.netBalance >= 0 ? "+" : "-"}${settings.currency} ${fmt(Math.abs(metrics.netBalance))}`, sub: metrics.totalIncome > 0 ? `${((metrics.netBalance / metrics.totalIncome) * 100).toFixed(1)}% net margin` : "Operating result", color: metrics.netBalance >= 0 ? colors.income : colors.expense },
+              ];
+        return (
+          <View style={styles.metricsGrid}>
+            {cards.map((c) => (
+              <View
+                key={c.label}
+                style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border, borderTopColor: c.color, minWidth: isMobile ? "100%" : 200 }]}
+              >
+                <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>{c.label}</Text>
+                <Text style={[styles.metricValue, { color: c.color }]}>{c.value}</Text>
+                <Text style={[styles.metricSub, { color: colors.mutedForeground }]}>{c.sub}</Text>
+              </View>
+            ))}
           </View>
-        )}
-      </View>
+        );
+      })()}
 
-      {/* ─── Sub-Tab Navigation Bar ─── */}
+      {/* ─── Sub-tab navigation ─── */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}>
-        <View style={[styles.tabBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={[styles.tabBar, { borderBottomColor: colors.border }]}>
           {[
-            { id: "statement", label: "Executive Statement", icon: SvgFileText },
-            { id: "analytics", label: "Financial Trends", icon: SvgChart },
-            { id: "departments", label: "Department Matrix", icon: SvgLayers },
-            { id: "payroll", label: "Payroll Audit", icon: SvgUsers },
+            { id: "statement", label: "Income statement", icon: SvgFileText },
+            { id: "analytics", label: "Financial trends", icon: SvgChart },
+            { id: "departments", label: "Departments", icon: SvgLayers },
+            { id: "payroll", label: "Payroll audit", icon: SvgUsers },
           ].map((tab) => {
             const IconComp = tab.icon;
             const isActive = activeTab === tab.id;
             return (
               <TouchableOpacity
                 key={tab.id}
-                style={[
-                  styles.tabBtn,
-                  isActive && { backgroundColor: colors.primary, borderColor: "transparent" },
-                ]}
+                style={[styles.tabBtn, { borderBottomColor: isActive ? colors.primary : "transparent" }]}
                 onPress={() => setActiveTab(tab.id as any)}
                 activeOpacity={0.8}
               >
-                <IconComp size={14} color={isActive ? "#FFFFFF" : colors.mutedForeground} />
-                <Text style={[styles.tabBtnText, { color: isActive ? "#FFFFFF" : colors.foreground }]}>
+                <IconComp size={15} color={isActive ? colors.primary : colors.mutedForeground} />
+                <Text style={[styles.tabBtnText, { color: isActive ? colors.foreground : colors.mutedForeground, fontFamily: isActive ? "Inter_600SemiBold" : "Inter_500Medium" }]}>
                   {tab.label}
                 </Text>
               </TouchableOpacity>
@@ -536,144 +479,128 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
         </View>
       </ScrollView>
 
-      {/* ─── Tab Content ─── */}
-      {activeTab === "statement" && (
-        <View style={{ gap: 16 }}>
-          {/* Income & Expense Breakdown Statement */}
-          <View style={[styles.panelCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.panelHeader}>
-              <View>
-                <Text style={[styles.panelTitle, { color: colors.foreground }]}>Income & Expenditure Statement</Text>
-                <Text style={[styles.panelSubtitle, { color: colors.mutedForeground }]}>
-                  Comprehensive statement for {activePeriod.label}
-                </Text>
-              </View>
-            </View>
+      {/* ─── Tab: Income statement ─── */}
+      {activeTab === "statement" && (() => {
+        const pctOf = (v: number, total: number) => (total > 0 ? `${((v / total) * 100).toFixed(0)}%` : "—");
+        const marginPct = metrics.totalIncome > 0 ? (metrics.netBalance / metrics.totalIncome) * 100 : null;
+        const Row = ({ label, value, pct, color, strong, indent }: { label: string; value: string; pct?: string; color?: string; strong?: boolean; indent?: boolean }) => (
+          <View style={[styles.statementRow, { borderBottomColor: colors.border }]}>
+            <Text style={[strong ? styles.statementTotalLabel : styles.statementLabel, { color: colors.foreground, paddingLeft: indent ? 14 : 0 }]}>{label}</Text>
+            {pct !== undefined && <Text style={[styles.statementPct, { color: colors.mutedForeground }]}>{pct}</Text>}
+            <Text style={[strong ? styles.statementTotalVal : styles.statementAmount, { color: color || colors.foreground }]}>{value}</Text>
+          </View>
+        );
 
-            {/* Income Streams */}
-            <View style={{ gap: 8 }}>
-              <Text style={[styles.sectionHeading, { color: colors.income }]}>REVENUE & INFLOWS</Text>
+        return (
+          <View style={[styles.statementGrid, isMobile && { flexDirection: "column" }]}>
+            {/* Income statement */}
+            <View style={[styles.panelCard, styles.statementMain, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={styles.panelHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.panelTitle, { color: colors.foreground }]}>Income statement</Text>
+                  <Text style={[styles.panelSubtitle, { color: colors.mutedForeground }]}>{activePeriod.label}</Text>
+                </View>
+              </View>
+
+              <View style={[styles.statementHead, { borderBottomColor: colors.border }]}>
+                <Text style={[styles.statementHeadText, { color: colors.mutedForeground, flex: 1 }]}>Account</Text>
+                <Text style={[styles.statementHeadText, styles.statementPct, { color: colors.mutedForeground }]}>% of total</Text>
+                <Text style={[styles.statementHeadText, { color: colors.mutedForeground, width: 150, textAlign: "right" }]}>Amount</Text>
+              </View>
+
+              {/* Income */}
+              <Text style={[styles.sectionHeading, { color: colors.foreground }]}>Income</Text>
               {incomeByCat.length === 0 ? (
-                <Text style={{ color: colors.mutedForeground, fontSize: 13, fontStyle: "italic", paddingVertical: 4 }}>
-                  No income records yet.
-                </Text>
+                <Text style={[styles.emptyLine, { color: colors.mutedForeground }]}>No income recorded in this period.</Text>
               ) : (
                 incomeByCat.map((item) => (
-                  <View key={item.category} style={[styles.statementRow, { borderBottomColor: colors.border }]}>
-                    <Text style={[styles.statementLabel, { color: colors.foreground }]}>{item.category}</Text>
-                    <Text style={[styles.statementAmount, { color: colors.income }]}>
-                      +{settings.currency} {fmt(item.total)}
-                    </Text>
-                  </View>
+                  <Row key={item.category} indent label={item.category} pct={pctOf(item.total, metrics.totalIncome)} value={`${settings.currency} ${fmt(item.total)}`} />
                 ))
               )}
-              <View style={[styles.statementTotalRow, { backgroundColor: colors.income + "12", borderColor: colors.income + "30" }]}>
-                <Text style={[styles.statementTotalLabel, { color: colors.income }]}>Total Inflows</Text>
-                <Text style={[styles.statementTotalVal, { color: colors.income }]}>
-                  +{settings.currency} {fmt(metrics.totalIncome)}
-                </Text>
-              </View>
-            </View>
+              <Row strong label="Total income" value={`${settings.currency} ${fmt(metrics.totalIncome)}`} color={colors.income} />
 
-            {/* Expense Streams */}
-            <View style={{ gap: 8, marginTop: 12 }}>
-              <Text style={[styles.sectionHeading, { color: colors.expense }]}>OPERATIONAL EXPENDITURE & OUTFLOWS</Text>
+              {/* Expenses */}
+              <Text style={[styles.sectionHeading, { color: colors.foreground, marginTop: 14 }]}>Expenses</Text>
               {expenseByCat.length === 0 ? (
-                <Text style={{ color: colors.mutedForeground, fontSize: 13, fontStyle: "italic", paddingVertical: 4 }}>
-                  No expense records yet.
-                </Text>
+                <Text style={[styles.emptyLine, { color: colors.mutedForeground }]}>No expenses recorded in this period.</Text>
               ) : (
                 expenseByCat.map((item) => (
-                  <View key={item.category} style={[styles.statementRow, { borderBottomColor: colors.border }]}>
-                    <Text style={[styles.statementLabel, { color: colors.foreground }]}>{item.category}</Text>
-                    <Text style={[styles.statementAmount, { color: colors.expense }]}>
-                      -{settings.currency} {fmt(item.total)}
-                    </Text>
-                  </View>
+                  <Row key={item.category} indent label={item.category} pct={pctOf(item.total, metrics.totalExpense)} value={`${settings.currency} ${fmt(item.total)}`} />
                 ))
               )}
-              <View style={[styles.statementTotalRow, { backgroundColor: colors.expense + "12", borderColor: colors.expense + "30" }]}>
-                <Text style={[styles.statementTotalLabel, { color: colors.expense }]}>Total Outflows</Text>
-                <Text style={[styles.statementTotalVal, { color: colors.expense }]}>
-                  -{settings.currency} {fmt(metrics.totalExpense)}
+              <Row strong label="Total expenses" value={`${settings.currency} ${fmt(metrics.totalExpense)}`} color={colors.expense} />
+
+              {/* Net result */}
+              <View style={[styles.netSurplusBox, { borderTopColor: colors.foreground }]}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={[styles.netSurplusLabel, { color: colors.foreground }]}>
+                    {metrics.netBalance >= 0 ? "Net income" : "Net loss"}
+                  </Text>
+                  <Text style={[styles.netSurplusSub, { color: colors.mutedForeground }]}>
+                    {marginPct !== null ? `${marginPct.toFixed(1)}% operating margin` : "Income − expenses"}
+                  </Text>
+                </View>
+                <Text style={[styles.netSurplusValue, { color: metrics.netBalance >= 0 ? colors.income : colors.expense }]}>
+                  {metrics.netBalance >= 0 ? "+" : "-"}
+                  {settings.currency} {fmt(Math.abs(metrics.netBalance))}
                 </Text>
               </View>
             </View>
 
-            {/* Net Operating Surplus Footer */}
-            <View style={[styles.netSurplusBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
-              <View>
-                <Text style={[styles.netSurplusLabel, { color: colors.foreground }]}>NET OPERATING CASHFLOW / (DEFICIT)</Text>
-                <Text style={{ fontSize: 11, color: colors.mutedForeground, marginTop: 2 }}>
-                  {metrics.totalIncome > 0 ? `${((metrics.netBalance / metrics.totalIncome) * 100).toFixed(1)}% Operating Margin` : "Operating Result"}
-                </Text>
-              </View>
-              <Text
-                style={[
-                  styles.netSurplusValue,
-                  { color: metrics.netBalance >= 0 ? colors.income : colors.expense },
-                ]}
-              >
-                {metrics.netBalance >= 0 ? "+" : "-"}
-                {settings.currency} {fmt(Math.abs(metrics.netBalance))}
-              </Text>
-            </View>
-
-            {/* Department Budget & Unallocated Funds Reconciliation */}
+            {/* Budget reconciliation */}
             {totalBudgetAllocated > 0 && (
-              <View style={{ gap: 8, marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.border }}>
-                <Text style={[styles.sectionHeading, { color: colors.primary }]}>DEPARTMENT BUDGET & UNALLOCATED FUNDS RECONCILIATION</Text>
-                
-                <View style={[styles.statementRow, { borderBottomColor: colors.border }]}>
-                  <Text style={[styles.statementLabel, { color: colors.foreground }]}>Recognized Revenue Inflows</Text>
-                  <Text style={[styles.statementAmount, { color: colors.income }]}>
-                    +{settings.currency} {fmt(metrics.totalIncome)}
-                  </Text>
+              <View style={[styles.panelCard, styles.statementSide, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={styles.panelHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.panelTitle, { color: colors.foreground }]}>Budget reconciliation</Text>
+                    <Text style={[styles.panelSubtitle, { color: colors.mutedForeground }]}>How income is allocated and used</Text>
+                  </View>
                 </View>
 
-                <View style={[styles.statementRow, { borderBottomColor: colors.border }]}>
-                  <Text style={[styles.statementLabel, { color: colors.foreground }]}>Approved Department Budget Allocation</Text>
-                  <Text style={[styles.statementAmount, { color: colors.primary }]}>
-                    {settings.currency} {fmt(totalBudgetAllocated)}
-                  </Text>
-                </View>
+                <Row label="Total income" value={`+${settings.currency} ${fmt(metrics.totalIncome)}`} color={colors.income} />
+                <Row label="Less: department budgets" value={`−${settings.currency} ${fmt(totalBudgetAllocated)}`} />
+                <Row strong label="Unallocated funds" value={`${settings.currency} ${fmt(unallocatedFunds)}`} color={colors.info} />
 
-                <View style={[styles.statementTotalRow, { backgroundColor: colors.primary + "12", borderColor: colors.primary + "30" }]}>
-                  <Text style={[styles.statementTotalLabel, { color: colors.primary }]}>Unallocated Available Funds (Income - Budget)</Text>
-                  <Text style={[styles.statementTotalVal, { color: colors.primary }]}>
-                    {settings.currency} {fmt(unallocatedFunds)}
-                  </Text>
-                </View>
+                <View style={{ height: 8 }} />
+                <Row label="Total income" value={`+${settings.currency} ${fmt(metrics.totalIncome)}`} color={colors.income} />
+                <Row label="Less: expenses paid" value={`−${settings.currency} ${fmt(metrics.totalExpense)}`} color={colors.expense} />
 
-                <View style={[styles.statementRow, { borderBottomColor: colors.border }]}>
-                  <Text style={[styles.statementLabel, { color: colors.foreground }]}>Operational Disbursements & Outflows</Text>
-                  <Text style={[styles.statementAmount, { color: colors.expense }]}>
-                    -{settings.currency} {fmt(metrics.totalExpense)}
-                  </Text>
-                </View>
-
-                <View style={[styles.netSurplusBox, { backgroundColor: colors.income + "15", borderColor: colors.income + "40" }]}>
-                  <View>
-                    <Text style={[styles.netSurplusLabel, { color: colors.foreground, fontSize: 11 }]}>NET CASH POSITION (INCOME - EXPENSES)</Text>
-                    <Text style={{ fontSize: 11, color: colors.mutedForeground, marginTop: 2 }}>
-                      {retainedCapitalPct.toFixed(1)}% of Revenue Retained · {netCash >= 0 ? "+" : "-"}{settings.currency} {fmt(Math.abs(netCash))} Cashflow
+                <View style={[styles.netSurplusBox, { borderTopColor: colors.foreground }]}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={[styles.netSurplusLabel, { color: colors.foreground }]}>Net cash position</Text>
+                    <Text style={[styles.netSurplusSub, { color: colors.mutedForeground }]}>
+                      {retainedCapitalPct.toFixed(1)}% of income retained
                     </Text>
                   </View>
-                  <Text
-                    style={[
-                      styles.netSurplusValue,
-                      { color: netCash >= 0 ? colors.income : colors.expense, fontSize: 18 },
-                    ]}
-                  >
+                  <Text style={[styles.netSurplusValue, { color: netCash >= 0 ? colors.income : colors.expense }]}>
                     {netCash >= 0 ? "+" : "-"}
                     {settings.currency} {fmt(Math.abs(netCash))}
                   </Text>
                 </View>
+
+                {/* Visual: how the budget is being used */}
+                <View style={{ gap: 8, marginTop: 6 }}>
+                  <View style={styles.statementHead}>
+                    <Text style={[styles.statementHeadText, { color: colors.mutedForeground, flex: 1 }]}>Budget used</Text>
+                    <Text style={[styles.statementHeadText, { color: colors.foreground }]}>
+                      {((metrics.totalExpense / totalBudgetAllocated) * 100).toFixed(1)}%
+                    </Text>
+                  </View>
+                  <View style={{ height: 8, borderRadius: 4, backgroundColor: colors.muted, overflow: "hidden" }}>
+                    <View
+                      style={{
+                        height: "100%",
+                        width: `${Math.min(100, Math.max(2, (metrics.totalExpense / totalBudgetAllocated) * 100))}%`,
+                        backgroundColor: metrics.totalExpense > totalBudgetAllocated ? colors.expense : colors.primary,
+                      }}
+                    />
+                  </View>
+                </View>
               </View>
             )}
           </View>
-        </View>
-      )}
+        );
+      })()}
 
       {activeTab === "analytics" && (
         <View style={{ gap: 16 }}>
@@ -753,7 +680,7 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
               <DonutChart
                 segments={expenseDonutSegments}
                 size={isMobile ? 134 : 164}
-                strokeWidth={isMobile ? 11 : 13}
+                strokeWidth={isMobile ? 8 : 9}
                 centerLabel={`${settings.currency} ${fmtShort(metrics.totalExpense)}`}
                 centerSub="Total Spent"
                 currency={settings.currency}
@@ -920,7 +847,7 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
                           <Text style={{ fontSize: 14, fontFamily: "Inter_700Bold", color: "#8B5CF6" }}>
                             {settings.currency} {fmt(net)}
                           </Text>
-                          <Text style={{ fontSize: 10.5, color: colors.mutedForeground }}>
+                          <Text style={{ fontSize: 11.5, color: colors.mutedForeground }}>
                             Base: {settings.currency} {fmt(p.baseSalary || 0)} | Bonus: +{fmt(p.bonus || 0)} | Ded: -{fmt(p.deductions || 0)}
                           </Text>
                         </View>
@@ -1212,7 +1139,7 @@ const styles = StyleSheet.create({
   customDateSheet: {
     width: "100%",
     maxWidth: 520,
-    borderRadius: 18,
+    borderRadius: 10,
     borderWidth: 1,
     overflow: "hidden",
     shadowColor: "#000",
@@ -1263,13 +1190,12 @@ const styles = StyleSheet.create({
   },
   pageTitle: {
     fontSize: 22,
-    fontFamily: "Inter_800ExtraBold",
-    letterSpacing: -0.6,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: -0.4,
   },
   pageSubtitle: {
     fontSize: 13,
     fontFamily: "Inter_400Regular",
-    letterSpacing: -0.1,
     marginTop: 2,
   },
   primaryBtn: {
@@ -1304,13 +1230,65 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: "Inter_700Bold",
   },
+  toolbarLabel: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+  },
+  scopeTagText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+  },
+  scopeTagSub: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+  },
+  statementGrid: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 16,
+  },
+  statementMain: {
+    flex: 3,
+    minWidth: 0,
+  },
+  statementSide: {
+    flex: 2,
+    minWidth: 0,
+  },
+  statementHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "transparent",
+  },
+  statementHeadText: {
+    fontSize: 12.5,
+    fontFamily: "Inter_600SemiBold",
+  },
+  statementPct: {
+    width: 80,
+    textAlign: "right",
+    fontSize: 13,
+  },
+  emptyLine: {
+    fontSize: 13,
+    paddingVertical: 8,
+    paddingLeft: 14,
+  },
+  netSurplusSub: {
+    fontSize: 12.5,
+    fontFamily: "Inter_400Regular",
+    marginTop: 2,
+  },
   scopeToolbar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: 14,
+    borderRadius: 8,
     borderWidth: 1,
     gap: 12,
     flexWrap: "wrap",
@@ -1327,21 +1305,23 @@ const styles = StyleSheet.create({
   periodPillsContainer: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 10,
+    borderRadius: 8,
     padding: 3,
     borderWidth: 1,
-    gap: 3,
+    gap: 2,
   },
   periodPill: {
-    paddingHorizontal: 11,
+    paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 7,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "transparent",
     alignItems: "center",
     justifyContent: "center",
   },
   periodPillText: {
-    fontSize: 12,
-    fontFamily: "Inter_700Bold",
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
   },
   metricsGrid: {
     flexDirection: "row",
@@ -1351,48 +1331,45 @@ const styles = StyleSheet.create({
   metricCard: {
     flex: 1,
     minWidth: 200,
-    borderRadius: 16,
+    borderRadius: 8,
     borderWidth: 1,
+    borderTopWidth: 3,
     padding: 16,
-    gap: 4,
+    gap: 6,
   },
   metricLabel: {
-    fontSize: 10.5,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: 0.6,
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
   },
   metricValue: {
     fontSize: 22,
-    fontFamily: "Inter_800ExtraBold",
-    letterSpacing: -0.6,
-    marginVertical: 2,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: -0.4,
   },
   metricSub: {
-    fontSize: 11.5,
+    fontSize: 12.5,
     fontFamily: "Inter_400Regular",
   },
   tabBar: {
     flexDirection: "row",
-    padding: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 6,
+    borderBottomWidth: 1,
+    gap: 4,
     flexWrap: "nowrap",
   },
   tabBtn: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 8,
     paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
+    paddingVertical: 12,
+    borderBottomWidth: 2,
+    marginBottom: -1,
   },
   tabBtnText: {
-    fontSize: 12.5,
-    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
   },
   panelCard: {
-    borderRadius: 16,
+    borderRadius: 10,
     borderWidth: 1,
     padding: 18,
     gap: 14,
@@ -1408,82 +1385,74 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   panelTitle: {
-    fontSize: 15,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: -0.2,
+    fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
   },
   panelSubtitle: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: "Inter_400Regular",
     marginTop: 2,
   },
   sectionHeading: {
-    fontSize: 11,
-    fontFamily: "Inter_800ExtraBold",
-    letterSpacing: 0.8,
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
     marginTop: 4,
   },
   statementRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 9,
+    paddingVertical: 10,
     borderBottomWidth: 1,
+    gap: 12,
   },
   statementLabel: {
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
     flex: 1,
     minWidth: 0,
-    paddingRight: 8,
   },
   statementAmount: {
-    fontSize: 13.5,
-    fontFamily: "Inter_700Bold",
-    flexShrink: 0,
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
+    width: 150,
+    textAlign: "right",
+    fontVariant: ["tabular-nums"],
   },
   statementTotalRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    marginTop: 4,
+    gap: 12,
   },
   statementTotalLabel: {
-    fontSize: 13,
-    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
     flex: 1,
     minWidth: 0,
-    paddingRight: 8,
   },
   statementTotalVal: {
-    fontSize: 14,
-    fontFamily: "Inter_800ExtraBold",
-    flexShrink: 0,
+    fontSize: 14.5,
+    fontFamily: "Inter_600SemiBold",
+    width: 150,
+    textAlign: "right",
   },
   netSurplusBox: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginTop: 8,
-    flexWrap: "wrap",
-    gap: 8,
+    paddingTop: 14,
+    paddingBottom: 4,
+    borderTopWidth: 2,
+    marginTop: 6,
+    gap: 12,
   },
   netSurplusLabel: {
-    fontSize: 13,
-    fontFamily: "Inter_800ExtraBold",
-    letterSpacing: 0.2,
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
   },
   netSurplusValue: {
-    fontSize: 18,
-    fontFamily: "Inter_800ExtraBold",
+    fontSize: 20,
+    fontFamily: "Inter_600SemiBold",
+    textAlign: "right",
   },
   deptAuditCard: {
     padding: 12,
@@ -1513,7 +1482,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   deptBadgeText: {
-    fontSize: 9.5,
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
   },
   payrollSummaryStrip: {
@@ -1531,7 +1500,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   payrollSummaryLabel: {
-    fontSize: 9.5,
+    fontSize: 11,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.5,
   },

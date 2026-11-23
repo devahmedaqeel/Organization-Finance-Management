@@ -2375,6 +2375,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Exported so the web fiscal-year scope can re-provide filtered data (components/web/FiscalScope.tsx). */
+export { FinanceContext };
+
 export function useFinance() {
   return useContext(FinanceContext);
 }

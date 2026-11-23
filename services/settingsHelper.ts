@@ -7,6 +7,8 @@ export interface Settings {
   organizationPhone: string;
   currency: string;
   fiscalYear: string;
+  /** Month the fiscal year starts in (1–12). Default 7 = July. */
+  fiscalYearStartMonth?: number;
   organizationLogo?: string;
   emailAutomatedEnabled?: boolean;
   emailjsServiceId?: string;

@@ -66,7 +66,7 @@ function AnimatedBarRow({
       </View>
 
       <View style={styles.barWrap}>
-        <View style={[styles.track, { backgroundColor: colors.border }]}>
+        <View style={[styles.track, { backgroundColor: colors.muted }]}>
           <Animated.View
             style={[
               styles.fill,
@@ -79,7 +79,7 @@ function AnimatedBarRow({
         </View>
       </View>
 
-      <Text style={[styles.value, { color: item.color }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>
+      <Text style={[styles.value, { color: colors.foreground }]} numberOfLines={Platform.OS === "web" ? undefined : 1} adjustsFontSizeToFit minimumFontScale={0.7}>
         {formatValue(item.value)}
       </Text>
     </View>
@@ -121,7 +121,7 @@ export function HBarChart({
 }
 
 const styles = StyleSheet.create({
-  container: { gap: 14 },
+  container: { gap: 16 },
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -133,33 +133,33 @@ const styles = StyleSheet.create({
     paddingRight: 6,
   },
   label: {
-    fontSize: 13,
+    fontSize: 13.5,
     fontWeight: "600",
     fontFamily: "Inter_600SemiBold",
-    letterSpacing: -0.2,
+    letterSpacing: -0.1,
   },
   sublabel: {
     fontSize: 12,
-    fontWeight: "500",
-    fontFamily: "Inter_500Medium",
+    fontWeight: "400",
+    fontFamily: "Inter_400Regular",
     marginTop: 2,
     letterSpacing: -0.1,
   },
   barWrap: { flex: 1 },
   track: {
-    height: 10,
-    borderRadius: 6,
+    height: 12,
+    borderRadius: 4,
     overflow: "hidden",
   },
   fill: {
     height: "100%",
-    borderRadius: 6,
+    borderRadius: 4,
   },
   value: {
-    minWidth: 72,
-    fontSize: 13,
-    fontWeight: "700",
-    fontFamily: "Inter_700Bold",
+    minWidth: 96,
+    fontSize: 13.5,
+    fontWeight: "600",
+    fontFamily: "Inter_600SemiBold",
     textAlign: "right",
     letterSpacing: -0.2,
   },

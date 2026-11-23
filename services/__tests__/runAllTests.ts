@@ -86,6 +86,11 @@ const testSuites = [
     cmd: "npx",
     args: ["-y", "tsx", "--test", "services/__tests__/payslipTemplates.test.ts"],
   },
+  {
+    name: "16. Direct Payslip Editing & Read-only Financial Values Suite",
+    cmd: "npx",
+    args: ["-y", "tsx", "--test", "services/__tests__/payslipDirectEditing.test.ts"],
+  },
 ];
 
 console.log("\n=======================================================");

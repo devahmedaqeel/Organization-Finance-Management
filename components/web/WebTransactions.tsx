@@ -18,6 +18,7 @@ import {
   SvgTrash,
   SvgEdit,
 } from "./SvgIcons";
+import { FitText, splitDescription } from "./FitText";
 
 export function WebTransactions() {
   const colors = useColors();
@@ -244,7 +245,7 @@ export function WebTransactions() {
       {isMobile ? (
         <View style={{ gap: 10 }}>
           {filteredTransactions.length === 0 ? (
-            <View style={[styles.emptyWrap, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 14 }]}>
+            <View style={[styles.emptyWrap, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 8 }]}>
               <SvgFileText size={36} color={colors.mutedForeground} />
               <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No ledger records matching filters</Text>
               <Text style={[styles.emptySubtitle, { color: colors.mutedForeground }]}>
@@ -335,11 +336,11 @@ export function WebTransactions() {
       ) : (
         <View style={[styles.tableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <ScrollView horizontal contentContainerStyle={{ width: "100%" }} showsHorizontalScrollIndicator={true}>
-            <View style={{ minWidth: 700, width: "100%" }}>
+            <View style={{ minWidth: 1060, width: "100%" }}>
               {/* Table Header */}
               <View style={[styles.tableHeader, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
                 <TouchableOpacity
-                  style={[styles.thCol, { width: 92, paddingLeft: 14, paddingRight: 4 }]}
+                  style={[styles.thCol, { width: 112, paddingLeft: 14, paddingRight: 4 }]}
                   onPress={() => {
                     if (sortField === "date") setSortAsc(!sortAsc);
                     else {
@@ -348,28 +349,28 @@ export function WebTransactions() {
                     }
                   }}
                 >
-                  <Text style={[styles.thText, { color: colors.mutedForeground }]}>DATE</Text>
+                  <Text numberOfLines={1} style={[styles.thText, { color: colors.mutedForeground }]}>Date</Text>
                   {sortField === "date" && <SvgChevronDown size={11} color={colors.primary} />}
                 </TouchableOpacity>
 
-                <View style={[styles.thCol, { width: 80, paddingHorizontal: 4 }]}>
-                  <Text style={[styles.thText, { color: colors.mutedForeground }]}>TYPE</Text>
+                <View style={[styles.thCol, { width: 96, paddingHorizontal: 4 }]}>
+                  <Text numberOfLines={1} style={[styles.thText, { color: colors.mutedForeground }]}>Type</Text>
                 </View>
 
-                <View style={[styles.thCol, { width: 105, paddingHorizontal: 4 }]}>
-                  <Text style={[styles.thText, { color: colors.mutedForeground }]}>CATEGORY</Text>
+                <View style={[styles.thCol, { width: 160, paddingHorizontal: 4 }]}>
+                  <Text numberOfLines={1} style={[styles.thText, { color: colors.mutedForeground }]}>Category</Text>
                 </View>
 
-                <View style={[styles.thCol, { flex: 1, minWidth: 120, paddingHorizontal: 6 }]}>
-                  <Text style={[styles.thText, { color: colors.mutedForeground }]}>MEMO / REF</Text>
+                <View style={[styles.thCol, { flex: 1, minWidth: 220, paddingHorizontal: 6 }]}>
+                  <Text numberOfLines={1} style={[styles.thText, { color: colors.mutedForeground }]}>Memo / Ref</Text>
                 </View>
 
-                <View style={[styles.thCol, { width: 130, paddingHorizontal: 4 }]}>
-                  <Text style={[styles.thText, { color: colors.mutedForeground }]}>DEPARTMENT</Text>
+                <View style={[styles.thCol, { width: 165, paddingHorizontal: 4 }]}>
+                  <Text numberOfLines={1} style={[styles.thText, { color: colors.mutedForeground }]}>Department</Text>
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.thCol, { width: 125, paddingHorizontal: 4, justifyContent: "flex-end" }]}
+                  style={[styles.thCol, { width: 145, paddingHorizontal: 4, justifyContent: "flex-end" }]}
                   onPress={() => {
                     if (sortField === "amount") setSortAsc(!sortAsc);
                     else {
@@ -378,13 +379,13 @@ export function WebTransactions() {
                     }
                   }}
                 >
-                  <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>AMOUNT</Text>
+                  <Text numberOfLines={1} style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>Amount</Text>
                   {sortField === "amount" && <SvgChevronDown size={11} color={colors.primary} />}
                 </TouchableOpacity>
 
                 {canEdit && (
                   <View style={[styles.thCol, { width: 85, paddingRight: 14, paddingLeft: 4, justifyContent: "flex-end" }]}>
-                    <Text style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>ACTIONS</Text>
+                    <Text numberOfLines={1} style={[styles.thText, { color: colors.mutedForeground, textAlign: "right" }]}>Actions</Text>
                   </View>
                 )}
               </View>
@@ -401,11 +402,11 @@ export function WebTransactions() {
               ) : (
                 filteredTransactions.map((tx) => (
                   <View key={tx.id} style={[styles.tableRow, { borderBottomColor: colors.border }]}>
-                    <View style={[styles.tdCol, { width: 92, paddingLeft: 14, paddingRight: 4 }]}>
-                      <Text style={[styles.dateText, { color: colors.foreground }]}>{tx.date}</Text>
+                    <View style={[styles.tdCol, { width: 112, paddingLeft: 14, paddingRight: 4 }]}>
+                      <Text numberOfLines={1} style={[styles.dateText, { color: colors.foreground }]}>{tx.date}</Text>
                     </View>
 
-                    <View style={[styles.tdCol, { width: 80, paddingHorizontal: 4, alignItems: "flex-start", justifyContent: "center" }]}>
+                    <View style={[styles.tdCol, { width: 96, paddingHorizontal: 4, alignItems: "flex-start", justifyContent: "center" }]}>
                       <View
                         style={[
                           styles.catBadge,
@@ -426,28 +427,36 @@ export function WebTransactions() {
                       </View>
                     </View>
 
-                    <View style={[styles.tdCol, { width: 105, paddingHorizontal: 4 }]}>
-                      <Text style={[styles.deptText, { color: colors.foreground }]}>
+                    <View style={[styles.tdCol, { width: 160, paddingHorizontal: 4 }]}>
+                      <FitText style={[styles.deptText, { color: colors.foreground }]}>
                         {tx.category}
-                      </Text>
+                      </FitText>
                     </View>
 
-                    <View style={[styles.tdCol, { flex: 1, minWidth: 140, paddingHorizontal: 6, overflow: "hidden" }]}>
-                      <Text style={[styles.descText, { color: colors.foreground }]}>
-                        {tx.description || "No description provided"}
-                      </Text>
-                      <Text style={[styles.refText, { color: colors.mutedForeground }]}>
-                        {tx.referenceNumber || `TXN-${tx.id.slice(-6).toUpperCase()}`}
-                      </Text>
+                    <View style={[styles.tdCol, { flex: 1, minWidth: 220, paddingHorizontal: 6, overflow: "hidden" }]}>
+                      {(() => {
+                        const p = splitDescription(tx.description);
+                        const ref = tx.referenceNumber || `TXN-${tx.id.slice(-6).toUpperCase()}`;
+                        return (
+                          <>
+                            {p.detail ? (
+                              <FitText style={[styles.descText, { color: colors.foreground }]}>{p.title}</FitText>
+                            ) : (
+                              <Text style={[styles.descText, { color: colors.foreground }]}>{p.title}</Text>
+                            )}
+                            <FitText style={[styles.refText, { color: colors.mutedForeground }]}>{p.detail ? `${ref} · ${p.detail}` : ref}</FitText>
+                          </>
+                        );
+                      })()}
                     </View>
 
-                    <View style={[styles.tdCol, { width: 130, paddingHorizontal: 4 }]}>
-                      <Text style={[styles.deptText, { color: colors.foreground }]}>
+                    <View style={[styles.tdCol, { width: 165, paddingHorizontal: 4 }]}>
+                      <FitText style={[styles.deptText, { color: colors.foreground }]}>
                         {tx.department}
-                      </Text>
+                      </FitText>
                     </View>
 
-                    <View style={[styles.tdCol, { width: 125, paddingHorizontal: 4, alignItems: "flex-end" }]}>
+                    <View style={[styles.tdCol, { width: 145, paddingHorizontal: 4, alignItems: "flex-end" }]}>
                       <Text
                         style={[
                           styles.amountText,
@@ -602,13 +611,13 @@ const styles = StyleSheet.create({
   metricCard: {
     flex: 1,
     minWidth: 160,
-    borderRadius: 14,
+    borderRadius: 8,
     borderWidth: 1,
     padding: 12,
     gap: 3,
   },
   metricLabel: {
-    fontSize: 10,
+    fontSize: 11.5,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.6,
   },
@@ -623,7 +632,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
   },
   filterBarCard: {
-    borderRadius: 14,
+    borderRadius: 8,
     borderWidth: 1,
     padding: 10,
     gap: 8,
@@ -663,7 +672,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
   },
   mobileCard: {
-    borderRadius: 14,
+    borderRadius: 8,
     borderWidth: 1,
     padding: 14,
     gap: 8,
@@ -718,7 +727,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
   },
   tableCard: {
-    borderRadius: 16,
+    borderRadius: 10,
     borderWidth: 1,
     overflow: "hidden",
     width: "100%",
@@ -735,9 +744,9 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   thText: {
-    fontSize: 10.5,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: 0.8,
+    fontSize: 12.5,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 0.1,
   },
   tableRow: {
     flexDirection: "row",
@@ -760,18 +769,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   catBadgeText: {
-    fontSize: 10.5,
+    fontSize: 11.5,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.3,
   },
   descText: {
     fontSize: 13,
-    fontFamily: "Inter_600SemiBold",
+    lineHeight: 19,
+    fontFamily: "Inter_500Medium",
     letterSpacing: -0.2,
-    lineHeight: 18,
   },
   refText: {
-    fontSize: 10.5,
+    fontSize: 11.5,
     fontFamily: "Inter_400Regular",
     marginTop: 1,
   },

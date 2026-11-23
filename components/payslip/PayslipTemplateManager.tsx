@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Modal, Text, View, useWindowDimensions } from "react-native";
+import { ActivityIndicator, Modal, Text, TouchableOpacity, View, useWindowDimensions } from "react-native";
 import { useAuth } from "@/context/AuthContext";
 import { useFinance } from "@/context/FinanceContext";
 import { useColors } from "@/hooks/useColors";
@@ -120,7 +120,7 @@ export function PayslipTemplateManager() {
 
   if (editing) {
     return (
-      <View style={{ flex: 1, minHeight: 600 }}>
+      <View style={{ flex: 1, minWidth: 0 }}>
         <PayslipTemplateEditor
           initial={editing}
           org={org}
@@ -148,96 +148,158 @@ export function PayslipTemplateManager() {
     );
   }
 
+  const activeCount = lib.templates.filter((t) => t.isActive).length;
+  const defaultTpl = lib.templates.find((t) => t.id === lib.defaultTemplateId);
+
   return (
-    <View style={{ gap: 12 }}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-        <View style={{ flex: 1, minWidth: 220 }}>
-          <Text style={{ color: colors.foreground, fontSize: 18, fontWeight: "800" }}>Payslip Templates</Text>
-          <Text style={{ color: colors.mutedForeground, fontSize: 12, marginTop: 2 }}>
-            Templates control how salary slips look. They never change salary calculations. Logo is taken from your Organization Profile.
+    <View style={{ gap: 16 }}>
+      {/* Header */}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <View style={{ flex: 1, minWidth: 240 }}>
+          <Text style={{ color: colors.foreground, fontSize: 18, fontFamily: "Inter_600SemiBold" }}>Payslip templates</Text>
+          <Text style={{ color: colors.mutedForeground, fontSize: 13, lineHeight: 19, marginTop: 2 }}>
+            Choose how payslips look when you print or download them.
           </Text>
         </View>
         {lib.canManage ? (
           <View style={narrow ? { width: "100%" } : undefined}>
-            <SmallButton
-              label="+ Create Template"
-              tone="primary"
-              onPress={() => setWizard(true)}
-            />
+            <SmallButton label="+ New template" tone="primary" onPress={() => setWizard(true)} />
           </View>
         ) : null}
       </View>
 
-      {notice ? <Notice notice={notice} /> : null}
-      {lib.error ? <Text style={{ color: colors.warning, fontSize: 12 }}>{lib.error}</Text> : null}
-      {lib.loading ? <ActivityIndicator color={ACCENT} /> : null}
-
-      {lib.templates.map((t) => {
-        const isDefault = t.id === lib.defaultTemplateId;
-        const busy = busyId === t.id;
-        return (
-          <View
-            key={t.id}
-            style={{
-              borderWidth: 1,
-              borderColor: isDefault ? ACCENT : colors.border,
-              backgroundColor: colors.card,
-              borderRadius: 12,
-              padding: 14,
-              gap: 10,
-              opacity: t.isActive ? 1 : 0.7,
-            }}
-          >
-            <View style={{ flexDirection: narrow ? "column" : "row", gap: 8 }}>
-              <View style={{ flex: 1 }}>
-                <View style={{ flexDirection: "row", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-                  <Text style={{ color: colors.foreground, fontSize: 15, fontWeight: "700" }}>{t.name}</Text>
-                  {isDefault ? <Badge text="Default" color={ACCENT} /> : null}
-                  {t.isBuiltIn ? <Badge text="Built-in" color="#0EA5E9" /> : <Badge text="Custom" color="#10B981" />}
-                  {t.isCustomizedBuiltIn ? <Badge text="Customized" color="#F59E0B" /> : null}
-                  {!t.isActive ? <Badge text="Inactive" color="#64748B" /> : null}
-                </View>
-                {t.description ? <Text style={{ color: colors.mutedForeground, fontSize: 12, marginTop: 4 }}>{t.description}</Text> : null}
-                <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 4 }}>
-                  {t.page.size} · {t.page.orientation} · {t.components.layout === "dual" ? "two-column tables" : "single-column tables"}
-                  {t.updatedAt ? ` · Updated ${new Date(t.updatedAt).toLocaleDateString()}${t.updatedByName ? ` by ${t.updatedByName}` : ""}` : ""}
-                </Text>
-              </View>
-              {busy ? <ActivityIndicator color={ACCENT} /> : null}
+      {/* Quick guide */}
+      <View style={{ flexDirection: narrow ? "column" : "row", gap: 10 }}>
+        {[
+          { n: "1", title: "Preview", text: "See a template with sample salary data." },
+          { n: "2", title: "Make default", text: "The default is used for every new payslip." },
+          { n: "3", title: "Edit or duplicate", text: "Change layout, colours and fields. Amounts never change." },
+        ].map((s) => (
+          <View key={s.n} style={{ flex: 1, flexDirection: "row", gap: 10, padding: 12, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card }}>
+            <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: colors.primary + "18", alignItems: "center", justifyContent: "center" }}>
+              <Text style={{ color: colors.primary, fontSize: 12.5, fontFamily: "Inter_600SemiBold" }}>{s.n}</Text>
             </View>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
-              <SmallButton label="Preview" onPress={() => setPreviewing(t)} />
-              {lib.canManage ? (
-                <>
-                  <SmallButton label="Edit" onPress={() => setEditing(cloneTemplate(t))} disabled={busy} />
-                  <SmallButton label="Duplicate" onPress={() => run(t.id, () => duplicatePayslipTemplate(user, t), `Duplicated "${t.name}".`)} disabled={busy} />
-                  <SmallButton label="Rename" onPress={() => setRenaming(t)} disabled={busy} />
-                  <SmallButton
-                    label={t.isActive ? "Deactivate" : "Activate"}
-                    disabled={busy || (isDefault && t.isActive)}
-                    onPress={() =>
-                      run(t.id, () => setPayslipTemplateActive(user, t, !t.isActive, lib.defaultTemplateId), t.isActive ? "Template deactivated." : "Template activated.")
-                    }
-                  />
-                </>
-              ) : null}
-              {lib.canSetDefault && !isDefault ? (
-                <SmallButton
-                  label="Set as Default"
-                  disabled={busy || !t.isActive}
-                  onPress={() => run(t.id, () => setDefaultPayslipTemplate(user, t.id), `"${t.name}" is now the organization default.`)}
-                />
-              ) : null}
-              {lib.canManage && t.isCustomizedBuiltIn ? (
-                <SmallButton label="Restore Original" onPress={() => setConfirm({ kind: "restore", t })} disabled={busy} />
-              ) : null}
-              {lib.canManage && !t.isBuiltIn ? (
-                <SmallButton label="Delete" tone="danger" onPress={() => setConfirm({ kind: "delete", t })} disabled={busy} />
-              ) : null}
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: colors.foreground, fontSize: 13.5, fontFamily: "Inter_600SemiBold" }}>{s.title}</Text>
+              <Text style={{ color: colors.mutedForeground, fontSize: 12.5, lineHeight: 18, marginTop: 1 }}>{s.text}</Text>
             </View>
           </View>
-        );
-      })}
+        ))}
+      </View>
+
+      {/* Status line */}
+      <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>
+        {lib.templates.length} {lib.templates.length === 1 ? "template" : "templates"} · {activeCount} active
+        {defaultTpl ? ` · Default: ${defaultTpl.name}` : ""} · Logo comes from Settings → Organization profile
+      </Text>
+
+      {notice ? <Notice notice={notice} /> : null}
+      {lib.error ? <Text style={{ color: colors.warning, fontSize: 13 }}>{lib.error}</Text> : null}
+      {lib.loading ? <ActivityIndicator color={colors.primary} /> : null}
+
+      {/* Template cards */}
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 14 }}>
+        {lib.templates.map((t) => {
+          const isDefault = t.id === lib.defaultTemplateId;
+          const busy = busyId === t.id;
+          const dual = t.components.layout === "dual";
+          const canToggle = !(isDefault && t.isActive);
+          return (
+            <View
+              key={t.id}
+              style={{
+                flexGrow: 1,
+                flexBasis: narrow ? "100%" : 380,
+                minWidth: narrow ? undefined : 320,
+                borderWidth: isDefault ? 2 : 1,
+                borderColor: isDefault ? colors.primary : colors.border,
+                backgroundColor: colors.card,
+                borderRadius: 10,
+                padding: 16,
+                gap: 14,
+                opacity: t.isActive ? 1 : 0.75,
+              }}
+            >
+              {/* Top: sketch + title */}
+              <View style={{ flexDirection: "row", gap: 14 }}>
+                <LayoutSketch dual={dual} landscape={t.page.orientation === "landscape"} color={colors.primary} />
+                <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
+                  <Text style={{ color: colors.foreground, fontSize: 15.5, fontFamily: "Inter_600SemiBold", lineHeight: 21 }}>{t.name}</Text>
+                  <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
+                    {isDefault ? <Badge text="✓ Default" color={colors.primary} /> : null}
+                    {t.isBuiltIn ? <Badge text="Built-in" color={colors.info} /> : <Badge text="Custom" color="#8B5CF6" />}
+                    {t.isCustomizedBuiltIn ? <Badge text="Customized" color={colors.warning} /> : null}
+                    {!t.isActive ? <Badge text="Inactive" color="#64748B" /> : null}
+                  </View>
+                  {t.description ? (
+                    <Text style={{ color: colors.mutedForeground, fontSize: 13, lineHeight: 19 }}>{t.description}</Text>
+                  ) : null}
+                </View>
+                {busy ? <ActivityIndicator color={colors.primary} /> : null}
+              </View>
+
+              {/* Facts */}
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                {[t.page.size, t.page.orientation === "landscape" ? "Landscape" : "Portrait", dual ? "Two-column tables" : "Single-column tables"].map((x) => (
+                  <View key={x} style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4, backgroundColor: colors.muted }}>
+                    <Text style={{ color: colors.foreground, fontSize: 12 }}>{x}</Text>
+                  </View>
+                ))}
+              </View>
+              {t.updatedAt ? (
+                <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>
+                  Updated {new Date(t.updatedAt).toLocaleDateString()}
+                  {t.updatedByName ? ` by ${t.updatedByName}` : ""}
+                </Text>
+              ) : null}
+
+              {/* Main actions */}
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.border }}>
+                <SmallButton label="Preview" onPress={() => setPreviewing(t)} />
+                {lib.canSetDefault && !isDefault ? (
+                  <SmallButton
+                    label="Make default"
+                    tone="primary"
+                    disabled={busy || !t.isActive}
+                    accessibilityLabel={t.isActive ? `Make ${t.name} the default template` : "Activate this template first to make it the default"}
+                    onPress={() => run(t.id, () => setDefaultPayslipTemplate(user, t.id), `"${t.name}" is now the default template.`)}
+                  />
+                ) : null}
+                {lib.canManage ? (
+                  <SmallButton label="Edit" onPress={() => setEditing(cloneTemplate(t))} disabled={busy} />
+                ) : null}
+              </View>
+
+              {/* More actions */}
+              {lib.canManage ? (
+                <View style={{ gap: 6 }}>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 16 }}>
+                    <TextAction label="Duplicate" color={colors.primary} disabled={busy} onPress={() => run(t.id, () => duplicatePayslipTemplate(user, t), `Copied "${t.name}".`)} />
+                    <TextAction label="Rename" color={colors.primary} disabled={busy} onPress={() => setRenaming(t)} />
+                    <TextAction
+                      label={t.isActive ? "Turn off" : "Turn on"}
+                      color={colors.primary}
+                      disabled={busy || !canToggle}
+                      onPress={() => run(t.id, () => setPayslipTemplateActive(user, t, !t.isActive, lib.defaultTemplateId), t.isActive ? "Template turned off." : "Template turned on.")}
+                    />
+                    {t.isCustomizedBuiltIn ? (
+                      <TextAction label="Restore original" color={colors.primary} disabled={busy} onPress={() => setConfirm({ kind: "restore", t })} />
+                    ) : null}
+                    {!t.isBuiltIn ? (
+                      <TextAction label="Delete" color={colors.expense} disabled={busy} onPress={() => setConfirm({ kind: "delete", t })} />
+                    ) : null}
+                  </View>
+                  {!canToggle ? (
+                    <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>The default template can't be turned off. Make another template the default first.</Text>
+                  ) : !t.isActive && lib.canSetDefault ? (
+                    <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>Turn this template on to use it or make it the default.</Text>
+                  ) : null}
+                </View>
+              ) : null}
+            </View>
+          );
+        })}
+      </View>
 
       <ConfirmDialog
         visible={confirm?.kind === "delete"}
@@ -282,8 +344,8 @@ export function PayslipTemplateManager() {
           <View style={{ width: "100%", maxWidth: 960, height: "92%", backgroundColor: colors.card, borderRadius: 14, overflow: "hidden" }}>
             <View style={{ flexDirection: "row", alignItems: "center", padding: 12, gap: 8, borderBottomWidth: 1, borderBottomColor: colors.border }}>
               <View style={{ flex: 1 }}>
-                <Text style={{ color: colors.foreground, fontWeight: "800" }}>{previewing?.name}</Text>
-                <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>Preview with sample data</Text>
+                <Text style={{ color: colors.foreground, fontSize: 15, fontFamily: "Inter_600SemiBold" }}>{previewing?.name}</Text>
+                <Text style={{ color: colors.mutedForeground, fontSize: 12.5 }}>Preview with sample salary data — your real payroll is not changed</Text>
               </View>
               <SmallButton label="Close" onPress={() => setPreviewing(null)} />
             </View>
@@ -297,8 +359,44 @@ export function PayslipTemplateManager() {
 
 function Badge({ text, color }: { text: string; color: string }) {
   return (
-    <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, backgroundColor: color + "1F" }}>
-      <Text style={{ color, fontSize: 11, fontWeight: "800" }}>{text}</Text>
+    <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, backgroundColor: color + "18" }}>
+      <Text style={{ color, fontSize: 12, fontFamily: "Inter_600SemiBold" }}>{text}</Text>
+    </View>
+  );
+}
+
+/** Small text-style action (used for secondary template actions). */
+function TextAction({ label, color, onPress, disabled }: { label: string; color: string; onPress: () => void; disabled?: boolean }) {
+  return (
+    <TouchableOpacity onPress={onPress} disabled={disabled} accessibilityRole="button" hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }} style={{ opacity: disabled ? 0.4 : 1 }}>
+      <Text style={{ color, fontSize: 13, fontFamily: "Inter_600SemiBold" }}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+/** Tiny drawing of the page layout so users can tell templates apart at a glance. */
+function LayoutSketch({ dual, landscape, color }: { dual: boolean; landscape: boolean; color: string }) {
+  const colors = useColors();
+  const w = landscape ? 76 : 58;
+  const h = landscape ? 58 : 76;
+  const bar = (width: number | string, op = 1) => (
+    <View style={{ height: 4, width: width as any, borderRadius: 2, backgroundColor: color, opacity: op }} />
+  );
+  return (
+    <View style={{ width: w, height: h, borderRadius: 4, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, padding: 6, gap: 4 }}>
+      {bar("60%")}
+      {bar("35%", 0.4)}
+      <View style={{ flexDirection: "row", gap: 4, marginTop: 2, flex: 1 }}>
+        <View style={{ flex: 1, gap: 3 }}>
+          {[1, 2, 3].map((i) => <View key={i} style={{ height: 3, borderRadius: 2, backgroundColor: colors.mutedForeground, opacity: 0.35 }} />)}
+        </View>
+        {dual ? (
+          <View style={{ flex: 1, gap: 3 }}>
+            {[1, 2, 3].map((i) => <View key={i} style={{ height: 3, borderRadius: 2, backgroundColor: colors.mutedForeground, opacity: 0.35 }} />)}
+          </View>
+        ) : null}
+      </View>
+      {bar("45%", 0.7)}
     </View>
   );
 }
@@ -308,7 +406,7 @@ function Notice({ notice }: { notice: { tone: "ok" | "err"; text: string } }) {
   const c = notice.tone === "ok" ? colors.income : colors.expense;
   return (
     <View accessibilityLiveRegion="polite" style={{ padding: 10, borderRadius: 8, backgroundColor: c + "14", borderWidth: 1, borderColor: c + "55" }}>
-      <Text style={{ color: c, fontSize: 12, fontWeight: "600" }}>{notice.text}</Text>
+      <Text style={{ color: c, fontSize: 13, fontFamily: "Inter_600SemiBold" }}>{notice.tone === "ok" ? "✓ " : "⚠ "}{notice.text}</Text>
     </View>
   );
 }

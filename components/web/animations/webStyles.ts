@@ -118,6 +118,35 @@ export function injectWebMicroAnimations() {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
 
+    /* Desktop: button & chip labels always stay on one line */
+    @media (min-width: 768px) {
+      #root [role="button"] > div[dir="auto"] {
+        white-space: nowrap;
+      }
+    }
+
+    /* Crisp, readable text rendering */
+    html, body, #root {
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+      font-feature-settings: "cv11", "ss01";
+      scroll-behavior: smooth;
+    }
+    /* Numbers line up in tables & KPI cards */
+    #root div[dir="auto"] {
+      font-variant-numeric: tabular-nums;
+      overflow-wrap: break-word;
+    }
+    /* Smooth, subtle feedback on every clickable element */
+    #root [role="button"], #root [tabindex="0"] {
+      transition: background-color .18s ease, border-color .18s ease, box-shadow .18s ease, opacity .18s ease, transform .18s ease;
+    }
+    #root [role="button"]:focus-visible {
+      outline: 2px solid rgba(59, 130, 246, 0.55);
+      outline-offset: 2px;
+    }
+
     [style*="Inter_400Regular"], [style*="Inter_400"] {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
       font-weight: 400 !important;
@@ -132,11 +161,11 @@ export function injectWebMicroAnimations() {
     }
     [style*="Inter_700Bold"], [style*="Inter_700"] {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
-      font-weight: 700 !important;
+      font-weight: 600 !important;
     }
     [style*="Inter_800ExtraBold"], [style*="Inter_800"] {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
-      font-weight: 800 !important;
+      font-weight: 700 !important;
     }
 
     /* Icon Font Protections */
@@ -286,20 +315,9 @@ export function injectWebMicroAnimations() {
     /* ─── App shell: ambient backdrop + glass surfaces ─── */
 
     /* Layered colour glows over the theme background (inline background-color stays the base) */
-    [data-ofm-app-bg="light"] {
-      background-image:
-        radial-gradient(1000px 620px at 0% 0%, rgba(59, 130, 246, 0.30), transparent 60%),
-        radial-gradient(760px 520px at 70% 5%, rgba(14, 165, 233, 0.20), transparent 60%),
-        radial-gradient(1000px 700px at 100% 100%, rgba(139, 92, 246, 0.26), transparent 60%),
-        radial-gradient(700px 500px at 30% 85%, rgba(236, 72, 153, 0.10), transparent 60%),
-        linear-gradient(180deg, #EEF3FB 0%, #F4F1FB 100%);
-    }
-    [data-ofm-app-bg="dark"] {
-      background-image:
-        radial-gradient(1000px 620px at 0% 0%, rgba(37, 99, 235, 0.36), transparent 60%),
-        radial-gradient(700px 480px at 75% 0%, rgba(14, 165, 233, 0.12), transparent 60%),
-        radial-gradient(1000px 700px at 100% 100%, rgba(124, 58, 237, 0.30), transparent 60%),
-        linear-gradient(180deg, #070D1C 0%, #0B1024 100%);
+    /* Flat, neutral workspace background (accounting-suite look) */
+    [data-ofm-app-bg="light"], [data-ofm-app-bg="dark"] {
+      background-image: none;
     }
 
     /* Frosted glass for every surface painted with the web glass palette (hooks/useColors.ts) */

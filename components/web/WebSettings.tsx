@@ -16,6 +16,7 @@ import * as ImagePicker from "expo-image-picker";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings, AppTheme } from "@/context/SettingsContext";
 import { useColors } from "@/hooks/useColors";
+import { MONTH_NAMES, fiscalRange, fiscalStartYearFor, normalizeStartMonth, parseFiscalStartYear } from "@/services/fiscalYear";
 import { WORLD_CURRENCIES, POPULAR_CURRENCIES } from "@/constants/currencies";
 import { CountryFlag } from "@/components/CountryFlag";
 import {
@@ -42,12 +43,21 @@ interface FieldConfig {
 }
 
 const FIELDS: FieldConfig[] = [
-  { key: "organizationName", label: "Organization Legal Name", placeholder: "e.g. Organization Finance Management" },
-  { key: "organizationAddress", label: "Headquarters Address", placeholder: "City, Province, Country", multiline: true },
-  { key: "organizationEmail", label: "Official Email", placeholder: "finance@organization.com", keyboard: "email-address" },
-  { key: "organizationPhone", label: "Phone Number", placeholder: "+1-XXX-XXXXXXX", keyboard: "phone-pad" },
-  { key: "fiscalYear", label: "Fiscal Year", placeholder: "2025-2026" },
+  { key: "organizationName", label: "Organization name", placeholder: "e.g. Organization Finance Management" },
+  { key: "organizationAddress", label: "Address", placeholder: "Street, city, province, country", multiline: true },
+  { key: "organizationEmail", label: "Email", placeholder: "finance@organization.com", keyboard: "email-address" },
+  { key: "organizationPhone", label: "Phone", placeholder: "+92 300 0000000", keyboard: "phone-pad" },
+  { key: "fiscalYear", label: "Fiscal year", placeholder: "2025-2026" },
 ];
+
+/** One-line help under each field so users know where the value is used. */
+const FIELD_HINTS: Record<string, string> = {
+  organizationName: "Shown in the sidebar, on reports and on payslips",
+  organizationAddress: "Printed in the header of reports and payslips",
+  organizationEmail: "Contact email printed on reports and payslips",
+  organizationPhone: "Contact number printed on reports and payslips",
+  fiscalYear: "Your financial year, e.g. 2025-2026",
+};
 
 export function WebSettings() {
   const colors = useColors();
@@ -199,9 +209,9 @@ export function WebSettings() {
               <SvgSettings size={20} color={colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.pageTitle, { color: colors.foreground, fontSize: isMobile ? 19 : 22 }]}>System & Organization Settings</Text>
+              <Text style={[styles.pageTitle, { color: colors.foreground, fontSize: isMobile ? 19 : 22 }]}>Settings</Text>
               <Text style={[styles.pageSubtitle, { color: colors.mutedForeground, fontSize: isMobile ? 12 : 13 }]}>
-                Configure legal branding, operating currency, fiscal year, and platform theme
+                Your organization's details, currency, fiscal year and appearance
               </Text>
             </View>
           </View>
@@ -209,6 +219,9 @@ export function WebSettings() {
 
         {canEdit && (
           <View style={[styles.headerActions, isMobile && { width: "100%" }]}>
+            <Text style={{ fontSize: 13, color: dirty ? colors.warning : colors.mutedForeground, fontFamily: "Inter_500Medium" }}>
+              {dirty ? "● Unsaved changes" : "All changes saved"}
+            </Text>
             {dirty && (
               <TouchableOpacity
                 style={[styles.outlineBtn, { borderColor: colors.border, backgroundColor: colors.card }, isMobile && { flex: 1 }]}
@@ -241,7 +254,7 @@ export function WebSettings() {
               activeOpacity={0.8}
             >
               <SvgCheck size={14} color="#FFFFFF" />
-              <Text style={styles.primaryBtnText}>{saving ? "Saving..." : "Save Settings"}</Text>
+              <Text style={styles.primaryBtnText}>{saving ? "Saving…" : "Save changes"}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -252,7 +265,7 @@ export function WebSettings() {
         <View style={[styles.successBanner, { backgroundColor: colors.income + "18", borderColor: colors.income + "40" }]}>
           <SvgCheck size={18} color={colors.income} />
           <Text style={[styles.successText, { color: colors.income }]}>
-            Organization settings saved and synchronized across all connected devices!
+            Settings saved. They're now used everywhere — sidebar, reports and payslips.
           </Text>
         </View>
       )}
@@ -262,7 +275,10 @@ export function WebSettings() {
         {/* Column 1: Organization Branding & Details */}
         <View style={{ flex: 1.2, minWidth: isMobile ? "100%" : 360, gap: 18 }}>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.cardHeading, { color: colors.foreground }]}>Institutional Branding & Identity</Text>
+            <View>
+              <Text style={[styles.cardHeading, { color: colors.foreground }]}>Company profile</Text>
+              <Text style={[styles.cardSubheading, { color: colors.mutedForeground }]}>These details appear on reports, payslips and in the sidebar.</Text>
+            </View>
 
             {/* Logo Section */}
             <View style={[styles.logoSection, { backgroundColor: colors.background, borderColor: colors.border }]}>
@@ -281,7 +297,7 @@ export function WebSettings() {
                   {form.organizationName || "Your Organization"}
                 </Text>
                 <Text style={[styles.logoStatus, { color: colors.mutedForeground }]}>
-                  {form.organizationLogo ? "Active Custom Logo" : "Default Initials"}
+                  {form.organizationLogo ? "Using your uploaded logo" : "No logo yet — your initials are shown instead"}
                 </Text>
 
                 {canEdit && (
@@ -293,7 +309,7 @@ export function WebSettings() {
                     >
                       <SvgUpload size={13} color="#FFFFFF" />
                       <Text style={[styles.logoActionText, { color: "#FFFFFF" }]}>
-                        Upload Logo
+                        {form.organizationLogo ? "Change logo" : "Upload logo"}
                       </Text>
                     </TouchableOpacity>
 
@@ -306,7 +322,7 @@ export function WebSettings() {
                         }}
                         activeOpacity={0.8}
                       >
-                        <Text style={[styles.logoActionText, { color: colors.expense }]}>Remove</Text>
+                        <Text style={[styles.logoActionText, { color: colors.expense }]}>Remove logo</Text>
                       </TouchableOpacity>
                     ) : null}
                   </View>
@@ -317,7 +333,7 @@ export function WebSettings() {
             {/* Form Fields */}
             {FIELDS.map((field) => (
               <View key={field.key} style={styles.formGroup}>
-                <Text style={[styles.label, { color: colors.mutedForeground }]}>{field.label.toUpperCase()}</Text>
+                <Text style={[styles.label, { color: colors.foreground }]}>{field.label}</Text>
                 <View
                   style={[
                     styles.inputWrap,
@@ -340,6 +356,39 @@ export function WebSettings() {
                     multiline={field.multiline}
                   />
                 </View>
+                {FIELD_HINTS[field.key] ? (
+                  <Text style={[styles.fieldHint, { color: colors.mutedForeground }]}>{FIELD_HINTS[field.key]}</Text>
+                ) : null}
+                {field.key === "fiscalYear" ? (
+                  <View style={{ gap: 6, marginTop: 4 }}>
+                    <Text style={[styles.label, { color: colors.foreground }]}>Fiscal year starts in</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                      {MONTH_NAMES.map((name, i) => {
+                        const on = normalizeStartMonth(settings.fiscalYearStartMonth) === i + 1;
+                        return (
+                          <TouchableOpacity
+                            key={name}
+                            disabled={!canEdit}
+                            onPress={() => {
+                              const m = i + 1;
+                              const y = fiscalStartYearFor(new Date(), m);
+                              updateSettings({ fiscalYearStartMonth: m, fiscalYear: fiscalRange(y, m).label });
+                            }}
+                            style={{ height: 30, paddingHorizontal: 10, borderRadius: 6, borderWidth: 1, justifyContent: "center", borderColor: on ? colors.primary : colors.border, backgroundColor: on ? colors.primary + "14" : "transparent" }}
+                          >
+                            <Text style={{ fontSize: 12.5, fontFamily: "Inter_600SemiBold", color: on ? colors.primary : colors.foreground }}>{name.slice(0, 3)}</Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                    <Text style={[styles.fieldHint, { color: colors.mutedForeground }]}>
+                      {(() => {
+                        const r = fiscalRange(parseFiscalStartYear(form.fiscalYear, normalizeStartMonth(settings.fiscalYearStartMonth)), normalizeStartMonth(settings.fiscalYearStartMonth));
+                        return `FY ${r.label} runs ${r.start.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })} – ${r.end.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}. Picking a month saves instantly and switches to the fiscal year that includes today.`;
+                      })()}
+                    </Text>
+                  </View>
+                ) : null}
               </View>
             ))}
           </View>
@@ -347,10 +396,13 @@ export function WebSettings() {
           {/* Card: Currency */}
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-              <Text style={[styles.cardHeading, { color: colors.foreground }]}>Operating Currency</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.cardHeading, { color: colors.foreground }]}>Currency</Text>
+                <Text style={[styles.cardSubheading, { color: colors.mutedForeground }]}>Used for every amount in the app, reports and payslips.</Text>
+              </View>
               <TouchableOpacity onPress={() => setCurrencyModal(true)}>
                 <Text style={{ fontSize: 12, fontFamily: "Inter_700Bold", color: colors.primary }}>
-                  View All ({WORLD_CURRENCIES.length}) →
+                  Browse all {WORLD_CURRENCIES.length} →
                 </Text>
               </TouchableOpacity>
             </View>
@@ -389,10 +441,10 @@ export function WebSettings() {
           {/* Card: Active Authenticated Account & Session */}
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-              <Text style={[styles.cardHeading, { color: colors.foreground }]}>Active Logged In Account</Text>
-              <View style={[styles.activeStatusBadge, { backgroundColor: "#10B98118", borderColor: "#10B98135" }]}>
-                <View style={[styles.activeStatusDot, { backgroundColor: "#10B981" }]} />
-                <Text style={[styles.activeStatusBadgeText, { color: "#10B981" }]}>Active Session</Text>
+              <Text style={[styles.cardHeading, { color: colors.foreground }]}>Your account</Text>
+              <View style={[styles.activeStatusBadge, { backgroundColor: colors.income + "16", borderColor: colors.income + "35" }]}>
+                <View style={[styles.activeStatusDot, { backgroundColor: colors.income }]} />
+                <Text style={[styles.activeStatusBadgeText, { color: colors.income }]}>Signed in</Text>
               </View>
             </View>
 
@@ -411,7 +463,7 @@ export function WebSettings() {
                   <View style={[styles.userSessionRolePill, { backgroundColor: colors.primary + "15", borderColor: colors.primary + "35" }]}>
                     <SvgShield size={11} color={colors.primary} />
                     <Text style={[styles.userSessionRoleText, { color: colors.primary }]}>
-                      {(user?.role || "admin").toUpperCase()}
+                      {(user?.role || "admin").charAt(0).toUpperCase() + (user?.role || "admin").slice(1)}
                     </Text>
                   </View>
                 </View>
@@ -435,21 +487,24 @@ export function WebSettings() {
               </View>
 
               <View style={styles.userSessionMetaRow}>
-                <Text style={[styles.userSessionMetaLabel, { color: colors.mutedForeground }]}>Clearance</Text>
+                <Text style={[styles.userSessionMetaLabel, { color: colors.mutedForeground }]}>Access level</Text>
                 <Text style={[styles.userSessionMetaValue, { color: colors.income }]}>
-                  {user?.role === "admin" ? "Full Institutional Administrator" : "Scoped Role Clearance"}
+                  {user?.role === "admin" ? "Full access (administrator)" : user?.role === "accountant" ? "Finance records & payroll" : user?.role === "manager" ? "Reports & departments (view)" : "Own payslips only"}
                 </Text>
               </View>
             </View>
 
             <Text style={[styles.userSessionDisclaimer, { color: colors.mutedForeground }]}>
-              You are signed into OFM with this email address. All financial transactions, budgets, and settings updates are audited under this authenticated session.
+              Every change you make — transactions, budgets and settings — is recorded under this account.
             </Text>
           </View>
 
           {/* Card: Theme Switcher */}
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.cardHeading, { color: colors.foreground }]}>Appearance & Theme</Text>
+            <View>
+              <Text style={[styles.cardHeading, { color: colors.foreground }]}>Appearance</Text>
+              <Text style={[styles.cardSubheading, { color: colors.mutedForeground }]}>Light, dark, or match your device. Changes apply instantly.</Text>
+            </View>
 
             <View style={[styles.themeCardSegmented, { backgroundColor: colors.background, borderColor: colors.border }]}>
               {[
@@ -568,6 +623,8 @@ export function WebSettings() {
 }
 
 const styles = StyleSheet.create({
+  cardSubheading: { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 18, marginTop: 2 },
+  fieldHint: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 17 },
   container: {
     flex: 1,
     minWidth: 0,
@@ -598,8 +655,8 @@ const styles = StyleSheet.create({
   },
   pageTitle: {
     fontSize: 22,
-    fontFamily: "Inter_800ExtraBold",
-    letterSpacing: -0.6,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: -0.4,
   },
   pageSubtitle: {
     fontSize: 13,
@@ -663,14 +720,14 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
   },
   card: {
-    borderRadius: 16,
+    borderRadius: 10,
     borderWidth: 1,
     padding: 20,
     gap: 14,
   },
   cardHeading: {
     fontSize: 16,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
   },
   cardSubText: {
     fontSize: 12,
@@ -688,7 +745,7 @@ const styles = StyleSheet.create({
   logoBox: {
     width: 56,
     height: 56,
-    borderRadius: 14,
+    borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
@@ -708,8 +765,8 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
   },
   logoStatus: {
-    fontSize: 11.5,
-    fontFamily: "Inter_500Medium",
+    fontSize: 12.5,
+    fontFamily: "Inter_400Regular",
   },
   logoActionBtn: {
     flexDirection: "row",
@@ -728,9 +785,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   label: {
-    fontSize: 10.5,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: 0.5,
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
   },
   inputWrap: {
     flexDirection: "row",
@@ -848,14 +904,14 @@ const styles = StyleSheet.create({
   modalCard: {
     width: "100%",
     maxWidth: 520,
-    borderRadius: 18,
+    borderRadius: 10,
     borderWidth: 1,
     overflow: "hidden",
   },
   currModalCard: {
     width: "100%",
     maxWidth: 580,
-    borderRadius: 18,
+    borderRadius: 10,
     borderWidth: 1,
     overflow: "hidden",
     maxHeight: "85%",
@@ -923,7 +979,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   symbolMiniText: {
-    fontSize: 10.5,
+    fontSize: 11.5,
     fontFamily: "Inter_600SemiBold",
   },
   checkCircle: {
@@ -984,7 +1040,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   activeStatusBadgeText: {
-    fontSize: 10.5,
+    fontSize: 11.5,
     fontFamily: "Inter_700Bold",
   },
   userSessionBox: {
@@ -998,7 +1054,7 @@ const styles = StyleSheet.create({
   userSessionAvatar: {
     width: 44,
     height: 44,
-    borderRadius: 22,
+    borderRadius: 10,
     borderWidth: 1.5,
     alignItems: "center",
     justifyContent: "center",
@@ -1021,7 +1077,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   userSessionRoleText: {
-    fontSize: 10,
+    fontSize: 11.5,
     fontFamily: "Inter_700Bold",
     letterSpacing: 0.5,
   },
@@ -1046,17 +1102,19 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   userSessionMetaLabel: {
-    fontSize: 11.5,
+    fontSize: 13,
     fontFamily: "Inter_500Medium",
   },
   userSessionMetaValue: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: "Inter_600SemiBold",
+    textAlign: "right",
+    flexShrink: 1,
   },
   userSessionDisclaimer: {
-    fontSize: 11,
+    fontSize: 12.5,
     fontFamily: "Inter_400Regular",
-    lineHeight: 15,
+    lineHeight: 18,
     marginTop: 6,
   },
 });

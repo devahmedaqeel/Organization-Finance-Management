@@ -232,10 +232,10 @@ export function WebBudgetModal({ visible, onClose, budgetToEdit, initialDepartme
               </View>
               <View>
                 <Text style={[styles.title, { color: colors.foreground }]}>
-                  {isEditing ? "Modify Budget Allocation" : "Allocate Department Budget"}
+                  {isEditing ? "Edit budget" : "Set a department budget"}
                 </Text>
                 <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-                  Set expenditure ceilings and overrun alerts
+                  Choose how much a department can spend, and when to warn you
                 </Text>
               </View>
             </View>
@@ -251,23 +251,23 @@ export function WebBudgetModal({ visible, onClose, budgetToEdit, initialDepartme
               style={[
                 styles.netCashBanner,
                 {
-                  backgroundColor: netCash <= 0 ? "#EF444415" : "#10B98115",
-                  borderColor: netCash <= 0 ? "#EF444440" : "#10B98140",
+                  backgroundColor: unallocatedNetCash <= 0 ? colors.expense + "12" : colors.income + "10",
+                  borderColor: unallocatedNetCash <= 0 ? colors.expense + "40" : colors.income + "40",
                 },
               ]}
             >
               <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                <Text style={[styles.netCashBannerTitle, { color: unallocatedNetCash <= 0 ? "#EF4444" : "#10B981" }]}>
-                  {unallocatedNetCash <= 0 ? "⚠️ NO UNALLOCATED CASH AVAILABLE" : "✓ AVAILABLE TO ALLOCATE"}
+                <Text style={[styles.netCashBannerTitle, { color: unallocatedNetCash <= 0 ? colors.expense : colors.foreground }]}>
+                  {unallocatedNetCash <= 0 ? "⚠ No money left to allocate" : "Available to allocate"}
                 </Text>
-                <Text style={[styles.netCashBannerAmount, { color: unallocatedNetCash <= 0 ? "#EF4444" : "#10B981" }]}>
+                <Text style={[styles.netCashBannerAmount, { color: unallocatedNetCash <= 0 ? colors.expense : colors.income }]}>
                   {settings.currency || "PKR"} {unallocatedNetCash.toLocaleString()}
                 </Text>
               </View>
               <Text style={[styles.netCashBannerSub, { color: colors.mutedForeground }]}>
                 {unallocatedNetCash <= 0
-                  ? `Total Net Cash is ${settings.currency || "PKR"} ${netCash.toLocaleString()}, all of which is already committed to existing budgets.`
-                  : `Total Net Cash: ${settings.currency || "PKR"} ${netCash.toLocaleString()} · Already Allocated: ${settings.currency || "PKR"} ${Math.max(0, netCash - unallocatedNetCash).toLocaleString()}`}
+                  ? `Your net cash (income − expenses) is ${settings.currency || "PKR"} ${netCash.toLocaleString()}, and all of it is already given to budgets.`
+                  : `Net cash ${settings.currency || "PKR"} ${netCash.toLocaleString()} (income − expenses) − already in budgets ${settings.currency || "PKR"} ${Math.max(0, netCash - unallocatedNetCash).toLocaleString()} = ${settings.currency || "PKR"} ${unallocatedNetCash.toLocaleString()} you can still allocate.`}
               </Text>
             </View>
 
@@ -280,12 +280,12 @@ export function WebBudgetModal({ visible, onClose, budgetToEdit, initialDepartme
 
             {/* Department */}
             <View style={styles.formGroup}>
-              <Text style={[styles.label, { color: colors.mutedForeground }]}>DEPARTMENT / COST CENTER *</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={{ flexDirection: "row", gap: 6, paddingVertical: 4 }}>
+              <Text style={[styles.label, { color: colors.foreground }]}>Department<Text style={{ color: colors.expense }}> *</Text></Text>
+              <View>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, paddingVertical: 4 }}>
                   {departments.length === 0 ? (
                     <Text style={{ color: colors.mutedForeground, fontSize: 13, fontStyle: "italic", paddingVertical: 4 }}>
-                      No departments created yet.
+                      No departments yet. Create one on the Departments page first.
                     </Text>
                   ) : (
                     departments.map((d) => d.name).map((dept) => (
@@ -312,14 +312,15 @@ export function WebBudgetModal({ visible, onClose, budgetToEdit, initialDepartme
                     ))
                   )}
                 </View>
-              </ScrollView>
+              </View>
             </View>
 
             {/* Category */}
             <View style={styles.formGroup}>
-              <Text style={[styles.label, { color: colors.mutedForeground }]}>EXPENSE CATEGORY *</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={{ flexDirection: "row", gap: 6, paddingVertical: 4 }}>
+              <Text style={[styles.label, { color: colors.foreground }]}>What is it for?<Text style={{ color: colors.expense }}> *</Text></Text>
+              <Text style={[styles.hint, { color: colors.mutedForeground }]}>Pick the spending category this budget covers.</Text>
+              <View>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, paddingVertical: 4 }}>
                   {BUDGET_CATEGORIES.map((cat) => (
                     <TouchableOpacity
                       key={cat}
@@ -343,13 +344,13 @@ export function WebBudgetModal({ visible, onClose, budgetToEdit, initialDepartme
                     </TouchableOpacity>
                   ))}
                 </View>
-              </ScrollView>
+              </View>
             </View>
 
             {/* Amount & Period */}
             <View style={[styles.row, isMobile && { flexDirection: "column" }]}>
               <View style={[styles.formGroup, { flex: 1 }]}>
-                <Text style={[styles.label, { color: colors.mutedForeground }]}>ALLOCATED CEILING ({settings.currency}) *</Text>
+                <Text style={[styles.label, { color: colors.foreground }]}>Budget amount ({settings.currency})<Text style={{ color: colors.expense }}> *</Text></Text>
                 <View
                   style={[
                     styles.inputWrap,
@@ -374,10 +375,17 @@ export function WebBudgetModal({ visible, onClose, budgetToEdit, initialDepartme
                     autoFocus={!isEditing}
                   />
                 </View>
+                {!isEditing && Number(allocated) > 0 ? (
+                  <Text style={[styles.hint, { color: Number(allocated) > unallocatedNetCash ? colors.expense : colors.mutedForeground }]}>
+                    {Number(allocated) > unallocatedNetCash
+                      ? `More than the ${settings.currency || "PKR"} ${unallocatedNetCash.toLocaleString()} available`
+                      : `${settings.currency || "PKR"} ${(unallocatedNetCash - Number(allocated)).toLocaleString()} will still be available after this`}
+                  </Text>
+                ) : null}
               </View>
 
               <View style={[styles.formGroup, { flex: 1 }]}>
-                <Text style={[styles.label, { color: colors.mutedForeground }]}>FISCAL PERIOD (YYYY-MM) *</Text>
+                <Text style={[styles.label, { color: colors.foreground }]}>Month<Text style={{ color: colors.expense }}> *</Text></Text>
                 <View
                   style={[
                     styles.inputWrap,
@@ -390,7 +398,7 @@ export function WebBudgetModal({ visible, onClose, budgetToEdit, initialDepartme
                 >
                   <TextInput
                     style={[styles.input, { color: colors.foreground }]}
-                    placeholder="2026-05"
+                    placeholder="YYYY-MM, e.g. 2026-11"
                     placeholderTextColor={colors.mutedForeground + "80"}
                     value={period}
                     onChangeText={setPeriod}
@@ -403,7 +411,8 @@ export function WebBudgetModal({ visible, onClose, budgetToEdit, initialDepartme
 
             {/* Alert Threshold */}
             <View style={styles.formGroup}>
-              <Text style={[styles.label, { color: colors.mutedForeground }]}>OVERRUN WARNING THRESHOLD (%)</Text>
+              <Text style={[styles.label, { color: colors.foreground }]}>Warn me when spending reaches</Text>
+              <Text style={[styles.hint, { color: colors.mutedForeground }]}>You'll get an alert when this much of the budget has been used.</Text>
               <View style={{ flexDirection: "row", gap: 8 }}>
                 {["70", "80", "90", "95"].map((th) => (
                   <TouchableOpacity
@@ -434,7 +443,7 @@ export function WebBudgetModal({ visible, onClose, budgetToEdit, initialDepartme
 
             {/* Notes */}
             <View style={styles.formGroup}>
-              <Text style={[styles.label, { color: colors.mutedForeground }]}>NOTES & CONSTRAINTS</Text>
+              <Text style={[styles.label, { color: colors.foreground }]}>Notes <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular" }}>(optional)</Text></Text>
               <View
                 style={[
                   styles.textAreaWrap,
@@ -447,7 +456,7 @@ export function WebBudgetModal({ visible, onClose, budgetToEdit, initialDepartme
               >
                 <TextInput
                   style={[styles.textArea, { color: colors.foreground }]}
-                  placeholder="e.g. Annual HEC faculty salary ceiling..."
+                  placeholder="e.g. Faculty salaries for the autumn semester"
                   placeholderTextColor={colors.mutedForeground + "80"}
                   value={notes}
                   onChangeText={setNotes}
@@ -486,7 +495,7 @@ export function WebBudgetModal({ visible, onClose, budgetToEdit, initialDepartme
             >
               <SvgPlus size={15} color="#FFFFFF" />
               <Text style={styles.submitBtnText}>
-                {submitting ? "Saving..." : isEditing ? "Update Allocation" : "Allocate Budget"}
+                {submitting ? "Saving…" : isEditing ? "Save changes" : "Save budget"}
               </Text>
             </TouchableOpacity>
           </View>
@@ -497,6 +506,7 @@ export function WebBudgetModal({ visible, onClose, budgetToEdit, initialDepartme
 }
 
 const styles = StyleSheet.create({
+  hint: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 17 },
   backdrop: {
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.65)",
@@ -508,7 +518,7 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 560,
     maxHeight: "90%",
-    borderRadius: 20,
+    borderRadius: 10,
     borderWidth: 1,
     overflow: "hidden",
     display: "flex",
@@ -530,11 +540,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   title: {
-    fontSize: 16,
-    fontFamily: "Inter_700Bold",
+    fontSize: 17,
+    fontFamily: "Inter_600SemiBold",
   },
   subtitle: {
-    fontSize: 11.5,
+    fontSize: 13,
     fontFamily: "Inter_400Regular",
     marginTop: 2,
   },
@@ -559,9 +569,8 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   label: {
-    fontSize: 10.5,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: 0.5,
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
   },
   inputWrap: {
     flexDirection: "row",
@@ -597,13 +606,14 @@ const styles = StyleSheet.create({
   },
   chip: {
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+    height: 32,
+    justifyContent: "center",
+    borderRadius: 6,
     borderWidth: 1,
   },
   chipText: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
   },
   errorBanner: {
     flexDirection: "row",
@@ -658,17 +668,17 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   netCashBannerTitle: {
-    fontSize: 12,
-    fontFamily: "Inter_700Bold",
-    letterSpacing: 0.5,
+    fontSize: 13.5,
+    fontFamily: "Inter_600SemiBold",
   },
   netCashBannerAmount: {
     fontSize: 13,
     fontFamily: "Inter_700Bold",
   },
   netCashBannerSub: {
-    fontSize: 11.5,
+    fontSize: 12.5,
     fontFamily: "Inter_400Regular",
-    lineHeight: 16,
+    lineHeight: 18,
+    marginTop: 4,
   },
 });
