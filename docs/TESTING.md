@@ -9,7 +9,7 @@
 | Build verification | Metro bundles for Android, iOS and web | App builds for every platform |
 | Manual functional | Web browser + Expo Go / APK | Screens, roles and flows behave as specified |
 
-Current status: **TypeScript 0 errors · 16/16 suites pass · Android, iOS and web bundles build.**
+Current status: **TypeScript 0 errors · 17/17 suites pass · Android, iOS and web bundles build.**
 
 ---
 
@@ -33,12 +33,13 @@ Current status: **TypeScript 0 errors · 16/16 suites pass · Android, iOS and w
 | 14 | `newOrgCleanState.test.ts` | New organization starts with clean data |
 | 15 | `orgBadgeHeader.test.ts` | Organization identity in headers |
 | 16 | `PasswordResetEngine.test.ts` | Password reset tokens and flow |
+| 17 | `googleAuthFlow.test.ts` | Google sign-in: callback validation, cancelled popups vs real errors, profile lookup deadlines |
 
 Run:
 
 ```bash
 npm test
-# MASTER TEST SUMMARY: 16/16 SUITES PASSED
+# MASTER TEST SUMMARY: 17/17 SUITES PASSED
 ```
 
 ---

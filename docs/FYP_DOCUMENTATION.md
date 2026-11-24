@@ -116,7 +116,7 @@ OFM borrows the clean accounting look of tools like QuickBooks (green/red income
 
 - **Model:** Iterative / Agile — features delivered in short cycles (auth → ledger → budgets → payroll → reports → insights → sync → UI refinement), each followed by testing and feedback.
 - **Tools:** VS Code, Expo CLI, EAS CLI, Firebase CLI, Git & GitHub, Mermaid for diagrams.
-- **Quality gates for each change:** `npm run typecheck` (0 errors), `npm test` (16/16 suites), bundle build for Android, iOS and web.
+- **Quality gates for each change:** `npm run typecheck` (0 errors), `npm test` (17/17 suites), bundle build for Android, iOS and web.
 
 ---
 
@@ -171,7 +171,7 @@ OFM borrows the clean accounting look of tools like QuickBooks (green/red income
 | NFR-04 | Reliability | Offline outbox with retry; tombstones prevent deleted records from reappearing |
 | NFR-05 | Security | Firebase Authentication; role checks in UI; data isolated by `organizationId` |
 | NFR-06 | Portability | One codebase for web, Android, iOS |
-| NFR-07 | Maintainability | TypeScript, layered services, 16 automated test suites |
+| NFR-07 | Maintainability | TypeScript, layered services, 17 automated test suites |
 | NFR-08 | Accuracy | Single calculation engine used by every screen; exact (unrounded) money values |
 
 ---
@@ -334,7 +334,7 @@ Sequences: **DIAGRAMS.md §10 and §11**. Details: **[../DATA_FLOW.md](../DATA_F
 | Level | Approach | Result |
 |---|---|---|
 | Static | `npm run typecheck` (TypeScript strict compile) | 0 errors |
-| Unit / integration | 16 automated suites (`npm test`) covering calculations, payroll, payslips, reports, insights, offline sync, cross-platform parity, password reset | 16/16 passing |
+| Unit / integration | 17 automated suites (`npm test`) covering calculations, payroll, payslips, reports, insights, offline sync, cross-platform parity, password reset | 17/17 passing |
 | Build | Android, iOS and web bundles built from the dev server | All build without errors |
 | Manual | Role-based access, module walkthroughs on web and Expo Go | See [TESTING.md](TESTING.md) |
 
@@ -363,7 +363,7 @@ Step-by-step: **[../DEPLOYMENT.md](../DEPLOYMENT.md)**; diagram: **DIAGRAMS.md �
 - Four roles with distinct navigation and permissions.
 - Automated payroll posting to the ledger, budget alerts and organization notifications.
 - PDF and CSV reports downloadable on web, Android and iOS.
-- TypeScript compile clean; 16/16 automated test suites pass.
+- TypeScript compile clean; 17/17 automated test suites pass.
 
 *(Add screenshots of the Dashboard, Budgets, Payroll, Reports, AI Insights and mobile screens here in your printed report.)*
 

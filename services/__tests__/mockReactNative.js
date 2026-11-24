@@ -53,6 +53,12 @@ Module.prototype.require = function (id) {
       shareAsync: async () => {},
     };
   }
+  if (id === "expo-constants") {
+    return { executionEnvironment: "standalone", appOwnership: "standalone" };
+  }
+  if (id === "expo-crypto") {
+    return { randomUUID: require("node:crypto").randomUUID };
+  }
   if (id === "expo-web-browser") {
     return {
       maybeCompleteAuthSession: () => {},

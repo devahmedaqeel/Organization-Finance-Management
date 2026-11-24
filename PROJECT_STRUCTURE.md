@@ -16,7 +16,7 @@ Organization-Finance-Management/
 ├── public/                      Static web files (favicon)
 ├── scripts/                     Helper scripts (icons, PDF verification)
 ├── services/                    Business logic (calculations, payroll, reports, sync…)
-│   └── __tests__/               16 automated test suites
+│   └── __tests__/               17 automated test suites
 ├── stubs/                       Platform stubs for web/native differences
 ├── utils/                       Formatting, dates, layout, toast helpers
 ├── assets/                      Images, icon, adaptive icon, fonts

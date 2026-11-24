@@ -39,7 +39,7 @@ npm run web        # web only
 
 ```bash
 npm run typecheck   # 0 errors expected
-npm test            # 16/16 suites expected
+npm test            # 17/17 suites expected
 ```
 
 ## 5. Web → Firebase Hosting
@@ -87,7 +87,7 @@ firebase deploy --only functions --project ofmapp-main
 ## 9. Release checklist
 
 - [ ] `npm run typecheck` — 0 errors
-- [ ] `npm test` — 16/16
+- [ ] `npm test` — 17/17
 - [ ] Web export builds; hosting deploy succeeds; live site loads
 - [ ] APK installs and signs in
 - [ ] Web ↔ mobile sync checked with the same organization

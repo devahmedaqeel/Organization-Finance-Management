@@ -22,7 +22,7 @@
 | [docs/DATABASE.md](docs/DATABASE.md) | Firestore collections, fields and relationships |
 | [docs/ROLES_AND_PERMISSIONS.md](docs/ROLES_AND_PERMISSIONS.md) | Admin / Accountant / Manager / Employee access matrix |
 | [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | Step-by-step guide for every module (web and mobile) |
-| [docs/TESTING.md](docs/TESTING.md) | Test strategy, the 16 automated suites and manual test cases |
+| [docs/TESTING.md](docs/TESTING.md) | Test strategy, the 17 automated suites and manual test cases |
 | [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) | Folder-by-folder and file-by-file map of the codebase |
 | [DEPLOYMENT.md](DEPLOYMENT.md) | Run locally, Expo Go, build the APK, deploy to Firebase Hosting |
 | [CHANGELOG.md](CHANGELOG.md) | Version history |
@@ -65,7 +65,7 @@
 | Files & sharing | expo-print, expo-sharing, expo-file-system (legacy API), Android Storage Access Framework |
 | Local storage | AsyncStorage (mobile), localStorage / IndexedDB (web) |
 | Notifications | expo-notifications (push), Firestore `notifications` collection |
-| Testing | 16 TypeScript test suites run with `tsx` (`npm test`) |
+| Testing | 17 TypeScript test suites run with `tsx` (`npm test`) |
 
 ---
 
@@ -90,7 +90,7 @@ Useful scripts:
 | `npm start` | Start the Expo dev server (web + mobile) |
 | `npm run web` | Open the web app only |
 | `npm run typecheck` | TypeScript check (`tsc --noEmit`) |
-| `npm test` | Run all 16 automated test suites |
+| `npm test` | Run all 17 automated test suites |
 | `npm run build:web` | Export the static web build to `dist/` |
 | `npm run deploy:hosting` | Build web and deploy to Firebase Hosting |
 | `npm run build:apk` | Build an installable Android APK with EAS |
@@ -164,7 +164,7 @@ Details: [docs/ROLES_AND_PERMISSIONS.md](docs/ROLES_AND_PERMISSIONS.md).
 
 - Web: deployed at https://ofmapp-main.web.app
 - Android: APK built with EAS (`preview` profile)
-- Expo SDK 58 · TypeScript clean (0 errors) · 16/16 test suites passing
+- Expo SDK 58 · TypeScript clean (0 errors) · 17/17 test suites passing
 
 ## Author
 
