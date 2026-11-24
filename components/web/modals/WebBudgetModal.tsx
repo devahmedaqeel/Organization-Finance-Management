@@ -222,10 +222,10 @@ export function WebBudgetModal({ visible, onClose, budgetToEdit, initialDepartme
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={[styles.backdrop, isMobile && { padding: 10 }]}>
-        <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View {...({ dataSet: { ofmDialogOverlay: "" } } as any)} style={[styles.backdrop, isMobile && { padding: 10 }]}>
+        <View {...({ dataSet: { ofmDialogCard: "" } } as any)} style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           {/* Header */}
-          <View style={[styles.header, { borderBottomColor: colors.border }]}>
+          <View {...({ dataSet: { ofmDialogHeader: "" } } as any)} style={[styles.header, { borderBottomColor: colors.border }]}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
               <View style={[styles.iconWrap, { backgroundColor: colors.primary + "20" }]}>
                 <SvgPieChart size={20} color={colors.primary} />
@@ -245,7 +245,7 @@ export function WebBudgetModal({ visible, onClose, budgetToEdit, initialDepartme
           </View>
 
           {/* Body */}
-          <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
+          <ScrollView {...({ dataSet: { ofmDialogBody: "" } } as any)} keyboardShouldPersistTaps="handled" style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
             {/* Available Net Cash Status Banner */}
             <View
               style={[
@@ -477,7 +477,7 @@ export function WebBudgetModal({ visible, onClose, budgetToEdit, initialDepartme
           </ScrollView>
 
           {/* Footer Actions */}
-          <View style={[styles.footer, { borderTopColor: colors.border }]}>
+          <View {...({ dataSet: { ofmDialogFooter: "" } } as any)} style={[styles.footer, { borderTopColor: colors.border }]}>
             <TouchableOpacity style={[styles.cancelBtn, { borderColor: colors.border }]} onPress={onClose} disabled={submitting}>
               <Text style={[styles.cancelBtnText, { color: colors.foreground }]}>Cancel</Text>
             </TouchableOpacity>

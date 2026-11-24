@@ -1,5 +1,5 @@
 import React from "react";
-import { Modal, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from "react-native";
+import { Modal, StyleSheet, Text, TouchableOpacity, View, ScrollView, useWindowDimensions } from "react-native";
 import { useColors } from "@/hooks/useColors";
 import { SvgTrash, SvgX, SvgShield } from "../SvgIcons";
 
@@ -33,8 +33,8 @@ export function WebConfirmModal({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <View
+      <View {...({ dataSet: { ofmDialogOverlay: "" } } as any)} style={styles.backdrop}>
+        <View {...({ dataSet: { ofmDialogCard: "" } } as any)}
           style={[
             styles.card,
             {
@@ -45,7 +45,7 @@ export function WebConfirmModal({
           ]}
         >
           {/* Header */}
-          <View style={styles.header}>
+          <View {...({ dataSet: { ofmDialogHeader: "" } } as any)} style={styles.header}>
             <View style={[styles.iconCircle, { backgroundColor: mainColor + "18", borderColor: mainColor + "35" }]}>
               {isDanger ? <SvgTrash size={20} color={mainColor} /> : <SvgShield size={20} color={mainColor} />}
             </View>
@@ -55,13 +55,13 @@ export function WebConfirmModal({
           </View>
 
           {/* Body */}
-          <View style={styles.body}>
+          <ScrollView {...({ dataSet: { ofmDialogBody: "" } } as any)} style={{ flexShrink: 1, minHeight: 0 }} contentContainerStyle={styles.body}>
             <Text style={[styles.title, { color: colors.foreground }]}>{title}</Text>
             <Text style={[styles.message, { color: colors.mutedForeground }]}>{message}</Text>
-          </View>
+          </ScrollView>
 
           {/* Footer Actions */}
-          <View style={[styles.footer, { borderTopColor: colors.border }]}>
+          <View {...({ dataSet: { ofmDialogFooter: "" } } as any)} style={[styles.footer, { borderTopColor: colors.border }]}>
             <TouchableOpacity
               style={[styles.cancelBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
               onPress={onClose}

@@ -216,8 +216,8 @@ export function WebDepartmentStaffModal({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={[styles.backdrop, isMobile && { padding: 12 }]}>
-        <View
+      <View {...({ dataSet: { ofmDialogOverlay: "" } } as any)} style={[styles.backdrop, isMobile && { padding: 12 }]}>
+        <View {...({ dataSet: { ofmDialogCard: "" } } as any)}
           style={[
             styles.modalCard,
             {
@@ -228,7 +228,7 @@ export function WebDepartmentStaffModal({
           ]}
         >
           {/* Header */}
-          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+          <View {...({ dataSet: { ofmDialogHeader: "" } } as any)} style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
               <View style={[styles.headerIconWrap, { backgroundColor: colors.primary + "16" }]}>
                 {isAllSelected ? <SvgLayers size={20} color={colors.primary} /> : <SvgUsers size={20} color={colors.primary} />}
@@ -247,7 +247,7 @@ export function WebDepartmentStaffModal({
             </TouchableOpacity>
           </View>
 
-          <ScrollView
+          <ScrollView {...({ dataSet: { ofmDialogBody: "" } } as any)}
             style={styles.modalBody}
             contentContainerStyle={[styles.modalBodyContent, { gap: 16 }, isMobile && { paddingHorizontal: 16, paddingTop: 16 }]}
             showsVerticalScrollIndicator
@@ -465,7 +465,7 @@ export function WebDepartmentStaffModal({
           </ScrollView>
 
           {/* Footer */}
-          <View style={[styles.modalFooter, { borderTopColor: colors.border }]}>
+          <View {...({ dataSet: { ofmDialogFooter: "" } } as any)} style={[styles.modalFooter, { borderTopColor: colors.border }]}>
             {!isAllSelected && activeDept && onEditDepartment && (
               <TouchableOpacity
                 style={[styles.secondaryBtn, { borderColor: colors.border }]}

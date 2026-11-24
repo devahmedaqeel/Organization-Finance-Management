@@ -125,10 +125,10 @@ export function WebMemberRoleModal({ visible, onClose, member, onUpdateSuccess }
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={[styles.backdrop, isMobile && { padding: 10 }]}>
-        <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View {...({ dataSet: { ofmDialogOverlay: "" } } as any)} style={[styles.backdrop, isMobile && { padding: 10 }]}>
+        <View {...({ dataSet: { ofmDialogCard: "" } } as any)} style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           {/* Header */}
-          <View style={[styles.header, { borderBottomColor: colors.border }]}>
+          <View {...({ dataSet: { ofmDialogHeader: "" } } as any)} style={[styles.header, { borderBottomColor: colors.border }]}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
               <View style={[styles.iconWrap, { backgroundColor: "#6366F120" }]}>
                 <SvgShield size={20} color="#6366F1" />
@@ -144,7 +144,7 @@ export function WebMemberRoleModal({ visible, onClose, member, onUpdateSuccess }
           </View>
 
           {/* Role Selection Options */}
-          <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
+          <ScrollView {...({ dataSet: { ofmDialogBody: "" } } as any)} keyboardShouldPersistTaps="handled" style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
             <View style={{ gap: 10 }}>
               {ROLES.map((r) => {
                 const isSelected = selectedRole === r.id;
@@ -192,7 +192,7 @@ export function WebMemberRoleModal({ visible, onClose, member, onUpdateSuccess }
           </ScrollView>
 
           {/* Footer */}
-          <View style={[styles.footer, { borderTopColor: colors.border, justifyContent: "space-between" }]}>
+          <View {...({ dataSet: { ofmDialogFooter: "" } } as any)} style={[styles.footer, { borderTopColor: colors.border, justifyContent: "space-between" }]}>
             <TouchableOpacity
               style={[styles.cancelBtn, { borderColor: "#EF444440", backgroundColor: "#EF444415" }]}
               onPress={handleDeleteMember}

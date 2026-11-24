@@ -1,5 +1,6 @@
+import { useWebLayout } from "@/hooks/useWebLayout";
 import React, { useState, useEffect, useMemo } from "react";
-import { StyleSheet, Text, TextInput, TouchableOpacity, View, ScrollView, useWindowDimensions } from "react-native";
+import { StyleSheet, Text, TextInput, TouchableOpacity, View, ScrollView } from "react-native";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/config/firebase";
 import { useAuth, User, UserRole } from "@/context/AuthContext";
@@ -28,7 +29,7 @@ const ROLE_CONFIG: Record<UserRole, { color: string; bg: string; border: string;
 
 export function WebTeam() {
   const colors = useColors();
-  const { width } = useWindowDimensions();
+  const { width } = useWebLayout();
   const isMobile = width < 768;
 
   const { user } = useAuth();

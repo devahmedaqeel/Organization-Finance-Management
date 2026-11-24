@@ -1,3 +1,4 @@
+import { useWebLayout } from "@/hooks/useWebLayout";
 import React, { useState, useMemo } from "react";
 import {
   Animated,
@@ -8,7 +9,6 @@ import {
   TouchableOpacity,
   ScrollView,
   Platform,
-  useWindowDimensions,
 } from "react-native";
 import { useColors } from "@/hooks/useColors";
 import * as Haptics from "expo-haptics";
@@ -62,7 +62,7 @@ export function FinancialAnalyticsSuite({
   only,
 }: Props) {
   const colors = useColors();
-  const { width } = useWindowDimensions();
+  const { width } = useWebLayout();
   const isMobile = width < 768;
 
   // Safe fallback to FinanceContext

@@ -1,5 +1,6 @@
+import { useWebLayout } from "@/hooks/useWebLayout";
 import React, { useState, useMemo, useEffect } from "react";
-import { StyleSheet, Text, TextInput, TouchableOpacity, View, ScrollView, useWindowDimensions, Platform } from "react-native";
+import { StyleSheet, Text, TextInput, TouchableOpacity, View, ScrollView, Platform } from "react-native";
 import { useFinance, PayrollEntry } from "@/context/FinanceContext";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
@@ -27,7 +28,7 @@ import { generatePayslipsPdf, preparePayslipProfile } from "@/services/payslipDo
 
 export function WebPayroll() {
   const colors = useColors();
-  const { width } = useWindowDimensions();
+  const { width } = useWebLayout();
   const isMobile = width < 768;
 
   const { user } = useAuth();

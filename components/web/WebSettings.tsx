@@ -1,3 +1,4 @@
+import { useWebLayout } from "@/hooks/useWebLayout";
 import React, { useState, useEffect, useMemo } from "react";
 import {
   StyleSheet,
@@ -9,7 +10,6 @@ import {
   Modal,
   FlatList,
   Image,
-  useWindowDimensions,
   Platform,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
@@ -61,7 +61,7 @@ const FIELD_HINTS: Record<string, string> = {
 
 export function WebSettings() {
   const colors = useColors();
-  const { width } = useWindowDimensions();
+  const { width } = useWebLayout();
   const isMobile = width < 768;
 
   const { user } = useAuth();

@@ -1,3 +1,4 @@
+import { useWebLayout } from "@/hooks/useWebLayout";
 import React, { useState, useMemo } from "react";
 import {
   StyleSheet,
@@ -6,7 +7,6 @@ import {
   TouchableOpacity,
   View,
   ScrollView,
-  useWindowDimensions,
   Platform,
 } from "react-native";
 import { useFinance, Budget, Department } from "@/context/FinanceContext";
@@ -36,7 +36,7 @@ const DEPT_COLORS = ["#3B82F6", "#10B981", "#F59E0B", "#8B5CF6", "#EC4899", "#06
 
 export function WebBudgets() {
   const colors = useColors();
-  const { width } = useWindowDimensions();
+  const { width } = useWebLayout();
   const isMobile = width < 768;
 
   const { user } = useAuth();

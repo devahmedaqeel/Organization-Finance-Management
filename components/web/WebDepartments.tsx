@@ -1,5 +1,6 @@
+import { useWebLayout } from "@/hooks/useWebLayout";
 import React, { useState, useMemo } from "react";
-import { StyleSheet, Text, TouchableOpacity, View, ScrollView, useWindowDimensions } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View, ScrollView } from "react-native";
 import { useFinance, Department } from "@/context/FinanceContext";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
@@ -20,7 +21,7 @@ import {
 
 export function WebDepartments() {
   const colors = useColors();
-  const { width } = useWindowDimensions();
+  const { width } = useWebLayout();
   const isMobile = width < 768;
 
   const { user } = useAuth();
@@ -575,12 +576,12 @@ const styles = StyleSheet.create({
   sumLink: { fontSize: 12.5, fontFamily: "Inter_600SemiBold" },
   rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10 },
   chipWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  personChip: { flexDirection: "row", alignItems: "center", gap: 6, paddingLeft: 4, paddingRight: 10, paddingVertical: 4, borderRadius: 999, borderWidth: 1 },
+  personChip: { maxWidth: "100%", flexWrap: "wrap", flexDirection: "row", alignItems: "center", gap: 6, paddingLeft: 4, paddingRight: 10, paddingVertical: 4, borderRadius: 999, borderWidth: 1 },
   personAvatar: { width: 22, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center" },
   personAvatarText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
   personName: { fontSize: 12.5, fontFamily: "Inter_500Medium" },
   personMeta: { fontSize: 12, fontFamily: "Inter_400Regular" },
-  dHeader: { flexDirection: "row", alignItems: "center", gap: 12 },
+  dHeader: { flexWrap: "wrap", flexDirection: "row", alignItems: "center", gap: 12 },
   dAvatar: { width: 42, height: 42, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   dAvatarText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
   dName: { fontSize: 16, fontFamily: "Inter_600SemiBold", lineHeight: 22 },
@@ -591,7 +592,7 @@ const styles = StyleSheet.create({
   dSpendText: { fontSize: 13.5, fontFamily: "Inter_500Medium" },
   dPct: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
   dTable: { borderWidth: 1, borderRadius: 8, overflow: "hidden" },
-  dRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, paddingHorizontal: 14, paddingVertical: 10 },
+  dRow: { flexWrap: "wrap", flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, paddingHorizontal: 14, paddingVertical: 10 },
   dRowLabel: { fontSize: 13, fontFamily: "Inter_500Medium" },
   dRowValue: { fontSize: 14, fontFamily: "Inter_600SemiBold", textAlign: "right", flex: 1 },
   dContact: { fontSize: 13, fontFamily: "Inter_500Medium", textAlign: "right", flexShrink: 1 },
@@ -606,7 +607,7 @@ const styles = StyleSheet.create({
   deptCard: {
     flexGrow: 1,
     flexBasis: 360,
-    minWidth: 300,
+    minWidth: 0,
     maxWidth: "100%",
     borderRadius: 10,
     borderWidth: 1,

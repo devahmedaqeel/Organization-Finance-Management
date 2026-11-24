@@ -1,5 +1,6 @@
+import { useWebLayout } from "@/hooks/useWebLayout";
 import React, { useState, useEffect, useMemo } from "react";
-import { StyleSheet, Text, TextInput, TouchableOpacity, View, ScrollView, useWindowDimensions, Modal } from "react-native";
+import { StyleSheet, Text, TextInput, TouchableOpacity, View, ScrollView, Modal } from "react-native";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
 import { useColors } from "@/hooks/useColors";
@@ -18,7 +19,7 @@ import { SvgPlus, SvgSearch, SvgEdit, SvgTrash, SvgCheck, SvgX } from "./SvgIcon
 
 export function WebSalaryComponents() {
   const colors = useColors();
-  const { width } = useWindowDimensions();
+  const { width } = useWebLayout();
   const isMobile = width < 768;
   const { user } = useAuth();
   const { settings } = useSettings();
@@ -231,7 +232,9 @@ export function WebSalaryComponents() {
       </View>
 
       {/* Table Box */}
-      <View style={[styles.tableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={[styles.tableCard, { backgroundColor: colors.card, borderColor: colors.border, minWidth: 0, maxWidth: "100%" }]}>
+        <ScrollView horizontal contentContainerStyle={{ minWidth: "100%" }} showsHorizontalScrollIndicator>
+        <View style={{ minWidth: 960, flexGrow: 1 }}>
         <View style={[styles.tableHeader, { borderBottomColor: colors.border, backgroundColor: colors.background }]}>
           <Text style={[styles.th, { flex: 2, color: colors.mutedForeground }]}>COMPONENT / CODE</Text>
           <Text style={[styles.th, { flex: 1.5, color: colors.mutedForeground }]}>CATEGORY</Text>
@@ -345,13 +348,15 @@ export function WebSalaryComponents() {
             ))
           )}
         </ScrollView>
+        </View>
+        </ScrollView>
       </View>
 
       {/* Add / Edit Modal */}
       <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={() => setModalVisible(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.modalHeader}>
+        <View {...({ dataSet: { ofmDialogOverlay: "" } } as any)} style={styles.modalOverlay}>
+          <View {...({ dataSet: { ofmDialogCard: "" } } as any)} style={[styles.modalContent, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View {...({ dataSet: { ofmDialogHeader: "" } } as any)} style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.foreground }]}>
                 {editingComp ? "Edit Salary Component" : "New Salary Component"}
               </Text>
@@ -360,8 +365,8 @@ export function WebSalaryComponents() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={{ maxHeight: 460 }} showsVerticalScrollIndicator={false}>
-              <View style={styles.formRow}>
+            <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 460, flexShrink: 1, minHeight: 0 }} showsVerticalScrollIndicator={false}>
+              <View style={[styles.formRow, isMobile && { flexDirection: "column" }]}>
                 <View style={{ flex: 2 }}>
                   <Text style={[styles.label, { color: colors.mutedForeground }]}>COMPONENT NAME</Text>
                   <TextInput
@@ -385,7 +390,7 @@ export function WebSalaryComponents() {
                 </View>
               </View>
 
-              <View style={styles.formRow}>
+              <View style={[styles.formRow, isMobile && { flexDirection: "column" }]}>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.label, { color: colors.mutedForeground }]}>CATEGORY</Text>
                   <View style={styles.selectRow}>
@@ -408,7 +413,7 @@ export function WebSalaryComponents() {
                 </View>
               </View>
 
-              <View style={styles.formRow}>
+              <View style={[styles.formRow, isMobile && { flexDirection: "column" }]}>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.label, { color: colors.mutedForeground }]}>CALCULATION TYPE</Text>
                   <View style={styles.selectRow}>
@@ -436,7 +441,7 @@ export function WebSalaryComponents() {
                 </View>
               </View>
 
-              <View style={styles.formRow}>
+              <View style={[styles.formRow, isMobile && { flexDirection: "column" }]}>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.label, { color: colors.mutedForeground }]}>
                     {calcType === "percentage_of_basic" ? "PERCENTAGE (%)" : `AMOUNT (${settings.currency})`}
@@ -452,7 +457,7 @@ export function WebSalaryComponents() {
                 </View>
               </View>
 
-              <View style={styles.formRow}>
+              <View style={[styles.formRow, isMobile && { flexDirection: "column" }]}>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.label, { color: colors.mutedForeground }]}>DESCRIPTION / NOTES</Text>
                   <TextInput
@@ -498,7 +503,7 @@ export function WebSalaryComponents() {
               </View>
             </ScrollView>
 
-            <View style={styles.modalFooter}>
+            <View {...({ dataSet: { ofmDialogFooter: "" } } as any)} style={styles.modalFooter}>
               <TouchableOpacity
                 style={[styles.btnSecondary, { borderColor: colors.border }]}
                 onPress={() => setModalVisible(false)}

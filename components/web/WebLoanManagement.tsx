@@ -1,5 +1,6 @@
+import { useWebLayout } from "@/hooks/useWebLayout";
 import React, { useState, useEffect, useMemo } from "react";
-import { StyleSheet, Text, TextInput, TouchableOpacity, View, ScrollView, useWindowDimensions, Modal } from "react-native";
+import { StyleSheet, Text, TextInput, TouchableOpacity, View, ScrollView, Modal } from "react-native";
 import { useAuth } from "@/context/AuthContext";
 import { useSettings } from "@/context/SettingsContext";
 import { useFinance } from "@/context/FinanceContext";
@@ -16,7 +17,7 @@ import { SvgPlus, SvgSearch, SvgCheck, SvgX, SvgDollar } from "./SvgIcons";
 
 export function WebLoanManagement() {
   const colors = useColors();
-  const { width } = useWindowDimensions();
+  const { width } = useWebLayout();
   const isMobile = width < 768;
   const { user } = useAuth();
   const { settings } = useSettings();
@@ -266,7 +267,9 @@ export function WebLoanManagement() {
       </View>
 
       {/* Table */}
-      <View style={[styles.tableCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={[styles.tableCard, { backgroundColor: colors.card, borderColor: colors.border, minWidth: 0, maxWidth: "100%" }]}>
+        <ScrollView horizontal contentContainerStyle={{ minWidth: "100%" }} showsHorizontalScrollIndicator>
+        <View style={{ minWidth: 960, flexGrow: 1 }}>
         <View style={[styles.tableHeader, { borderBottomColor: colors.border, backgroundColor: colors.background }]}>
           <Text style={[styles.th, { flex: 2, color: colors.mutedForeground }]}>EMPLOYEE / DEPT</Text>
           <Text style={[styles.th, { flex: 1.5, color: colors.mutedForeground }]}>LOAN TYPE</Text>
@@ -363,20 +366,22 @@ export function WebLoanManagement() {
             ))
           )}
         </ScrollView>
+        </View>
+        </ScrollView>
       </View>
 
       {/* Issue Loan Modal */}
       <Modal visible={modalVisible} transparent animationType="fade" onRequestClose={() => setModalVisible(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.modalHeader}>
+        <View {...({ dataSet: { ofmDialogOverlay: "" } } as any)} style={styles.modalOverlay}>
+          <View {...({ dataSet: { ofmDialogCard: "" } } as any)} style={[styles.modalContent, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View {...({ dataSet: { ofmDialogHeader: "" } } as any)} style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.foreground }]}>Issue Advance or Loan</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
                 <SvgX size={18} color={colors.mutedForeground} />
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={{ maxHeight: 460 }} showsVerticalScrollIndicator={false}>
+            <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 460, flexShrink: 1, minHeight: 0 }} showsVerticalScrollIndicator={false}>
               {/* Select Employee */}
               {knownEmployees.length > 0 && (
                 <View style={{ marginBottom: 12 }}>
@@ -401,7 +406,7 @@ export function WebLoanManagement() {
                 </View>
               )}
 
-              <View style={styles.formRow}>
+              <View style={[styles.formRow, isMobile && { flexDirection: "column" }]}>
                 <View style={{ flex: 1.5 }}>
                   <Text style={[styles.label, { color: colors.mutedForeground }]}>EMPLOYEE FULL NAME</Text>
                   <TextInput
@@ -420,7 +425,7 @@ export function WebLoanManagement() {
                 </View>
               </View>
 
-              <View style={styles.formRow}>
+              <View style={[styles.formRow, isMobile && { flexDirection: "column" }]}>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.label, { color: colors.mutedForeground }]}>LOAN PROGRAM</Text>
                   <View style={styles.selectRow}>
@@ -445,7 +450,7 @@ export function WebLoanManagement() {
                 </View>
               </View>
 
-              <View style={styles.formRow}>
+              <View style={[styles.formRow, isMobile && { flexDirection: "column" }]}>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.label, { color: colors.mutedForeground }]}>PRINCIPAL AMOUNT ({settings.currency})</Text>
                   <TextInput
@@ -470,7 +475,7 @@ export function WebLoanManagement() {
                 </View>
               </View>
 
-              <View style={styles.formRow}>
+              <View style={[styles.formRow, isMobile && { flexDirection: "column" }]}>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.label, { color: colors.mutedForeground }]}>MONTHLY DEDUCTION ({settings.currency})</Text>
                   <TextInput
@@ -482,7 +487,7 @@ export function WebLoanManagement() {
                 </View>
               </View>
 
-              <View style={styles.formRow}>
+              <View style={[styles.formRow, isMobile && { flexDirection: "column" }]}>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.label, { color: colors.mutedForeground }]}>PURPOSE / REASON</Text>
                   <TextInput
@@ -496,7 +501,7 @@ export function WebLoanManagement() {
               </View>
             </ScrollView>
 
-            <View style={styles.modalFooter}>
+            <View {...({ dataSet: { ofmDialogFooter: "" } } as any)} style={styles.modalFooter}>
               <TouchableOpacity
                 style={[styles.btnSecondary, { borderColor: colors.border }]}
                 onPress={() => setModalVisible(false)}

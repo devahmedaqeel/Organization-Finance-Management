@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, { createContext, useContext, useEffect, useState, useMemo, useCallback } from "react";
+import React, { createContext, useContext, useEffect, useState, useMemo, useCallback, useRef } from "react";
 import {
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
@@ -11,7 +11,6 @@ import {
   signInWithCredential,
   signInWithPopup,
   signInWithRedirect,
-  getRedirectResult,
   signInAnonymously,
 } from "firebase/auth";
 import { doc, getDoc, setDoc, deleteDoc, collection, query, where, getDocs, Timestamp, onSnapshot } from "firebase/firestore";
@@ -19,6 +18,10 @@ import { Platform } from "react-native";
 import { auth, db } from "../config/firebase";
 import * as WebBrowser from "expo-web-browser";
 import { makeRedirectUri } from "expo-auth-session";
+import Constants from "expo-constants";
+import { randomUUID } from "expo-crypto";
+import { getGoogleRedirectResult } from "@/services/googleRedirectResult";
+import { isGoogleBridgePath, isGooglePopupCancellation, googleAuthErrorMessage, normalizeGoogleRole, parseNativeGoogleCallback, withAuthTimeout } from "@/services/googleAuthFlow";
 import { requestPasswordReset } from "@/services/passwordResetClientService";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -132,6 +135,7 @@ export interface User {
 interface AuthContextValue {
   user: User | null;
   isLoading: boolean;
+  googleSignInError: string | null;
   login: (email: string, password: string, role?: UserRole) => Promise<boolean>;
   loginWithGoogle: (role?: UserRole) => Promise<boolean>;
   loginWithGoogleCredential: (idToken: string, accessToken: string, role?: UserRole) => Promise<boolean>;
@@ -146,6 +150,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue>({
   user: null,
   isLoading: true,
+  googleSignInError: null,
   login: async () => false,
   loginWithGoogle: async () => false,
   loginWithGoogleCredential: async () => false,
@@ -156,7 +161,20 @@ const AuthContext = createContext<AuthContextValue>({
   updateUserOrganization: async () => {},
 });
 
+function clearGoogleLoginIntent() {
+  if (typeof window === "undefined") return;
+  for (const storage of [() => window.sessionStorage, () => window.localStorage]) {
+    try { storage().removeItem("google_login_role"); storage().removeItem("ofm_google_redirect_pending"); } catch {}
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [googleSignInError, setGoogleSignInError] = useState<string | null>(null);
+  const googleSignInPending = useRef((() => {
+    if (Platform.OS !== "web" || typeof window === "undefined") return false;
+    try { return window.sessionStorage.getItem("ofm_google_redirect_pending") === "1" || window.localStorage.getItem("ofm_google_redirect_pending") === "1"; } catch { return false; }
+  })());
+  const isNativeBridge = Platform.OS === "web" && typeof window !== "undefined" && isGoogleBridgePath(window.location.pathname);
   // Reliable cross-platform session persistence helper
   const persistUserSession = useCallback(async (userToPersist: User | null) => {
     if (userToPersist) {
@@ -206,19 +224,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const resolveCanonicalUserProfile = useCallback(async (firebaseUser: any, defaultRole: UserRole = "admin"): Promise<User> => {
     const formattedEmail = (firebaseUser.email || "").toLowerCase().trim();
     let existingData: Partial<User> = {};
+    const deadline = Date.now() + 15000;
+    const readProfile = <T,>(operation: Promise<T>) => withAuthTimeout(operation, Math.max(1, deadline - Date.now()), "Your organization details could not be loaded. Check your connection and try again.");
 
     try {
-      const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+      const userDoc = await readProfile(getDoc(doc(db, "users", firebaseUser.uid)));
       if (userDoc.exists()) {
         existingData = userDoc.data() as Partial<User>;
       } else {
         const q = query(collection(db, "users"), where("email", "==", formattedEmail));
-        const snap = await getDocs(q);
+        const snap = await readProfile(getDocs(q));
         if (!snap.empty) {
           existingData = snap.docs[0].data() as Partial<User>;
         }
       }
-    } catch (e) {}
+    } catch (e) {
+      // Do not create a different organization from a failed profile lookup.
+      throw e;
+    }
 
     let org = existingData.organization || "";
     let orgId = existingData.organizationId || "";
@@ -227,7 +250,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Brand-new account (e.g. first Google sign-in): an admin's invitation decides org and role
     if (!existingData.organizationId && formattedEmail) {
       try {
-        const inviteDoc = await getDoc(doc(db, "invitations", formattedEmail));
+        const inviteDoc = await readProfile(getDoc(doc(db, "invitations", formattedEmail)));
         const invite = inviteDoc.exists() ? (inviteDoc.data() as any) : null;
         if (invite?.organizationId) {
           org = invite.organization || org;
@@ -235,7 +258,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           userRole = ["admin", "accountant", "manager", "employee"].includes(invite.role) ? invite.role : "employee";
           setDoc(doc(db, "invitations", formattedEmail), { status: "accepted", acceptedAt: Timestamp.now() }, { merge: true }).catch(() => {});
         }
-      } catch (e) {}
+      } catch (e) { throw e; }
     }
 
     // Canonical organization mapping: preserve user org or initialize clean tenant
@@ -262,10 +285,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Handle Google redirect result on web (after signInWithRedirect completes)
   useEffect(() => {
-    if (Platform.OS === "web") {
-      getRedirectResult(auth)
+    if (Platform.OS === "web" && !isNativeBridge) {
+      getGoogleRedirectResult(auth)
         .then(async (result) => {
           if (result) {
+            googleSignInPending.current = true;
             const firebaseUser = result.user;
             let savedRole: UserRole | null = null;
             if (typeof window !== "undefined") {
@@ -276,17 +300,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 sessionStorage.removeItem("google_login_role");
               } catch (e) {}
             }
-            const role: UserRole = savedRole || "admin";
+            const role: UserRole = normalizeGoogleRole(savedRole);
             const activeUser = await resolveCanonicalUserProfile(firebaseUser, role);
             await persistUserSession(activeUser);
             setUser(activeUser);
+            clearGoogleLoginIntent();
+            googleSignInPending.current = false;
+          } else if (googleSignInPending.current) {
+            clearGoogleLoginIntent();
+            googleSignInPending.current = false;
+            setGoogleSignInError("Google sign-in could not be restored. Please try again and allow sign-in popups for this website.");
           }
         })
         .catch((err) => {
-          console.log("Redirect result notice:", err?.message || err);
+          clearGoogleLoginIntent();
+          googleSignInPending.current = false;
+          setGoogleSignInError(googleAuthErrorMessage(err));
         });
     }
-  }, [resolveCanonicalUserProfile, persistUserSession]);
+  }, [resolveCanonicalUserProfile, persistUserSession, isNativeBridge]);
 
 
   // 1. Instant Local Cache Restore on Mount (takes ~5ms, zero network latency)
@@ -337,6 +369,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // 2. Real-time Firebase Auth state sync with background timeout
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      // The bridge returns credentials to native; it must not provision a web profile.
+      // Interactive Google sign-in resolves its selected role and profile itself.
+      if (isNativeBridge || googleSignInPending.current) { setIsLoading(false); return; }
       if (firebaseUser) {
         // Anonymous sessions are purely for Firestore transport authorization.
         // Never overwrite or reset the active user profile or organization!
@@ -397,7 +432,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => unsubscribe();
-  }, [resolveCanonicalUserProfile, persistUserSession]);
+  }, [resolveCanonicalUserProfile, persistUserSession, isNativeBridge]);
 
   // 3. Real-time Live Role and Permission Synchronization
   // Updates user role immediately if online when changed in Firestore; retains cached role if offline.
@@ -659,21 +694,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const handleGoogleWebResult = async (result: any, role: UserRole): Promise<boolean> => {
     const firebaseUser = result.user;
 
-    // Check if there is a pending native redirect
-    if (typeof window !== "undefined") {
-      const urlParams = new URLSearchParams(window.location.search);
-      const isNative = urlParams.get("native") === "true";
-      const targetRole = (urlParams.get("role") as UserRole) || role;
-      if (isNative) {
-        const credential = GoogleAuthProvider.credentialFromResult(result);
-        const idToken = credential?.idToken || "";
-        const accessToken = credential?.accessToken || "";
-        const deepLink = `ofm-app://login?idToken=${encodeURIComponent(idToken)}&accessToken=${encodeURIComponent(accessToken)}&role=${targetRole}`;
-        window.location.href = deepLink;
-        return true;
-      }
-    }
-
     const activeUser = await resolveCanonicalUserProfile(firebaseUser, role);
     await persistUserSession(activeUser);
     setUser(activeUser);
@@ -681,6 +701,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const loginWithGoogle = async (role: UserRole = "admin"): Promise<boolean> => {
+    if (googleSignInPending.current) return false;
+    googleSignInPending.current = true;
+    setGoogleSignInError(null);
     try {
       if (Platform.OS === "web") {
         const provider = new GoogleAuthProvider();
@@ -697,59 +720,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         try {
           const result = await signInWithPopup(auth, provider);
-          return handleGoogleWebResult(result, role);
+          return await handleGoogleWebResult(result, role);
         } catch (popupError: any) {
-          if (
-            popupError.code === "auth/popup-closed-by-user" ||
-            popupError.code === "auth/cancelled-popup-request"
-          ) {
+          if (isGooglePopupCancellation(popupError)) {
             return false;
           }
           if (popupError.code === "auth/popup-blocked") {
+            for (const storage of [() => window.sessionStorage, () => window.localStorage]) {
+              try { storage().setItem("ofm_google_redirect_pending", "1"); } catch {}
+            }
             await signInWithRedirect(auth, provider);
             return true;
           }
           if (popupError.code === "auth/unauthorized-domain") {
             throw new Error("This website domain is not authorized for Google Sign-In. Please check Firebase Console authorized domains.");
           }
-          throw popupError;
+          throw new Error(googleAuthErrorMessage(popupError));
         }
       } else {
-        // Native Android/iOS — use openAuthSessionAsync with dynamically resolved redirectUri
+        if (Constants.executionEnvironment === "storeClient") {
+          throw new Error("Google sign-in requires the installed OFM app or a development build. Expo Go cannot handle this application callback.");
+        }
+        // The same auth session owns the return URL and credential exchange.
         const redirectUri = makeRedirectUri({ scheme: "ofm-app", path: "login" });
-        const webOrigin = "https://ofmapp-main.web.app";
-        const authUrl = `${webOrigin}/auth/google?role=${role}&redirect_uri=${encodeURIComponent(redirectUri)}`;
+        const state = randomUUID();
+        const webOrigin = (process.env.EXPO_PUBLIC_AUTH_BRIDGE_ORIGIN || "https://ofmapp-main.web.app").replace(/\/$/, "");
+        const authUrl = `${webOrigin}/auth/google?role=${role}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`;
 
         const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
 
         if (result.type === "success" && result.url) {
-          // Parse the deep link URL for tokens
-          const parsed = new URL(result.url);
-          const idToken = parsed.searchParams.get("idToken");
-          const accessToken = parsed.searchParams.get("accessToken");
-          const returnedRole = (parsed.searchParams.get("role") as UserRole) || role;
-
-          if (idToken && accessToken) {
-            return loginWithGoogleCredential(
-              decodeURIComponent(idToken),
-              decodeURIComponent(accessToken),
-              returnedRole
-            );
-          }
+          const tokens = parseNativeGoogleCallback(result.url, redirectUri, state);
+          return await loginWithGoogleCredential(tokens.idToken || "", tokens.accessToken || "", tokens.role);
         }
         // User cancelled or no tokens returned
         return false;
       }
     } catch (error: any) {
       console.error("Google Login Error:", error);
-      throw error;
+      throw new Error(googleAuthErrorMessage(error));
+    } finally {
+      clearGoogleLoginIntent();
+      googleSignInPending.current = false;
     }
   };
 
   const loginWithGoogleCredential = async (idToken: string, accessToken: string, role: UserRole = "admin"): Promise<boolean> => {
     try {
       const credential = GoogleAuthProvider.credential(idToken, accessToken);
-      const userCredential = await signInWithCredential(auth, credential);
+      const userCredential = await withAuthTimeout(signInWithCredential(auth, credential), 20000, "Could not complete Google sign-in. Check your internet connection and try again.");
       const firebaseUser = userCredential.user;
 
       const activeUser = await resolveCanonicalUserProfile(firebaseUser, role);
@@ -757,8 +776,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(activeUser);
       return true;
     } catch (error) {
-      console.error("Firebase Native Google Login Error:", error);
-      return false;
+      throw new Error(googleAuthErrorMessage(error as { code?: string; message?: string }));
     }
   };
 
@@ -800,6 +818,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     () => ({
       user,
       isLoading,
+      googleSignInError,
       login,
       loginWithGoogle,
       loginWithGoogleCredential,
@@ -809,7 +828,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       hasPermission: (permission: keyof RolePermissions) => user?.role ? (ROLE_PERMISSIONS[user.role]?.[permission] ?? false) : false,
       updateUserOrganization,
     }),
-    [user, isLoading, login, loginWithGoogle, loginWithGoogleCredential, signUp, forgotPassword, logout]
+    [user, isLoading, googleSignInError, login, loginWithGoogle, loginWithGoogleCredential, signUp, forgotPassword, logout]
   );
 
   return (

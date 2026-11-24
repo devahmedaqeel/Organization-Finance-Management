@@ -1,3 +1,4 @@
+import { useWebLayout } from "@/hooks/useWebLayout";
 import React, { useMemo, useState, useEffect } from "react";
 import {
   StyleSheet,
@@ -5,7 +6,6 @@ import {
   TouchableOpacity,
   View,
   ScrollView,
-  useWindowDimensions,
   Platform,
 } from "react-native";
 import {
@@ -75,7 +75,7 @@ interface WebAIInsightsProps {
 
 export function WebAIInsights({ onNavigate }: WebAIInsightsProps) {
   const colors = useColors();
-  const { width } = useWindowDimensions();
+  const { width } = useWebLayout();
   const isMobile = width < 768;
   const isWide = width >= 992;
 

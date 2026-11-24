@@ -347,10 +347,10 @@ export function WebPayrollModal({ visible, onClose, entryToEdit }: WebPayrollMod
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={[styles.backdrop, isMobile && { padding: 10 }]}>
-        <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View {...({ dataSet: { ofmDialogOverlay: "" } } as any)} style={[styles.backdrop, isMobile && { padding: 10 }]}>
+        <View {...({ dataSet: { ofmDialogCard: "" } } as any)} style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           {/* Header */}
-          <View style={[styles.header, { borderBottomColor: colors.border }]}>
+          <View {...({ dataSet: { ofmDialogHeader: "" } } as any)} style={[styles.header, { borderBottomColor: colors.border }]}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
               <View style={[styles.iconWrap, { backgroundColor: "#8B5CF620" }]}>
                 <SvgUsers size={20} color="#8B5CF6" />
@@ -370,7 +370,7 @@ export function WebPayrollModal({ visible, onClose, entryToEdit }: WebPayrollMod
           </View>
 
           {/* Body */}
-          <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
+          <ScrollView {...({ dataSet: { ofmDialogBody: "" } } as any)} keyboardShouldPersistTaps="handled" style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
             {/* Employee Name & ID */}
             {/* Employee Name & ID */}
             <View style={[styles.row, isMobile && { flexDirection: "column" }]}>
@@ -807,7 +807,7 @@ export function WebPayrollModal({ visible, onClose, entryToEdit }: WebPayrollMod
           </ScrollView>
 
           {/* Footer Actions */}
-          <View style={[styles.footer, { borderTopColor: colors.border }]}>
+          <View {...({ dataSet: { ofmDialogFooter: "" } } as any)} style={[styles.footer, { borderTopColor: colors.border }]}>
             <TouchableOpacity style={[styles.cancelBtn, { borderColor: colors.border }]} onPress={onClose} disabled={submitting}>
               <Text style={[styles.cancelBtnText, { color: colors.foreground }]}>Cancel</Text>
             </TouchableOpacity>

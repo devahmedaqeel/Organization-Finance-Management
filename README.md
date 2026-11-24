@@ -1,233 +1,171 @@
 # OFM — Organization Finance Management
 
-> **Enterprise Institutional Accounting, Real-Time Cloud Synchronization, Multi-Role Access Control & Executive Financial Dossiers**
+> One finance workspace for an organization — income, expenses, department budgets, payroll, payslips, reports and insights — on **Web, Android and iOS**, kept in sync in real time.
 
-[![Platform](https://img.shields.io/badge/Platform-Native_Android_%7C_iOS_%7C_Web_%7C_Tablet-10B981?style=for-the-badge&logo=expo&logoColor=white)](https://expo.dev/)
-[![Database](https://img.shields.io/badge/Database-Firebase_Cloud_Firestore-F59E0B?style=for-the-badge&logo=firebase&logoColor=white)](https://firebase.google.com/)
-[![EAS Build](https://img.shields.io/badge/EAS_Build-Android_APK_Ready-8B5CF6?style=for-the-badge&logo=expo&logoColor=white)](https://expo.dev/)
-[![License](https://img.shields.io/badge/License-MIT-3B82F6?style=for-the-badge)](LICENSE)
+[![Expo SDK](https://img.shields.io/badge/Expo_SDK-58-000020?logo=expo&logoColor=white)](https://docs.expo.dev/)
+[![React Native](https://img.shields.io/badge/React_Native-0.88-61DAFB?logo=react&logoColor=black)](https://reactnative.dev/)
+[![Firebase](https://img.shields.io/badge/Firebase-Firestore_%7C_Auth_%7C_Hosting-FFCA28?logo=firebase&logoColor=black)](https://firebase.google.com/)
+[![Live](https://img.shields.io/badge/Live-ofmapp--main.web.app-2CA01C)](https://ofmapp-main.web.app)
 
----
-
-## Overview
-
-**OFM (Organization Finance Management)** is an enterprise financial intelligence and general ledger platform built with **React Native / Expo SDK 54**, **React Native Web**, and **Google Cloud Firestore**.
-
-It delivers real-time double-entry ledger accounting, department budget allocation ceilings, staff payroll and automated payslip generation (PDF & High-Resolution Image), multi-period compliance reporting, a granular role-based personnel security matrix, and **instant two-way real-time data synchronization between Mobile and Web platforms**.
+**Live web app:** https://ofmapp-main.web.app
 
 ---
 
-- **Offline-First Resilience**: Full CRUD functionality without an active network connection. Records persist locally, immediately participate in calculations, and synchronize upon reconnection.
-- **Durable Crash-Safe Outbox**: Offline creations, updates, and deletions enter an idempotent background synchronization outbox with automatic exponential backoff retry.
-- **Cold Start 0ms Hydration**: Instant data availability upon launching the application offline with zero blank screen flicker or empty cache overwrites.
-- **Permanent Deletion & Tombstone Guarantee**: Deleted records are purged centrally and registered in local persistent tombstones, preventing zombie resurrection from stale server snapshots.
-- **Adaptive Web Responsiveness for All Devices**:
-  - **Desktop ($\ge 1080\text{px}$)**: Dual-pane enterprise layout with collapsible sidebar, real-time KPI matrix, and wide data tables.
-  - **Tablet ($768\text{px} - 1079\text{px}$)**: Fluid grid layout with compact icon sidebar and swipeable filters.
-  - **Mobile Web ($< 768\text{px}$)**: Native-feeling mobile app experience with slide-out drawer, floating bottom navigation bar (`Home`, `Ledger`, `Reports`, `More`), and edge swipe back navigation.
-- **Two-Way Real-Time Synchronization**: Central Cloud Firestore serves as the authoritative single source of truth; updates from Web propagate to Mobile, and offline mobile mutations propagate seamlessly to Web.
-- **Multi-Role Security (RBAC)**: Distinct permissions for Super Administrator, Accountant, Manager, and Employee with strict multi-tenant isolation.
-- **Double-Entry General Ledger**: Record Revenue Inflows and Operational Expense Outflows with voucher references, category tagging, and receipt verification.
-- **Department Cost Centers**: Allocate fiscal expenditure ceilings, track department burn rates, and receive real-time budget overrun warnings.
-- **Staff Payroll & Payslip Engine**: Automated calculation of base salaries, allowances, bonuses, and statutory deductions with 1-click official PDF & High-Res Image exports.
-- **Deterministic AI Insights & Alerts**: 100% data-driven, read-only intelligence covering all 6 data availability scenarios, strict historical trend gating, statistical anomaly detection, duplicate transaction recognition, and anti-spam notification idempotency.
-- **Multi-Page Vector PDF Reporting Suite**: User-controlled financial statement exports with print-optimized CSS, multi-page vector layout, native mobile downloads via `expo-print`, and direct sharing via `expo-sharing`.
-- **Exact Numeric Formatting**: All financial figures across Web and Mobile are formatted as exact, unrounded values (`PKR 7,750`, `PKR 7,100`), eliminating lossy abbreviation distortion.
-- **Mobile Text Visibility Guarantee**: Responsive minimum widths and flexible containers prevent text clipping (`Inflows`, `Total Expenses`, `Department Budget`) across all screen sizes (320px–430px+).
-- **Session & Refresh Resilience**: Web refresh preserves authenticated user and active organization without falling back to demo accounts.
-- **Live Production Hosting**: Deployed on Google Firebase Hosting worldwide CDN: [https://ofmapp-main.web.app](https://ofmapp-main.web.app).
+## Documentation index
 
-## Technology Stack
-
-Documented strictly from the actual technologies implemented in this project:
-
-- **Frontend & Web**: [React Native for Web](https://necolas.github.io/react-native-web/) (v0.21.0), [React 19](https://react.dev/) (v19.2.3), [Expo Router v4](https://docs.expo.dev/router/introduction/) (v57.0.19)
-- **Mobile**: [React Native](https://reactnative.dev/) (v0.86.3), [Expo SDK 54](https://docs.expo.dev/) (v57.0.20), [react-native-reanimated](https://docs.swmansion.com/react-native-reanimated/) (v4.5.1), [react-native-safe-area-context](https://github.com/th3rdwave/react-native-safe-area-context)
-- **Backend**: Serverless architecture powered by [Firebase](https://firebase.google.com/) (v12.13.0) and Cloud Functions (`functions/`)
-- **Database**: [Google Cloud Firestore](https://firebase.google.com/docs/firestore) (real-time document store with active snapshot listeners)
-- **Authentication**: [Firebase Authentication](https://firebase.google.com/docs/auth) (Email/Password, Google OAuth Federation, multi-tier persistence via IndexedDB, LocalStorage, and AsyncStorage)
-- **APIs & SDKs**: Firebase JavaScript SDK v12, Expo Print (`expo-print`), Expo Sharing (`expo-sharing`), CraftMyPDF REST API integration
-- **Build Pipeline**: [EAS Build](https://docs.expo.dev/build/introduction/) (Expo Application Services) for standalone Android APK and AAB packages
+| Document | What it covers |
+|---|---|
+| **[docs/FYP_DOCUMENTATION.md](docs/FYP_DOCUMENTATION.md)** | Complete Final Year Project report: introduction, problem, objectives, scope, requirements, design, implementation, testing, conclusion |
+| **[docs/DIAGRAMS.md](docs/DIAGRAMS.md)** | All diagrams: architecture, use case, ERD, class, sequence, activity, DFD (level 0/1), state, deployment, navigation |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | System architecture, layers, modules and design decisions |
+| [DATA_FLOW.md](DATA_FLOW.md) | How data moves: real-time sync, offline outbox, payroll → expense, notifications, reports |
+| [docs/DATABASE.md](docs/DATABASE.md) | Firestore collections, fields and relationships |
+| [docs/ROLES_AND_PERMISSIONS.md](docs/ROLES_AND_PERMISSIONS.md) | Admin / Accountant / Manager / Employee access matrix |
+| [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | Step-by-step guide for every module (web and mobile) |
+| [docs/TESTING.md](docs/TESTING.md) | Test strategy, the 16 automated suites and manual test cases |
+| [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) | Folder-by-folder and file-by-file map of the codebase |
+| [DEPLOYMENT.md](DEPLOYMENT.md) | Run locally, Expo Go, build the APK, deploy to Firebase Hosting |
+| [CHANGELOG.md](CHANGELOG.md) | Version history |
+| [CLEANUP.md](CLEANUP.md) | Log of earlier repository cleanup |
 
 ---
 
-## Project Structure
+## What the system does
 
-A concise overview of the core project structure:
-
-```
-├── app/                                 # Expo Router file-based navigation & routes
-│   ├── (tabs)/                          # Bottom tab navigation (Dashboard, Income, Expenses, Reports, More)
-│   ├── auth/                            # Google OAuth & authentication routing handlers
-│   ├── _layout.tsx                      # Root application provider shell & safe area wrappers
-│   ├── index.tsx                        # 0ms lightweight root route handler
-│   ├── budget.tsx                       # Department budget allocations
-│   ├── departments.tsx                  # Department cost center management
-│   ├── payroll.tsx                      # Staff payroll & payslips
-│   ├── team.tsx                         # Personnel & RBAC management
-│   ├── settings.tsx                     # Organization profile & branding
-│   └── ai-insights.tsx                  # Predictive fiscal health & insights
-├── components/                          # Reusable UI component hierarchy
-│   ├── analytics/                       # High-density financial analytics suite
-│   ├── web/                             # Desktop widescreen enterprise views & modals
-│   └── ...                              # Native & cross-platform cards, charts, and modals
-├── config/                              # Configuration & Firebase initialization
-│   └── firebase.ts                      # Multi-platform Firebase Auth & Firestore setup
-├── constants/                           # Global constants (colors, currencies, categories, branding)
-├── context/                             # Global state providers (AuthContext, FinanceContext, SettingsContext)
-├── functions/                           # Firebase Cloud Functions backend service
-├── hooks/                               # Custom hooks (responsive, keyboard, colors, notifications)
-├── services/                            # Authoritative financial math, reports & PDF engines
-│   ├── FinancialCalculationEngine.ts    # Authoritative calculation formulas & KPIs
-│   ├── DatePeriodService.ts             # Fiscal period filtering & date range calculations
-│   ├── ReportExportService.ts           # PDF dossier generator & compiler
-│   └── payslipExportService.ts          # Native PDF & PNG slip exporter
-├── stubs/                               # Web compatibility stubs (keyboard controller)
-└── utils/                               # Shared date and financial formatting utilities
-```
+| Module | Main features |
+|---|---|
+| **Authentication** | Email/password sign-in and sign-up, Google sign-in, forgot/reset password, role chosen at sign-up, invite code (admin's email) to join an organization |
+| **Dashboard** | Available cash card, overview cards (Income, Expenses, Budget, Transactions, Staff payroll), cash-flow bar chart and trend chart, budget / margin / spending donut analytics, top departments, recent transactions |
+| **Income & Expenses** | Record, edit and delete income and expense transactions with category, department, date, payment method and reference |
+| **Transactions** | Full ledger with search, type filter and date range |
+| **Budgets** | Department budget lines, allocation vs spent, status (on track / near limit / over), filters |
+| **Departments** | Department cards with head count, budget, spending and staff roster; one-click set-up for departments used in records but not yet created |
+| **Payroll & Payslips** | Salary runs (base, bonus, deductions, net), payroll status workflow, automatic payroll expense in the ledger, payslip templates (editor, preview), PDF/PNG payslips |
+| **Team** | Members list, role changes, invite by email, pending invites, duplicate-invite protection |
+| **Reports** | Period summary, trend, analytics, department spending; export to **PDF** and **CSV** (web download, Android save-to-folder, iOS share sheet) |
+| **AI Insights** | Rule-based financial health score, alerts (critical / advisories / positive), recommended actions, supporting charts |
+| **Notifications** | Organization-wide notification centre, push notifications on mobile, budget and ledger alerts |
+| **Settings** | Company profile, logo, currency, fiscal year and fiscal-year start month, theme (light/dark/system) |
+| **Fiscal year** | Pick a fiscal year (or all time) on the web; every page is scoped to it |
+| **Offline** | Mobile keeps working offline; changes queue in an outbox and sync when back online |
 
 ---
 
-## Installation
+## Technology stack
 
-### Prerequisites
-- **Node.js**: v18 or higher (LTS recommended)
-- **npm**: v9 or higher
-- **Expo CLI**: `npm install -g expo-cli eas-cli` (optional global installation)
+| Layer | Technology |
+|---|---|
+| UI framework | React 19.3, React Native 0.88, React Native Web 0.21 |
+| App platform | Expo SDK 58, Expo Router 58 (file-based routing) |
+| Language | TypeScript |
+| Charts & icons | react-native-svg (custom SVG charts, donut rings, bar chart, icon set) |
+| Backend | Firebase Authentication, Cloud Firestore (real-time listeners), Cloud Functions |
+| Hosting | Firebase Hosting (`ofmapp-main.web.app`) |
+| Mobile builds | EAS Build (Android APK / AAB) |
+| Files & sharing | expo-print, expo-sharing, expo-file-system (legacy API), Android Storage Access Framework |
+| Local storage | AsyncStorage (mobile), localStorage / IndexedDB (web) |
+| Notifications | expo-notifications (push), Firestore `notifications` collection |
+| Testing | 16 TypeScript test suites run with `tsx` (`npm test`) |
 
-### Setup Steps
+---
+
+## Quick start
+
 ```bash
-# 1. Clone the repository
+# 1. Get the code
 git clone https://github.com/devahmedaqeel/Organization-Finance-Management.git
-
-# 2. Navigate to project directory
 cd Organization-Finance-Management
 
-# 3. Install project dependencies
+# 2. Install
 npm install
+
+# 3. Run (web + Expo Go QR code)
+npm start            # press "w" for web, scan the QR with Expo Go (SDK 58)
 ```
 
----
+Useful scripts:
 
-## Environment Configuration
+| Command | Purpose |
+|---|---|
+| `npm start` | Start the Expo dev server (web + mobile) |
+| `npm run web` | Open the web app only |
+| `npm run typecheck` | TypeScript check (`tsc --noEmit`) |
+| `npm test` | Run all 16 automated test suites |
+| `npm run build:web` | Export the static web build to `dist/` |
+| `npm run deploy:hosting` | Build web and deploy to Firebase Hosting |
+| `npm run build:apk` | Build an installable Android APK with EAS |
+| `npm run build:aab` | Build an Android App Bundle for the Play Store |
 
-Create a `.env` file in the root directory. Provide your own Firebase and external service credentials.
+Full instructions: [DEPLOYMENT.md](DEPLOYMENT.md).
 
-> **CRITICAL SECURITY NOTICE**: Never commit actual API keys, private credentials, or secrets to version control.
+### Environment variables
+
+The app reads Firebase settings from `EXPO_PUBLIC_*` variables (with project defaults in `config/firebase.ts`). Create `.env` for your own Firebase project:
 
 ```env
-# Firebase Configuration
-EXPO_PUBLIC_FIREBASE_API_KEY=YOUR_FIREBASE_API_KEY
-EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=YOUR_PROJECT_ID.firebaseapp.com
-EXPO_PUBLIC_FIREBASE_PROJECT_ID=YOUR_PROJECT_ID
-EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=YOUR_PROJECT_ID.firebasestorage.app
-EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=YOUR_MESSAGING_SENDER_ID
-EXPO_PUBLIC_FIREBASE_APP_ID=YOUR_FIREBASE_APP_ID
-
-# Optional External PDF Generation Service
-EXPO_PUBLIC_CRAFTMYPDF_API_KEY=YOUR_CRAFTMYPDF_API_KEY
+EXPO_PUBLIC_FIREBASE_API_KEY=...
+EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+EXPO_PUBLIC_FIREBASE_PROJECT_ID=your-project
+EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=your-project.firebasestorage.app
+EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...
+EXPO_PUBLIC_FIREBASE_APP_ID=...
+EXPO_PUBLIC_APP_URL=https://your-project.web.app
 ```
+
+> Never commit real secrets. `.env` is git-ignored.
 
 ---
 
-## Running the Project
+## High-level architecture
 
-### Development Server
-```bash
-# Start local Metro bundler (clears cache and ensures assets)
-npm start
-# or: npx expo start -c
+```mermaid
+flowchart LR
+  subgraph Clients
+    W[Web app<br/>React Native Web<br/>Firebase Hosting]
+    A[Android app<br/>APK / Expo Go]
+    I[iOS app<br/>Expo Go]
+  end
+  subgraph Shared["Shared code (one TypeScript codebase)"]
+    CTX[Contexts<br/>Auth · Finance · Settings]
+    SVC[Services<br/>Calculation engine · Payroll · Reports · Insights · Sync]
+  end
+  subgraph Firebase
+    AUTH[(Firebase Auth)]
+    FS[(Cloud Firestore)]
+    FN[Cloud Functions]
+  end
+  W --> CTX
+  A --> CTX
+  I --> CTX
+  CTX --> SVC
+  CTX <-->|real-time listeners| FS
+  CTX --> AUTH
+  SVC --> FN
 ```
 
-### Web Application
-To run the Web application in your browser:
-```bash
-# Start Metro bundler targeting web
-npm run web
-# or navigate to http://localhost:8081 directly in your browser
-```
-
-### Mobile Application
-To run the Mobile application on an emulator or physical device:
-```bash
-# For Android:
-npm run android
-# or press 'a' in the interactive terminal after running 'npm start'
-
-# For iOS (macOS required):
-npm run ios
-# or press 'i' in the interactive terminal after running 'npm start'
-```
+More diagrams: [docs/DIAGRAMS.md](docs/DIAGRAMS.md).
 
 ---
 
-## Available Scripts
+## Roles at a glance
 
-The following scripts are defined in `package.json`:
+| Role | Can do |
+|---|---|
+| **Admin** | Everything: team, roles, settings, budgets, payroll, transactions, reports, insights |
+| **Accountant** | Income, expenses, budgets, payroll, payslip templates, reports, insights |
+| **Manager** | View budgets, departments, payroll; approve payroll; reports and insights |
+| **Employee** | Own payslips (and reports permission) |
 
-| Script | Command | Purpose |
-| :--- | :--- | :--- |
-| `npm start` | `node ensure_assets.js && expo start` | Syncs assets and starts the Metro development server |
-| `npm run android` | `expo run:android` | Builds and runs the native Android project |
-| `npm run ios` | `expo run:ios` | Builds and runs the native iOS project |
-| `npm run web` | `expo start --web` | Starts the local Metro development server for Web |
-| `npm run build:apk` | `eas build -p android --profile preview` | Builds a standalone Android APK via EAS Build |
-| `npm run build:aab` | `eas build -p android --profile production` | Builds a production Android App Bundle (AAB) via EAS |
-| `npm run build:web` | `expo export -p web` | Exports the static production web bundle into `dist/` |
-| `npm run deploy:hosting`| `expo export -p web && firebase deploy --only hosting` | Exports web bundle and deploys to Firebase Hosting |
-| `npm run typecheck` | `tsc -p tsconfig.json --noEmit` | Runs full TypeScript static type checking |
-| `npm test` | `npx -y tsx services/__tests__/runAllTests.ts` | Runs the comprehensive 13-suite automated test matrix (100% passing) |
+Details: [docs/ROLES_AND_PERMISSIONS.md](docs/ROLES_AND_PERMISSIONS.md).
 
 ---
 
-## Build
+## Project status
 
-### Web Bundle Export
-```bash
-npm run build:web
-```
-This command bundles all web assets into the `dist/` directory ready for static hosting.
+- Web: deployed at https://ofmapp-main.web.app
+- Android: APK built with EAS (`preview` profile)
+- Expo SDK 58 · TypeScript clean (0 errors) · 16/16 test suites passing
 
-### Mobile Standalone APK Build (EAS Build)
-```bash
-npm run build:apk
-```
-This initiates a cloud build using the `preview` profile configured in `eas.json` to generate an installable `.apk` file for Android devices.
+## Author
 
----
-
-## Architecture
-
-OFM uses a **Single Unified Backend Architecture** where Google Cloud Firestore is the authoritative central source of truth for all clients:
-
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│                        CENTRAL CLOUD FIRESTORE                         │
-│                      (Single Authoritative SSOT)                       │
-└──────────────────────────────────┬─────────────────────────────────────┘
-                                   │
-                     WebSocket Real-Time Sync (onSnapshot)
-                     + Durable Idempotent Outbox Push
-                                   │
-                ┌──────────────────┴──────────────────┐
-                ▼                                     ▼
-┌──────────────────────────────┐     ┌──────────────────────────────┐
-│       WEB APPLICATION        │     │      MOBILE APPLICATION      │
-│  (Desktop / Tablet / PWA)    │     │    (Android APK / iOS)       │
-│                              │     │                              │
-│ • WebShell Enterprise Layout │     │ • Expo Router Tab Navigator  │
-│ • Desktop / Tablet / Mobile  │     │ • Touch-Optimized Cards      │
-│ • IndexedDB & LocalStorage   │     │ • AsyncStorage Persistence   │
-│ • Durable Offline Outbox     │     │ • Durable Offline Outbox     │
-│ • Tombstone Register         │     │ • Tombstone Register         │
-│ • Direct Firestore SDK       │     │ • Cold-Start 0ms Hydration   │
-└──────────────────────────────┘     └──────────────────────────────┘
-```
-
-Both clients share:
-1. **Central Collections**: `transactions`, `budgets`, `departments`, `payroll`, `settings`, `notifications`.
-2. **Organization Isolation**: Scoped strictly by `organizationId` across all reads, writes, and cache keys (`ofm_data:${orgId}:*`).
-3. **Deterministic Math Engine**: All financial calculations are executed through `services/FinancialCalculationEngine.ts`.
-4. **Persistent Tombstones**: Deleted records are purged centrally and registered in local persistent tombstones, preventing zombie resurrection.
-5. **Crash-Safe Outbox**: Offline operations are serialized with unique operation IDs, ensuring zero duplicates upon network restoration.
-
+Ahmed Aqeel — Final Year Project, Organization Finance Management (OFM).

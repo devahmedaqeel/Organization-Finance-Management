@@ -1,10 +1,12 @@
-import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from "react-native";
-import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from "firebase/auth";
+import React, { useEffect, useState, useRef } from "react";
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, ScrollView } from "react-native";
+import { GoogleAuthProvider, signInWithPopup, signInWithRedirect } from "firebase/auth";
 import { auth } from "@/config/firebase";
 import { OFMBrandLogo } from "@/components/OFMBrandLogo";
 import { OFM_BRAND } from "@/constants/brand";
-import { UserRole } from "@/context/AuthContext";
+import { type UserRole } from "@/context/AuthContext";
+import { getGoogleRedirectResult } from "@/services/googleRedirectResult";
+import { buildNativeGoogleCallback, validateNativeGoogleRedirect, normalizeGoogleRole, isGooglePopupCancellation, googleAuthErrorMessage, withAuthTimeout } from "@/services/googleAuthFlow";
 import { SvgGoogle, SvgAlertCircle, SvgCheck, SvgExternalLink } from "@/components/web/SvgIcons";
 
 export default function GoogleAuthBridgeWebScreen() {
@@ -13,99 +15,98 @@ export default function GoogleAuthBridgeWebScreen() {
   const [deepLinkUrl, setDeepLinkUrl] = useState<string>("");
   const [role, setRole] = useState<UserRole>("admin");
   const [targetRedirectUri, setTargetRedirectUri] = useState<string>("");
+  const [callbackState, setCallbackState] = useState("");
+  const started = useRef(false);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+  const createProvider = () => {
+    const provider = new GoogleAuthProvider();
+    provider.addScope("email");
+    provider.addScope("profile");
+    provider.setCustomParameters({ prompt: "select_account" });
+    return provider;
+  };
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const targetRole = (urlParams.get("role") as UserRole) || "admin";
-    const customRedirect = urlParams.get("redirect_uri") || "";
-    setRole(targetRole);
-    setTargetRedirectUri(customRedirect);
-
-    const checkRedirectResult = async () => {
-      try {
-        const redirectRes = await getRedirectResult(auth);
-        if (redirectRes) {
-          handleAuthSuccess(redirectRes, targetRole, customRedirect);
-        }
-      } catch (err: any) {
-        console.error("Google Auth Redirect Check Error:", err);
-      }
-    };
-
-    checkRedirectResult();
-  }, []);
-
-  const handleAuthSuccess = (res: any, userRole: UserRole, customRedirect?: string) => {
+  const handleAuthSuccess = (res: any, userRole: UserRole, customRedirect: string, state: string) => {
     try {
       const credential = GoogleAuthProvider.credentialFromResult(res);
-      const idToken = credential?.idToken || "";
-      const accessToken = credential?.accessToken || "";
-
-      let finalUrl = "";
-      const baseRedirect = customRedirect || targetRedirectUri;
-
-      if (baseRedirect && baseRedirect.trim() !== "") {
-        const joinChar = baseRedirect.includes("?") ? "&" : "?";
-        finalUrl = `${baseRedirect}${joinChar}idToken=${encodeURIComponent(idToken)}&accessToken=${encodeURIComponent(accessToken)}&role=${userRole}`;
-      } else {
-        finalUrl = `ofm-app://login?idToken=${encodeURIComponent(idToken)}&accessToken=${encodeURIComponent(accessToken)}&role=${userRole}`;
-      }
-
+      const finalUrl = buildNativeGoogleCallback(customRedirect || "ofm-app://login", credential || {}, userRole, state);
       setDeepLinkUrl(finalUrl);
-      setStatus("redirecting");
-
-      // Attempt clean redirect to app
-      setTimeout(() => {
-        try {
-          window.location.href = finalUrl;
-        } catch (e) {}
-        setStatus("success");
-      }, 500);
-    } catch (e: any) {
-      console.error("Failed to build callback link:", e);
+      setStatus("success");
+      // Return immediately; the manual button remains available if the OS blocks navigation.
+      window.location.replace(finalUrl);
+    } catch (error: any) {
       setStatus("error");
-      setErrorMessage("Could not parse authentication token.");
+      setErrorMessage(googleAuthErrorMessage(error));
     }
   };
+
+  useEffect(() => {
+    if (typeof window === "undefined" || started.current) return;
+    started.current = true;
+    const params = new URLSearchParams(window.location.search);
+    const targetRole = normalizeGoogleRole(params.get("role"));
+    const customRedirect = params.get("redirect_uri") || "ofm-app://login";
+    const state = params.get("state") || "";
+    setRole(targetRole);
+    setTargetRedirectUri(customRedirect);
+    setCallbackState(state);
+    const attemptKey = "ofm_google_bridge_attempt:" + state;
+
+    const resume = async () => {
+      try {
+        validateNativeGoogleRedirect(customRedirect);
+        setStatus("loading");
+        const result = await withAuthTimeout(getGoogleRedirectResult(auth), 20000, "Could not restore Google sign-in. Check your connection and try again.");
+        if (result) {
+          try { sessionStorage.removeItem(attemptKey); } catch {}
+          handleAuthSuccess(result, targetRole, customRedirect, state);
+          return;
+        }
+        // An app-originated request uses a full browser redirect, avoiding a second
+        // popup gesture and popup blockers inside Android/iOS authentication sessions.
+        let attempted = true;
+        try { attempted = sessionStorage.getItem(attemptKey) === "1"; } catch {}
+        if (state && !attempted) {
+          sessionStorage.setItem(attemptKey, "1");
+          await signInWithRedirect(auth, createProvider());
+          return;
+        }
+        setStatus("initial");
+      } catch (error: any) {
+        setStatus("error");
+        setErrorMessage(googleAuthErrorMessage(error));
+      }
+    };
+    void resume();
+  }, []);
 
   const handleSignIn = async () => {
     try {
       setStatus("loading");
       setErrorMessage("");
-      const provider = new GoogleAuthProvider();
-      provider.addScope("email");
-      provider.addScope("profile");
-      provider.setCustomParameters({ prompt: "select_account" });
+      validateNativeGoogleRedirect(targetRedirectUri || "ofm-app://login");
+      const provider = createProvider();
 
       try {
         const res = await signInWithPopup(auth, provider);
         if (res) {
-          handleAuthSuccess(res, role, targetRedirectUri);
+          handleAuthSuccess(res, role, targetRedirectUri, callbackState);
         }
       } catch (popupErr: any) {
-        if (popupErr.code === "auth/popup-closed-by-user" || popupErr.code === "auth/cancelled-popup-request") {
+        if (isGooglePopupCancellation(popupErr)) {
           setStatus("initial");
           return;
         }
-        // Seamless fallback to redirect on mobile browsers or blocked popups
-        try {
+        // A redirect cannot fix configuration or network errors.
+        if (popupErr.code === "auth/popup-blocked") {
           await signInWithRedirect(auth, provider);
           return;
-        } catch (redirectErr) {
-          throw popupErr;
         }
+        throw popupErr;
       }
     } catch (err: any) {
-      console.error("Google Sign-in Error:", err);
-      if (err.code === "auth/unauthorized-domain") {
-        setStatus("error");
-        setErrorMessage("Domain not authorized in Firebase Console settings.");
-      } else {
-        setStatus("error");
-        setErrorMessage(err.message || "Failed to authenticate with Google.");
-      }
+      setStatus("error");
+      setErrorMessage(googleAuthErrorMessage(err));
     }
   };
 
@@ -116,7 +117,7 @@ export default function GoogleAuthBridgeWebScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={{ flex: 1, backgroundColor: "#060D1F" }} contentContainerStyle={styles.container}>
       <View style={styles.card}>
         <OFMBrandLogo size={68} />
         <Text style={styles.brandTitle}>{OFM_BRAND.fullName}</Text>
@@ -137,7 +138,7 @@ export default function GoogleAuthBridgeWebScreen() {
               Sign in with your verified organizational Google Account to access OFM Cloud.
             </Text>
 
-            <TouchableOpacity style={styles.googleBtn} onPress={handleSignIn} activeOpacity={0.85}>
+            <TouchableOpacity style={styles.googleBtn} accessibilityRole="button" onPress={handleSignIn} activeOpacity={0.85}>
               <View style={styles.googleIconBox}>
                 <SvgGoogle size={19} />
               </View>
@@ -180,13 +181,13 @@ export default function GoogleAuthBridgeWebScreen() {
           </View>
         )}
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flexGrow: 1,
     backgroundColor: "#060D1F",
     alignItems: "center",
     justifyContent: "center",

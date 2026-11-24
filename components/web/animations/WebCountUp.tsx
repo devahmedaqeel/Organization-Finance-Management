@@ -1,5 +1,6 @@
+import { FitText } from "../FitText";
 import React, { useEffect, useState, useRef } from "react";
-import { Text, TextStyle, StyleProp, Platform } from "react-native";
+import { TextStyle, StyleProp, Platform } from "react-native";
 
 interface WebCountUpProps {
   value: number;
@@ -100,5 +101,5 @@ export function WebCountUp({
     return `${sign}${prefix}${formattedNum}${suffix}`;
   };
 
-  return <Text style={style}>{formattedOutput()}</Text>;
+  return <FitText minSize={14} style={style}>{formattedOutput()}</FitText>;
 }

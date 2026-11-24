@@ -1,5 +1,6 @@
+import { useWebLayout } from "@/hooks/useWebLayout";
 import React, { useState, useMemo, useEffect } from "react";
-import { StyleSheet, Text, TouchableOpacity, View, ScrollView, useWindowDimensions, Modal, TextInput, Platform } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View, ScrollView, Modal, TextInput, Platform } from "react-native";
 import { useFinance, Department } from "@/context/FinanceContext";
 import { WebDepartmentStaffModal } from "./modals/WebDepartmentStaffModal";
 import { useAuth } from "@/context/AuthContext";
@@ -62,7 +63,7 @@ const REPORT_PERIOD_PRESETS = [
 
 export function WebReports({ onNavigate }: WebReportsProps = {}) {
   const colors = useColors();
-  const { width } = useWindowDimensions();
+  const { width } = useWebLayout();
   const isMobile = width < 768;
 
   const { user } = useAuth();
@@ -343,7 +344,7 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
         </View>
 
         {/* Action Buttons */}
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 10, width: isMobile ? "100%" : "auto", marginTop: isMobile ? 8 : 0 }}>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 10, width: isMobile ? "100%" : "auto", marginTop: isMobile ? 8 : 0 }}>
           <TouchableOpacity
             style={[styles.outlineBtn, { borderColor: colors.border, backgroundColor: colors.card, flex: isMobile ? 1 : undefined }]}
             onPress={() => setExportModalVisible(true)}
@@ -484,10 +485,10 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
         const pctOf = (v: number, total: number) => (total > 0 ? `${((v / total) * 100).toFixed(0)}%` : "—");
         const marginPct = metrics.totalIncome > 0 ? (metrics.netBalance / metrics.totalIncome) * 100 : null;
         const Row = ({ label, value, pct, color, strong, indent }: { label: string; value: string; pct?: string; color?: string; strong?: boolean; indent?: boolean }) => (
-          <View style={[styles.statementRow, { borderBottomColor: colors.border }]}>
-            <Text style={[strong ? styles.statementTotalLabel : styles.statementLabel, { color: colors.foreground, paddingLeft: indent ? 14 : 0 }]}>{label}</Text>
+          <View style={[styles.statementRow, { borderBottomColor: colors.border }, width < 520 && { flexWrap: "wrap" }]}>
+            <Text style={[strong ? styles.statementTotalLabel : styles.statementLabel, { color: colors.foreground, paddingLeft: indent ? 14 : 0 }, width < 520 && { flexBasis: "100%" }]}>{label}</Text>
             {pct !== undefined && <Text style={[styles.statementPct, { color: colors.mutedForeground }]}>{pct}</Text>}
-            <Text style={[strong ? styles.statementTotalVal : styles.statementAmount, { color: color || colors.foreground }]}>{value}</Text>
+            <Text style={[strong ? styles.statementTotalVal : styles.statementAmount, { color: color || colors.foreground }, width < 520 && { width: "auto", flex: 1, minWidth: 0 }]}>{value}</Text>
           </View>
         );
 
@@ -502,8 +503,8 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
                 </View>
               </View>
 
-              <View style={[styles.statementHead, { borderBottomColor: colors.border }]}>
-                <Text style={[styles.statementHeadText, { color: colors.mutedForeground, flex: 1 }]}>Account</Text>
+              <View style={[styles.statementHead, { borderBottomColor: colors.border }, width < 520 && { flexWrap: "wrap" }]}>
+                <Text style={[styles.statementHeadText, { color: colors.mutedForeground, flex: 1 }, width < 520 && { flexBasis: "100%" }]}>Account</Text>
                 <Text style={[styles.statementHeadText, styles.statementPct, { color: colors.mutedForeground }]}>% of total</Text>
                 <Text style={[styles.statementHeadText, { color: colors.mutedForeground, width: 150, textAlign: "right" }]}>Amount</Text>
               </View>
@@ -531,7 +532,7 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
               <Row strong label="Total expenses" value={`${settings.currency} ${fmt(metrics.totalExpense)}`} color={colors.expense} />
 
               {/* Net result */}
-              <View style={[styles.netSurplusBox, { borderTopColor: colors.foreground }]}>
+              <View style={[styles.netSurplusBox, width < 520 && { flexDirection: "column", alignItems: "stretch" }, { borderTopColor: colors.foreground }]}>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={[styles.netSurplusLabel, { color: colors.foreground }]}>
                     {metrics.netBalance >= 0 ? "Net income" : "Net loss"}
@@ -565,7 +566,7 @@ export function WebReports({ onNavigate }: WebReportsProps = {}) {
                 <Row label="Total income" value={`+${settings.currency} ${fmt(metrics.totalIncome)}`} color={colors.income} />
                 <Row label="Less: expenses paid" value={`−${settings.currency} ${fmt(metrics.totalExpense)}`} color={colors.expense} />
 
-                <View style={[styles.netSurplusBox, { borderTopColor: colors.foreground }]}>
+                <View style={[styles.netSurplusBox, width < 520 && { flexDirection: "column", alignItems: "stretch" }, { borderTopColor: colors.foreground }]}>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={[styles.netSurplusLabel, { color: colors.foreground }]}>Net cash position</Text>
                     <Text style={[styles.netSurplusSub, { color: colors.mutedForeground }]}>

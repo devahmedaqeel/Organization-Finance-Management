@@ -191,8 +191,8 @@ export function WebTransactionModal({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={[styles.backdrop, isMobile && { padding: 10 }]}>
-        <View
+      <View {...({ dataSet: { ofmDialogOverlay: "" } } as any)} style={[styles.backdrop, isMobile && { padding: 10 }]}>
+        <View {...({ dataSet: { ofmDialogCard: "" } } as any)}
           style={[
             styles.modalCard,
             {
@@ -202,7 +202,7 @@ export function WebTransactionModal({
           ]}
         >
           {/* Header */}
-          <View style={[styles.header, { borderBottomColor: colors.border }]}>
+          <View {...({ dataSet: { ofmDialogHeader: "" } } as any)} style={[styles.header, { borderBottomColor: colors.border }]}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
               <View
                 style={[
@@ -234,7 +234,7 @@ export function WebTransactionModal({
           </View>
 
           {/* Form Body */}
-          <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
+          <ScrollView {...({ dataSet: { ofmDialogBody: "" } } as any)} keyboardShouldPersistTaps="handled" style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
             {/* Type Switcher */}
             {!isEditing && (
               <View style={styles.formGroup}>
@@ -641,7 +641,7 @@ export function WebTransactionModal({
           </ScrollView>
 
           {/* Footer Actions */}
-          <View style={[styles.footer, { borderTopColor: colors.border }]}>
+          <View {...({ dataSet: { ofmDialogFooter: "" } } as any)} style={[styles.footer, { borderTopColor: colors.border }]}>
             <Text style={[styles.footerSummary, { color: colors.mutedForeground }]} numberOfLines={2}>
               {Number(amount) > 0
                 ? `${type === "income" ? "+" : "-"}${settings.currency} ${Number(amount).toLocaleString()} · ${category || "No category"}${type === "expense" && department ? ` · ${department}` : ""} · ${date}`

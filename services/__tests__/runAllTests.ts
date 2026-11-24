@@ -91,6 +91,11 @@ const testSuites = [
     cmd: "npx",
     args: ["-y", "tsx", "--test", "services/__tests__/payslipDirectEditing.test.ts"],
   },
+  {
+    name: "17. Google Sign-in Callback & Timeout Suite",
+    cmd: "npx",
+    args: ["-y", "tsx", "--test", "services/__tests__/googleAuthFlow.test.ts"],
+  },
 ];
 
 console.log("\n=======================================================");

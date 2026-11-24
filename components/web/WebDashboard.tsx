@@ -1,6 +1,7 @@
+import { useWebLayout } from "@/hooks/useWebLayout";
 import React, { useState, useMemo, useEffect } from "react";
 import { subscribeDashboardPeriod } from "@/services/fiscalYear";
-import { StyleSheet, Text, TouchableOpacity, View, ScrollView, useWindowDimensions } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View, ScrollView } from "react-native";
 import { useFinance, Transaction, Department } from "@/context/FinanceContext";
 import { WebDepartmentStaffModal } from "./modals/WebDepartmentStaffModal";
 import { useAuth } from "@/context/AuthContext";
@@ -72,7 +73,7 @@ export function WebDashboard({
   onOpenBudgetModal,
 }: WebDashboardProps) {
   const colors = useColors();
-  const { width } = useWindowDimensions();
+  const { width } = useWebLayout();
   const isMobile = width < 768;
 
   const { user } = useAuth();
@@ -698,7 +699,7 @@ export function WebDashboard({
                 style={[
                   styles.kpi2Card,
                   { backgroundColor: colors.card, borderColor: colors.border },
-                  isMobile && { minWidth: "47%", flexBasis: "47%" },
+                  isMobile && { minWidth: 0, flexBasis: width < 480 ? "100%" : "47%" },
                   isMobile && c.key === "payroll" && { minWidth: "100%", flexBasis: "100%" },
                 ]}
                 onPress={() => onNavigate(c.route)}
@@ -711,7 +712,7 @@ export function WebDashboard({
                   <View style={[styles.kpi2Icon, { backgroundColor: c.tone + "16" }]}>
                     <Feather name={c.icon as any} size={15} color={c.tone} />
                   </View>
-                  <Text numberOfLines={1} style={[styles.kpi2Label, { color: colors.mutedForeground }]}>{c.label}</Text>
+                  <Text style={[styles.kpi2Label, { color: colors.mutedForeground }]}>{c.label}</Text>
                 </View>
 
                 {/* Amount */}
@@ -723,7 +724,7 @@ export function WebDashboard({
 
                 {/* Status + bar */}
                 <View style={{ gap: 6 }}>
-                  <Text numberOfLines={1} style={[styles.kpi2Status, { color: c.statusTone }]}>{c.status}</Text>
+                  <Text style={[styles.kpi2Status, { color: c.statusTone }]}>{c.status}</Text>
                   <View style={[styles.kpi2Track, { backgroundColor: c.barRest && c.bar > 0 ? c.barRest : colors.muted }]}>
                     <View style={{ width: `${Math.max(c.bar > 0 ? 2 : 0, Math.min(100, c.bar))}%`, height: "100%", backgroundColor: c.barTone }} />
                   </View>
@@ -764,7 +765,7 @@ export function WebDashboard({
               ? chartContainerWidth - 36
               : isMobile
               ? width - 40
-              : Math.min(width - (width >= 1024 ? 320 : 64), 960)
+              : Math.min(width - 40, 960)
           }
           height={185}
           currency={settings.currency}

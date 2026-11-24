@@ -1,3 +1,4 @@
+import { WebLayoutContext } from "@/hooks/useWebLayout";
 import React, { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from "react";
 // WebShell: Master desktop/tablet/mobile responsive shell for OFM with real-time notification center
 import { StyleSheet, Text, TouchableOpacity, View, ScrollView, useWindowDimensions, Modal, Image, ActivityIndicator } from "react-native";
@@ -203,6 +204,8 @@ export function WebShell() {
 
   const [activeTab, setActiveTab] = useState<WebTabKey>("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(isTablet);
+  const [workspaceWidth, setWorkspaceWidth] = useState(0);
+  const availableWidth = Math.max(0, width - (isMobile ? 0 : sidebarCollapsed ? 76 : 260));
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const [notificationModalVisible, setNotificationModalVisible] = useState(false);
   const [fyOpen, setFyOpen] = useState(false);
@@ -745,7 +748,7 @@ export function WebShell() {
       )}
 
       {/* ─── MAIN APP WORKSPACE ─── */}
-      <View style={styles.workspace}>
+      <View style={styles.workspace} onLayout={(event) => setWorkspaceWidth(Math.round(event.nativeEvent.layout.width))}>
         {/* Open In Native App Banner for Mobile Browsers */}
         <OpenInAppBanner />
 
@@ -1096,14 +1099,14 @@ export function WebShell() {
         {/* Dynamic Main Content Tab */}
         {/* What period the pages are showing */}
         {scopeMode === "fiscal" && activeTab !== "settings" && activeTab !== "team" && (
-          <View style={[styles.scopeBar, { backgroundColor: fySavedCount === 0 ? colors.warning + "14" : colors.primary + "0C", borderBottomColor: colors.border }]}>
+          <View {...ofm("ofmScopeBar")} style={[styles.scopeBar, { backgroundColor: fySavedCount === 0 ? colors.warning + "14" : colors.primary + "0C", borderBottomColor: colors.border }]}>
             <SvgCalendar size={14} color={fySavedCount === 0 ? colors.warning : colors.primary} />
-            <Text numberOfLines={1} style={[styles.scopeText, { color: colors.foreground, flexShrink: 1 }]}>
+            <Text style={[styles.scopeText, { color: colors.foreground, flexShrink: 1 }]}>
               Showing <Text style={{ fontFamily: "Inter_600SemiBold" }}>FY {fyRangeSaved.label}</Text>
               <Text style={{ color: colors.mutedForeground }}> · {fyDate(fyRangeSaved.start)} – {fyDate(fyRangeSaved.end)}</Text>
               {fySavedCount === 0 ? <Text style={{ color: colors.warning }}> · no records in this fiscal year yet</Text> : <Text style={{ color: colors.mutedForeground }}> · {fySavedCount} {fySavedCount === 1 ? "transaction" : "transactions"}</Text>}
             </Text>
-            <View style={{ flexDirection: "row", gap: 6, marginLeft: "auto" }}>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginLeft: "auto", maxWidth: "100%" }}>
               {fySavedYear !== fyCurrentYear && user?.role === "admin" && (
                 <TouchableOpacity
                   style={[styles.scopeBtn, { borderColor: colors.primary, backgroundColor: colors.primary }]}
@@ -1122,9 +1125,9 @@ export function WebShell() {
           </View>
         )}
         {scopeMode === "all" && activeTab !== "settings" && activeTab !== "team" && (
-          <View style={[styles.scopeBar, { backgroundColor: colors.muted, borderBottomColor: colors.border }]}>
+          <View {...ofm("ofmScopeBar")} style={[styles.scopeBar, { backgroundColor: colors.muted, borderBottomColor: colors.border }]}>
             <SvgCalendar size={14} color={colors.mutedForeground} />
-            <Text numberOfLines={1} style={[styles.scopeText, { color: colors.foreground, flexShrink: 1 }]}>
+            <Text style={[styles.scopeText, { color: colors.foreground, flexShrink: 1 }]}>
               Showing <Text style={{ fontFamily: "Inter_600SemiBold" }}>all time</Text>
               <Text style={{ color: colors.mutedForeground }}> · every record, not limited to a fiscal year</Text>
             </Text>
@@ -1134,7 +1137,8 @@ export function WebShell() {
           </View>
         )}
 
-        <View style={[styles.tabContentArea, isMobile && { paddingBottom: 84 }]}>
+        <View {...ofm("ofmContentArea")} style={[styles.tabContentArea, isMobile && { paddingBottom: 84 }]}>
+          <WebLayoutContext.Provider value={Math.min(workspaceWidth || availableWidth, availableWidth)}>
           <FiscalScopeProvider mode={scopeMode}>
           <WebPageTransition pageKey={activeTab}>
             <TabErrorBoundary tabKey={activeTab}>
@@ -1192,6 +1196,7 @@ export function WebShell() {
             </TabErrorBoundary>
           </WebPageTransition>
           </FiscalScopeProvider>
+          </WebLayoutContext.Provider>
         </View>
 
         {/* ─── NATIVE-APP-STYLE MOBILE BOTTOM NAVIGATION (<768px) ─── */}
@@ -1425,6 +1430,7 @@ const styles = StyleSheet.create({
   },
   drawerContent: {
     width: 280,
+    maxWidth: "90%",
     height: "100%",
     borderRightWidth: 1,
     display: "flex",

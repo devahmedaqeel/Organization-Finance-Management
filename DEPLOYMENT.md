@@ -1,67 +1,94 @@
-# OFM — Deployment & Production Build Guide
+# OFM — Run, Build and Deploy
 
-This document provides step-by-step instructions for deploying **OFM (Organization Finance Management)** across Web (Firebase Hosting) and Mobile (Android Standalone APK via EAS Build).
+## 1. Requirements
 
----
+| Tool | Version |
+|---|---|
+| Node.js | 18 or newer |
+| npm | 9 or newer |
+| Expo Go (phone) | supports **SDK 58** |
+| EAS CLI | `npx eas-cli` (for APK builds) |
+| Firebase CLI | `npm i -g firebase-tools` (for hosting) |
 
-## 1. Production Web Deployment (Firebase Hosting)
+## 2. Install
 
-### Prerequisites
-* Node.js `>= 18`
-* Firebase CLI installed (`npm install -g firebase-tools` or via `npx firebase`)
-
-### Deployment Steps
 ```bash
-# 1. Navigate to the project directory
-cd "c:\Users\user\Downloads\Organization-Finance-Management-main (3)\Organization-Finance-Management-main"
-
-# 2. Export static web bundle
-npx expo export -p web
-
-# 3. Deploy to Firebase Hosting
-npx firebase deploy --only hosting
+git clone https://github.com/devahmedaqeel/Organization-Finance-Management.git
+cd Organization-Finance-Management
+npm install
 ```
 
-* **Live Production URL**: [https://ofmapp-main.web.app/](https://ofmapp-main.web.app/)
+Optional `.env` for your own Firebase project — see [README.md](README.md#environment-variables).
 
----
+## 3. Run locally
 
-## 2. Standalone Android APK Build (EAS CLI)
-
-The project includes preconfigured build profiles in `eas.json`.
-
-### A. Cloud Build (Recommended — No Android Studio Required)
 ```bash
-# 1. Login to your Expo account
-npx eas-cli login
-
-# 2. Trigger Android Standalone APK build
-npx eas-cli build -p android --profile preview
+npm start          # Expo dev server
+#   w  → open web at http://localhost:8081
+#   QR → scan with Expo Go (Android/iOS)
+npm run web        # web only
 ```
 
-* When the build finishes, EAS provides a direct download link and QR code for the `.apk` file.
+### Expo Go checklist
+1. Phone and computer on the **same network**.
+2. On Windows, the network profile must be **Private** (Settings → Network & internet → your network → Private), otherwise the firewall blocks the phone.
+3. Expo Go must support SDK 58 (update it from the store).
+4. Alternative: USB with `adb reverse tcp:8081 tcp:8081` and open `exp://127.0.0.1:8081`, or install the APK.
 
-### B. Local Build (Requires Android SDK & NDK)
+## 4. Quality checks
+
 ```bash
-npx eas-cli build -p android --profile preview --local
+npm run typecheck   # 0 errors expected
+npm test            # 16/16 suites expected
 ```
 
----
+## 5. Web → Firebase Hosting
 
-## 3. Cloud Firestore Security Rules Deployment
-
-To deploy updated database security rules from `firestore.rules`:
 ```bash
-npx firebase deploy --only firestore:rules
+npx expo export -p web                     # builds dist/
+firebase deploy --only hosting --project ofmapp-main
+# or: npm run deploy:hosting
 ```
 
----
+- `firebase.json` → hosting site `ofmapp-main`, public folder `dist`.
+- Live URL: https://ofmapp-main.web.app
+- If you have several Google accounts in the Firebase CLI, add `--account <owner-email>` or run `firebase login:use <owner-email>`.
 
-## 4. One-Line Deploy & GitHub Push Pipeline
+## 6. Android APK (EAS Build)
 
-To compile the web bundle, deploy to Firebase Hosting, and push all commits to GitHub in a single command:
-
-```powershell
-cd "c:\Users\user\Downloads\Organization-Finance-Management-main (3)\Organization-Finance-Management-main"
-npx expo export -p web; npx firebase deploy --only hosting; git add .; git commit -m "Deploy: Update production web bundle and documentation"; git push origin main
+```bash
+npx eas-cli login                                    # once
+npx eas-cli build -p android --profile preview       # APK
+# or: npm run build:apk
 ```
+
+- Profiles in `eas.json`: `development` (dev client), `preview` (**APK**, internal), `production` (AAB for Play Store, `npm run build:aab`).
+- The build page shows a download link and QR code for the APK.
+- If the folder is not a git repository, set `EAS_NO_VCS=1` before the build command.
+
+## 7. Firestore rules and indexes
+
+```bash
+firebase deploy --only firestore:rules,firestore:indexes --project ofmapp-main
+```
+
+> Review `firestore.rules` before deploying — the current rules are permissive (see FYP report §17).
+
+## 8. Cloud Functions
+
+```bash
+cd functions
+npm install
+npx tsc            # compiles src/ → lib/ (entry: lib/index.js, Node 18)
+cd ..
+firebase deploy --only functions --project ofmapp-main
+```
+
+## 9. Release checklist
+
+- [ ] `npm run typecheck` — 0 errors
+- [ ] `npm test` — 16/16
+- [ ] Web export builds; hosting deploy succeeds; live site loads
+- [ ] APK installs and signs in
+- [ ] Web ↔ mobile sync checked with the same organization
+- [ ] Version bumped in `app.json` (`version`, Android `versionCode`)

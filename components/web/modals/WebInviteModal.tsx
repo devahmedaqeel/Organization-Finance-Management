@@ -172,10 +172,10 @@ ${orgName}`;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={handleResetAndClose}>
-      <View style={[styles.backdrop, isMobile && { padding: 10 }]}>
-        <View style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View {...({ dataSet: { ofmDialogOverlay: "" } } as any)} style={[styles.backdrop, isMobile && { padding: 10 }]}>
+        <View {...({ dataSet: { ofmDialogCard: "" } } as any)} style={[styles.modalCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           {/* Header */}
-          <View style={[styles.header, { borderBottomColor: colors.border }]}>
+          <View {...({ dataSet: { ofmDialogHeader: "" } } as any)} style={[styles.header, { borderBottomColor: colors.border }]}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
               <View style={[styles.iconWrap, { backgroundColor: colors.primary + "16" }]}>
                 <SvgShield size={20} color={colors.primary} />
@@ -313,7 +313,7 @@ ${orgName}`;
             </ScrollView>
           ) : (
             <>
-              <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
+              <ScrollView {...({ dataSet: { ofmDialogBody: "" } } as any)} keyboardShouldPersistTaps="handled" style={styles.body} contentContainerStyle={styles.bodyContent} showsVerticalScrollIndicator={false}>
                 <View style={styles.formGroup}>
                   <Text style={[styles.label, { color: colors.foreground }]}>Full name <Text style={{ color: colors.mutedForeground, fontFamily: "Inter_400Regular" }}>(optional)</Text></Text>
                   <View style={[styles.inputWrap, { backgroundColor: colors.background, borderColor: colors.border }]}>
@@ -393,7 +393,7 @@ ${orgName}`;
               </ScrollView>
 
               {/* Footer Actions */}
-              <View style={[styles.footer, { borderTopColor: colors.border }]}>
+              <View {...({ dataSet: { ofmDialogFooter: "" } } as any)} style={[styles.footer, { borderTopColor: colors.border }]}>
                 <TouchableOpacity style={[styles.cancelBtn, { borderColor: colors.border }]} onPress={handleResetAndClose} disabled={submitting}>
                   <Text style={[styles.cancelBtnText, { color: colors.foreground }]}>Cancel</Text>
                 </TouchableOpacity>

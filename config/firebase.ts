@@ -11,9 +11,17 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 
+const projectId = process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || "ofmapp-main";
+// Firebase Hosting serves /__/auth on both first-party project domains. Use the
+// current hosting domain so redirect sessions work when third-party storage is blocked.
+const hostingAuthDomain = Platform.OS === "web" && typeof window !== "undefined" &&
+  [`${projectId}.web.app`, `${projectId}.firebaseapp.com`].includes(window.location.hostname)
+    ? window.location.hostname
+    : `${projectId}.firebaseapp.com`;
+
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || "AIzaSyDPpbHAUApFuyq-u1L891fvl95C5mHeSKY",
-  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || "ofmapp-main.firebaseapp.com",
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || hostingAuthDomain,
   projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || "ofmapp-main",
   storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET || "ofmapp-main.firebasestorage.app",
   messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "940511583527",

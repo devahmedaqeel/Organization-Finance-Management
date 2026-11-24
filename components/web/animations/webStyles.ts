@@ -1,3 +1,4 @@
+import { RESPONSIVE_WEB_CSS, trackWebViewport } from "./responsiveStyles";
 import { Platform } from "react-native";
 
 export function injectWebMicroAnimations() {
@@ -118,12 +119,7 @@ export function injectWebMicroAnimations() {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
 
-    /* Desktop: button & chip labels always stay on one line */
-    @media (min-width: 768px) {
-      #root [role="button"] > div[dir="auto"] {
-        white-space: nowrap;
-      }
-    }
+    /* Labels may wrap when zoom or a compact workspace needs more room. */
 
     /* Crisp, readable text rendering */
     html, body, #root {
@@ -466,6 +462,7 @@ export function injectWebMicroAnimations() {
 
   const styleEl = document.createElement("style");
   styleEl.id = styleId;
-  styleEl.textContent = css;
+  styleEl.textContent = css + RESPONSIVE_WEB_CSS;
+  trackWebViewport();
   document.head.appendChild(styleEl);
 }

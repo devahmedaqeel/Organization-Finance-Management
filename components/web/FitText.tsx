@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Platform, StyleSheet, Text, TextProps, TextStyle } from "react-native";
 
 /**
- * Single-line text that shrinks its font (down to `minSize`) so the whole string fits its column.
+ * Text that shrinks to `minSize`, then wraps rather than hiding part of a value.
  * Web measures the string with a canvas; native falls back to adjustsFontSizeToFit.
  * Display-only: it never changes the data passed in.
  */
@@ -35,9 +35,13 @@ export function FitText({
   const text = React.Children.toArray(children).join("");
 
   let size = base;
+  let wrap = false;
   if (Platform.OS === "web" && width > 0) {
     const needed = measure(text, base, WEIGHT[String(flat.fontFamily)] || 400);
-    if (needed > width) size = Math.max(minSize, Math.floor(((base * width) / needed) * 10) / 10);
+    if (needed > width) {
+      size = Math.max(minSize, Math.floor(((base * width) / needed) * 10) / 10);
+      wrap = measure(text, size, WEIGHT[String(flat.fontFamily)] || 400) > width;
+    }
   }
 
   return (
@@ -47,10 +51,10 @@ export function FitText({
         const w = Math.floor(e.nativeEvent.layout.width);
         if (Math.abs(w - width) > 1) setWidth(w);
       }}
-      numberOfLines={1}
+      numberOfLines={wrap ? undefined : 1}
       adjustsFontSizeToFit
       minimumFontScale={minSize / base}
-      style={[style, { fontSize: size, lineHeight: Math.round(size * 1.4) }]}
+      style={[style, { minWidth: 0, flexShrink: 1, fontSize: size, lineHeight: Math.round(size * 1.4) }]}
     >
       {text}
     </Text>
