@@ -1,9 +1,11 @@
-import { ScrollViewStyleReset } from "expo-router/html";
+import { ScrollViewStyleReset, useServerDocumentContext } from "expo-router/html";
 import { type PropsWithChildren } from "react";
 
 export default function RootHtml({ children }: PropsWithChildren) {
+  // Expo SDK 58: the app's JavaScript, CSS and favicon arrive as head/body nodes and must be rendered here.
+  const { headNodes, bodyNodes, htmlAttributes, bodyAttributes } = useServerDocumentContext();
   return (
-    <html lang="en">
+    <html lang="en" {...htmlAttributes}>
       <head>
         <meta charSet="utf-8" />
         <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
@@ -248,8 +250,9 @@ export default function RootHtml({ children }: PropsWithChildren) {
             100% { transform: translateX(200%); }
           }
         ` }} />
+        {headNodes}
       </head>
-      <body>
+      <body {...bodyAttributes}>
         <div id="root">
           {/* Instant Native Splash (Replaced instantly upon React hydration) */}
           <div
@@ -311,6 +314,7 @@ export default function RootHtml({ children }: PropsWithChildren) {
           </div>
           {children}
         </div>
+        {bodyNodes}
       </body>
     </html>
   );
